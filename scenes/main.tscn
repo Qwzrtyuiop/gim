@@ -1,0 +1,212 @@
+[gd_scene format=3 uid="uid://b4kf2g35q86vt"]
+
+[ext_resource type="Script" uid="uid://2tg5iyn2isvx" path="res://scripts/game.gd" id="1_yc7bn"]
+[ext_resource type="Texture2D" uid="uid://vm4oo5i1uo1v" path="res://assets/background/bg1_loop.png" id="2_ng6ny"]
+[ext_resource type="Texture2D" uid="uid://pxi04docuwat" path="res://assets/vehicles/player_tricycle.png" id="3_nievf"]
+[ext_resource type="Texture2D" uid="uid://b60gv7jlj337l" path="res://assets/vehicles/blue_truck.png" id="4_jf3dk"]
+[ext_resource type="Texture2D" uid="uid://1y06d3qti6eg" path="res://assets/vehicles/jeepney.png" id="5_4yrqb"]
+[ext_resource type="Texture2D" uid="uid://ct6meoi4elmsw" path="res://assets/vehicles/gray_sedan.png" id="6_vyico"]
+[ext_resource type="Texture2D" uid="uid://c4hdfgheduxj5" path="res://assets/vehicles/vendor_tricycle.png" id="7_abbt5"]
+[ext_resource type="Texture2D" uid="uid://c7iev2sfp8t65" path="res://assets/vehicles/motorcycle.png" id="8_kw13x"]
+[ext_resource type="Texture2D" uid="uid://vaarmdqhgc1" path="res://assets/vehicles/sedan.png" id="9_c7lel"]
+[ext_resource type="Texture2D" uid="uid://b5kbx25r7i86a" path="res://assets/vehicles/truck.png" id="10_1s5vf"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="11_rqqbv"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_mf7tu"]
+font = ExtResource("11_rqqbv")
+font_size = 15
+font_color = Color(0.98, 0.96, 0.8, 1)
+outline_size = 4
+outline_color = Color(0, 0, 0, 0.82)
+
+[sub_resource type="LabelSettings" id="LabelSettings_speed_preview"]
+font = ExtResource("11_rqqbv")
+font_size = 12
+font_color = Color(0.95, 0.96, 0.88, 1)
+outline_size = 1
+outline_color = Color(0, 0, 0, 0.95)
+
+[node name="Main" type="Node2D" unique_id=817588642]
+script = ExtResource("1_yc7bn")
+
+[node name="EditorPreview" type="Node2D" parent="." unique_id=17731789]
+
+[node name="BackgroundPreview" type="Sprite2D" parent="EditorPreview" unique_id=1517291424]
+z_index = -100
+scale = Vector2(0.681818, 0.681818)
+texture = ExtResource("2_ng6ny")
+centered = false
+
+[node name="LaneSnapLines" type="Node2D" parent="EditorPreview" unique_id=2020877251]
+z_index = 80
+
+[node name="IncomingSnapLine" type="Line2D" parent="EditorPreview/LaneSnapLines" unique_id=75480285]
+position = Vector2(0, 440)
+points = PackedVector2Array(0, 0, 639.13226, 0, 1280, 0)
+width = 3.0
+default_color = Color(0.1, 0.85, 1, 0.82)
+
+[node name="MainSnapLine" type="Line2D" parent="EditorPreview/LaneSnapLines" unique_id=121193948]
+position = Vector2(0, 526)
+points = PackedVector2Array(0, 0, 1280, 0)
+width = 3.0
+default_color = Color(1, 0.88, 0.15, 0.86)
+
+[node name="ShoulderSnapLine" type="Line2D" parent="EditorPreview/LaneSnapLines" unique_id=2127490525]
+position = Vector2(0, 658)
+points = PackedVector2Array(0, 0, 1280, 0)
+width = 3.0
+default_color = Color(0.35, 1, 0.45, 0.82)
+
+[node name="VehicleScaleReferences" type="Node2D" parent="EditorPreview" unique_id=951317657]
+z_index = 70
+
+[node name="PlayerTricycleReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=715851420]
+position = Vector2(150, 205)
+scale = Vector2(0.324, 0.324)
+texture = ExtResource("3_nievf")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/PlayerTricycleReference" unique_id=1781682883]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-155, 134, -111.6, 106.5, 0, 110.35, 111.6, 106.5, 155, 134, 111.6, 161.5, 0, 157.65, -111.6, 161.5)
+
+[node name="BlueTruckReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1859614815]
+position = Vector2(174.00002, 295)
+scale = Vector2(0.3262741, 0.32627407)
+texture = ExtResource("4_jf3dk")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/BlueTruckReference" unique_id=1353723790]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-260, 185, -187.2, 147.5, 0, 152.75, 187.2, 147.5, 260, 185, 187.2, 222.5, 0, 217.25, -187.2, 222.5)
+
+[node name="GraySedanReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1110818240]
+position = Vector2(150, 415)
+scale = Vector2(0.38, 0.38)
+texture = ExtResource("6_vyico")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/GraySedanReference" unique_id=1956355456]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-225, 95, -162, 72.5, 0, 75.65, 162, 72.5, 225, 95, 162, 117.5, 0, 114.35, -162, 117.5)
+
+[node name="JeepneyReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1041006437]
+position = Vector2(190.64667, 497.02502)
+scale = Vector2(0.42596763, 0.42596766)
+texture = ExtResource("5_4yrqb")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/JeepneyReference" unique_id=1046043363]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-260, 125, -187.2, 97.5, 0, 101.35, 187.2, 97.5, 260, 125, 187.2, 152.5, 0, 148.65, -187.2, 152.5)
+
+[node name="MotorcycleReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=2134990558]
+position = Vector2(161.51128, 610.235)
+scale = Vector2(0.3812773, 0.38127735)
+texture = ExtResource("8_kw13x")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/MotorcycleReference" unique_id=2113173698]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-115, 105, -82.8, 82.5, 0, 85.65, 82.8, 82.5, 115, 105, 82.8, 127.5, 0, 124.35, -82.8, 127.5)
+
+[node name="SedanReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1264735215]
+position = Vector2(360, 205)
+scale = Vector2(0.38, 0.38)
+texture = ExtResource("9_c7lel")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/SedanReference" unique_id=815794400]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-230, 90, -165.6, 69, 0, 71.94, 165.6, 69, 230, 90, 165.6, 111, 0, 108.06, -165.6, 111)
+
+[node name="TruckReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=823216871]
+position = Vector2(415, 296)
+scale = Vector2(0.32019103, 0.32019106)
+texture = ExtResource("10_1s5vf")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/TruckReference" unique_id=425053742]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-260, 185, -187.2, 147.5, 0, 152.75, 187.2, 147.5, 260, 185, 187.2, 222.5, 0, 217.25, -187.2, 222.5)
+
+[node name="VendorTricycleReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1030399335]
+position = Vector2(369.85358, 426.77252)
+scale = Vector2(0.35853976, 0.35853976)
+texture = ExtResource("7_abbt5")
+
+[node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/VendorTricycleReference" unique_id=379667320]
+z_index = -1
+color = Color(0, 0, 0, 0.34)
+polygon = PackedVector2Array(-135, 135, -97.2, 110, 0, 113.5, 97.2, 110, 135, 135, 97.2, 160, 0, 156.5, -97.2, 160)
+
+[node name="HudPanelPreview" type="ColorRect" parent="EditorPreview" unique_id=932928313]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 322.0
+offset_bottom = 202.0
+color = Color(0.06, 0.07, 0.08, 0)
+
+[node name="SpeedArcBackPreview" type="Line2D" parent="EditorPreview"]
+position = Vector2(118, 124)
+points = PackedVector2Array(-65.8179, 38, -74.0208, 17.2715, -74.0208, -17.2715, -65.8179, -38, -38, -65.8179, -17.2715, -74.0208, 17.2715, -74.0208, 38, -65.8179, 65.8179, -38)
+width = 16.0
+default_color = Color(0, 0, 0, 0.64)
+
+[node name="SpeedArcGreenPreview" type="Line2D" parent="EditorPreview"]
+position = Vector2(118, 124)
+points = PackedVector2Array(-65.8179, 38, -74.0208, 17.2715, -74.0208, -17.2715, -65.8179, -38)
+width = 12.0
+default_color = Color(0.26, 0.88, 0.3, 1)
+
+[node name="SpeedArcYellowPreview" type="Line2D" parent="EditorPreview"]
+position = Vector2(118, 124)
+points = PackedVector2Array(-38, -65.8179, -17.2715, -74.0208, 17.2715, -74.0208)
+width = 12.0
+default_color = Color(0.94, 0.82, 0.22, 1)
+
+[node name="SpeedArcRedPreview" type="Line2D" parent="EditorPreview"]
+position = Vector2(118, 124)
+points = PackedVector2Array(38, -65.8179, 65.8179, -38)
+width = 12.0
+default_color = Color(0.82, 0.2, 0.18, 1)
+
+[node name="SpeedNeedlePreview" type="Line2D" parent="EditorPreview"]
+points = PackedVector2Array(108, 126, 158, 78)
+width = 5.0
+default_color = Color(0.96, 0.18, 0.15, 1)
+
+[node name="SpeedNeedleCenterPreview" type="Polygon2D" parent="EditorPreview"]
+color = Color(0.95, 0.92, 0.72, 1)
+polygon = PackedVector2Array(110, 116, 118, 112, 126, 116, 130, 124, 126, 132, 118, 136, 110, 132, 106, 124)
+
+[node name="HudTextPreview" type="Label" parent="EditorPreview" unique_id=303073475]
+offset_left = 34.0
+offset_top = 28.0
+offset_right = 306.0
+offset_bottom = 186.0
+text = "SPEED
+
+     081
+     KM/H
+
+             TIME
+             45.0
+
+DIST 0000/1000"
+label_settings = SubResource("LabelSettings_speed_preview")
+
+[node name="BottomBarPreview" type="ColorRect" parent="EditorPreview" unique_id=485737877]
+offset_top = 662.0
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.06, 0.07, 0.08, 0.9)
+
+[node name="ControlsPreview" type="Label" parent="EditorPreview" unique_id=1424112530]
+offset_left = 28.0
+offset_top = 675.0
+offset_right = 980.0
+offset_bottom = 710.0
+text = "UP/DOWN lane     LEFT/RIGHT speed     SPACE/R restart"
+label_settings = SubResource("LabelSettings_mf7tu")

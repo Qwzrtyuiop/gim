@@ -1,0 +1,147 @@
+[gd_scene load_steps=9 format=3 uid="uid://bfid4j4r4diok"]
+
+[ext_resource type="Script" path="res://scripts/stage_results.gd" id="1_tquao"]
+[ext_resource type="FontFile" path="res://assets/fonts/PixelifySans-wght.ttf" id="2_8u0qp"]
+[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/rest.png" id="3_g85nl"]
+[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/store.png" id="4_dcwer"]
+[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/ride.png" id="5_qawoh"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_results"]
+font = ExtResource("2_8u0qp")
+font_size = 36
+font_color = Color(0.98, 0.95, 0.78, 1)
+outline_size = 3
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_status"]
+font = ExtResource("2_8u0qp")
+font_size = 24
+font_color = Color(0.92, 0.95, 0.88, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.05, 0.055, 0.06, 0.94)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.98, 0.82, 0.24, 0.72)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="StageResults" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_tquao")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -290.0
+offset_right = 360.0
+offset_bottom = 256.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="ResultsLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -248.0
+offset_right = 300.0
+offset_bottom = 62.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_results")
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = 55.0
+offset_right = 300.0
+offset_bottom = 92.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_status")
+horizontal_alignment = 1
+
+[node name="BreakButtons" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -335.0
+offset_top = 112.0
+offset_right = 335.0
+offset_bottom = 238.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="RestButton" type="TextureButton" parent="BreakButtons"]
+custom_minimum_size = Vector2(221, 96)
+layout_mode = 2
+tooltip_text = "Rest"
+texture_normal = ExtResource("3_g85nl")
+texture_pressed = ExtResource("3_g85nl")
+texture_hover = ExtResource("3_g85nl")
+texture_focused = ExtResource("3_g85nl")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="StoreButton" type="TextureButton" parent="BreakButtons"]
+custom_minimum_size = Vector2(188, 96)
+layout_mode = 2
+tooltip_text = "Store"
+texture_normal = ExtResource("4_dcwer")
+texture_pressed = ExtResource("4_dcwer")
+texture_hover = ExtResource("4_dcwer")
+texture_focused = ExtResource("4_dcwer")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="RideButton" type="TextureButton" parent="BreakButtons"]
+custom_minimum_size = Vector2(197, 96)
+layout_mode = 2
+tooltip_text = "Ride"
+texture_normal = ExtResource("5_qawoh")
+texture_pressed = ExtResource("5_qawoh")
+texture_hover = ExtResource("5_qawoh")
+texture_focused = ExtResource("5_qawoh")
+ignore_texture_size = true
+stretch_mode = 0

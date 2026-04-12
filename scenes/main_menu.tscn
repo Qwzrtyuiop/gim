@@ -1,0 +1,223 @@
+[gd_scene format=3 uid="uid://fdmm23pg34ea"]
+
+[ext_resource type="Script" uid="uid://cstjurkv3hhyn" path="res://scripts/main_menu.gd" id="1_ax3lt"]
+[ext_resource type="Texture2D" uid="uid://vm4oo5i1uo1v" path="res://assets/background/bg1_loop.png" id="2_mfjxx"]
+[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="3_5p8nm"]
+[ext_resource type="Texture2D" uid="uid://dnjhxq5xjsg6" path="res://assets/menu/logo.png" id="4_14rdd"]
+[ext_resource type="FontFile" path="res://assets/fonts/PixelifySans-wght.ttf" id="5_y265i"]
+[ext_resource type="Texture2D" path="res://assets/menu/buttons/start_inactive.png" id="6_d72k0"]
+[ext_resource type="Texture2D" path="res://assets/menu/buttons/quit_inactive.png" id="8_xc3vo"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
+font = ExtResource("5_y265i")
+font_size = 25
+font_color = Color(0.98, 0.95, 0.78, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_hint"]
+font = ExtResource("5_y265i")
+font_size = 22
+font_color = Color(0.92, 0.95, 0.88, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_normal"]
+bg_color = Color(0.07, 0.08, 0.08, 0.78)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.98, 0.82, 0.24, 0.95)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0, 0, 0, 0.45)
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_hover"]
+bg_color = Color(0.98, 0.82, 0.24, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.18, 0.08, 0.05, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0, 0, 0, 0.45)
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_pressed"]
+bg_color = Color(0.36, 0.84, 0.48, 0.95)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.08, 0.18, 0.08, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_backing"]
+bg_color = Color(0.04, 0.045, 0.05, 0.42)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.98, 0.82, 0.24, 0.48)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="MainMenu" type="Control" unique_id=889567701]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ax3lt")
+
+[node name="Background" type="TextureRect" parent="." unique_id=104333775]
+z_index = -100
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_mfjxx")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="SkyShade" type="ColorRect" parent="." unique_id=49518708]
+z_index = -20
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.06, 0.07, 0.22)
+
+[node name="TrafficLayer" type="Node2D" parent="." unique_id=1107309933]
+z_index = -50
+
+[node name="MenuTraceLines" type="Node2D" parent="." unique_id=1198633152]
+z_index = 20
+
+[node name="TopTraceLine" type="Line2D" parent="MenuTraceLines" unique_id=446614647]
+position = Vector2(0, 435)
+points = PackedVector2Array(0, 0, 1280, 0)
+width = 3.0
+default_color = Color(0.1, 0.85, 1, 0.82)
+
+[node name="MainTraceLine" type="Line2D" parent="MenuTraceLines" unique_id=1561511813]
+position = Vector2(0, 535)
+points = PackedVector2Array(0, 0, 1280, 0)
+width = 3.0
+default_color = Color(1, 0.88, 0.15, 0.86)
+
+[node name="Logo" type="TextureRect" parent="." unique_id=1399324484]
+z_index = 10
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -258.0
+offset_top = 38.0
+offset_right = 258.0
+offset_bottom = 188.0
+grow_horizontal = 2
+texture = ExtResource("4_14rdd")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Subtitle" type="Label" parent="." unique_id=1492565112]
+z_index = 10
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -330.0
+offset_top = 178.0
+offset_right = 330.0
+offset_bottom = 244.0
+grow_horizontal = 2
+text = "a Role-Playing Game Exploring Filipino Traits
+Through the Journey of a Tricycle Driver"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+
+[node name="Menu" type="VBoxContainer" parent="." unique_id=799899787]
+z_index = 10
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -16.0
+offset_right = 160.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 6
+
+[node name="StartButton" type="TextureButton" parent="Menu" unique_id=57344172]
+custom_minimum_size = Vector2(390, 144)
+layout_mode = 2
+tooltip_text = "Start Ride"
+texture_normal = ExtResource("6_d72k0")
+texture_pressed = ExtResource("6_d72k0")
+texture_hover = ExtResource("6_d72k0")
+texture_focused = ExtResource("6_d72k0")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="QuitButton" type="TextureButton" parent="Menu" unique_id=1859904405]
+custom_minimum_size = Vector2(390, 144)
+layout_mode = 2
+tooltip_text = "Quit"
+texture_normal = ExtResource("8_xc3vo")
+texture_pressed = ExtResource("8_xc3vo")
+texture_hover = ExtResource("8_xc3vo")
+texture_focused = ExtResource("8_xc3vo")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="FooterBacking" type="ColorRect" parent="."]
+z_index = 8
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -70.0
+grow_horizontal = 2
+grow_vertical = 0
+color = Color(0.04, 0.045, 0.05, 0.54)
+
+[node name="Hint" type="Label" parent="." unique_id=1636253835]
+z_index = 10
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -410.0
+offset_top = -48.0
+offset_right = 410.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "ENTER start     ESC quit     HOLD R reset progress"
+label_settings = SubResource("LabelSettings_hint")
+horizontal_alignment = 1
