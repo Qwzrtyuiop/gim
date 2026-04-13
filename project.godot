@@ -15,14 +15,14 @@ run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+PlayerState="*res://scripts/player_state.gd"
+
 [display]
 
 window/size/viewport_width=1280
 window/size/viewport_height=720
-
-[autoload]
-
-PlayerState="*res://scripts/player_state.gd"
 
 [physics]
 

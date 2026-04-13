@@ -840,7 +840,7 @@ func _layout_scene() -> void:
 		bottom_bar.size = Vector2(size.x, 58.0)
 
 	if help_label:
-		help_label.text = "UP/DOWN switch lane     LEFT/RIGHT adjust speed     SPACE/R menu action"
+		help_label.text = "UP/DOWN switch lane    LEFT/RIGHT adjust speed    SPACE/R action"
 		help_label.position = Vector2(28.0, size.y - 45.0)
 		help_label.size = Vector2(size.x * 0.56, 34.0)
 
