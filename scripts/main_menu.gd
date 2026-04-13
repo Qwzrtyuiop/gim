@@ -15,6 +15,7 @@ const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
 const Scene01IntroPayload := preload("res://scripts/story/payloads/scene_01_intro.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const GENERIC_BUTTON_TEXTURE := preload("res://assets/ui/button_generic.png")
+const MAIN_MENU_BGM_PATH := "res://assets/story/music/peace.mp3"
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
 	"gray_sedan": preload("res://assets/vehicles/gray_sedan.png"),
@@ -52,6 +53,7 @@ var is_start_transitioning := false
 var audio_panel_refs: Dictionary = {}
 var audio_toggle_button: TextureButton
 var audio_toggle_label: Label
+var bgm_player: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -72,6 +74,7 @@ func _ready() -> void:
 	_build_audio_panel()
 	_create_dialogs()
 	_spawn_menu_traffic()
+	_start_main_menu_bgm()
 	hint_label.text = _default_hint_text()
 
 
@@ -229,6 +232,18 @@ func _toggle_audio_panel() -> void:
 		return
 	audio_panel.visible = not audio_panel.visible
 	audio_toggle_label.text = "AUDIO  -" if audio_panel.visible else "AUDIO"
+
+
+func _start_main_menu_bgm() -> void:
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.name = "MainMenuBGMPlayer"
+	bgm_player.stream = load(MAIN_MENU_BGM_PATH)
+	bgm_player.autoplay = false
+	bgm_player.bus = &"Master"
+	add_child(bgm_player)
+	AudioSettingsManager.register_player(bgm_player, "music")
+	bgm_player.play()
+
 
 func _fade_to_intro_story() -> void:
 	var tween := create_tween()

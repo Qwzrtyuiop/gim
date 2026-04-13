@@ -3,11 +3,14 @@ extends Control
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const GAME_OVER_BGM_PATH := "res://assets/story/music/truth.mp3"
 const DEBT_FAIL_PATTERN := "Debt collector came for PhP "
 
 @onready var message_label: Label = $Panel/MessageLabel
 @onready var menu_button: BaseButton = $Panel/MenuButton
 @onready var reset_button: BaseButton = $Panel/ResetButton
+
+var bgm_player: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -20,6 +23,7 @@ func _ready() -> void:
 	menu_button.pressed.connect(_go_to_menu)
 	reset_button.pressed.connect(_reset_progress)
 	reset_button.grab_focus()
+	_start_game_over_bgm()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -61,6 +65,17 @@ func _extract_debt_failure_details(text: String) -> Dictionary:
 		"amount": int(match.get_string(1)),
 		"day": int(match.get_string(2)),
 	}
+
+
+func _start_game_over_bgm() -> void:
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.name = "GameOverBGMPlayer"
+	bgm_player.stream = load(GAME_OVER_BGM_PATH)
+	bgm_player.autoplay = false
+	bgm_player.bus = &"Master"
+	add_child(bgm_player)
+	AudioSettingsManager.register_player(bgm_player, "music")
+	bgm_player.play()
 
 
 func _apply_button_font(button: BaseButton) -> void:
