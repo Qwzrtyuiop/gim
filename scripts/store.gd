@@ -7,6 +7,7 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const STORE_BGM_PATH := "res://assets/stagebgm/store.mp3"
+const FAIL_FADE_SECONDS := 0.35
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
 const TIER_BORDER_COLOR := Color(0.23, 0.16, 0.10, 0.92)
@@ -85,6 +86,7 @@ const STORE_ITEMS := [
 @onready var item_list: VBoxContainer = $ItemScroll/ItemList
 @onready var back_button: BaseButton = $BackButton
 @onready var ride_button: BaseButton = $RideButton
+@onready var fade_overlay: ColorRect = $FadeOverlay
 
 var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
@@ -212,7 +214,7 @@ func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxConta
 		if str(item.get("id", "")) == "yosi":
 			PlayerState.record_yosi_purchase()
 			if PlayerState.is_run_failed():
-				get_tree().change_scene_to_file(GAME_OVER_SCENE)
+				await _fade_to_scene(GAME_OVER_SCENE)
 				return
 		status_label.text = "%s restored energy." % item["name"]
 	elif item["type"] == "gas":
@@ -452,3 +454,10 @@ func _create_dialogs() -> void:
 	ride_confirm_dialog.get_cancel_button().text = "BACK"
 	ride_confirm_dialog.confirmed.connect(_ride)
 	add_child(ride_confirm_dialog)
+
+
+func _fade_to_scene(scene_path: String) -> void:
+	var tween := create_tween()
+	tween.tween_property(fade_overlay, "color:a", 1.0, FAIL_FADE_SECONDS)
+	await tween.finished
+	get_tree().change_scene_to_file(scene_path)
