@@ -1,0 +1,46 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/sleep_transition.gd" id="1_sleep"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_sleep"]
+font = ExtResource("2_font")
+font_size = 22
+font_color = Color(0.96, 0.96, 0.92, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[node name="SleepTransition" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_sleep")
+
+[node name="Blackout" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="MessageLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -24.0
+offset_right = 220.0
+offset_bottom = 24.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_sleep")
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -1,7 +1,7 @@
 extends Control
 
 const GAME_SCENE := "res://scenes/main.tscn"
-const UI_FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
+const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
 	"gray_sedan": preload("res://assets/vehicles/gray_sedan.png"),
@@ -92,7 +92,7 @@ func _start_game() -> void:
 func _confirm_start_game() -> void:
 	if not PlayerState.prepare_stage_start():
 		blocked_start_message_time = 1.8
-		hint_label.text = "No energy left. Hold R to reset progress"
+		hint_label.text = "%s Hold R to reset progress" % PlayerState.get_stage_start_error()
 		return
 	get_tree().change_scene_to_file(GAME_SCENE)
 
@@ -113,13 +113,13 @@ func _create_dialogs() -> void:
 
 func _apply_button_font(button: BaseButton) -> void:
 	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 28)
+	button.add_theme_font_size_override("font_size", 18)
 	button.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.18, 0.08, 0.05, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.18, 0.08, 0.05, 1.0))
 	button.add_theme_color_override("font_focus_color", Color(0.18, 0.08, 0.05, 1.0))
 	button.add_theme_color_override("font_outline_color", Color.BLACK)
-	button.add_theme_constant_override("outline_size", 2)
+	button.add_theme_constant_override("outline_size", 1)
 
 
 func _connect_button_glow(button: BaseButton) -> void:

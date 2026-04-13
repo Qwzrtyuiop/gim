@@ -1,6 +1,11 @@
 extends Control
 
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const SPEED_COLOR := Color(0.98, 0.86, 0.32, 1.0)
+const LABEL_COLOR := Color(0.95, 0.96, 0.88, 1.0)
+const DISTANCE_LABEL_COLOR := Color(0.72, 0.92, 0.88, 1.0)
+const DISTANCE_VALUE_COLOR := Color(0.60, 0.95, 0.80, 1.0)
+const TIME_LABEL_COLOR := Color(0.78, 0.92, 0.94, 1.0)
 
 var speed_kmh := 0
 var speed_ratio := 0.0
@@ -36,13 +41,15 @@ func _draw() -> void:
 	draw_circle(center, 8.0, Color(0.95, 0.92, 0.72, 1.0))
 	draw_circle(center, 4.0, Color(0.08, 0.08, 0.09, 1.0))
 
-	_draw_text("SPEED", Vector2(22.0, 18.0), 13, Color(0.95, 0.96, 0.88, 1.0))
-	_draw_text("%03d" % speed_kmh, Vector2(196.0, 52.0), 24, Color(0.98, 0.86, 0.32, 1.0))
-	_draw_text("KM/H", Vector2(203.0, 88.0), 12, Color(0.95, 0.96, 0.88, 1.0))
+	_draw_text("SPEED", Vector2(22.0, 18.0), 13, LABEL_COLOR)
+	_draw_text("%03d" % speed_kmh, Vector2(192.0, 52.0), 22, SPEED_COLOR)
+	_draw_text("KM/H", Vector2(200.0, 84.0), 11, LABEL_COLOR)
 
-	_draw_text("TIME", Vector2(196.0, 124.0), 10, Color(0.78, 0.92, 0.94, 1.0))
-	_draw_text("%04.1f" % time_left_s, Vector2(196.0, 143.0), 13, Color(0.95, 0.96, 0.88, 1.0))
-	_draw_text("DIST %04d/%04d" % [distance_m, target_distance_m], Vector2(22.0, 164.0), 10, Color(0.95, 0.96, 0.88, 1.0))
+	_draw_text("DISTANCE", Vector2(188.0, 108.0), 8, DISTANCE_LABEL_COLOR)
+	_draw_text("%04dM / %04dM" % [distance_m, target_distance_m], Vector2(188.0, 127.0), 10, DISTANCE_VALUE_COLOR)
+
+	_draw_text("TIME", Vector2(188.0, 152.0), 9, TIME_LABEL_COLOR)
+	_draw_text("%04.1f" % time_left_s, Vector2(188.0, 170.0), 12, LABEL_COLOR)
 
 
 func _draw_speed_segments(center: Vector2, radius: float, start_angle: float, end_angle: float) -> void:

@@ -2,6 +2,7 @@ extends Node
 
 signal money_changed(amount: int)
 signal energy_changed(amount: int)
+signal gas_changed(amount: int)
 signal karma_changed(amount: int)
 signal upgrade_changed(upgrade_id: String, level: int)
 signal achievement_unlocked(achievement_id: String)
@@ -12,15 +13,25 @@ const STAGE_TIMES := ["morning", "noon", "night"]
 const STAGE_TRAFFIC_TYPES := ["chill", "normal", "traffic-jam", "busy", "speeders"]
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const DEBT_GOALS := [1000]
+const DEFAULT_STARTING_GAS := 7
+const DEFAULT_GAS_PRICE := 70
 const TRANSITION_RIDE := "ride"
 const TRANSITION_REST_TO_NIGHT := "rest_to_night"
 const TRANSITION_REST_TO_NEXT_DAY := "rest_to_next_day"
+const TRANSITION_SLEEP_TO_NEXT_DAY := "sleep_to_next_day"
 const END_OF_DAY_ENERGY_BONUS := 1
+const NIGHT_SLEEP_ENERGY_BONUS := 1
 const ESTIMATED_BONUS_TIME_RATIO := 0.35
+const TRIP_GAS_COSTS := {
+	"short": 2,
+	"medium": 3,
+	"long": 4,
+}
 const REST_ENERGY_BONUSES := {
 	TRANSITION_RIDE: 0,
 	TRANSITION_REST_TO_NIGHT: 1,
 	TRANSITION_REST_TO_NEXT_DAY: 2,
+	TRANSITION_SLEEP_TO_NEXT_DAY: 0,
 }
 const ESTIMATED_STAGE_PROFILES := {
 	"short": {
@@ -139,6 +150,7 @@ const MOCK_CHARACTERS := [
 
 var last_stage_result: Dictionary = {}
 var max_energy := 5
+var max_gas := DEFAULT_STARTING_GAS
 var current_stage_type := FIRST_STAGE_TYPE
 var current_day := 1
 var stage_round := 0
@@ -162,6 +174,13 @@ var energy := 3:
 	set(value):
 		energy = clampi(value, 0, max_energy)
 		energy_changed.emit(energy)
+
+var gas := DEFAULT_STARTING_GAS:
+	set(value):
+		gas = clampi(value, 0, max_gas)
+		gas_changed.emit(gas)
+
+var gas_price := DEFAULT_GAS_PRICE
 
 var karma := 0:
 	set(value):
@@ -228,7 +247,7 @@ func get_current_time_of_day() -> String:
 
 func normalize_transition_mode(transition_mode: String) -> String:
 	match transition_mode:
-		TRANSITION_REST_TO_NIGHT, TRANSITION_REST_TO_NEXT_DAY:
+		TRANSITION_REST_TO_NIGHT, TRANSITION_REST_TO_NEXT_DAY, TRANSITION_SLEEP_TO_NEXT_DAY:
 			return transition_mode
 	return TRANSITION_RIDE
 
@@ -240,6 +259,8 @@ func get_next_stage_time(transition_mode: String = TRANSITION_RIDE) -> String:
 	if safe_transition_mode == TRANSITION_REST_TO_NIGHT and current_time == "morning":
 		return "night"
 	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY and current_time == "noon":
+		return "morning"
+	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY and current_time == "night":
 		return "morning"
 
 	match current_time:
@@ -259,13 +280,69 @@ func has_rested_today() -> bool:
 	return last_rest_day == get_current_day()
 
 
-func prepare_stage_start() -> bool:
-	if pending_stage_energy_cost:
-		return true
-	if energy <= 0:
+func get_transition_display_day(transition_mode: String = TRANSITION_RIDE) -> int:
+	var display_day := get_current_day()
+	if will_advance_day(transition_mode):
+		display_day += 1
+	return max(1, display_day)
+
+
+func get_trip_gas_cost(stage_descriptor := "") -> int:
+	var difficulty_key := _difficulty_from_stage_descriptor(String(stage_descriptor))
+	return int(TRIP_GAS_COSTS.get(difficulty_key, TRIP_GAS_COSTS["short"]))
+
+
+func get_gas_price() -> int:
+	return max(0, gas_price)
+
+
+func set_gas_price(price: int) -> void:
+	gas_price = max(0, price)
+
+
+func add_gas(amount: int) -> void:
+	gas += amount
+
+
+func spend_gas(amount: int) -> bool:
+	if amount < 0 or gas < amount:
 		return false
 
+	gas -= amount
+	return true
+
+
+func apply_night_rest_bonus() -> int:
+	var applied_bonus := mini(NIGHT_SLEEP_ENERGY_BONUS, max_energy - energy)
+	if applied_bonus > 0:
+		add_energy(applied_bonus)
+	return applied_bonus
+
+
+func get_stage_start_error(stage_descriptor := "") -> String:
+	if pending_stage_energy_cost:
+		return ""
+	if energy <= 0:
+		return "Not enough energy to start this trip."
+
+	var trip_gas_cost := get_trip_gas_cost(stage_descriptor)
+	if gas < trip_gas_cost:
+		return "Not enough gas for this trip."
+
+	return ""
+
+
+func prepare_stage_start(stage_descriptor := "") -> bool:
+	if pending_stage_energy_cost:
+		return true
+
+	if not get_stage_start_error(stage_descriptor).is_empty():
+		return false
+
+	var trip_gas_cost := get_trip_gas_cost(stage_descriptor)
+
 	spend_energy(1)
+	spend_gas(trip_gas_cost)
 	pending_stage_energy_cost = true
 	return true
 
@@ -276,13 +353,15 @@ func confirm_stage_started() -> void:
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
 	var safe_transition_mode := normalize_transition_mode(String(transition_mode))
-	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY:
+	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
 		return true
 	return safe_transition_mode == TRANSITION_RIDE and get_current_time_of_day() == "night"
 
 
 func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
 	var safe_transition_mode := normalize_transition_mode(String(transition_mode))
+	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
+		return 0
 	var energy_bonus := int(REST_ENERGY_BONUSES.get(safe_transition_mode, 0))
 	if will_advance_day(safe_transition_mode):
 		energy_bonus += END_OF_DAY_ENERGY_BONUS
@@ -350,6 +429,17 @@ func _parse_stage_type(type_name: String) -> Dictionary:
 	}
 
 
+func _difficulty_from_stage_descriptor(stage_descriptor: String) -> String:
+	var descriptor := stage_descriptor
+	if descriptor.is_empty():
+		descriptor = get_current_stage_type()
+	if descriptor == "easy":
+		return "short"
+	if STAGE_DIFFICULTIES.has(descriptor):
+		return descriptor
+	return String(_parse_stage_type(descriptor).get("difficulty", "short"))
+
+
 func add_money(amount: int) -> void:
 	money += amount
 
@@ -405,15 +495,43 @@ func get_run_fail_reason() -> String:
 	return run_fail_reason
 
 
-func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE) -> void:
+func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE, allow_back := true) -> void:
+	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
+	locked_characters = locked_characters.duplicate(true)
+	var locked_distance := String(pending_trip_selection.get("selected_distance", ""))
 	pending_trip_selection = {
 		"return_scene": return_scene,
 		"transition_mode": normalize_transition_mode(String(transition_mode)),
+		"allow_back": bool(allow_back),
 	}
+	if not locked_characters.is_empty():
+		pending_trip_selection["locked_characters"] = locked_characters
+	if STAGE_DIFFICULTIES.has(locked_distance):
+		pending_trip_selection["selected_distance"] = locked_distance
 
 
 func get_pending_trip_selection() -> Dictionary:
 	return pending_trip_selection.duplicate(true)
+
+
+func has_locked_pending_trip_selection() -> bool:
+	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
+	return not locked_characters.is_empty()
+
+
+func get_locked_pending_trip_characters() -> Array:
+	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
+	return locked_characters.duplicate(true)
+
+
+func get_locked_pending_trip_distance() -> String:
+	var locked_distance := String(pending_trip_selection.get("selected_distance", ""))
+	return locked_distance if STAGE_DIFFICULTIES.has(locked_distance) else ""
+
+
+func lock_pending_trip_selection(displayed_characters: Array, selected_distance: String) -> void:
+	pending_trip_selection["locked_characters"] = displayed_characters.duplicate(true)
+	pending_trip_selection["selected_distance"] = selected_distance if STAGE_DIFFICULTIES.has(selected_distance) else "short"
 
 
 func clear_pending_trip_selection() -> void:
@@ -535,6 +653,9 @@ func has_achievement(achievement_id: String) -> bool:
 func reset() -> void:
 	money = 0
 	energy = 3
+	max_gas = DEFAULT_STARTING_GAS
+	gas = DEFAULT_STARTING_GAS
+	gas_price = DEFAULT_GAS_PRICE
 	karma = 0
 	begin_stage_sequence()
 	last_stage_result.clear()

@@ -1,22 +1,23 @@
-[gd_scene load_steps=8 format=3 uid="uid://bd8dn625yf45t"]
+[gd_scene load_steps=9 format=3 uid="uid://bd8dn625yf45t"]
 
 [ext_resource type="Script" path="res://scripts/store.gd" id="1_e3otq"]
-[ext_resource type="FontFile" path="res://assets/fonts/PixelifySans-wght.ttf" id="2_wih1i"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_wih1i"]
 [ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/ride.png" id="3_ipqv7"]
 [ext_resource type="Texture2D" path="res://assets/bg/bgstore.png" id="4_p7h2d"]
+[ext_resource type="Texture2D" path="res://assets/ui/button_generic.png" id="5_h2wdx"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
 font = ExtResource("2_wih1i")
-font_size = 48
+font_size = 28
 font_color = Color(0.35, 0.17, 0.08, 1)
 outline_size = 4
 outline_color = Color(0.98, 0.94, 0.82, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_status"]
 font = ExtResource("2_wih1i")
-font_size = 24
+font_size = 14
 font_color = Color(0.25, 0.18, 0.10, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0.98, 0.94, 0.82, 0.95)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
@@ -89,15 +90,15 @@ horizontal_alignment = 1
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 120.0
-offset_bottom = 176.0
+offset_top = 146.0
+offset_bottom = 202.0
 grow_horizontal = 2
 label_settings = SubResource("LabelSettings_status")
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
-[node name="ItemList" type="VBoxContainer" parent="."]
+[node name="ItemScroll" type="ScrollContainer" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -105,11 +106,18 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -440.0
-offset_top = -176.0
+offset_top = -142.0
 offset_right = 440.0
 offset_bottom = 238.0
 grow_horizontal = 2
 grow_vertical = 2
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="ItemList" type="VBoxContainer" parent="ItemScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 8
 
 [node name="StatusLabel" type="Label" parent="."]
@@ -150,3 +158,35 @@ texture_hover = ExtResource("3_ipqv7")
 texture_focused = ExtResource("3_ipqv7")
 ignore_texture_size = true
 stretch_mode = 0
+
+[node name="BackButton" type="TextureButton" parent="."]
+custom_minimum_size = Vector2(197, 96)
+layout_mode = 1
+anchors_preset = 1
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 64.0
+offset_top = -126.0
+offset_right = 261.0
+offset_bottom = -30.0
+grow_vertical = 0
+texture_normal = ExtResource("5_h2wdx")
+texture_pressed = ExtResource("5_h2wdx")
+texture_hover = ExtResource("5_h2wdx")
+texture_disabled = ExtResource("5_h2wdx")
+texture_focused = ExtResource("5_h2wdx")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="BackLabel" type="Label" parent="BackButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "BACK"
+label_settings = SubResource("LabelSettings_status")
+horizontal_alignment = 1
+vertical_alignment = 1
+mouse_filter = 2

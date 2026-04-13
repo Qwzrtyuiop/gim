@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://qhu5e84en4g1"]
 
 [ext_resource type="Script" uid="uid://dftndwfmpicou" path="res://scripts/ride_selection.gd" id="1_ride"]
-[ext_resource type="FontFile" uid="uid://cedkkdxw7xil6" path="res://assets/fonts/PixelifySans-wght.ttf" id="2_font"]
+[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
 [ext_resource type="Texture2D" uid="uid://fbv070ai7fu6" path="res://assets/bg/rideselectbg.png" id="3_bg"]
 [ext_resource type="Texture2D" uid="uid://buwkwy70ahfgb" path="res://assets/ui/button_generic.png" id="4_generic"]
 
@@ -22,21 +22,21 @@ shadow_offset = Vector2(0, 4)
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
 font = ExtResource("2_font")
-font_size = 34
+font_size = 22
 font_color = Color(0.24, 0.13, 0.07, 1)
-outline_size = 3
+outline_size = 2
 outline_color = Color(0.98, 0.94, 0.83, 0.96)
 
 [sub_resource type="LabelSettings" id="LabelSettings_body"]
 font = ExtResource("2_font")
-font_size = 18
+font_size = 12
 font_color = Color(0.28, 0.18, 0.1, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0.98, 0.94, 0.83, 0.92)
 
 [sub_resource type="LabelSettings" id="LabelSettings_small"]
 font = ExtResource("2_font")
-font_size = 14
+font_size = 10
 font_color = Color(0.3, 0.19, 0.1, 1)
 outline_size = 1
 outline_color = Color(0.98, 0.94, 0.83, 0.86)
@@ -121,9 +121,9 @@ horizontal_alignment = 1
 [node name="MoneyLabel" type="Label" parent="Panel" unique_id=1698576744]
 layout_mode = 1
 offset_left = 90.0
-offset_top = 118.0
+offset_top = 144.0
 offset_right = 1064.0
-offset_bottom = 158.0
+offset_bottom = 180.0
 label_settings = SubResource("LabelSettings_small")
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -132,9 +132,9 @@ autowrap_mode = 3
 [node name="CharacterHeader" type="Label" parent="Panel" unique_id=353152798]
 layout_mode = 1
 offset_left = 90.0
-offset_top = 176.0
+offset_top = 196.0
 offset_right = 1064.0
-offset_bottom = 210.0
+offset_bottom = 230.0
 text = "AVAILABLE PASSENGERS"
 label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
@@ -142,9 +142,9 @@ horizontal_alignment = 1
 [node name="CardA" type="Panel" parent="Panel" unique_id=1401948190]
 layout_mode = 1
 offset_left = 76.0
-offset_top = 226.0
+offset_top = 236.0
 offset_right = 372.0
-offset_bottom = 442.0
+offset_bottom = 452.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
 [node name="PortraitA" type="Panel" parent="Panel/CardA" unique_id=108000001]
@@ -169,9 +169,9 @@ autowrap_mode = 3
 [node name="CardB" type="Panel" parent="Panel" unique_id=1850713097]
 layout_mode = 1
 offset_left = 429.0
-offset_top = 226.0
+offset_top = 236.0
 offset_right = 725.0
-offset_bottom = 442.0
+offset_bottom = 452.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
 [node name="PortraitB" type="Panel" parent="Panel/CardB" unique_id=108000002]
@@ -196,9 +196,9 @@ autowrap_mode = 3
 [node name="CardC" type="Panel" parent="Panel" unique_id=163046608]
 layout_mode = 1
 offset_left = 782.0
-offset_top = 226.0
+offset_top = 236.0
 offset_right = 1078.0
-offset_bottom = 442.0
+offset_bottom = 452.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
 [node name="PortraitC" type="Panel" parent="Panel/CardC" unique_id=108000003]
@@ -223,9 +223,9 @@ autowrap_mode = 3
 [node name="DistanceHeader" type="Label" parent="Panel" unique_id=752597417]
 layout_mode = 1
 offset_left = 90.0
-offset_top = 468.0
+offset_top = 478.0
 offset_right = 1064.0
-offset_bottom = 502.0
+offset_bottom = 512.0
 text = "DISTANCE"
 label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
@@ -234,9 +234,9 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(220, 78)
 layout_mode = 1
 offset_left = 280.0
-offset_top = 488.0
+offset_top = 500.0
 offset_right = 500.0
-offset_bottom = 566.0
+offset_bottom = 578.0
 texture_normal = ExtResource("4_generic")
 texture_pressed = ExtResource("4_generic")
 texture_hover = ExtResource("4_generic")
@@ -246,22 +246,24 @@ ignore_texture_size = true
 stretch_mode = 0
 
 [node name="ShortLabel" type="Label" parent="Panel/ShortButton" unique_id=655763780]
-layout_mode = 0
-offset_left = 2.0
-offset_top = 26.0
-offset_right = 222.0
-offset_bottom = 62.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "SHORT"
 label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="MediumButton" type="TextureButton" parent="Panel" unique_id=1820495092]
 custom_minimum_size = Vector2(220, 78)
 layout_mode = 1
 offset_left = 464.0
-offset_top = 488.0
+offset_top = 500.0
 offset_right = 684.0
-offset_bottom = 566.0
+offset_bottom = 578.0
 texture_normal = ExtResource("4_generic")
 texture_pressed = ExtResource("4_generic")
 texture_hover = ExtResource("4_generic")
@@ -271,22 +273,24 @@ ignore_texture_size = true
 stretch_mode = 0
 
 [node name="MediumLabel" type="Label" parent="Panel/MediumButton" unique_id=1739365117]
-layout_mode = 0
-offset_left = -2.0
-offset_top = 25.0
-offset_right = 218.0
-offset_bottom = 61.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "MEDIUM"
 label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="LongButton" type="TextureButton" parent="Panel" unique_id=1951350229]
 custom_minimum_size = Vector2(220, 78)
 layout_mode = 1
 offset_left = 647.0
-offset_top = 488.0
+offset_top = 500.0
 offset_right = 867.0
-offset_bottom = 566.0
+offset_bottom = 578.0
 texture_normal = ExtResource("4_generic")
 texture_pressed = ExtResource("4_generic")
 texture_hover = ExtResource("4_generic")
@@ -296,20 +300,23 @@ ignore_texture_size = true
 stretch_mode = 0
 
 [node name="LongLabel" type="Label" parent="Panel/LongButton" unique_id=793322805]
-layout_mode = 0
-offset_top = 26.0
-offset_right = 220.0
-offset_bottom = 62.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "LONG"
 label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="StatusLabel" type="Label" parent="Panel" unique_id=1684899722]
 layout_mode = 1
-offset_left = 110.0
-offset_top = 602.0
-offset_right = 1044.0
-offset_bottom = 638.0
+offset_left = 117.0
+offset_top = 604.0
+offset_right = 1051.0
+offset_bottom = 640.0
 text = "Choose a passenger to start the next trip."
 label_settings = SubResource("LabelSettings_small")
 horizontal_alignment = 1
@@ -320,9 +327,9 @@ autowrap_mode = 3
 custom_minimum_size = Vector2(220, 78)
 layout_mode = 1
 offset_left = 468.0
-offset_top = 547.0
+offset_top = 560.0
 offset_right = 688.0
-offset_bottom = 625.0
+offset_bottom = 638.0
 texture_normal = ExtResource("4_generic")
 texture_pressed = ExtResource("4_generic")
 texture_hover = ExtResource("4_generic")
@@ -332,11 +339,13 @@ ignore_texture_size = true
 stretch_mode = 0
 
 [node name="BackLabel" type="Label" parent="Panel/BackButton" unique_id=1149272551]
-layout_mode = 0
-offset_left = 1.0
-offset_top = 26.0
-offset_right = 221.0
-offset_bottom = 62.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 text = "BACK"
 label_settings = SubResource("LabelSettings_body")
 horizontal_alignment = 1
+vertical_alignment = 1

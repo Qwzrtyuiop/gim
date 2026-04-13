@@ -2,6 +2,9 @@ extends Node2D
 
 const BG_TEXTURE := preload("res://assets/background/bg1_loop.png")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
+const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
+const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
@@ -376,9 +379,12 @@ var player_is_stage_clear_exiting := false
 var bottom_bar: ColorRect
 var speedometer: Control
 var help_label: Label
-var footer_stats_label: Label
+var footer_stats_row: HBoxContainer
+var footer_money_label: Label
+var footer_energy_label: Label
+var footer_gas_label: Label
 var status_label: Label
-var top_right_info_panel: Panel
+var top_right_info_panel: TextureRect
 var stage_label: Label
 var debt_goal_label: Label
 var speeder_warning_label: Label
@@ -687,40 +693,47 @@ func _create_ui() -> void:
 	help_label = _make_label(13, Color(0.95, 0.96, 0.88, 1.0), 4)
 	ui.add_child(help_label)
 
-	footer_stats_label = _make_label(13, Color(1.0, 0.97, 0.82, 1.0), 4)
-	footer_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	footer_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	ui.add_child(footer_stats_label)
+	footer_stats_row = HBoxContainer.new()
+	footer_stats_row.alignment = BoxContainer.ALIGNMENT_END
+	footer_stats_row.add_theme_constant_override("separation", 14)
+	ui.add_child(footer_stats_row)
+
+	footer_money_label = _make_label(14, Color(1.0, 0.97, 0.82, 1.0), 4)
+	footer_money_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	footer_stats_row.add_child(footer_money_label)
+
+	footer_stats_row.add_child(_make_stat_icon(ENERGY_ICON, 22.0))
+	footer_energy_label = _make_label(15, Color(1.0, 0.97, 0.82, 1.0), 4)
+	footer_energy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	footer_stats_row.add_child(footer_energy_label)
+
+	footer_stats_row.add_child(_make_stat_icon(GAS_ICON, 22.0))
+	footer_gas_label = _make_label(15, Color(1.0, 0.97, 0.82, 1.0), 4)
+	footer_gas_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	footer_stats_row.add_child(footer_gas_label)
 
 	status_label = _make_label(22, Color(1.0, 0.97, 0.82, 1.0), 6)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(status_label)
 
-	top_right_info_panel = Panel.new()
+	top_right_info_panel = TextureRect.new()
 	top_right_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var top_right_panel_style := StyleBoxFlat.new()
-	top_right_panel_style.bg_color = Color(0.14, 0.14, 0.14, 0.42)
-	top_right_panel_style.border_width_left = 1
-	top_right_panel_style.border_width_top = 1
-	top_right_panel_style.border_width_right = 1
-	top_right_panel_style.border_width_bottom = 1
-	top_right_panel_style.border_color = Color(0.82, 0.82, 0.82, 0.16)
-	top_right_panel_style.corner_radius_top_left = 6
-	top_right_panel_style.corner_radius_top_right = 6
-	top_right_panel_style.corner_radius_bottom_right = 6
-	top_right_panel_style.corner_radius_bottom_left = 6
+	top_right_info_panel.texture = UI_FRAME_TEXTURE
+	top_right_info_panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	top_right_info_panel.stretch_mode = TextureRect.STRETCH_SCALE
 	ui.add_child(top_right_info_panel)
-	top_right_info_panel.add_theme_stylebox_override("panel", top_right_panel_style)
 
-	stage_label = _make_label(12, Color(0.92, 0.95, 0.88, 1.0), 4)
-	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
+	stage_label = _make_label(11, Color(0.92, 0.95, 0.88, 1.0), 4)
+	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stage_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 	ui.add_child(stage_label)
 
-	debt_goal_label = _make_label(12, Color(0.98, 0.92, 0.74, 1.0), 4)
-	debt_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	debt_goal_label = _make_label(10, Color(0.98, 0.92, 0.74, 1.0), 4)
+	debt_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	debt_goal_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	debt_goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	ui.add_child(debt_goal_label)
 
 	speeder_warning_label = _make_label(48, Color(1.0, 0.92, 0.2, 1.0), 7)
@@ -758,6 +771,16 @@ func _make_label(font_size: int, color: Color, outline_size: int) -> Label:
 	label.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 0.82))
 	label.add_theme_constant_override("outline_size", outline_size)
 	return label
+
+
+func _make_stat_icon(texture: Texture2D, size_value: float) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.texture = texture
+	icon.custom_minimum_size = Vector2(size_value, size_value)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return icon
 
 
 func _current_time_filter_color() -> Color:
@@ -870,26 +893,26 @@ func _layout_scene() -> void:
 		help_label.position = Vector2(28.0, size.y - 45.0)
 		help_label.size = Vector2(size.x * 0.56, 34.0)
 
-	if footer_stats_label:
-		footer_stats_label.position = Vector2(size.x * 0.56, size.y - 45.0)
-		footer_stats_label.size = Vector2(size.x * 0.40 - 28.0, 34.0)
+	if footer_stats_row:
+		footer_stats_row.position = Vector2(size.x * 0.40, size.y - 50.0)
+		footer_stats_row.size = Vector2(size.x * 0.56 - 24.0, 40.0)
 
 	if status_label:
 		status_label.position = Vector2(0.0, size.y * 0.37)
 		status_label.size = Vector2(size.x, 120.0)
 
 	if top_right_info_panel:
-		top_right_info_panel.position = Vector2(size.x - 610.0, 10.0)
-		top_right_info_panel.size = Vector2(580.0, 74.0)
+		top_right_info_panel.position = Vector2(size.x - 414.0, 10.0)
+		top_right_info_panel.size = Vector2(396.0, 164.0)
 
 	if stage_label:
-		stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
-		stage_label.position = Vector2(size.x - 578.0, 20.0)
-		stage_label.size = Vector2(526.0, 26.0)
+		stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
+		stage_label.position = Vector2(size.x - 382.0, 34.0)
+		stage_label.size = Vector2(332.0, 60.0)
 
 	if debt_goal_label:
-		debt_goal_label.position = Vector2(size.x - 578.0, 48.0)
-		debt_goal_label.size = Vector2(526.0, 22.0)
+		debt_goal_label.position = Vector2(size.x - 382.0, 108.0)
+		debt_goal_label.size = Vector2(332.0, 28.0)
 
 	if speeder_warning_label:
 		speeder_warning_label.position = Vector2(player_x + 105.0, _lane_y(1, size) - 92.0)
@@ -1532,15 +1555,15 @@ func _update_ui() -> void:
 	else:
 		status_label.text = "%s\n%s" % [game_state, end_message]
 
-	if footer_stats_label:
-		footer_stats_label.text = "Money PhP %d     Energy %d/%d" % [
-			PlayerState.money,
-			PlayerState.energy,
-			PlayerState.max_energy,
-		]
+	if footer_money_label:
+		footer_money_label.text = "PhP %d" % PlayerState.money
+	if footer_energy_label:
+		footer_energy_label.text = "%d/%d" % [PlayerState.energy, PlayerState.max_energy]
+	if footer_gas_label:
+		footer_gas_label.text = "%d/%d" % [PlayerState.gas, PlayerState.max_gas]
 
 	if stage_label:
-		stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
+		stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 
 	if debt_goal_label:
 		debt_goal_label.text = PlayerState.get_debt_status_text()

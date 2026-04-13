@@ -3,20 +3,19 @@
 [ext_resource type="Script" uid="uid://cstjurkv3hhyn" path="res://scripts/main_menu.gd" id="1_ax3lt"]
 [ext_resource type="Texture2D" uid="uid://vm4oo5i1uo1v" path="res://assets/background/bg1_loop.png" id="2_mfjxx"]
 [ext_resource type="Texture2D" uid="uid://dnjhxq5xjsg6" path="res://assets/menu/logo.png" id="4_14rdd"]
-[ext_resource type="FontFile" uid="uid://cedkkdxw7xil6" path="res://assets/fonts/PixelifySans-wght.ttf" id="5_y265i"]
+[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="5_y265i"]
 [ext_resource type="Texture2D" uid="uid://d1efue5uhvbjs" path="res://assets/menu/buttons/start_inactive.png" id="6_d72k0"]
 [ext_resource type="Texture2D" uid="uid://duotevl0m03dt" path="res://assets/menu/buttons/quit_inactive.png" id="8_xc3vo"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("5_y265i")
-font_size = 25
 font_color = Color(0.98, 0.95, 0.78, 1)
 outline_size = 2
 outline_color = Color(0, 0, 0, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_hint"]
 font = ExtResource("5_y265i")
-font_size = 22
+font_size = 13
 font_color = Color(0.92, 0.95, 0.88, 1)
 outline_size = 2
 outline_color = Color(0, 0, 0, 0.95)
