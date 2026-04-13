@@ -3,6 +3,11 @@ extends Control
 const GAME_SCENE := "res://scenes/main.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
+const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
+const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
+const STORE_SCENE := "res://scenes/store.tscn"
+const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
+const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const Scene01IntroPayload := preload("res://scripts/story/payloads/scene_01_intro.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -24,6 +29,8 @@ const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
 @onready var quit_button: BaseButton = $Menu/QuitButton
+@onready var achievements_button: BaseButton = $Menu/AchievementsButton
+@onready var achievements_label: Label = $Menu/AchievementsButton/AchievementsLabel
 @onready var background: TextureRect = $Background
 @onready var traffic_layer: Node2D = $TrafficLayer
 @onready var menu_trace_lines: Node2D = $MenuTraceLines
@@ -43,12 +50,16 @@ var is_start_transitioning := false
 func _ready() -> void:
 	rng.randomize()
 	start_button.grab_focus()
+	achievements_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	start_button.pressed.connect(_start_game)
 	quit_button.pressed.connect(_quit_game)
+	achievements_button.pressed.connect(_open_achievements_library)
 	_apply_button_font(start_button)
 	_apply_button_font(quit_button)
+	_apply_button_font(achievements_button)
 	ButtonGlow.attach(self, start_button)
 	ButtonGlow.attach(self, quit_button)
+	ButtonGlow.attach(self, achievements_button)
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu_trace_lines.visible = false
 	_create_dialogs()
@@ -75,7 +86,12 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
-		_start_game()
+		if achievements_button.has_focus():
+			_open_achievements_library()
+		elif quit_button.has_focus():
+			_quit_game()
+		else:
+			_start_game()
 	elif event.is_action_pressed("ui_cancel"):
 		_quit_game()
 
@@ -86,6 +102,10 @@ func _start_game() -> void:
 	if PlayerState.is_run_failed():
 		blocked_start_message_time = 1.8
 		hint_label.text = _default_hint_text()
+		return
+
+	if PlayerState.has_save_data():
+		_continue_saved_game()
 		return
 
 	PlayerState.begin_stage_sequence()
@@ -112,10 +132,24 @@ func _confirm_start_game() -> void:
 	_fade_to_intro_story()
 
 
+func _continue_saved_game() -> void:
+	is_start_transitioning = true
+	start_button.disabled = true
+	quit_button.disabled = true
+	achievements_button.disabled = true
+	_fade_to_scene(_saved_resume_scene())
+
+
 func _quit_game() -> void:
 	if is_start_transitioning:
 		return
 	get_tree().quit()
+
+
+func _open_achievements_library() -> void:
+	if is_start_transitioning:
+		return
+	get_tree().change_scene_to_file(ACHIEVEMENTS_LIBRARY_SCENE)
 
 
 func _create_dialogs() -> void:
@@ -143,6 +177,28 @@ func _fade_to_intro_story() -> void:
 	tween.tween_property(fade_overlay, "color:a", 1.0, START_FADE_SECONDS)
 	await tween.finished
 	get_tree().change_scene_to_file(STORY_SCENE)
+
+
+func _fade_to_scene(scene_path: String) -> void:
+	var tween := create_tween()
+	tween.tween_property(fade_overlay, "color:a", 1.0, START_FADE_SECONDS)
+	await tween.finished
+	get_tree().change_scene_to_file(scene_path)
+
+
+func _saved_resume_scene() -> String:
+	var saved_scene := PlayerState.get_resume_scene()
+	match saved_scene:
+		GAME_SCENE, STORY_SCENE, DAY_START_SCENE, RIDE_SELECTION_SCENE, STORE_SCENE, STAGE_RESULTS_SCENE, SLEEP_TRANSITION_SCENE:
+			return saved_scene
+
+	if not PlayerState.get_pending_story().is_empty():
+		return STORY_SCENE
+	if not PlayerState.get_pending_sleep_transition_state().is_empty():
+		return SLEEP_TRANSITION_SCENE
+	if not PlayerState.get_pending_trip_selection().is_empty():
+		return RIDE_SELECTION_SCENE
+	return GAME_SCENE
 
 
 func _update_reset_progress(delta: float) -> void:

@@ -16,6 +16,7 @@ const RESUME_AFTER_DAY_START_STORY := "after_day_start_story"
 
 
 func _ready() -> void:
+	PlayerState.set_resume_scene("res://scenes/sleep_transition.tscn")
 	message_label.text = "SLEEPING..."
 	message_label.visible = true
 	message_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
@@ -52,6 +53,11 @@ func _transition_mode() -> String:
 
 
 func _run_full_sequence() -> void:
+	if _transition_mode() == PlayerState.TRANSITION_REST_TO_NIGHT:
+		await _show_sleep_message()
+		_finish_transition()
+		return
+
 	if _launch_story_trigger(PlayerState.STORY_TRIGGER_DAY_END, PlayerState.get_current_day(), RESUME_AFTER_DAY_END_STORY):
 		return
 	await _run_after_day_end_story()

@@ -80,6 +80,7 @@ var stats_row_refs: Dictionary = {}
 
 
 func _ready() -> void:
+	PlayerState.set_resume_scene("res://scenes/store.tscn")
 	_create_stats_row()
 	_refresh_back_button()
 	back_button.pressed.connect(_back_to_selection)
@@ -92,6 +93,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
+		return
 	if event.is_action_pressed("ui_accept"):
 		if back_button.visible and back_button.has_focus():
 			_back_to_selection()

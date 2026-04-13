@@ -1,0 +1,242 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/achievements_library.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/background/bg1_loop.png" id="2_bg"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="3_font"]
+[ext_resource type="Texture2D" path="res://assets/ui/button_generic.png" id="4_button"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_title"]
+font = ExtResource("3_font")
+font_size = 22
+font_color = Color(0.98, 0.95, 0.82, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
+font = ExtResource("3_font")
+font_size = 11
+font_color = Color(0.95, 0.91, 0.78, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_body"]
+font = ExtResource("3_font")
+font_size = 12
+font_color = Color(0.98, 0.95, 0.88, 1)
+outline_size = 1
+outline_color = Color(0, 0, 0, 0.95)
+
+[node name="AchievementsLibrary" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="."]
+z_index = -20
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Shade" type="ColorRect" parent="."]
+z_index = -10
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.04, 0.05, 0.6)
+
+[node name="TitleLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -360.0
+offset_top = 42.0
+offset_right = 360.0
+offset_bottom = 82.0
+grow_horizontal = 2
+text = "ACHIEVEMENTS LIBRARY"
+label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -420.0
+offset_top = 88.0
+offset_right = 420.0
+offset_bottom = 124.0
+grow_horizontal = 2
+text = "Unlocked Filipino values and the moments that revealed them."
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -420.0
+offset_top = -180.0
+offset_right = 420.0
+offset_bottom = 220.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 26.0
+offset_right = -28.0
+offset_bottom = -86.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ListContainer" type="VBoxContainer" parent="Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="EmptyLabel" type="Label" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = 120.0
+offset_right = -40.0
+offset_bottom = -120.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "No Filipino values unlocked yet."
+label_settings = SubResource("LabelSettings_body")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BackButton" type="TextureButton" parent="Panel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -136.0
+offset_top = -68.0
+offset_right = 136.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 0
+texture_normal = ExtResource("4_button")
+texture_pressed = ExtResource("4_button")
+texture_hover = ExtResource("4_button")
+texture_focused = ExtResource("4_button")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="BackLabel" type="Label" parent="Panel/BackButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "BACK"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DetailOverlay" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.72)
+
+[node name="DetailPanel" type="Panel" parent="DetailOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -170.0
+offset_right = 320.0
+offset_bottom = 170.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="DetailOverlay/DetailPanel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = 62.0
+grow_horizontal = 2
+label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="DetailOverlay/DetailPanel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 28.0
+offset_top = 66.0
+offset_right = -28.0
+offset_bottom = 92.0
+grow_horizontal = 2
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+
+[node name="BodyLabel" type="Label" parent="DetailOverlay/DetailPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 34.0
+offset_top = 108.0
+offset_right = -34.0
+offset_bottom = -78.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_body")
+autowrap_mode = 2
+
+[node name="CloseButton" type="Button" parent="DetailOverlay/DetailPanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -94.0
+offset_top = -58.0
+offset_right = 94.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "CLOSE"

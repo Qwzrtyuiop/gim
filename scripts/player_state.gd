@@ -1,5 +1,8 @@
 extends Node
 
+const Day02StationBillPayload := preload("res://scripts/story/payloads/day_02_station_bill.gd")
+const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+
 signal money_changed(amount: int)
 signal energy_changed(amount: int)
 signal gas_changed(amount: int)
@@ -33,6 +36,23 @@ const TRIP_GAS_COSTS := {
 	"medium": 2,
 	"long": 3,
 }
+const STAGE_DISTANCE_RANGES := {
+	"short": Vector2(800.0, 1200.0),
+	"medium": Vector2(1200.0, 1800.0),
+	"long": Vector2(1800.0, 2800.0),
+}
+const ACHIEVEMENT_ORDER := [
+	"mapagsamantala",
+]
+const ACHIEVEMENT_DEFINITIONS := {
+	"mapagsamantala": {
+		"title": "Mapagsamantala",
+		"subtitle": "Opportunistic",
+		"description": "Taking advantage when the opportunity presents itself\nespecially when it costs someone else more than it costs you.\n\nJohn saw the opening and took it.\nWhether it was right or not didn’t matter, he needed the money more than them.",
+	},
+}
+const SAVE_PATH := "user://progress_save.tres"
+const SAVE_VERSION := 1
 const REST_ENERGY_BONUSES := {
 	TRANSITION_RIDE: 0,
 	TRANSITION_REST_TO_NIGHT: 1,
@@ -153,8 +173,6 @@ const MOCK_CHARACTERS := [
 		"eligible_distances": ["short", "medium"],
 	},
 ]
-const DEFAULT_STORY_TRIGGERS := []
-
 var last_stage_result: Dictionary = {}
 var max_energy := 5
 var max_gas := DEFAULT_STARTING_GAS
@@ -165,6 +183,7 @@ var pending_stage_energy_cost := false
 var pending_trip_selection: Dictionary = {}
 var pending_story: Dictionary = {}
 var pending_sleep_transition_state: Dictionary = {}
+var pending_gameplay_entry_fade_duration := 0.0
 var current_mock_character_id := ""
 var seen_mock_characters: Dictionary = {}
 var last_rest_day := 0
@@ -176,21 +195,28 @@ var run_fail_reason := ""
 var rng := RandomNumberGenerator.new()
 var story_triggers: Array[Dictionary] = []
 var consumed_story_triggers: Dictionary = {}
+var last_seen_story_sections: Dictionary = {}
+var last_seen_story_id := ""
+var resume_scene_path := ""
+var _is_loading_save := false
 
 var money := 0:
 	set(value):
 		money = max(0, value)
 		money_changed.emit(money)
+		save_progress()
 
 var energy := 3:
 	set(value):
 		energy = clampi(value, 0, max_energy)
 		energy_changed.emit(energy)
+		save_progress()
 
 var gas := DEFAULT_STARTING_GAS:
 	set(value):
 		gas = clampi(value, 0, max_gas)
 		gas_changed.emit(gas)
+		save_progress()
 
 var gas_price := DEFAULT_GAS_PRICE
 
@@ -198,6 +224,7 @@ var karma := 0:
 	set(value):
 		karma = value
 		karma_changed.emit(karma)
+		save_progress()
 
 var upgrades: Dictionary = {}
 var achievements: Dictionary = {}
@@ -205,6 +232,137 @@ var achievements: Dictionary = {}
 
 func _ready() -> void:
 	rng.randomize()
+	_load_progress()
+
+
+func _load_progress() -> void:
+	if not ResourceLoader.exists(SAVE_PATH):
+		return
+
+	var loaded_resource := ResourceLoader.load(SAVE_PATH)
+	if not loaded_resource is GameSaveResource:
+		return
+
+	var save_resource := loaded_resource as GameSaveResource
+	var save_data: Dictionary = save_resource.data.duplicate(true)
+	if save_data.is_empty():
+		return
+
+	_is_loading_save = true
+	money = int(save_data.get("money", money))
+	max_energy = int(save_data.get("max_energy", max_energy))
+	energy = int(save_data.get("energy", energy))
+	max_gas = int(save_data.get("max_gas", max_gas))
+	gas = int(save_data.get("gas", gas))
+	gas_price = int(save_data.get("gas_price", gas_price))
+	karma = int(save_data.get("karma", karma))
+	current_stage_type = str(save_data.get("current_stage_type", current_stage_type))
+	current_day = int(save_data.get("current_day", current_day))
+	stage_round = int(save_data.get("stage_round", stage_round))
+	pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", pending_stage_energy_cost))
+	pending_trip_selection = Dictionary(save_data.get("pending_trip_selection", {})).duplicate(true)
+	pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
+	pending_sleep_transition_state = Dictionary(save_data.get("pending_sleep_transition_state", {})).duplicate(true)
+	pending_gameplay_entry_fade_duration = float(save_data.get("pending_gameplay_entry_fade_duration", pending_gameplay_entry_fade_duration))
+	current_mock_character_id = str(save_data.get("current_mock_character_id", current_mock_character_id))
+	seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
+	last_rest_day = int(save_data.get("last_rest_day", last_rest_day))
+	debt_goal_index = int(save_data.get("debt_goal_index", debt_goal_index))
+	last_debt_collection_day = int(save_data.get("last_debt_collection_day", last_debt_collection_day))
+	remaining_debt = int(save_data.get("remaining_debt", remaining_debt))
+	run_failed = bool(save_data.get("run_failed", run_failed))
+	run_fail_reason = str(save_data.get("run_fail_reason", run_fail_reason))
+	last_stage_result = Dictionary(save_data.get("last_stage_result", {})).duplicate(true)
+	story_triggers.clear()
+	var saved_story_triggers: Array = save_data.get("story_triggers", [])
+	for trigger_data in saved_story_triggers:
+		if trigger_data is Dictionary:
+			story_triggers.append((trigger_data as Dictionary).duplicate(true))
+	consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
+	upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
+	achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
+	last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
+	last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
+	resume_scene_path = str(save_data.get("resume_scene_path", ""))
+	_is_loading_save = false
+
+
+func save_progress() -> void:
+	if _is_loading_save:
+		return
+
+	var save_resource := GameSaveResource.new()
+	save_resource.version = SAVE_VERSION
+	save_resource.data = {
+		"money": money,
+		"max_energy": max_energy,
+		"energy": energy,
+		"max_gas": max_gas,
+		"gas": gas,
+		"gas_price": gas_price,
+		"karma": karma,
+		"current_stage_type": current_stage_type,
+		"current_day": current_day,
+		"stage_round": stage_round,
+		"pending_stage_energy_cost": pending_stage_energy_cost,
+		"pending_trip_selection": pending_trip_selection.duplicate(true),
+		"pending_story": pending_story.duplicate(true),
+		"pending_sleep_transition_state": pending_sleep_transition_state.duplicate(true),
+		"pending_gameplay_entry_fade_duration": pending_gameplay_entry_fade_duration,
+		"current_mock_character_id": current_mock_character_id,
+		"seen_mock_characters": seen_mock_characters.duplicate(true),
+		"last_rest_day": last_rest_day,
+		"debt_goal_index": debt_goal_index,
+		"last_debt_collection_day": last_debt_collection_day,
+		"remaining_debt": remaining_debt,
+		"run_failed": run_failed,
+		"run_fail_reason": run_fail_reason,
+		"last_stage_result": last_stage_result.duplicate(true),
+		"story_triggers": story_triggers.duplicate(true),
+		"consumed_story_triggers": consumed_story_triggers.duplicate(true),
+		"upgrades": upgrades.duplicate(true),
+		"achievements": achievements.duplicate(true),
+		"last_seen_story_sections": last_seen_story_sections.duplicate(true),
+		"last_seen_story_id": last_seen_story_id,
+		"resume_scene_path": resume_scene_path,
+	}
+	ResourceSaver.save(save_resource, SAVE_PATH)
+
+
+func set_last_seen_story_section(story_id: String, section_index: int) -> void:
+	var safe_story_id := str(story_id).strip_edges()
+	if safe_story_id.is_empty():
+		return
+	last_seen_story_id = safe_story_id
+	last_seen_story_sections[safe_story_id] = max(-1, section_index)
+	save_progress()
+
+
+func get_last_seen_story_section(story_id: String) -> int:
+	var safe_story_id := str(story_id).strip_edges()
+	if safe_story_id.is_empty():
+		return -1
+	return int(last_seen_story_sections.get(safe_story_id, -1))
+
+
+func get_last_seen_story_id() -> String:
+	return last_seen_story_id
+
+
+func has_save_data() -> bool:
+	return ResourceLoader.exists(SAVE_PATH)
+
+
+func set_resume_scene(scene_path: String) -> void:
+	var safe_scene_path := str(scene_path).strip_edges()
+	if safe_scene_path.is_empty() or resume_scene_path == safe_scene_path:
+		return
+	resume_scene_path = safe_scene_path
+	save_progress()
+
+
+func get_resume_scene() -> String:
+	return resume_scene_path
 
 
 func begin_stage_sequence() -> void:
@@ -215,6 +373,7 @@ func begin_stage_sequence() -> void:
 	clear_pending_trip_selection()
 	clear_pending_story()
 	clear_pending_sleep_transition_state()
+	clear_pending_gameplay_entry_fade()
 	last_rest_day = 0
 	debt_goal_index = 0
 	last_debt_collection_day = 0
@@ -222,6 +381,7 @@ func begin_stage_sequence() -> void:
 	run_failed = false
 	run_fail_reason = ""
 	_reset_story_triggers()
+	save_progress()
 
 
 func get_current_stage_type() -> String:
@@ -256,6 +416,21 @@ func get_days_until_debt_collection(day_number := -1) -> int:
 	var effective_day: int = int(day_number) if int(day_number) > 0 else get_current_day()
 	var cycle_day: int = ((effective_day - 1) % DEBT_COLLECTION_INTERVAL_DAYS) + 1
 	return DEBT_COLLECTION_INTERVAL_DAYS - cycle_day + 1
+
+
+func get_stage_distance_range(difficulty: String) -> Vector2:
+	var safe_difficulty := difficulty if STAGE_DIFFICULTIES.has(difficulty) else "short"
+	return STAGE_DISTANCE_RANGES.get(safe_difficulty, STAGE_DISTANCE_RANGES["short"])
+
+
+func get_stage_distance_average(difficulty: String) -> float:
+	var distance_range := get_stage_distance_range(difficulty)
+	return (distance_range.x + distance_range.y) * 0.5
+
+
+func roll_stage_target_distance(difficulty: String) -> float:
+	var distance_range := get_stage_distance_range(difficulty)
+	return rng.randf_range(distance_range.x, distance_range.y)
 
 
 func get_debt_status_text(day_number := -1) -> String:
@@ -326,6 +501,7 @@ func get_gas_price() -> int:
 
 func set_gas_price(price: int) -> void:
 	gas_price = max(0, price)
+	save_progress()
 
 
 func add_gas(amount: int) -> void:
@@ -372,11 +548,13 @@ func prepare_stage_start(stage_descriptor := "") -> bool:
 	spend_energy(1)
 	spend_gas(trip_gas_cost)
 	pending_stage_energy_cost = true
+	save_progress()
 	return true
 
 
 func confirm_stage_started() -> void:
 	pending_stage_energy_cost = false
+	save_progress()
 
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
@@ -420,6 +598,7 @@ func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_d
 	current_stage_type = next_stage
 	if will_advance_day(safe_transition_mode):
 		_resolve_debt_collection_for_day(current_day)
+	save_progress()
 	return current_stage_type
 
 
@@ -506,6 +685,7 @@ func add_karma(amount: int) -> void:
 func set_last_stage_result(result: Dictionary) -> void:
 	last_stage_result = result.duplicate(true)
 	last_stage_result["paid_out"] = false
+	save_progress()
 
 
 func get_last_stage_result() -> Dictionary:
@@ -519,6 +699,7 @@ func claim_last_stage_total() -> int:
 	var total := int(last_stage_result.get("total", 0))
 	add_money(total)
 	last_stage_result["paid_out"] = true
+	save_progress()
 	return total
 
 
@@ -543,6 +724,7 @@ func set_pending_trip_selection(return_scene: String, transition_mode: String = 
 		pending_trip_selection["locked_characters"] = locked_characters
 	if STAGE_DIFFICULTIES.has(locked_distance):
 		pending_trip_selection["selected_distance"] = locked_distance
+	save_progress()
 
 
 func get_pending_trip_selection() -> Dictionary:
@@ -567,14 +749,17 @@ func get_locked_pending_trip_distance() -> String:
 func lock_pending_trip_selection(displayed_characters: Array, selected_distance: String) -> void:
 	pending_trip_selection["locked_characters"] = displayed_characters.duplicate(true)
 	pending_trip_selection["selected_distance"] = selected_distance if STAGE_DIFFICULTIES.has(selected_distance) else "short"
+	save_progress()
 
 
 func clear_pending_trip_selection() -> void:
 	pending_trip_selection.clear()
+	save_progress()
 
 
 func set_pending_story(story_payload: Dictionary) -> void:
 	pending_story = story_payload.duplicate(true)
+	save_progress()
 
 
 func get_pending_story() -> Dictionary:
@@ -583,10 +768,12 @@ func get_pending_story() -> Dictionary:
 
 func clear_pending_story() -> void:
 	pending_story.clear()
+	save_progress()
 
 
 func set_pending_sleep_transition_state(state: Dictionary) -> void:
 	pending_sleep_transition_state = state.duplicate(true)
+	save_progress()
 
 
 func get_pending_sleep_transition_state() -> Dictionary:
@@ -595,10 +782,29 @@ func get_pending_sleep_transition_state() -> Dictionary:
 
 func clear_pending_sleep_transition_state() -> void:
 	pending_sleep_transition_state.clear()
+	save_progress()
+
+
+func set_pending_gameplay_entry_fade(duration: float) -> void:
+	pending_gameplay_entry_fade_duration = maxf(0.0, duration)
+	save_progress()
+
+
+func consume_pending_gameplay_entry_fade() -> float:
+	var duration := pending_gameplay_entry_fade_duration
+	pending_gameplay_entry_fade_duration = 0.0
+	save_progress()
+	return maxf(0.0, duration)
+
+
+func clear_pending_gameplay_entry_fade() -> void:
+	pending_gameplay_entry_fade_duration = 0.0
+	save_progress()
 
 
 func set_sleep_transition_resume_step(resume_step: String) -> void:
 	pending_sleep_transition_state["resume_step"] = resume_step
+	save_progress()
 
 
 func get_sleep_transition_resume_step() -> String:
@@ -610,11 +816,13 @@ func add_story_trigger(trigger_data: Dictionary) -> void:
 		return
 
 	story_triggers.append(trigger_data.duplicate(true))
+	save_progress()
 
 
 func clear_story_triggers() -> void:
 	story_triggers.clear()
 	consumed_story_triggers.clear()
+	save_progress()
 
 
 func get_story_triggers() -> Array:
@@ -663,6 +871,7 @@ func consume_story_trigger(trigger_data: Dictionary) -> void:
 	var trigger_id := _story_trigger_id(trigger_data)
 	if not trigger_id.is_empty():
 		consumed_story_triggers[trigger_id] = true
+	save_progress()
 
 
 func get_mock_characters() -> Array:
@@ -704,7 +913,8 @@ func estimate_stage_earnings(stage_type: String) -> int:
 	var parts := _parse_stage_type(stage_type)
 	var difficulty_key := str(parts.get("difficulty", "short"))
 	var difficulty_profile: Dictionary = ESTIMATED_STAGE_PROFILES[difficulty_key] if ESTIMATED_STAGE_PROFILES.has(difficulty_key) else ESTIMATED_STAGE_PROFILES["short"]
-	var base_fare := float(difficulty_profile["target_distance"]) * float(difficulty_profile["fare_php_per_meter"])
+	var estimated_distance := get_stage_distance_average(difficulty_key)
+	var base_fare := estimated_distance * float(difficulty_profile["fare_php_per_meter"])
 	var estimated_bonus_seconds := float(difficulty_profile["time_limit"]) * ESTIMATED_BONUS_TIME_RATIO
 	var base_bonus := estimated_bonus_seconds * float(difficulty_profile["time_bonus_php_per_second"])
 	var multiplier := get_stage_earnings_multiplier(parts["time"], parts["traffic"])
@@ -731,17 +941,20 @@ func _resolve_debt_collection_for_day(day_number: int) -> bool:
 			goal_amount,
 			day_number,
 		]
+		save_progress()
 		return false
 
 	spend_money(goal_amount)
 	remaining_debt = maxi(0, remaining_debt - goal_amount)
 	if debt_goal_index < WEEKLY_DEBT_GOALS.size() - 1:
 		debt_goal_index += 1
+	save_progress()
 	return true
 
 
 func set_current_mock_character(character_id: String) -> void:
 	current_mock_character_id = character_id
+	save_progress()
 
 
 func get_current_mock_character_id() -> String:
@@ -750,6 +963,7 @@ func get_current_mock_character_id() -> String:
 
 func mark_mock_character_seen(character_id: String) -> void:
 	seen_mock_characters[character_id] = true
+	save_progress()
 
 
 func has_seen_mock_character(character_id: String) -> bool:
@@ -760,6 +974,7 @@ func set_upgrade_level(upgrade_id: String, level: int) -> void:
 	var safe_level: int = max(0, level)
 	upgrades[upgrade_id] = safe_level
 	upgrade_changed.emit(upgrade_id, safe_level)
+	save_progress()
 
 
 func get_upgrade_level(upgrade_id: String) -> int:
@@ -767,15 +982,40 @@ func get_upgrade_level(upgrade_id: String) -> int:
 
 
 func unlock_achievement(achievement_id: String) -> void:
-	if achievements.get(achievement_id, false):
+	var safe_id := str(achievement_id).strip_edges().to_lower()
+	if not ACHIEVEMENT_DEFINITIONS.has(safe_id):
+		return
+	if achievements.get(safe_id, false):
 		return
 
-	achievements[achievement_id] = true
-	achievement_unlocked.emit(achievement_id)
+	achievements[safe_id] = true
+	achievement_unlocked.emit(safe_id)
+	save_progress()
 
 
 func has_achievement(achievement_id: String) -> bool:
-	return bool(achievements.get(achievement_id, false))
+	return bool(achievements.get(str(achievement_id).strip_edges().to_lower(), false))
+
+
+func get_achievement_data(achievement_id: String) -> Dictionary:
+	var safe_id := str(achievement_id).strip_edges().to_lower()
+	if not ACHIEVEMENT_DEFINITIONS.has(safe_id):
+		return {}
+
+	var achievement_data: Dictionary = ACHIEVEMENT_DEFINITIONS[safe_id]
+	var result := achievement_data.duplicate(true)
+	result["id"] = safe_id
+	result["unlocked"] = has_achievement(safe_id)
+	return result
+
+
+func get_unlocked_achievement_ids() -> Array[String]:
+	var unlocked_ids: Array[String] = []
+	for achievement_id in ACHIEVEMENT_ORDER:
+		var safe_id := str(achievement_id)
+		if has_achievement(safe_id):
+			unlocked_ids.append(safe_id)
+	return unlocked_ids
 
 
 func reset() -> void:
@@ -790,6 +1030,7 @@ func reset() -> void:
 	clear_pending_trip_selection()
 	clear_pending_story()
 	clear_pending_sleep_transition_state()
+	clear_pending_gameplay_entry_fade()
 	current_mock_character_id = ""
 	seen_mock_characters.clear()
 	last_rest_day = 0
@@ -800,15 +1041,23 @@ func reset() -> void:
 	run_fail_reason = ""
 	upgrades.clear()
 	achievements.clear()
+	last_seen_story_sections.clear()
+	last_seen_story_id = ""
 	_reset_story_triggers()
+	save_progress()
 
 
 func _reset_story_triggers() -> void:
 	story_triggers.clear()
-	for trigger_data in DEFAULT_STORY_TRIGGERS:
-		if trigger_data is Dictionary:
-			story_triggers.append((trigger_data as Dictionary).duplicate(true))
+	story_triggers.append({
+		"id": "day_2_station_bill",
+		"phase": STORY_TRIGGER_STAGE_COMPLETE,
+		"day": 2,
+		"time_of_day": "morning",
+		"payload": Day02StationBillPayload.build(),
+	})
 	consumed_story_triggers.clear()
+	save_progress()
 
 
 func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_number: int, context: Dictionary = {}) -> bool:

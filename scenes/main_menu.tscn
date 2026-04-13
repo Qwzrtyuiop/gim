@@ -6,6 +6,7 @@
 [ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="5_y265i"]
 [ext_resource type="Texture2D" uid="uid://d1efue5uhvbjs" path="res://assets/menu/buttons/start_inactive.png" id="6_d72k0"]
 [ext_resource type="Texture2D" uid="uid://duotevl0m03dt" path="res://assets/menu/buttons/quit_inactive.png" id="8_xc3vo"]
+[ext_resource type="Texture2D" path="res://assets/ui/button_generic.png" id="9_achbtn"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("5_y265i")
@@ -111,7 +112,7 @@ anchor_bottom = 0.5
 offset_left = -160.0
 offset_top = -2.0
 offset_right = 160.0
-offset_bottom = 314.0
+offset_bottom = 396.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 6
@@ -137,6 +138,29 @@ texture_hover = ExtResource("8_xc3vo")
 texture_focused = ExtResource("8_xc3vo")
 ignore_texture_size = true
 stretch_mode = 0
+
+[node name="AchievementsButton" type="TextureButton" parent="Menu"]
+custom_minimum_size = Vector2(320, 72)
+layout_mode = 2
+tooltip_text = "Achievements"
+texture_normal = ExtResource("9_achbtn")
+texture_pressed = ExtResource("9_achbtn")
+texture_hover = ExtResource("9_achbtn")
+texture_focused = ExtResource("9_achbtn")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="AchievementsLabel" type="Label" parent="Menu/AchievementsButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "ACHIEVEMENTS"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="FooterBacking" type="ColorRect" parent="." unique_id=780355250]
 z_index = 8

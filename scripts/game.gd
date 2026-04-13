@@ -410,11 +410,16 @@ var speeder_lane_change_warning_active := false
 var speeder_lane_change_warning_target_lane := -1
 var pending_speeder_lane_change_sprite: Sprite2D
 var special_mode_hidden_modifiers := {}
+var gameplay_entry_fade_seconds := 0.0
+var rolled_target_distance := 0.0
+var rolled_target_stage_type := ""
 
 
 func _ready() -> void:
+	PlayerState.set_resume_scene("res://scenes/main.tscn")
 	_hide_editor_preview()
 	rng.randomize()
+	gameplay_entry_fade_seconds = PlayerState.consume_pending_gameplay_entry_fade() if use_player_state_stage_sequence else 0.0
 	if use_player_state_stage_sequence:
 		stage_type = PlayerState.get_current_stage_type()
 	_apply_stage_profile()
@@ -431,6 +436,7 @@ func _ready() -> void:
 	_create_night_visibility_mask()
 	_create_ui()
 	_layout_scene()
+	_begin_gameplay_entry_fade()
 	if use_player_state_stage_sequence:
 		PlayerState.confirm_stage_started()
 	set_process(true)
@@ -455,6 +461,7 @@ func _apply_stage_profile() -> void:
 		set(setting_name, profile[setting_name])
 
 	_apply_hidden_special_modifiers()
+	_apply_target_distance_roll()
 
 
 func _parse_stage_type(type_name: String) -> Dictionary:
@@ -486,6 +493,13 @@ func _parse_stage_type(type_name: String) -> Dictionary:
 		"time": parts[1],
 		"traffic": traffic_name,
 	}
+
+
+func _apply_target_distance_roll() -> void:
+	if rolled_target_distance <= 0.0 or rolled_target_stage_type != stage_type:
+		rolled_target_distance = PlayerState.roll_stage_target_distance(stage_difficulty)
+		rolled_target_stage_type = stage_type
+	target_distance = rolled_target_distance
 
 
 func _apply_player_upgrades() -> void:
@@ -765,9 +779,20 @@ func _create_ui() -> void:
 	add_child(speeder_beep_player)
 
 	fade_rect = ColorRect.new()
-	fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
+	fade_rect.color = Color(0.0, 0.0, 0.0, 1.0 if gameplay_entry_fade_seconds > 0.0 else 0.0)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(fade_rect)
+
+
+func _begin_gameplay_entry_fade() -> void:
+	if fade_rect == null:
+		return
+	if gameplay_entry_fade_seconds <= 0.0:
+		fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
+		return
+
+	var tween := create_tween()
+	tween.tween_property(fade_rect, "color:a", 0.0, gameplay_entry_fade_seconds)
 
 
 func _make_label(font_size: int, color: Color, outline_size: int) -> Label:
@@ -1384,14 +1409,12 @@ func _update_speeder_ai() -> void:
 
 		var lane_index := int(entity["lane"])
 		if _speeder_needs_lane_change(entity, lane_index):
-			var target_lane := 2 if lane_index == 1 else 1
-			if _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
-				if target_lane == player_lane:
-					_start_speeder_lane_change_warning(entity["sprite"], target_lane)
-				elif not speeder_lane_change_warning_active or pending_speeder_lane_change_sprite != entity["sprite"]:
-					entity["lane"] = target_lane
-					entity["target_lane"] = target_lane
-					entity["sprite"].z_index = _z_for_lane(target_lane, 2)
+			var avoid_target_lane := 2 if lane_index == 1 else 1
+			_try_set_speeder_target_lane(entity, avoid_target_lane)
+			continue
+
+		if lane_index != 1:
+			_try_set_speeder_target_lane(entity, 1)
 
 
 func _speeder_needs_lane_change(speeder: Dictionary, lane_index: int) -> bool:
@@ -1425,6 +1448,25 @@ func _lane_is_safe_for_entity(moving_entity: Dictionary, target_lane: int, safe_
 		var entity_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
 		if absf(entity_rect.get_center().x - moving_rect.get_center().x) < safe_gap:
 			return false
+	return true
+
+
+func _try_set_speeder_target_lane(entity: Dictionary, target_lane: int) -> bool:
+	if int(entity.get("lane", target_lane)) == target_lane:
+		return false
+	if not _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+		return false
+
+	if target_lane == player_lane:
+		_start_speeder_lane_change_warning(entity["sprite"], target_lane)
+		return true
+
+	if speeder_lane_change_warning_active and pending_speeder_lane_change_sprite != entity["sprite"]:
+		return false
+
+	entity["lane"] = target_lane
+	entity["target_lane"] = target_lane
+	entity["sprite"].z_index = _z_for_lane(target_lane, 2)
 	return true
 
 

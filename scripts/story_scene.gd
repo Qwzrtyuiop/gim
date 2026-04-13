@@ -48,6 +48,7 @@ var current_right_portrait_ref = null
 var current_focus_side := "none"
 var return_scene_path := FALLBACK_SCENE
 var complete_scene_path := ""
+var story_id := ""
 var choice_buttons: Array[BaseButton] = []
 var background_zoom := 1.0
 var background_pan := Vector2.ZERO
@@ -56,14 +57,20 @@ var is_input_locked := false
 
 
 func _ready() -> void:
+	PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
 	_apply_theme()
 	_load_story_payload()
 	_refresh_background_transform()
 	await _play_intro_fade()
-	await _show_line(0)
+	var resume_index := PlayerState.get_last_seen_story_section(story_id)
+	if resume_index < 0 or resume_index >= story_lines.size():
+		resume_index = 0
+	await _show_line(resume_index)
 
 
 func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
+		return
 	if is_input_locked or _has_active_choices():
 		return
 
@@ -100,6 +107,7 @@ func _load_story_payload() -> void:
 			story_lines.append((line_data as Dictionary).duplicate(true))
 
 	chapter_label.text = str(story_payload.get("chapter_title", "STORY")).to_upper()
+	story_id = str(story_payload.get("story_id", chapter_label.text.to_lower().replace(" ", "_")))
 	return_scene_path = str(story_payload.get("return_scene", FALLBACK_SCENE))
 	if return_scene_path.is_empty():
 		return_scene_path = FALLBACK_SCENE
@@ -116,6 +124,7 @@ func _show_line(index: int) -> void:
 
 	is_input_locked = true
 	current_line_index = index
+	PlayerState.set_last_seen_story_section(story_id, index)
 	var line := story_lines[index]
 	continue_label.visible = false
 	await _pause_for_seconds(float(line.get("pause_before", 0.0)))
@@ -185,14 +194,21 @@ func _render_choices(line: Dictionary) -> void:
 		button.custom_minimum_size = Vector2(420.0, 54.0)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.text = str(choice_data.get("text", "CONTINUE"))
+		var is_disabled := bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
+		button.disabled = is_disabled
+		button.focus_mode = Control.FOCUS_NONE if is_disabled else Control.FOCUS_ALL
 		_apply_choice_button_theme(button)
-		button.pressed.connect(_choose_branch.bind(choice_data))
+		if not is_disabled:
+			button.pressed.connect(_choose_branch.bind(choice_data))
 		choice_container.add_child(button)
 		choice_buttons.append(button)
-		ButtonGlow.attach(self, button)
+		if not is_disabled:
+			ButtonGlow.attach(self, button)
 
-	if not choice_buttons.is_empty():
-		choice_buttons[0].grab_focus()
+	for button in choice_buttons:
+		if is_instance_valid(button) and not button.disabled:
+			button.grab_focus()
+			break
 
 
 func _run_choice_actions(choice_data: Dictionary) -> void:
@@ -476,12 +492,14 @@ func _apply_choice_button_theme(button: Button) -> void:
 	button.add_theme_color_override("font_hover_color", Color(0.16, 0.10, 0.06, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.10, 0.08, 0.05, 1.0))
 	button.add_theme_color_override("font_focus_color", Color(0.16, 0.10, 0.06, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.56, 0.50, 0.9))
 	button.add_theme_color_override("font_outline_color", Color.BLACK)
 	button.add_theme_constant_override("outline_size", 1)
 	button.add_theme_stylebox_override("normal", _make_panel_style(CHOICE_BUTTON_BG, CHOICE_BUTTON_BORDER, 7))
 	button.add_theme_stylebox_override("hover", _make_panel_style(CHOICE_BUTTON_HOVER_BG, CHOICE_BUTTON_BORDER, 7))
 	button.add_theme_stylebox_override("pressed", _make_panel_style(CHOICE_BUTTON_PRESSED_BG, CHOICE_BUTTON_BORDER, 7))
 	button.add_theme_stylebox_override("focus", _make_panel_style(CHOICE_BUTTON_HOVER_BG, CHOICE_BUTTON_BORDER, 7))
+	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.18, 0.13, 0.10, 0.9), Color(0.10, 0.08, 0.06, 0.9), 7))
 
 
 func _make_panel_style(bg_color: Color, border_color: Color, radius: int) -> StyleBoxFlat:
@@ -532,6 +550,12 @@ func _run_story_action(action_data: Dictionary) -> void:
 			_play_music_action(action_data)
 		"stop_music", "music_stop":
 			bgm_player.stop()
+		"unlock_achievement", "achievement_unlock":
+			PlayerState.unlock_achievement(str(action_data.get("id", action_data.get("achievement_id", ""))))
+		"add_money", "gain_money":
+			PlayerState.add_money(int(action_data.get("amount", 0)))
+		"add_karma", "change_karma":
+			PlayerState.add_karma(int(action_data.get("amount", 0)))
 		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
 			_play_sfx_action(action_data)
 		"stop_sfx", "sfx_stop":

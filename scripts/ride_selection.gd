@@ -1,6 +1,7 @@
 extends Control
 
 const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
+const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
@@ -30,6 +31,7 @@ var stats_row_refs: Dictionary = {}
 
 
 func _ready() -> void:
+	PlayerState.set_resume_scene("res://scenes/ride_selection.tscn")
 	rng.randomize()
 	pending_trip_selection = PlayerState.get_pending_trip_selection()
 	selected_distance = PlayerState.get_locked_pending_trip_distance()
@@ -77,6 +79,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
+		return
 	if event.is_action_pressed("ui_cancel") and _allow_back():
 		_go_back()
 
@@ -152,6 +156,15 @@ func _refresh_character_cards() -> void:
 
 
 func _roll_character_cards() -> Array[Dictionary]:
+	for _attempt in range(24):
+		var rolled_cards := _roll_character_cards_once()
+		if _has_distance_coverage(rolled_cards):
+			return rolled_cards
+
+	return _build_guaranteed_coverage_cards()
+
+
+func _roll_character_cards_once() -> Array[Dictionary]:
 	var eligible_first_appearance: Array[Dictionary] = []
 	var eligible_repeat: Array[Dictionary] = []
 	for character_data in PlayerState.get_mock_characters():
@@ -195,6 +208,44 @@ func _roll_character_cards() -> Array[Dictionary]:
 
 		used_ids[picked_character["id"]] = true
 		card_results.append(_lock_character_for_selection(picked_character))
+
+	while card_results.size() < 3:
+		card_results.append({})
+
+	return card_results
+
+
+func _has_distance_coverage(card_results: Array[Dictionary]) -> bool:
+	for difficulty in PlayerState.STAGE_DIFFICULTIES:
+		var has_match := false
+		for character in card_results:
+			if character.is_empty():
+				continue
+			if _character_supports_distance(character, str(difficulty)):
+				has_match = true
+				break
+		if not has_match:
+			return false
+	return true
+
+
+func _build_guaranteed_coverage_cards() -> Array[Dictionary]:
+	var card_results: Array[Dictionary] = []
+	var used_ids: Dictionary = {}
+	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
+		var difficulty := str(difficulty_variant)
+		var candidate := _pick_character_for_distance(difficulty, used_ids)
+		if candidate.is_empty():
+			continue
+		used_ids[candidate["id"]] = true
+		card_results.append(_lock_character_for_selection(candidate))
+
+	while card_results.size() < 3:
+		var filler := _pick_character_for_distance(selected_distance, used_ids)
+		if filler.is_empty():
+			break
+		used_ids[filler["id"]] = true
+		card_results.append(_lock_character_for_selection(filler))
 
 	while card_results.size() < 3:
 		card_results.append({})
@@ -254,12 +305,45 @@ func _fallback_short_trip_character(used_ids: Dictionary) -> Dictionary:
 	return fallback_candidates[0]
 
 
+func _pick_character_for_distance(distance: String, used_ids: Dictionary) -> Dictionary:
+	var seen_candidates: Array[Dictionary] = []
+	var unseen_candidates: Array[Dictionary] = []
+	for character_data in PlayerState.get_mock_characters():
+		var character: Dictionary = character_data
+		var character_id := str(character.get("id", ""))
+		if used_ids.has(character_id):
+			continue
+		var is_seen := PlayerState.has_seen_mock_character(character_id)
+		if not _supports_distance_in_selection(character, distance, not is_seen):
+			continue
+		if is_seen:
+			seen_candidates.append(character)
+		else:
+			unseen_candidates.append(character)
+
+	if not seen_candidates.is_empty():
+		seen_candidates.shuffle()
+		return seen_candidates[0]
+	if not unseen_candidates.is_empty():
+		unseen_candidates.shuffle()
+		return unseen_candidates[0]
+	return {}
+
+
 func _supports_short_trip(character: Dictionary, is_first_appearance: bool) -> bool:
+	return _supports_distance_in_selection(character, "short", is_first_appearance)
+
+
+func _supports_distance_in_selection(character: Dictionary, distance: String, is_first_appearance: bool) -> bool:
 	if is_first_appearance:
-		return str(character.get("first_distance", "")) == "short"
+		return str(character.get("first_distance", "")) == distance
 
 	var eligible_distances: Array = character.get("eligible_distances", [])
-	return eligible_distances.has("short")
+	return eligible_distances.has(distance)
+
+
+func _character_supports_distance(character: Dictionary, distance: String) -> bool:
+	return _supports_distance_in_selection(character, distance, bool(character.get("is_first_appearance", false)))
 
 
 func _lock_character_for_selection(picked_character: Dictionary) -> Dictionary:
@@ -333,6 +417,7 @@ func _choose_character(card_index: int) -> void:
 		return
 
 	PlayerState.set_current_mock_character(str(character.get("id", "")))
+	var should_show_day_start_transition := PlayerState.will_advance_day(transition_mode)
 	PlayerState.advance_to_next_stage(
 		transition_mode,
 		selected_distance,
@@ -342,7 +427,7 @@ func _choose_character(card_index: int) -> void:
 	if PlayerState.is_run_failed():
 		get_tree().change_scene_to_file(FALLBACK_SCENE)
 		return
-	get_tree().change_scene_to_file(NEXT_STAGE_SCENE)
+	get_tree().change_scene_to_file(DAY_START_SCENE if should_show_day_start_transition else NEXT_STAGE_SCENE)
 
 
 func _go_back() -> void:

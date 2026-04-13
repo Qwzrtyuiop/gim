@@ -20,6 +20,7 @@ var stats_row_refs: Dictionary = {}
 
 
 func _ready() -> void:
+	PlayerState.set_resume_scene("res://scenes/stage_results.tscn")
 	_create_stats_row()
 	ButtonGlow.attach(self, rest_button)
 	ButtonGlow.attach(self, store_button)
@@ -35,6 +36,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
+		return
 	if event.is_action_pressed("ui_accept"):
 		if rest_button.visible and rest_button.has_focus():
 			_rest_then_next_stage()
@@ -92,7 +95,7 @@ func _rest_then_next_stage() -> void:
 	var current_time := PlayerState.get_current_time_of_day()
 	if current_time == "night":
 		PlayerState.apply_night_rest_bonus()
-		_begin_sleep_transition()
+		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return
 
 	if not PlayerState.can_rest_after_stage():
@@ -100,10 +103,10 @@ func _rest_then_next_stage() -> void:
 
 	if current_time == "noon":
 		PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NEXT_DAY)
-		_begin_sleep_transition()
+		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return
 
-	_begin_trip_selection(PlayerState.TRANSITION_REST_TO_NIGHT)
+	_begin_sleep_transition(PlayerState.TRANSITION_REST_TO_NIGHT)
 
 
 func _next_stage() -> void:
@@ -115,8 +118,8 @@ func _begin_trip_selection(transition_mode: String) -> void:
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
-func _begin_sleep_transition() -> void:
-	PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY, false)
+func _begin_sleep_transition(transition_mode: String) -> void:
+	PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, transition_mode, false)
 	get_tree().change_scene_to_file(SLEEP_TRANSITION_SCENE)
 
 
