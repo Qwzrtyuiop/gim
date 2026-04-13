@@ -1,6 +1,7 @@
 extends Control
 
 const GAME_SCENE := "res://scenes/main.tscn"
+const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const FADE_SECONDS := 0.45
 const LINE_FADE_SECONDS := 0.35
@@ -39,6 +40,9 @@ func _begin_transition() -> void:
 	await _fade_node(day_label, "modulate:a", 0.0, FADE_SECONDS)
 	await _fade_node(fade_overlay, "color:a", 1.0, FADE_SECONDS)
 
+	if PlayerState.is_run_failed():
+		get_tree().change_scene_to_file(GAME_OVER_SCENE)
+		return
 	if not PlayerState.get_stage_start_error().is_empty():
 		get_tree().change_scene_to_file(FALLBACK_SCENE)
 		return

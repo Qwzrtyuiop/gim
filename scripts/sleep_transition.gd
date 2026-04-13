@@ -4,6 +4,7 @@ const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
+const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const SLEEP_MESSAGE_SECONDS := 1.0
 const LABEL_FADE_SECONDS := 0.45
@@ -66,15 +67,16 @@ func _run_full_sequence() -> void:
 
 func _run_after_day_end_story() -> void:
 	await _show_sleep_message()
-	if _launch_story_trigger(PlayerState.STORY_TRIGGER_SLEEP_MIDPOINT, _next_day_number(), RESUME_AFTER_SLEEP_MIDPOINT_STORY):
+	if _launch_story_trigger(PlayerState.STORY_TRIGGER_SLEEP_MIDPOINT, _target_day_number(), RESUME_AFTER_SLEEP_MIDPOINT_STORY):
 		return
 	await _run_after_sleep_midpoint_story()
 
 
 func _run_after_sleep_midpoint_story() -> void:
+	var target_day := _target_day_number()
 	await _show_day_card()
-	PlayerState.prepare_day_start(_next_day_number())
-	if _launch_story_trigger(PlayerState.STORY_TRIGGER_DAY_START, _next_day_number(), RESUME_AFTER_DAY_START_STORY):
+	PlayerState.prepare_day_start(target_day)
+	if _launch_story_trigger(PlayerState.STORY_TRIGGER_DAY_START, target_day, RESUME_AFTER_DAY_START_STORY):
 		return
 	_finish_transition()
 
@@ -88,7 +90,7 @@ func _show_sleep_message() -> void:
 
 
 func _show_day_card() -> void:
-	day_label.text = "DAY %d" % _next_day_number()
+	day_label.text = "DAY %d" % _target_day_number()
 	day_label.visible = true
 	day_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	await _fade_label(day_label, 1.0, LABEL_FADE_SECONDS)
@@ -97,7 +99,9 @@ func _show_day_card() -> void:
 	day_label.visible = false
 
 
-func _next_day_number() -> int:
+func _target_day_number() -> int:
+	if _transition_mode() == PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY and PlayerState.get_current_time_of_day() == "morning":
+		return PlayerState.get_current_day()
 	return PlayerState.get_transition_display_day(_transition_mode())
 
 
@@ -107,7 +111,11 @@ func _finish_transition() -> void:
 		get_tree().change_scene_to_file(HOUSE_DAY_START_SCENE)
 		return
 	if _transition_mode() == PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY:
-		PlayerState.prepare_day_start(_next_day_number())
+		if PlayerState.get_current_time_of_day() != "morning":
+			PlayerState.prepare_day_start(_target_day_number())
+		if PlayerState.is_run_failed():
+			get_tree().change_scene_to_file(GAME_OVER_SCENE)
+			return
 		get_tree().change_scene_to_file(HOUSE_DAY_START_SCENE)
 		return
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)

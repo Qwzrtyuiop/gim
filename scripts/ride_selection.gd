@@ -3,6 +3,7 @@ extends Control
 const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
 const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
+const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
@@ -411,7 +412,7 @@ func _choose_character(card_index: int) -> void:
 	)
 	PlayerState.clear_pending_trip_selection()
 	if PlayerState.is_run_failed():
-		get_tree().change_scene_to_file(FALLBACK_SCENE)
+		get_tree().change_scene_to_file(GAME_OVER_SCENE)
 		return
 	var target_scene := DAY_START_SCENE if should_show_day_start_transition else NEXT_STAGE_SCENE
 	if str(pending_trip_selection.get("return_scene", "")) == HOUSE_DAY_START_SCENE:

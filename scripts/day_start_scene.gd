@@ -4,9 +4,11 @@ const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
+const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const HOME_REST_FADE_SECONDS := 0.28
 
 @onready var header_label: Label = $HeaderLabel
 @onready var status_label: Label = $StatusLabel
@@ -14,12 +16,17 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 @onready var rest_button: BaseButton = $BreakButtons/RestButton
 @onready var store_button: BaseButton = $BreakButtons/StoreButton
 @onready var ride_button: BaseButton = $BreakButtons/RideButton
+@onready var fade_overlay: ColorRect = $FadeOverlay
 
 var stats_row_refs: Dictionary = {}
+var is_transitioning := false
 
 
 func _ready() -> void:
 	PlayerState.set_resume_scene(DAY_START_SCENE)
+	if PlayerState.is_run_failed():
+		get_tree().change_scene_to_file(GAME_OVER_SCENE)
+		return
 	var current_time := PlayerState.get_current_time_of_day()
 	if PlayerState.get_current_day() <= 1 or (current_time != "morning" and current_time != "noon" and current_time != "night"):
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
@@ -38,6 +45,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if is_transitioning:
+		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
 	if event.is_action_pressed("ui_accept"):
@@ -69,26 +78,30 @@ func _render_day_start() -> void:
 
 
 func _ride_now() -> void:
+	if is_transitioning:
+		return
 	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _open_store() -> void:
+	if is_transitioning:
+		return
 	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 	get_tree().change_scene_to_file(STORE_SCENE)
 
 
 func _rest_then_noon() -> void:
+	if is_transitioning:
+		return
 	if PlayerState.get_current_time_of_day() == "night":
 		PlayerState.apply_night_rest_bonus()
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY, false)
 		get_tree().change_scene_to_file(SLEEP_TRANSITION_SCENE)
 		return
 
-	PlayerState.add_energy(1)
 	var next_time := "noon" if PlayerState.get_current_time_of_day() == "morning" else "night"
-	PlayerState.set_current_stage_time(next_time)
-	_render_day_start()
+	await _transition_home_rest(next_time)
 
 
 func _create_stats_row() -> void:
@@ -109,3 +122,29 @@ func _refresh_stats_row() -> void:
 	if stats_row_refs.is_empty():
 		return
 	PlayerStatsRow.refresh(stats_row_refs)
+
+
+func _transition_home_rest(next_time: String) -> void:
+	is_transitioning = true
+	_set_buttons_disabled(true)
+	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
+	PlayerState.add_energy(1)
+	PlayerState.set_current_stage_time(next_time)
+	_render_day_start()
+	await _fade_overlay_to(0.0, HOME_REST_FADE_SECONDS)
+	_set_buttons_disabled(false)
+	is_transitioning = false
+
+
+func _set_buttons_disabled(is_disabled: bool) -> void:
+	rest_button.disabled = is_disabled
+	store_button.disabled = is_disabled
+	ride_button.disabled = is_disabled
+
+
+func _fade_overlay_to(alpha_value: float, duration: float) -> void:
+	if fade_overlay == null:
+		return
+	var tween := create_tween()
+	tween.tween_property(fade_overlay, "color:a", alpha_value, duration)
+	await tween.finished

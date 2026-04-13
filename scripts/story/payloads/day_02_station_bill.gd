@@ -119,7 +119,6 @@ static func build() -> Dictionary:
 						"path": DRUM_MUSIC,
 						"loop": false,
 						"fade_out": 0.25,
-						"fade_in": 0.2,
 						"volume_db": -6.0,
 					}
 				],
