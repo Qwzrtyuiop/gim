@@ -1,0 +1,174 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/day_start_scene.gd" id="1_daystart"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
+[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/rest.png" id="3_rest"]
+[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/store.png" id="4_store"]
+[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/ride.png" id="5_ride"]
+[ext_resource type="Texture2D" path="res://assets/story/backgrounds/inhouse.png" id="6_bg"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.94, 0.89, 0.78, 0.82)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.33, 0.22, 0.12, 0.92)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0, 0, 0, 0.34)
+shadow_size = 10
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="LabelSettings" id="LabelSettings_header"]
+font = ExtResource("2_font")
+font_size = 22
+font_color = Color(0.22, 0.14, 0.08, 1)
+outline_size = 2
+outline_color = Color(0.93, 0.88, 0.74, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_status"]
+font = ExtResource("2_font")
+font_size = 12
+font_color = Color(0.27, 0.18, 0.1, 1)
+outline_size = 1
+outline_color = Color(0.95, 0.9, 0.78, 0.92)
+
+[node name="DayStartScene" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_daystart")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("6_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Shade" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.04, 0.02, 0.22)
+
+[node name="NightFilter" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.03, 0.06, 0.16, 0.42)
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -500.0
+offset_top = -290.0
+offset_right = 500.0
+offset_bottom = 320.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="HeaderLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -430.0
+offset_top = -248.0
+offset_right = 430.0
+offset_bottom = -90.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_header")
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -430.0
+offset_top = 30.0
+offset_right = 430.0
+offset_bottom = 136.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_status")
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="BreakButtons" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -430.0
+offset_top = 176.0
+offset_right = 430.0
+offset_bottom = 302.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="RestButton" type="TextureButton" parent="BreakButtons"]
+custom_minimum_size = Vector2(257, 112)
+layout_mode = 2
+tooltip_text = "Rest"
+texture_normal = ExtResource("3_rest")
+texture_pressed = ExtResource("3_rest")
+texture_hover = ExtResource("3_rest")
+texture_focused = ExtResource("3_rest")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="StoreButton" type="TextureButton" parent="BreakButtons"]
+custom_minimum_size = Vector2(220, 112)
+layout_mode = 2
+tooltip_text = "Store"
+texture_normal = ExtResource("4_store")
+texture_pressed = ExtResource("4_store")
+texture_hover = ExtResource("4_store")
+texture_focused = ExtResource("4_store")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="RideButton" type="TextureButton" parent="BreakButtons"]
+custom_minimum_size = Vector2(230, 112)
+layout_mode = 2
+tooltip_text = "Ride"
+texture_normal = ExtResource("5_ride")
+texture_pressed = ExtResource("5_ride")
+texture_hover = ExtResource("5_ride")
+texture_focused = ExtResource("5_ride")
+ignore_texture_size = true
+stretch_mode = 0

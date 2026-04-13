@@ -29,6 +29,9 @@ const CHOICE_BUTTON_BORDER := Color(0.13, 0.09, 0.06, 0.98)
 @onready var bgm_player: AudioStreamPlayer = $BGMPlayer
 @onready var sfx_player: AudioStreamPlayer = $SFXPlayer
 @onready var chapter_label: Label = $ChapterLabel
+@onready var debt_overlay: Panel = $DebtOverlay
+@onready var debt_remaining_label: Label = $DebtOverlay/DebtRemainingLabel
+@onready var debt_due_label: Label = $DebtOverlay/DebtDueLabel
 @onready var fade_overlay: ColorRect = $FadeOverlay
 @onready var left_portrait_frame: Panel = $LeftPortraitFrame
 @onready var left_portrait: TextureRect = $LeftPortraitFrame/LeftPortrait
@@ -55,6 +58,7 @@ var background_zoom := 1.0
 var background_pan := Vector2.ZERO
 var background_motion_tween: Tween
 var bgm_fade_tween: Tween
+var debt_overlay_tween: Tween
 var is_input_locked := false
 
 
@@ -67,6 +71,7 @@ func _ready() -> void:
 	var resume_index := PlayerState.get_last_seen_story_section(story_id)
 	if resume_index < 0 or resume_index >= story_lines.size():
 		resume_index = 0
+	await _restore_story_music_state(resume_index)
 	await _show_line(resume_index)
 
 
@@ -119,6 +124,62 @@ func _load_story_payload() -> void:
 	current_right_portrait_ref = story_payload.get("right_portrait", null)
 
 
+func _restore_story_music_state(resume_index: int) -> void:
+	var last_music_action: Dictionary = {}
+	var should_stop_music := false
+
+	var payload_music_action := _build_payload_music_action()
+	if not payload_music_action.is_empty():
+		last_music_action = payload_music_action
+
+	var capped_index := clampi(resume_index, 0, story_lines.size())
+	for line_index in range(capped_index):
+		var line_data: Dictionary = story_lines[line_index]
+		var raw_actions: Array = line_data.get("actions", line_data.get("triggers", []))
+		for action_data_variant in raw_actions:
+			if not action_data_variant is Dictionary:
+				continue
+			var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
+			var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
+			match action_type:
+				"play_music", "music_play":
+					last_music_action = action_data
+					should_stop_music = false
+				"stop_music", "music_stop":
+					last_music_action.clear()
+					should_stop_music = true
+
+	if should_stop_music:
+		bgm_player.stop()
+		return
+
+	if not last_music_action.is_empty():
+		var restore_action := last_music_action.duplicate(true)
+		restore_action["fade_in"] = 0.0
+		restore_action["fade_out"] = 0.0
+		restore_action["restart"] = true
+		await _play_music_action(restore_action)
+
+
+func _build_payload_music_action() -> Dictionary:
+	var payload_bgm = story_payload.get("bgm", story_payload.get("music", null))
+	if payload_bgm == null:
+		return {}
+	if payload_bgm is Dictionary:
+		return (payload_bgm as Dictionary).duplicate(true)
+
+	var path := str(payload_bgm).strip_edges()
+	if path.is_empty():
+		return {}
+	return {
+		"type": "play_music",
+		"path": path,
+		"loop": bool(story_payload.get("music_loop", story_payload.get("bgm_loop", true))),
+		"fade_in": float(story_payload.get("music_fade_in", story_payload.get("bgm_fade_in", DEFAULT_MUSIC_FADE_SECONDS))),
+		"volume_db": float(story_payload.get("music_volume_db", story_payload.get("bgm_volume_db", 0.0))),
+	}
+
+
 func _show_line(index: int) -> void:
 	if story_lines.is_empty() or index < 0 or index >= story_lines.size():
 		_finish_story()
@@ -157,6 +218,10 @@ func _apply_line_visuals(line: Dictionary) -> void:
 			current_background_ref = next_background_ref
 			_set_background_texture(current_background_ref, background_changed)
 		_apply_line_background_camera(line)
+	if line.has("show_debt_overlay"):
+		await _show_debt_overlay(line.get("show_debt_overlay", {}))
+	if line.has("hide_debt_overlay"):
+		await _hide_debt_overlay(line.get("hide_debt_overlay", {}))
 	_set_portrait(left_portrait_frame, left_portrait, current_left_portrait_ref)
 	_set_portrait(right_portrait_frame, right_portrait, current_right_portrait_ref)
 	_apply_portrait_focus_from_side(str(line.get("focus", line.get("speaker_side", "none"))))
@@ -450,6 +515,7 @@ func _apply_theme() -> void:
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	background_fade_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	chapter_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	debt_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	left_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	right_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	dialogue_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -457,17 +523,22 @@ func _apply_theme() -> void:
 	body_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	continue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_apply_label_theme(chapter_label, 12, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 2)
+	_apply_label_theme(debt_remaining_label, 11, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 2)
+	_apply_label_theme(debt_due_label, 10, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
 	_apply_label_theme(speaker_label, 16, Color(0.96, 0.84, 0.56, 1.0), Color.BLACK, 2)
 	_apply_label_theme(body_label, 13, Color(0.98, 0.96, 0.90, 1.0), Color.BLACK, 2)
 	_apply_label_theme(continue_label, 10, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
 	left_portrait_frame.visible = false
 	right_portrait_frame.visible = false
 	dialogue_panel.visible = false
+	debt_overlay.visible = false
+	debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	speaker_label.visible = false
 	body_label.text = ""
 	continue_label.visible = false
 	choice_container.visible = false
 
+	debt_overlay.add_theme_stylebox_override("panel", _make_panel_style(Color(0.12, 0.10, 0.09, 0.86), DIALOGUE_PANEL_BORDER, 10))
 	dialogue_panel.add_theme_stylebox_override("panel", _make_panel_style(DIALOGUE_PANEL_COLOR, DIALOGUE_PANEL_BORDER, 10))
 	left_portrait_frame.add_theme_stylebox_override("panel", _make_panel_style(PORTRAIT_PANEL_COLOR, PORTRAIT_PANEL_BORDER, 10))
 	right_portrait_frame.add_theme_stylebox_override("panel", _make_panel_style(PORTRAIT_PANEL_COLOR, PORTRAIT_PANEL_BORDER, 10))
@@ -560,6 +631,8 @@ func _run_story_action(action_data: Dictionary) -> void:
 			PlayerState.add_money(int(action_data.get("amount", 0)))
 		"add_karma", "change_karma":
 			PlayerState.add_karma(int(action_data.get("amount", 0)))
+		"add_character_progress", "increase_character_progress", "character_progress":
+			_apply_character_progress_action(action_data)
 		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
 			_play_sfx_action(action_data)
 		"stop_sfx", "sfx_stop":
@@ -661,6 +734,12 @@ func _play_sfx_action(action_data: Dictionary) -> void:
 		DisplayServer.beep()
 
 
+func _apply_character_progress_action(action_data: Dictionary) -> void:
+	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
+	var amount := int(action_data.get("amount", action_data.get("value", 1)))
+	PlayerState.increment_unique_character_progress(character_id, amount)
+
+
 func _configure_audio_stream_loop(stream: AudioStream, loop_enabled: bool) -> AudioStream:
 	if stream == null:
 		return null
@@ -699,6 +778,55 @@ func _fade_audio_player_volume(player: AudioStreamPlayer, duration: float, from_
 	bgm_fade_tween.tween_property(player, "volume_db", to_db, duration)
 	await bgm_fade_tween.finished
 	bgm_fade_tween = null
+
+
+func _show_debt_overlay(overlay_data) -> void:
+	var config: Dictionary = {}
+	if overlay_data is Dictionary:
+		config = (overlay_data as Dictionary).duplicate(true)
+	var display_day := int(config.get("day", PlayerState.get_current_day()))
+	debt_remaining_label.text = str(config.get(
+		"remaining_text",
+		"Debt Remaining: PhP %d" % PlayerState.get_total_debt_goal()
+	))
+	debt_due_label.text = str(config.get(
+		"due_text",
+		PlayerState.get_debt_due_text(display_day)
+	))
+	var fade_duration := float(config.get("fade_in", config.get("duration", 0.24)))
+	if debt_overlay_tween:
+		debt_overlay_tween.kill()
+	debt_overlay.visible = true
+	debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	if fade_duration <= 0.0:
+		debt_overlay.modulate = Color.WHITE
+		return
+	debt_overlay_tween = create_tween()
+	debt_overlay_tween.tween_property(debt_overlay, "modulate:a", 1.0, fade_duration)
+	await debt_overlay_tween.finished
+	debt_overlay_tween = null
+
+
+func _hide_debt_overlay(overlay_data) -> void:
+	var fade_duration := 0.2
+	if overlay_data is Dictionary:
+		fade_duration = float((overlay_data as Dictionary).get("fade_out", (overlay_data as Dictionary).get("duration", fade_duration)))
+	elif overlay_data != null:
+		fade_duration = float(overlay_data)
+	if not debt_overlay.visible:
+		return
+	if debt_overlay_tween:
+		debt_overlay_tween.kill()
+	if fade_duration <= 0.0:
+		debt_overlay.visible = false
+		debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
+		return
+	debt_overlay_tween = create_tween()
+	debt_overlay_tween.tween_property(debt_overlay, "modulate:a", 0.0, fade_duration)
+	await debt_overlay_tween.finished
+	debt_overlay.visible = false
+	debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	debt_overlay_tween = null
 
 
 func _apply_portrait_action(action_data: Dictionary) -> void:

@@ -172,6 +172,7 @@ anchor_bottom = 1.0
 offset_top = -70.0
 grow_horizontal = 2
 grow_vertical = 0
+mouse_filter = 2
 color = Color(0.04, 0.045, 0.05, 0.54)
 
 [node name="FadeOverlay" type="ColorRect" parent="." unique_id=1820910476]

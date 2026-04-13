@@ -21,7 +21,7 @@ const STORE_ITEMS := [
 	{
 		"id": "engine_tune",
 		"name": "Engine Tune",
-		"description": "+8% acceleration, +4% top speed per level",
+		"description": "increase top speed and acceleration",
 		"cost": 250,
 		"cost_step": 70,
 		"type": "upgrade",
@@ -30,7 +30,7 @@ const STORE_ITEMS := [
 	{
 		"id": "brake_kit",
 		"name": "Brake Kit",
-		"description": "+10% braking per level",
+		"description": "improve braking power",
 		"cost": 200,
 		"cost_step": 55,
 		"type": "upgrade",
@@ -39,15 +39,24 @@ const STORE_ITEMS := [
 	{
 		"id": "tire_grip",
 		"name": "Tire Grip",
-		"description": "+8% lane switching per level",
+		"description": "faster lane switching",
 		"cost": 150,
 		"cost_step": 60,
 		"type": "upgrade",
 		"max_level": 5,
 	},
 	{
+		"id": "yosi",
+		"name": "Warlboro Blue",
+		"description": "Restore 1 energy. May cause negative effects",
+		"cost": 25,
+		"type": "energy",
+		"energy": 1,
+	},
+	
+	{
 		"id": "energy_snack",
-		"name": "Energy Snack",
+		"name": "Energy Bar",
 		"description": "Restore 1 energy",
 		"cost": 50,
 		"type": "energy",
@@ -179,6 +188,8 @@ func _buy_item(item: Dictionary, label: Label, tier_container: HBoxContainer, bu
 		_refresh_tier_bars(tier_container, next_level, int(item["max_level"]))
 	elif item["type"] == "energy":
 		PlayerState.add_energy(int(item["energy"]))
+		if str(item.get("id", "")) == "yosi":
+			PlayerState.record_yosi_purchase()
 		status_label.text = "%s restored energy." % item["name"]
 	elif item["type"] == "gas":
 		var gas_before := PlayerState.gas
@@ -215,16 +226,18 @@ func _ride() -> void:
 		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 		return
 
-	PlayerState.set_pending_trip_selection(STORE_SCENE, PlayerState.TRANSITION_RIDE)
+	PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _back_to_selection() -> void:
-	if not PlayerState.has_locked_pending_trip_selection():
+	var pending_selection := PlayerState.get_pending_trip_selection()
+	var return_scene := str(pending_selection.get("return_scene", ""))
+	if not PlayerState.has_locked_pending_trip_selection() and return_scene.is_empty():
 		return
 
 	PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
-	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
+	get_tree().change_scene_to_file(return_scene if not return_scene.is_empty() else RIDE_SELECTION_SCENE)
 
 
 func _apply_button_font(button: Button) -> void:
@@ -342,7 +355,8 @@ func _create_stats_row() -> void:
 
 
 func _refresh_back_button() -> void:
-	back_button.visible = PlayerState.has_locked_pending_trip_selection()
+	var pending_selection := PlayerState.get_pending_trip_selection()
+	back_button.visible = PlayerState.has_locked_pending_trip_selection() or not str(pending_selection.get("return_scene", "")).is_empty()
 
 
 func _selection_transition_mode() -> String:

@@ -82,7 +82,7 @@ func _render_results(result: Dictionary) -> void:
 		rest_note = "Rest: sleep, recover +1 energy, then choose a morning trip."
 	elif allow_rest:
 		if time_of_day == "morning":
-			rest_note = "Rest: skip to night and recover +1 energy."
+			rest_note = "Rest: recover +1 energy, then return home for noon."
 		elif time_of_day == "noon":
 			rest_note = "Rest: sleep, recover +3 energy, then choose a morning trip."
 	elif time_of_day == "morning" or time_of_day == "noon":
@@ -106,6 +106,8 @@ func _rest_then_next_stage() -> void:
 		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return
 
+	PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NIGHT)
+	PlayerState.set_current_stage_time("noon")
 	_begin_sleep_transition(PlayerState.TRANSITION_REST_TO_NIGHT)
 
 

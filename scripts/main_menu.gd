@@ -3,6 +3,7 @@ extends Control
 const GAME_SCENE := "res://scenes/main.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
+const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
@@ -246,7 +247,7 @@ func _fade_to_scene(scene_path: String) -> void:
 func _saved_resume_scene() -> String:
 	var saved_scene := PlayerState.get_resume_scene()
 	match saved_scene:
-		GAME_SCENE, STORY_SCENE, DAY_START_SCENE, RIDE_SELECTION_SCENE, STORE_SCENE, STAGE_RESULTS_SCENE, SLEEP_TRANSITION_SCENE:
+		GAME_SCENE, STORY_SCENE, DAY_START_SCENE, HOUSE_DAY_START_SCENE, RIDE_SELECTION_SCENE, STORE_SCENE, STAGE_RESULTS_SCENE, SLEEP_TRANSITION_SCENE:
 			return saved_scene
 
 	if not PlayerState.get_pending_story().is_empty():

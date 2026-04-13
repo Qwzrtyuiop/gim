@@ -1,6 +1,7 @@
 extends Control
 
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
+const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
@@ -72,6 +73,7 @@ func _run_after_day_end_story() -> void:
 
 func _run_after_sleep_midpoint_story() -> void:
 	await _show_day_card()
+	PlayerState.prepare_day_start(_next_day_number())
 	if _launch_story_trigger(PlayerState.STORY_TRIGGER_DAY_START, _next_day_number(), RESUME_AFTER_DAY_START_STORY):
 		return
 	_finish_transition()
@@ -101,6 +103,13 @@ func _next_day_number() -> int:
 
 func _finish_transition() -> void:
 	PlayerState.clear_pending_sleep_transition_state()
+	if _transition_mode() == PlayerState.TRANSITION_REST_TO_NIGHT:
+		get_tree().change_scene_to_file(HOUSE_DAY_START_SCENE)
+		return
+	if _transition_mode() == PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY:
+		PlayerState.prepare_day_start(_next_day_number())
+		get_tree().change_scene_to_file(HOUSE_DAY_START_SCENE)
+		return
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 

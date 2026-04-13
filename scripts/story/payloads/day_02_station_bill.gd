@@ -1,13 +1,21 @@
 extends RefCounted
 
 const STATION_BACKGROUND := "res://assets/story/backgrounds/station.png"
-
+const CITY_AMBIENCE_MUSIC := "res://assets/story/music/city_ambience.mp3"
+const DRUM_MUSIC := "res://assets/story/music/drum.mp3"
 
 static func build() -> Dictionary:
 	return {
 		"story_id": "day_02_station_bill",
 		"chapter_title": "Day 2",
 		"background": STATION_BACKGROUND,
+		"music": {
+			"type": "play_music",
+			"path": CITY_AMBIENCE_MUSIC,
+			"loop": true,
+			"fade_in": 0.55,
+			"volume_db": -9.0,
+		},
 		"composition": [
 			{
 				"background": STATION_BACKGROUND,
@@ -102,10 +110,26 @@ static func build() -> Dictionary:
 			{
 				"speaker": "John Toda",
 				"text": "Me, however...",
+				"show_debt_overlay": {
+					"fade_in": 0.24,
+				},
+				"actions": [
+					{
+						"type": "play_music",
+						"path": DRUM_MUSIC,
+						"loop": false,
+						"fade_out": 0.25,
+						"fade_in": 0.2,
+						"volume_db": -6.0,
+					}
+				],
 			},
 			{
 				"speaker": "John Toda",
 				"text": "So what now?",
+				"hide_debt_overlay": {
+					"fade_out": 0.18,
+				},
 				"choices": [
 					{
 						"text": "Keep",

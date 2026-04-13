@@ -72,6 +72,32 @@ offset_bottom = 70.0
 theme_override_fonts/font = ExtResource("2_font")
 text = "STORY"
 
+[node name="DebtOverlay" type="Panel" parent="." unique_id=178445011]
+visible = false
+layout_mode = 1
+offset_left = 838.0
+offset_top = 34.0
+offset_right = 1226.0
+offset_bottom = 144.0
+
+[node name="DebtRemainingLabel" type="Label" parent="DebtOverlay" unique_id=1612844598]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 18.0
+offset_right = 360.0
+offset_bottom = 48.0
+theme_override_fonts/font = ExtResource("2_font")
+text = "Debt Remaining: PhP 50000"
+
+[node name="DebtDueLabel" type="Label" parent="DebtOverlay" unique_id=435082157]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 56.0
+offset_right = 360.0
+offset_bottom = 84.0
+theme_override_fonts/font = ExtResource("2_font")
+text = "Debt due in 6 days"
+
 [node name="LeftPortraitFrame" type="Panel" parent="." unique_id=1530341034]
 layout_mode = 1
 offset_left = 42.0
