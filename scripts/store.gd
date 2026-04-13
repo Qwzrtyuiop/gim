@@ -2,11 +2,9 @@ extends Control
 
 const STORE_SCENE := "res://scenes/store.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
+const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
-const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
-const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
-const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
 const TIER_BORDER_COLOR := Color(0.23, 0.16, 0.10, 0.92)
@@ -78,10 +76,7 @@ const STORE_ITEMS := [
 @onready var ride_button: BaseButton = $RideButton
 
 var ride_confirm_dialog: ConfirmationDialog
-var stats_row: HBoxContainer
-var money_value_label: Label
-var energy_value_label: Label
-var gas_value_label: Label
+var stats_row_refs: Dictionary = {}
 
 
 func _ready() -> void:
@@ -89,8 +84,8 @@ func _ready() -> void:
 	_refresh_back_button()
 	back_button.pressed.connect(_back_to_selection)
 	ride_button.pressed.connect(_attempt_ride)
-	_connect_button_glow(back_button)
-	_connect_button_glow(ride_button)
+	ButtonGlow.attach(self, back_button)
+	ButtonGlow.attach(self, ride_button)
 	_create_dialogs()
 	_build_items()
 	_refresh_header()
@@ -300,24 +295,6 @@ func _refresh_tier_bars(container: HBoxContainer, level: int, max_level: int) ->
 		container.modulate = Color.WHITE
 
 
-func _connect_button_glow(button: BaseButton) -> void:
-	button.modulate = BUTTON_NORMAL_MODULATE
-	button.mouse_entered.connect(_set_button_glow.bind(button, true))
-	button.mouse_exited.connect(_set_button_glow.bind(button, false))
-	button.focus_entered.connect(_set_button_glow.bind(button, true))
-	button.focus_exited.connect(_set_button_glow.bind(button, false))
-
-
-func _set_button_glow(button: BaseButton, is_glowing: bool) -> void:
-	var tween := create_tween()
-	tween.tween_property(
-		button,
-		"modulate",
-		BUTTON_GLOW_MODULATE if is_glowing else BUTTON_NORMAL_MODULATE,
-		0.08
-	)
-
-
 func _make_label_settings(font_size: int, color: Color) -> LabelSettings:
 	var settings := LabelSettings.new()
 	settings.font = UI_FONT
@@ -329,7 +306,13 @@ func _make_label_settings(font_size: int, color: Color) -> LabelSettings:
 
 
 func _create_stats_row() -> void:
-	stats_row = HBoxContainer.new()
+	stats_row_refs = PlayerStatsRow.create({
+		"font": UI_FONT,
+		"font_size": 12,
+		"font_color": Color(0.24, 0.16, 0.10, 1.0),
+		"outline_color": Color(0.95, 0.92, 0.84, 0.92),
+	})
+	var stats_row := stats_row_refs["row"] as HBoxContainer
 	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stats_row.layout_mode = 1
 	stats_row.anchors_preset = 10
@@ -337,19 +320,7 @@ func _create_stats_row() -> void:
 	stats_row.offset_top = 118.0
 	stats_row.offset_bottom = 146.0
 	stats_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	stats_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	stats_row.add_theme_constant_override("separation", 12)
 	add_child(stats_row)
-
-	money_value_label = _make_stat_label()
-	energy_value_label = _make_stat_label()
-	gas_value_label = _make_stat_label()
-
-	stats_row.add_child(money_value_label)
-	stats_row.add_child(_make_stat_icon(ENERGY_ICON))
-	stats_row.add_child(energy_value_label)
-	stats_row.add_child(_make_stat_icon(GAS_ICON))
-	stats_row.add_child(gas_value_label)
 
 
 func _refresh_back_button() -> void:
@@ -358,34 +329,14 @@ func _refresh_back_button() -> void:
 
 func _selection_transition_mode() -> String:
 	var pending_selection := PlayerState.get_pending_trip_selection()
-	return PlayerState.normalize_transition_mode(String(pending_selection.get("transition_mode", PlayerState.TRANSITION_RIDE)))
+	return PlayerState.normalize_transition_mode(str(pending_selection.get("transition_mode", PlayerState.TRANSITION_RIDE)))
 
 
 func _refresh_stats_row() -> void:
-	if not stats_row:
+	if stats_row_refs.is_empty():
 		return
 
-	money_value_label.text = "Money: PhP %d" % PlayerState.money
-	energy_value_label.text = "%d/%d" % [PlayerState.energy, PlayerState.max_energy]
-	gas_value_label.text = "%d/%d" % [PlayerState.gas, PlayerState.max_gas]
-
-
-func _make_stat_label() -> Label:
-	var label := Label.new()
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.label_settings = _make_label_settings(12, Color(0.24, 0.16, 0.10, 1.0))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	return label
-
-
-func _make_stat_icon(texture: Texture2D) -> TextureRect:
-	var icon := TextureRect.new()
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.texture = texture
-	icon.custom_minimum_size = Vector2(22.0, 22.0)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	return icon
+	PlayerStatsRow.refresh(stats_row_refs)
 
 
 func _make_store_row_style() -> StyleBoxFlat:

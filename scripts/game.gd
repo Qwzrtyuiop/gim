@@ -7,6 +7,7 @@ const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
+const STORY_SCENE := "res://scenes/story_scene.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const PLAYER_TEXTURE := preload("res://assets/vehicles/player_tricycle.png")
 const VEHICLE_TEXTURES := {
@@ -87,7 +88,7 @@ const DEFAULT_STAGE_PROFILE := {
 	"player_brake_x": 1.0,
 	"player_coast_deceleration": 85.0,
 	"player_coast_x": 1.0,
-	"player_lane_lerp_speed": 12.0,
+	"player_lane_lerp_speed": 9.0,
 	"player_lane_lerp_x": 1.0,
 	"player_distance_gain_x": 1.0,
 	"player_wiggle_stop_speed": 45.0,
@@ -279,7 +280,7 @@ const BACKGROUND_PROFILES := {
 @export_range(0.0, 5.0, 0.05) var player_brake_x := 1.0
 @export_range(0.0, 1200.0, 5.0) var player_coast_deceleration := 85.0
 @export_range(0.0, 5.0, 0.05) var player_coast_x := 1.0
-@export_range(0.0, 30.0, 0.25) var player_lane_lerp_speed := 12.0
+@export_range(0.0, 30.0, 0.25) var player_lane_lerp_speed := 9.0
 @export_range(0.0, 5.0, 0.05) var player_lane_lerp_x := 1.0
 @export_range(0.0, 5.0, 0.05) var player_distance_gain_x := 1.0
 @export_range(0.0, 300.0, 1.0) var player_wiggle_stop_speed := 45.0
@@ -386,6 +387,7 @@ var footer_gas_label: Label
 var status_label: Label
 var top_right_info_panel: TextureRect
 var stage_label: Label
+var weekly_goal_label: Label
 var debt_goal_label: Label
 var speeder_warning_label: Label
 var speeder_beep_player: AudioStreamPlayer
@@ -730,7 +732,12 @@ func _create_ui() -> void:
 	stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 	ui.add_child(stage_label)
 
-	debt_goal_label = _make_label(10, Color(0.98, 0.92, 0.74, 1.0), 4)
+	weekly_goal_label = _make_label(12, Color(1.0, 0.95, 0.78, 1.0), 4)
+	weekly_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	weekly_goal_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ui.add_child(weekly_goal_label)
+
+	debt_goal_label = _make_label(9, Color(0.92, 0.88, 0.74, 1.0), 3)
 	debt_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	debt_goal_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	debt_goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -905,14 +912,18 @@ func _layout_scene() -> void:
 		top_right_info_panel.position = Vector2(size.x - 414.0, 10.0)
 		top_right_info_panel.size = Vector2(396.0, 164.0)
 
-	if stage_label:
-		stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
-		stage_label.position = Vector2(size.x - 382.0, 34.0)
-		stage_label.size = Vector2(332.0, 60.0)
+		if stage_label:
+			stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
+			stage_label.position = Vector2(size.x - 382.0, 34.0)
+			stage_label.size = Vector2(332.0, 60.0)
 
-	if debt_goal_label:
-		debt_goal_label.position = Vector2(size.x - 382.0, 108.0)
-		debt_goal_label.size = Vector2(332.0, 28.0)
+		if weekly_goal_label:
+			weekly_goal_label.position = Vector2(size.x - 382.0, 100.0)
+			weekly_goal_label.size = Vector2(332.0, 32.0)
+
+		if debt_goal_label:
+			debt_goal_label.position = Vector2(size.x - 382.0, 132.0)
+			debt_goal_label.size = Vector2(332.0, 32.0)
 
 	if speeder_warning_label:
 		speeder_warning_label.position = Vector2(player_x + 105.0, _lane_y(1, size) - 92.0)
@@ -1565,8 +1576,15 @@ func _update_ui() -> void:
 	if stage_label:
 		stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 
+	if weekly_goal_label:
+		weekly_goal_label.text = "WEEKLY GOAL: PhP %d" % PlayerState.get_current_weekly_goal()
+
 	if debt_goal_label:
-		debt_goal_label.text = PlayerState.get_debt_status_text()
+		debt_goal_label.text = "Debt Remaining: PhP %d\nCollector in %d %s" % [
+			PlayerState.get_total_debt_goal(),
+			PlayerState.get_days_until_debt_collection(),
+			"day" if PlayerState.get_days_until_debt_collection() == 1 else "days",
+		]
 
 
 func _check_collisions() -> void:
@@ -1684,6 +1702,27 @@ func _update_stage_clear_transition(delta: float) -> void:
 
 
 func _go_to_profit_screen() -> void:
+	var stage_story_trigger := PlayerState.find_story_trigger_for_phase(
+		PlayerState.STORY_TRIGGER_STAGE_COMPLETE,
+		PlayerState.get_current_day(),
+		{
+			"stage_type": stage_type,
+			"difficulty": stage_difficulty,
+			"time_of_day": stage_time_of_day,
+			"traffic": stage_traffic,
+			"character_id": PlayerState.get_current_mock_character_id(),
+		}
+	)
+	if not stage_story_trigger.is_empty():
+		var story_payload := PlayerState.get_story_payload_for_trigger(stage_story_trigger)
+		if not story_payload.is_empty():
+			story_payload["return_scene"] = STAGE_RESULTS_SCENE
+			story_payload["next_scene"] = STAGE_RESULTS_SCENE
+			PlayerState.set_pending_story(story_payload)
+			PlayerState.consume_story_trigger(stage_story_trigger)
+			get_tree().change_scene_to_file(STORY_SCENE)
+			return
+
 	get_tree().change_scene_to_file(STAGE_RESULTS_SCENE)
 
 

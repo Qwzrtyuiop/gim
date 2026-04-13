@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/sleep_transition.gd" id="1_sleep"]
 [ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
@@ -7,6 +7,13 @@
 font = ExtResource("2_font")
 font_size = 22
 font_color = Color(0.96, 0.96, 0.92, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_day"]
+font = ExtResource("2_font")
+font_size = 30
+font_color = Color(0.98, 0.97, 0.9, 1)
 outline_size = 2
 outline_color = Color(0, 0, 0, 0.95)
 
@@ -42,5 +49,24 @@ offset_bottom = 24.0
 grow_horizontal = 2
 grow_vertical = 2
 label_settings = SubResource("LabelSettings_sleep")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DayLabel" type="Label" parent="."]
+visible = false
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -260.0
+offset_top = -32.0
+offset_right = 260.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_day")
 horizontal_alignment = 1
 vertical_alignment = 1

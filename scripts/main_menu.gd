@@ -1,6 +1,10 @@
 extends Control
 
 const GAME_SCENE := "res://scenes/main.tscn"
+const STORY_SCENE := "res://scenes/story_scene.tscn"
+const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
+const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const Scene01IntroPayload := preload("res://scripts/story/payloads/scene_01_intro.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
@@ -14,10 +18,9 @@ const ROAD_ACTOR_Z_BASE := 10
 const ROAD_ACTOR_Z_STEP := 10
 const INCOMING_LANE_SCALE := 0.78
 const MAIN_LANE_SCALE := 1.0
-const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
-const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
 const RESET_HOLD_SECONDS := 1.4
 const LAST_ENERGY_WARNING := "Start the day with your last energy?\nIf this trip goes bad, the run ends."
+const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
 @onready var quit_button: BaseButton = $Menu/QuitButton
@@ -25,6 +28,7 @@ const LAST_ENERGY_WARNING := "Start the day with your last energy?\nIf this trip
 @onready var traffic_layer: Node2D = $TrafficLayer
 @onready var menu_trace_lines: Node2D = $MenuTraceLines
 @onready var hint_label: Label = $Hint
+@onready var fade_overlay: ColorRect = $FadeOverlay
 
 var rng := RandomNumberGenerator.new()
 var menu_vehicles: Array = []
@@ -33,6 +37,7 @@ var reset_hold_time := 0.0
 var reset_message_time := 0.0
 var blocked_start_message_time := 0.0
 var start_confirm_dialog: ConfirmationDialog
+var is_start_transitioning := false
 
 
 func _ready() -> void:
@@ -42,8 +47,8 @@ func _ready() -> void:
 	quit_button.pressed.connect(_quit_game)
 	_apply_button_font(start_button)
 	_apply_button_font(quit_button)
-	_connect_button_glow(start_button)
-	_connect_button_glow(quit_button)
+	ButtonGlow.attach(self, start_button)
+	ButtonGlow.attach(self, quit_button)
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu_trace_lines.visible = false
 	_create_dialogs()
@@ -76,6 +81,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _start_game() -> void:
+	if is_start_transitioning:
+		return
 	if PlayerState.is_run_failed():
 		blocked_start_message_time = 1.8
 		hint_label.text = _default_hint_text()
@@ -90,14 +97,24 @@ func _start_game() -> void:
 
 
 func _confirm_start_game() -> void:
-	if not PlayerState.prepare_stage_start():
+	if not PlayerState.get_stage_start_error().is_empty():
 		blocked_start_message_time = 1.8
 		hint_label.text = "%s Hold R to reset progress" % PlayerState.get_stage_start_error()
 		return
-	get_tree().change_scene_to_file(GAME_SCENE)
+
+	is_start_transitioning = true
+	start_button.disabled = true
+	quit_button.disabled = true
+	PlayerState.set_pending_story(Scene01IntroPayload.build(
+		DAY_START_SCENE,
+		PlayerState.get_current_stage_type()
+	))
+	_fade_to_intro_story()
 
 
 func _quit_game() -> void:
+	if is_start_transitioning:
+		return
 	get_tree().quit()
 
 
@@ -121,23 +138,11 @@ func _apply_button_font(button: BaseButton) -> void:
 	button.add_theme_color_override("font_outline_color", Color.BLACK)
 	button.add_theme_constant_override("outline_size", 1)
 
-
-func _connect_button_glow(button: BaseButton) -> void:
-	button.modulate = BUTTON_NORMAL_MODULATE
-	button.mouse_entered.connect(_set_button_glow.bind(button, true))
-	button.mouse_exited.connect(_set_button_glow.bind(button, false))
-	button.focus_entered.connect(_set_button_glow.bind(button, true))
-	button.focus_exited.connect(_set_button_glow.bind(button, false))
-
-
-func _set_button_glow(button: BaseButton, is_glowing: bool) -> void:
+func _fade_to_intro_story() -> void:
 	var tween := create_tween()
-	tween.tween_property(
-		button,
-		"modulate",
-		BUTTON_GLOW_MODULATE if is_glowing else BUTTON_NORMAL_MODULATE,
-		0.08
-	)
+	tween.tween_property(fade_overlay, "color:a", 1.0, START_FADE_SECONDS)
+	await tween.finished
+	get_tree().change_scene_to_file(STORY_SCENE)
 
 
 func _update_reset_progress(delta: float) -> void:

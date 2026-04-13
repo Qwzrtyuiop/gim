@@ -1,25 +1,11 @@
-[gd_scene load_steps=10 format=3 uid="uid://bfid4j4r4diok"]
+[gd_scene format=3 uid="uid://bfid4j4r4diok"]
 
-[ext_resource type="Script" path="res://scripts/stage_results.gd" id="1_tquao"]
-[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_8u0qp"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/rest.png" id="3_g85nl"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/store.png" id="4_dcwer"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/ride.png" id="5_qawoh"]
-[ext_resource type="Texture2D" path="res://assets/bg/bgresult.png" id="6_t41m0"]
-
-[sub_resource type="LabelSettings" id="LabelSettings_results"]
-font = ExtResource("2_8u0qp")
-font_size = 22
-font_color = Color(0.22, 0.14, 0.08, 1)
-outline_size = 2
-outline_color = Color(0.93, 0.88, 0.74, 0.95)
-
-[sub_resource type="LabelSettings" id="LabelSettings_status"]
-font = ExtResource("2_8u0qp")
-font_size = 12
-font_color = Color(0.27, 0.18, 0.10, 1)
-outline_size = 1
-outline_color = Color(0.95, 0.90, 0.78, 0.92)
+[ext_resource type="Script" uid="uid://d0fogap6m72xr" path="res://scripts/stage_results.gd" id="1_tquao"]
+[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_8u0qp"]
+[ext_resource type="Texture2D" uid="uid://bw2xm8aa7yi28" path="res://assets/ui/breakbuttons/rest.png" id="3_g85nl"]
+[ext_resource type="Texture2D" uid="uid://dfos6wwc0bjgk" path="res://assets/ui/breakbuttons/store.png" id="4_dcwer"]
+[ext_resource type="Texture2D" uid="uid://che5t4hm0jmwu" path="res://assets/ui/breakbuttons/ride.png" id="5_qawoh"]
+[ext_resource type="Texture2D" uid="uid://co2n0vdtlpy6y" path="res://assets/bg/bgresult.png" id="6_t41m0"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.94, 0.89, 0.78, 0.82)
@@ -36,7 +22,21 @@ shadow_color = Color(0, 0, 0, 0.34)
 shadow_size = 10
 shadow_offset = Vector2(0, 4)
 
-[node name="StageResults" type="Control"]
+[sub_resource type="LabelSettings" id="LabelSettings_results"]
+font = ExtResource("2_8u0qp")
+font_size = 22
+font_color = Color(0.22, 0.14, 0.08, 1)
+outline_size = 2
+outline_color = Color(0.93, 0.88, 0.74, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_status"]
+font = ExtResource("2_8u0qp")
+font_size = 12
+font_color = Color(0.27, 0.18, 0.1, 1)
+outline_size = 1
+outline_color = Color(0.95, 0.9, 0.78, 0.92)
+
+[node name="StageResults" type="Control" unique_id=485702986]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -45,7 +45,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_tquao")
 
-[node name="Background" type="TextureRect" parent="."]
+[node name="Background" type="TextureRect" parent="." unique_id=782433433]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -56,7 +56,7 @@ texture = ExtResource("6_t41m0")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="Shade" type="ColorRect" parent="."]
+[node name="Shade" type="ColorRect" parent="." unique_id=680536115]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -65,7 +65,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.06, 0.04, 0.02, 0.22)
 
-[node name="Panel" type="Panel" parent="."]
+[node name="Panel" type="Panel" parent="." unique_id=2015533225]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -80,7 +80,7 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
-[node name="ResultsLabel" type="Label" parent="."]
+[node name="ResultsLabel" type="Label" parent="." unique_id=783440597]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -96,7 +96,7 @@ grow_vertical = 2
 label_settings = SubResource("LabelSettings_results")
 horizontal_alignment = 1
 
-[node name="StatusLabel" type="Label" parent="."]
+[node name="StatusLabel" type="Label" parent="." unique_id=1860378714]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -114,7 +114,7 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
-[node name="BreakButtons" type="HBoxContainer" parent="."]
+[node name="BreakButtons" type="HBoxContainer" parent="." unique_id=1262480800]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -130,7 +130,7 @@ grow_vertical = 2
 theme_override_constants/separation = 18
 alignment = 1
 
-[node name="RestButton" type="TextureButton" parent="BreakButtons"]
+[node name="RestButton" type="TextureButton" parent="BreakButtons" unique_id=2026623210]
 custom_minimum_size = Vector2(257, 112)
 layout_mode = 2
 tooltip_text = "Rest"
@@ -141,7 +141,7 @@ texture_focused = ExtResource("3_g85nl")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="StoreButton" type="TextureButton" parent="BreakButtons"]
+[node name="StoreButton" type="TextureButton" parent="BreakButtons" unique_id=339598409]
 custom_minimum_size = Vector2(220, 112)
 layout_mode = 2
 tooltip_text = "Store"
@@ -152,7 +152,7 @@ texture_focused = ExtResource("4_dcwer")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="RideButton" type="TextureButton" parent="BreakButtons"]
+[node name="RideButton" type="TextureButton" parent="BreakButtons" unique_id=1705534430]
 custom_minimum_size = Vector2(230, 112)
 layout_mode = 2
 tooltip_text = "Ride"

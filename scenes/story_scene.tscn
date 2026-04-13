@@ -1,0 +1,161 @@
+[gd_scene format=3 uid="uid://c3p6tn8qyj6i8"]
+
+[ext_resource type="Script" uid="uid://dl8js33lfk7dj" path="res://scripts/story_scene.gd" id="1_story"]
+[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
+
+[node name="StoryScene" type="Control" unique_id=925313710]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_story")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=1392102764]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.03, 0.03, 0.04, 1)
+
+[node name="FadeOverlay" type="ColorRect" parent="." unique_id=1323556296]
+z_index = 100
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Background" type="TextureRect" parent="." unique_id=913438422]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BackgroundFadeOverlay" type="ColorRect" parent="." unique_id=181246003]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0)
+
+[node name="BGMPlayer" type="AudioStreamPlayer" parent="." unique_id=1228825498]
+process_mode = 1
+
+[node name="SFXPlayer" type="AudioStreamPlayer" parent="." unique_id=217438462]
+process_mode = 1
+
+[node name="ScreenTint" type="ColorRect" parent="." unique_id=1333004000]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.34)
+
+[node name="ChapterLabel" type="Label" parent="." unique_id=907450692]
+layout_mode = 1
+offset_left = 54.0
+offset_top = 34.0
+offset_right = 468.0
+offset_bottom = 70.0
+theme_override_fonts/font = ExtResource("2_font")
+text = "STORY"
+
+[node name="LeftPortraitFrame" type="Panel" parent="." unique_id=1530341034]
+layout_mode = 1
+offset_left = 42.0
+offset_top = 132.0
+offset_right = 368.0
+offset_bottom = 616.0
+
+[node name="LeftPortrait" type="TextureRect" parent="LeftPortraitFrame" unique_id=323303553]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RightPortraitFrame" type="Panel" parent="." unique_id=949159485]
+layout_mode = 1
+offset_left = 914.0
+offset_top = 132.0
+offset_right = 1240.0
+offset_bottom = 616.0
+
+[node name="RightPortrait" type="TextureRect" parent="RightPortraitFrame" unique_id=1665265010]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="DialoguePanel" type="Panel" parent="." unique_id=658651968]
+layout_mode = 1
+offset_left = 54.0
+offset_top = 482.0
+offset_right = 1226.0
+offset_bottom = 686.0
+
+[node name="SpeakerLabel" type="Label" parent="DialoguePanel" unique_id=122740579]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 18.0
+offset_right = 404.0
+offset_bottom = 52.0
+theme_override_fonts/font = ExtResource("2_font")
+text = "SPEAKER"
+
+[node name="BodyLabel" type="Label" parent="DialoguePanel" unique_id=1015564479]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 60.0
+offset_right = 1140.0
+offset_bottom = 158.0
+theme_override_fonts/font = ExtResource("2_font")
+text = "Dialogue goes here."
+autowrap_mode = 3
+
+[node name="ContinueLabel" type="Label" parent="DialoguePanel" unique_id=286648162]
+layout_mode = 0
+offset_left = 898.0
+offset_top = 164.0
+offset_right = 1138.0
+offset_bottom = 188.0
+theme_override_fonts/font = ExtResource("2_font")
+text = "ENTER / CLICK"
+horizontal_alignment = 2
+
+[node name="ChoiceContainer" type="VBoxContainer" parent="." unique_id=398352893]
+visible = false
+layout_mode = 1
+offset_left = 430.0
+offset_top = 192.0
+offset_right = 850.0
+offset_bottom = 408.0
+theme_override_constants/separation = 14
+alignment = 1

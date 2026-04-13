@@ -2,16 +2,16 @@ extends Control
 
 const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
+const STORE_SCENE := "res://scenes/store.tscn"
+const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
-const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
-const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
-const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
 const EMPTY_CARD_CHANCE := 0.28
 @onready var subtitle_label: Label = $Panel/Subtitle
 @onready var status_label: Label = $Panel/StatusLabel
 @onready var money_label: Label = $Panel/MoneyLabel
 @onready var back_button: BaseButton = $Panel/BackButton
+@onready var back_label: Label = $Panel/BackButton/BackLabel
 @onready var short_button: BaseButton = $Panel/ShortButton
 @onready var medium_button: BaseButton = $Panel/MediumButton
 @onready var long_button: BaseButton = $Panel/LongButton
@@ -26,10 +26,7 @@ var pending_trip_selection: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var selected_distance := "short"
 var displayed_characters: Array[Dictionary] = []
-var stats_row: HBoxContainer
-var money_value_label: Label
-var energy_value_label: Label
-var gas_value_label: Label
+var stats_row_refs: Dictionary = {}
 
 
 func _ready() -> void:
@@ -41,7 +38,7 @@ func _ready() -> void:
 	back_button.visible = _allow_back()
 	_create_stats_row()
 
-	back_button.pressed.connect(_go_back)
+	back_button.pressed.connect(_handle_back_button_pressed)
 	short_button.pressed.connect(_set_distance.bind("short"))
 	medium_button.pressed.connect(_set_distance.bind("medium"))
 	long_button.pressed.connect(_set_distance.bind("long"))
@@ -53,7 +50,7 @@ func _ready() -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	for button in [back_button, short_button, medium_button, long_button]:
-		_connect_button_glow(button)
+		ButtonGlow.attach(self, button)
 
 	var locked_characters: Array = PlayerState.get_locked_pending_trip_characters()
 	if locked_characters.is_empty():
@@ -65,14 +62,18 @@ func _ready() -> void:
 			displayed_characters.append(character_data)
 
 	_refresh_header()
+	_refresh_action_button()
 	_set_distance(selected_distance)
-	match selected_distance:
-		"medium":
-			medium_button.grab_focus()
-		"long":
-			long_button.grab_focus()
-		_:
-			short_button.grab_focus()
+	if _show_store_shortcut():
+		back_button.grab_focus()
+	else:
+		match selected_distance:
+			"medium":
+				medium_button.grab_focus()
+			"long":
+				long_button.grab_focus()
+			_:
+				short_button.grab_focus()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -104,7 +105,10 @@ func _set_distance(difficulty: String) -> void:
 	_refresh_subtitle()
 	_refresh_distance_buttons()
 	_refresh_character_cards()
-	status_label.text = "Choose a passenger for a %s trip." % difficulty.capitalize()
+	if _show_store_shortcut():
+		status_label.text = "Out of gas. Visit the store to refuel before Day %d begins." % _display_day()
+	else:
+		status_label.text = "Choose a passenger for a %s trip." % difficulty.capitalize()
 
 
 func _refresh_distance_buttons() -> void:
@@ -114,10 +118,10 @@ func _refresh_distance_buttons() -> void:
 		{"button": long_button, "id": "long"},
 	]:
 		var button := button_data["button"] as BaseButton
-		var button_id: String = String(button_data["id"])
+		var button_id: String = str(button_data["id"])
 		var is_selected: bool = button_id == selected_distance
 		button.disabled = is_selected
-		button.modulate = BUTTON_GLOW_MODULATE if is_selected else BUTTON_NORMAL_MODULATE
+		ButtonGlow.set_state(self, button, is_selected)
 
 
 func _refresh_character_cards() -> void:
@@ -140,7 +144,7 @@ func _refresh_character_cards() -> void:
 			var preview_stage_type: String = _preview_stage_type(character)
 			panel.modulate = Color.WHITE if is_available else Color(0.74, 0.74, 0.74, 0.78)
 			label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d" % [
-				String(character["name"]).to_upper(),
+				str(character["name"]).to_upper(),
 				preview_stage_type,
 				PlayerState.estimate_stage_earnings(preview_stage_type),
 			]
@@ -239,7 +243,7 @@ func _fallback_short_trip_character(used_ids: Dictionary) -> Dictionary:
 		if used_ids.has(character["id"]):
 			continue
 
-		var is_seen := PlayerState.has_seen_mock_character(String(character["id"]))
+		var is_seen := PlayerState.has_seen_mock_character(str(character["id"]))
 		if _supports_short_trip(character, not is_seen):
 			fallback_candidates.append(character)
 
@@ -252,15 +256,15 @@ func _fallback_short_trip_character(used_ids: Dictionary) -> Dictionary:
 
 func _supports_short_trip(character: Dictionary, is_first_appearance: bool) -> bool:
 	if is_first_appearance:
-		return String(character.get("first_distance", "")) == "short"
+		return str(character.get("first_distance", "")) == "short"
 
 	var eligible_distances: Array = character.get("eligible_distances", [])
 	return eligible_distances.has("short")
 
 
 func _lock_character_for_selection(picked_character: Dictionary) -> Dictionary:
-	var was_seen_before_roll := PlayerState.has_seen_mock_character(String(picked_character["id"]))
-	PlayerState.mark_mock_character_seen(String(picked_character["id"]))
+	var was_seen_before_roll := PlayerState.has_seen_mock_character(str(picked_character["id"]))
+	PlayerState.mark_mock_character_seen(str(picked_character["id"]))
 	var locked_character: Dictionary = picked_character.duplicate(true)
 	locked_character["stage_traffic"] = PlayerState.get_random_stage_traffic_type()
 	locked_character["is_first_appearance"] = not was_seen_before_roll
@@ -277,7 +281,7 @@ func _is_character_available(character: Dictionary) -> bool:
 		return false
 
 	if bool(character.get("is_first_appearance", false)):
-		return selected_distance == String(character.get("first_distance", ""))
+		return selected_distance == str(character.get("first_distance", ""))
 
 	var eligible_distances: Array = character.get("eligible_distances", [])
 	return eligible_distances.has(selected_distance)
@@ -286,11 +290,11 @@ func _is_character_available(character: Dictionary) -> bool:
 func _preview_distance_for_character(character: Dictionary) -> String:
 	var preview_distance := selected_distance
 	if bool(character.get("is_first_appearance", false)):
-		preview_distance = String(character.get("first_distance", selected_distance))
+		preview_distance = str(character.get("first_distance", selected_distance))
 	elif not _is_character_available(character):
 		var eligible_distances: Array = character.get("eligible_distances", [])
 		if not eligible_distances.is_empty():
-			preview_distance = String(eligible_distances[0])
+			preview_distance = str(eligible_distances[0])
 
 	return preview_distance
 
@@ -299,7 +303,7 @@ func _preview_stage_type(character: Dictionary) -> String:
 	return PlayerState.build_stage_type(
 		_preview_distance_for_character(character),
 		PlayerState.get_next_stage_time(_transition_mode()),
-		String(character.get("stage_traffic", "chill"))
+		str(character.get("stage_traffic", "chill"))
 	)
 
 
@@ -316,22 +320,23 @@ func _choose_character(card_index: int) -> void:
 		return
 
 	var transition_mode := _transition_mode()
-	var energy_bonus := PlayerState.get_transition_energy_bonus(transition_mode)
-	var applied_bonus: int = mini(energy_bonus, PlayerState.max_energy - PlayerState.energy)
-	if applied_bonus > 0:
-		PlayerState.add_energy(applied_bonus)
+	var applied_bonus := PlayerState.apply_transition_energy_bonus(transition_mode)
 
 	if not PlayerState.prepare_stage_start(selected_distance):
 		if applied_bonus > 0:
 			PlayerState.add_energy(-applied_bonus)
-		status_label.text = PlayerState.get_stage_start_error(selected_distance)
+		var start_error := PlayerState.get_stage_start_error(selected_distance)
+		if _show_store_shortcut() and start_error == "Not enough gas for this trip.":
+			status_label.text = "Not enough gas for this trip. Visit the store to refuel."
+		else:
+			status_label.text = start_error
 		return
 
-	PlayerState.set_current_mock_character(String(character.get("id", "")))
+	PlayerState.set_current_mock_character(str(character.get("id", "")))
 	PlayerState.advance_to_next_stage(
 		transition_mode,
 		selected_distance,
-		String(character.get("stage_traffic", ""))
+		str(character.get("stage_traffic", ""))
 	)
 	PlayerState.clear_pending_trip_selection()
 	if PlayerState.is_run_failed():
@@ -344,30 +349,19 @@ func _go_back() -> void:
 	if not _allow_back():
 		return
 
-	var return_scene := String(pending_trip_selection.get("return_scene", FALLBACK_SCENE))
+	var return_scene := str(pending_trip_selection.get("return_scene", FALLBACK_SCENE))
 	get_tree().change_scene_to_file(return_scene if not return_scene.is_empty() else FALLBACK_SCENE)
 
 
-func _connect_button_glow(button: BaseButton) -> void:
-	button.modulate = BUTTON_NORMAL_MODULATE
-	button.mouse_entered.connect(_set_button_glow.bind(button, true))
-	button.mouse_exited.connect(_set_button_glow.bind(button, false))
-	button.focus_entered.connect(_set_button_glow.bind(button, true))
-	button.focus_exited.connect(_set_button_glow.bind(button, false))
-
-
-func _set_button_glow(button: BaseButton, is_glowing: bool) -> void:
-	var tween := create_tween()
-	tween.tween_property(
-		button,
-		"modulate",
-		BUTTON_GLOW_MODULATE if is_glowing else BUTTON_NORMAL_MODULATE,
-		0.08
-	)
+func _handle_back_button_pressed() -> void:
+	if _show_store_shortcut():
+		get_tree().change_scene_to_file(STORE_SCENE)
+		return
+	_go_back()
 
 
 func _transition_mode() -> String:
-	var transition_mode := String(pending_trip_selection.get("transition_mode", ""))
+	var transition_mode := str(pending_trip_selection.get("transition_mode", ""))
 	if transition_mode.is_empty():
 		if bool(pending_trip_selection.get("skip_to_night", false)):
 			return PlayerState.TRANSITION_REST_TO_NIGHT
@@ -379,55 +373,42 @@ func _allow_back() -> bool:
 	return bool(pending_trip_selection.get("allow_back", true))
 
 
+func _display_day() -> int:
+	return PlayerState.get_transition_display_day(_transition_mode())
+
+
+func _can_open_store_from_selection() -> bool:
+	return _display_day() >= 2 and PlayerState.gas <= 0
+
+
+func _show_store_shortcut() -> bool:
+	return not _allow_back() and _can_open_store_from_selection()
+
+
+func _refresh_action_button() -> void:
+	back_button.visible = _allow_back() or _show_store_shortcut()
+	back_label.text = "STORE" if _show_store_shortcut() else "BACK"
+
+
 func _create_stats_row() -> void:
-	stats_row = HBoxContainer.new()
+	stats_row_refs = PlayerStatsRow.create({
+		"font": UI_FONT,
+		"font_size": 10,
+		"font_color": Color(0.30, 0.19, 0.10, 1.0),
+		"outline_color": Color(0.98, 0.94, 0.83, 0.86),
+	})
+	var stats_row := stats_row_refs["row"] as HBoxContainer
 	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stats_row.layout_mode = 1
 	stats_row.offset_left = 90.0
 	stats_row.offset_top = 118.0
 	stats_row.offset_right = 1064.0
 	stats_row.offset_bottom = 144.0
-	stats_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	stats_row.add_theme_constant_override("separation", 12)
 	$Panel.add_child(stats_row)
-
-	money_value_label = _make_stat_label()
-	energy_value_label = _make_stat_label()
-	gas_value_label = _make_stat_label()
-
-	stats_row.add_child(money_value_label)
-	stats_row.add_child(_make_stat_icon(ENERGY_ICON))
-	stats_row.add_child(energy_value_label)
-	stats_row.add_child(_make_stat_icon(GAS_ICON))
-	stats_row.add_child(gas_value_label)
 
 
 func _refresh_stats_row() -> void:
-	if not stats_row:
+	if stats_row_refs.is_empty():
 		return
 
-	money_value_label.text = "Money: PhP %d" % PlayerState.money
-	energy_value_label.text = "%d/%d" % [PlayerState.energy, PlayerState.max_energy]
-	gas_value_label.text = "%d/%d" % [PlayerState.gas, PlayerState.max_gas]
-
-
-func _make_stat_label() -> Label:
-	var label := Label.new()
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.add_theme_font_override("font", UI_FONT)
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color(0.30, 0.19, 0.10, 1.0))
-	label.add_theme_color_override("font_outline_color", Color(0.98, 0.94, 0.83, 0.86))
-	label.add_theme_constant_override("outline_size", 1)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	return label
-
-
-func _make_stat_icon(texture: Texture2D) -> TextureRect:
-	var icon := TextureRect.new()
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	icon.texture = texture
-	icon.custom_minimum_size = Vector2(22.0, 22.0)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	return icon
+	PlayerStatsRow.refresh(stats_row_refs)
