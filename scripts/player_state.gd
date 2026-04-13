@@ -45,6 +45,7 @@ const STAGE_DISTANCE_RANGES := {
 const ACHIEVEMENT_ORDER := [
 	"mapagsamantala",
 	"maninigarilyo",
+	"tamad",
 ]
 const ACHIEVEMENT_DEFINITIONS := {
 	"mapagsamantala": {
@@ -56,6 +57,11 @@ const ACHIEVEMENT_DEFINITIONS := {
 		"title": "Maninigarilyo",
 		"subtitle": "Smoker",
 		"description": "In the Philippines, approximately 18.5% to 19.5% of Filipino adults are current tobacco users.\n\nToday John became one.",
+	},
+	"tamad": {
+		"title": "Tamad",
+		"subtitle": "Lazy",
+		"description": "todo placeholder",
 	},
 }
 const SMOKER_YOSI_GOAL := 10
@@ -257,6 +263,8 @@ var consumed_seeded_rider_rules: Dictionary = {}
 var last_rest_day := 0
 var yosi_bought_today := 0
 var yosi_bought_day := 1
+var rests_taken_today := 0
+var rests_taken_day := 1
 var debt_goal_index := 0
 var last_debt_collection_day := 0
 var remaining_debt := TOTAL_DEBT_GOAL
@@ -346,6 +354,8 @@ func _load_progress() -> void:
 	last_rest_day = int(save_data.get("last_rest_day", last_rest_day))
 	yosi_bought_today = int(save_data.get("yosi_bought_today", yosi_bought_today))
 	yosi_bought_day = int(save_data.get("yosi_bought_day", yosi_bought_day))
+	rests_taken_today = int(save_data.get("rests_taken_today", rests_taken_today))
+	rests_taken_day = int(save_data.get("rests_taken_day", rests_taken_day))
 	debt_goal_index = int(save_data.get("debt_goal_index", debt_goal_index))
 	last_debt_collection_day = int(save_data.get("last_debt_collection_day", last_debt_collection_day))
 	remaining_debt = int(save_data.get("remaining_debt", remaining_debt))
@@ -396,6 +406,8 @@ func save_progress() -> void:
 		"last_rest_day": last_rest_day,
 		"yosi_bought_today": yosi_bought_today,
 		"yosi_bought_day": yosi_bought_day,
+		"rests_taken_today": rests_taken_today,
+		"rests_taken_day": rests_taken_day,
 		"debt_goal_index": debt_goal_index,
 		"last_debt_collection_day": last_debt_collection_day,
 		"remaining_debt": remaining_debt,
@@ -461,6 +473,8 @@ func begin_stage_sequence() -> void:
 	last_rest_day = 0
 	yosi_bought_today = 0
 	yosi_bought_day = 1
+	rests_taken_today = 0
+	rests_taken_day = 1
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL
@@ -614,6 +628,7 @@ func spend_gas(amount: int) -> bool:
 
 func apply_night_rest_bonus() -> int:
 	var applied_bonus := mini(NIGHT_SLEEP_ENERGY_BONUS, max_energy - energy)
+	record_rest()
 	if applied_bonus > 0:
 		add_energy(applied_bonus)
 	return applied_bonus
@@ -672,6 +687,7 @@ func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> i
 
 func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
 	var applied_bonus := mini(get_transition_energy_bonus(transition_mode), max_energy - energy)
+	record_rest()
 	if applied_bonus > 0:
 		add_energy(applied_bonus)
 	return applied_bonus
@@ -1322,6 +1338,22 @@ func record_yosi_purchase(amount := 1) -> int:
 	return yosi_bought_today
 
 
+func record_rest(amount := 1) -> int:
+	var rest_amount := maxi(0, int(amount))
+	if rest_amount <= 0:
+		return rests_taken_today
+
+	if rests_taken_day != get_current_day():
+		_reset_daily_consumable_counters(get_current_day())
+
+	rests_taken_day = get_current_day()
+	rests_taken_today += rest_amount
+	if rests_taken_today >= 3:
+		unlock_achievement("tamad")
+	save_progress()
+	return rests_taken_today
+
+
 func unlock_achievement(achievement_id: String) -> void:
 	var safe_id := str(achievement_id).strip_edges().to_lower()
 	if not ACHIEVEMENT_DEFINITIONS.has(safe_id):
@@ -1370,6 +1402,8 @@ func _apply_achievement_effects(achievement_id: String) -> void:
 func _reset_daily_consumable_counters(day_number: int) -> void:
 	yosi_bought_day = max(1, day_number)
 	yosi_bought_today = 0
+	rests_taken_day = max(1, day_number)
+	rests_taken_today = 0
 
 
 func reset() -> void:
@@ -1395,6 +1429,8 @@ func reset() -> void:
 	last_rest_day = 0
 	yosi_bought_today = 0
 	yosi_bought_day = 1
+	rests_taken_today = 0
+	rests_taken_day = 1
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL

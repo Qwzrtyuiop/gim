@@ -128,6 +128,7 @@ func _transition_home_rest(next_time: String) -> void:
 	is_transitioning = true
 	_set_buttons_disabled(true)
 	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
+	PlayerState.record_rest()
 	PlayerState.add_energy(1)
 	PlayerState.set_current_stage_time(next_time)
 	_render_day_start()
