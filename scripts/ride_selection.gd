@@ -8,6 +8,7 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const EMPTY_CARD_CHANCE := 0.28
+
 @onready var subtitle_label: Label = $Panel/Subtitle
 @onready var status_label: Label = $Panel/StatusLabel
 @onready var money_label: Label = $Panel/MoneyLabel
@@ -26,6 +27,7 @@ const EMPTY_CARD_CHANCE := 0.28
 var pending_trip_selection: Dictionary = {}
 var rng := RandomNumberGenerator.new()
 var selected_distance := "short"
+var locked_character_pools: Dictionary = {}
 var displayed_characters: Array[Dictionary] = []
 var stats_row_refs: Dictionary = {}
 
@@ -54,14 +56,10 @@ func _ready() -> void:
 	for button in [back_button, short_button, medium_button, long_button]:
 		ButtonGlow.attach(self, button)
 
-	var locked_characters: Array = PlayerState.get_locked_pending_trip_characters()
-	if locked_characters.is_empty():
-		displayed_characters = _roll_character_cards()
-		PlayerState.lock_pending_trip_selection(displayed_characters, selected_distance)
-	else:
-		displayed_characters.clear()
-		for character_data in locked_characters:
-			displayed_characters.append(character_data)
+	locked_character_pools = PlayerState.get_locked_pending_trip_character_pools()
+	if locked_character_pools.is_empty():
+		locked_character_pools = _roll_character_pools()
+		PlayerState.lock_pending_trip_selection(locked_character_pools, selected_distance)
 
 	_refresh_header()
 	_refresh_action_button()
@@ -105,7 +103,8 @@ func _refresh_subtitle() -> void:
 
 func _set_distance(difficulty: String) -> void:
 	selected_distance = difficulty
-	PlayerState.lock_pending_trip_selection(displayed_characters, selected_distance)
+	displayed_characters = _get_pool_for_distance(selected_distance)
+	PlayerState.lock_pending_trip_selection(locked_character_pools, selected_distance)
 	_refresh_subtitle()
 	_refresh_distance_buttons()
 	_refresh_character_cards()
@@ -143,195 +142,147 @@ func _refresh_character_cards() -> void:
 			panel.modulate = Color(0.92, 0.92, 0.92, 0.52)
 			label.text = "EMPTY SLOT\nNo one available yet."
 			panel.mouse_default_cursor_shape = Control.CURSOR_ARROW
-		else:
-			var is_available := _is_character_available(character)
-			var preview_stage_type: String = _preview_stage_type(character)
-			panel.modulate = Color.WHITE if is_available else Color(0.74, 0.74, 0.74, 0.78)
-			label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d" % [
-				str(character["name"]).to_upper(),
-				preview_stage_type,
-				PlayerState.estimate_stage_earnings(preview_stage_type),
-			]
-			panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if is_available else Control.CURSOR_ARROW
+			continue
+
+		var preview_stage_type := _preview_stage_type(character)
+		panel.modulate = Color.WHITE
+		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d" % [
+			str(character["name"]).to_upper(),
+			preview_stage_type,
+			PlayerState.estimate_stage_earnings(preview_stage_type),
+		]
+		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 
-func _roll_character_cards() -> Array[Dictionary]:
+func _roll_character_pools() -> Dictionary:
 	for _attempt in range(24):
-		var rolled_cards := _roll_character_cards_once()
-		if _has_distance_coverage(rolled_cards):
-			return rolled_cards
+		var rolled_pools := _roll_character_pools_once(false)
+		if _has_distance_coverage(rolled_pools):
+			return rolled_pools
 
-	return _build_guaranteed_coverage_cards()
+	return _roll_character_pools_once(true)
 
 
-func _roll_character_cards_once() -> Array[Dictionary]:
-	var eligible_first_appearance: Array[Dictionary] = []
-	var eligible_repeat: Array[Dictionary] = []
-	for character_data in PlayerState.get_mock_characters():
-		var character: Dictionary = character_data
-		var is_seen := PlayerState.has_seen_mock_character(character["id"])
-		if not is_seen:
-			if rng.randf() <= float(character["first_appearance_chance"]):
-				eligible_first_appearance.append(character)
-		else:
-			eligible_repeat.append(character)
-
-	eligible_first_appearance.shuffle()
-	eligible_repeat.shuffle()
-
-	var card_results: Array[Dictionary] = []
+func _roll_character_pools_once(force_first_appearance_unlocks: bool) -> Dictionary:
+	var character_pools: Dictionary = {}
 	var used_ids: Dictionary = {}
-	var guaranteed_slot := -1
-	var guaranteed_character: Dictionary = {}
-	if PlayerState.gas <= 4:
-		guaranteed_character = _pick_short_trip_character_from_pools(eligible_first_appearance, eligible_repeat, used_ids)
-		if guaranteed_character.is_empty():
-			guaranteed_character = _fallback_short_trip_character(used_ids)
-		if not guaranteed_character.is_empty():
-			used_ids[guaranteed_character["id"]] = true
-			guaranteed_slot = rng.randi_range(0, 2)
+	var first_appearance_rolls := _build_first_appearance_rolls(force_first_appearance_unlocks)
 
-	for _slot_index in range(3):
-		if _slot_index == guaranteed_slot:
-			card_results.append(_lock_character_for_selection(guaranteed_character))
-			continue
+	for distance_variant in _ordered_distances_for_generation():
+		var distance := str(distance_variant)
+		character_pools[distance] = _build_distance_pool(
+			distance,
+			used_ids,
+			first_appearance_rolls,
+			force_first_appearance_unlocks
+		)
 
-		if rng.randf() < EMPTY_CARD_CHANCE:
+	return character_pools
+
+
+func _build_distance_pool(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool) -> Array[Dictionary]:
+	var card_results: Array[Dictionary] = []
+	var guaranteed_character := _pick_character_for_distance(
+		distance,
+		used_ids,
+		first_appearance_rolls,
+		force_first_appearance_unlocks
+	)
+	if not guaranteed_character.is_empty():
+		used_ids[str(guaranteed_character["id"])] = true
+		card_results.append(_lock_character_for_selection(guaranteed_character, distance))
+
+	while card_results.size() < 3:
+		if card_results.size() > 0 and rng.randf() < EMPTY_CARD_CHANCE:
 			card_results.append({})
 			continue
 
-		var picked_character := _pick_character_from_pools(eligible_first_appearance, eligible_repeat, used_ids)
-
-		if picked_character.is_empty():
-			card_results.append({})
-			continue
-
-		used_ids[picked_character["id"]] = true
-		card_results.append(_lock_character_for_selection(picked_character))
-
-	while card_results.size() < 3:
-		card_results.append({})
-
-	return card_results
-
-
-func _has_distance_coverage(card_results: Array[Dictionary]) -> bool:
-	for difficulty in PlayerState.STAGE_DIFFICULTIES:
-		var has_match := false
-		for character in card_results:
-			if character.is_empty():
-				continue
-			if _character_supports_distance(character, str(difficulty)):
-				has_match = true
-				break
-		if not has_match:
-			return false
-	return true
-
-
-func _build_guaranteed_coverage_cards() -> Array[Dictionary]:
-	var card_results: Array[Dictionary] = []
-	var used_ids: Dictionary = {}
-	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
-		var difficulty := str(difficulty_variant)
-		var candidate := _pick_character_for_distance(difficulty, used_ids)
-		if candidate.is_empty():
-			continue
-		used_ids[candidate["id"]] = true
-		card_results.append(_lock_character_for_selection(candidate))
-
-	while card_results.size() < 3:
-		var filler := _pick_character_for_distance(selected_distance, used_ids)
+		var filler := _pick_character_for_distance(
+			distance,
+			used_ids,
+			first_appearance_rolls,
+			force_first_appearance_unlocks
+		)
 		if filler.is_empty():
-			break
-		used_ids[filler["id"]] = true
-		card_results.append(_lock_character_for_selection(filler))
+			card_results.append({})
+			continue
 
-	while card_results.size() < 3:
-		card_results.append({})
+		used_ids[str(filler["id"])] = true
+		card_results.append(_lock_character_for_selection(filler, distance))
 
 	return card_results
 
 
-func _pick_character_from_pools(eligible_first_appearance: Array[Dictionary], eligible_repeat: Array[Dictionary], used_ids: Dictionary) -> Dictionary:
-	while not eligible_first_appearance.is_empty():
-		var first_candidate: Dictionary = eligible_first_appearance.pop_front()
-		if not used_ids.has(first_candidate["id"]):
-			return first_candidate
-
-	while not eligible_repeat.is_empty():
-		var repeat_candidate: Dictionary = eligible_repeat.pop_front()
-		if not used_ids.has(repeat_candidate["id"]):
-			return repeat_candidate
-
-	return {}
-
-
-func _pick_short_trip_character_from_pools(eligible_first_appearance: Array[Dictionary], eligible_repeat: Array[Dictionary], used_ids: Dictionary) -> Dictionary:
-	for index in range(eligible_first_appearance.size()):
-		var first_candidate: Dictionary = eligible_first_appearance[index]
-		if used_ids.has(first_candidate["id"]):
-			continue
-		if _supports_short_trip(first_candidate, true):
-			eligible_first_appearance.remove_at(index)
-			return first_candidate
-
-	for index in range(eligible_repeat.size()):
-		var repeat_candidate: Dictionary = eligible_repeat[index]
-		if used_ids.has(repeat_candidate["id"]):
-			continue
-		if _supports_short_trip(repeat_candidate, false):
-			eligible_repeat.remove_at(index)
-			return repeat_candidate
-
-	return {}
-
-
-func _fallback_short_trip_character(used_ids: Dictionary) -> Dictionary:
-	var fallback_candidates: Array[Dictionary] = []
-	for character_data in PlayerState.get_mock_characters():
-		var character: Dictionary = character_data
-		if used_ids.has(character["id"]):
-			continue
-
-		var is_seen := PlayerState.has_seen_mock_character(str(character["id"]))
-		if _supports_short_trip(character, not is_seen):
-			fallback_candidates.append(character)
-
-	if fallback_candidates.is_empty():
-		return {}
-
-	fallback_candidates.shuffle()
-	return fallback_candidates[0]
-
-
-func _pick_character_for_distance(distance: String, used_ids: Dictionary) -> Dictionary:
-	var seen_candidates: Array[Dictionary] = []
+func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool) -> Dictionary:
 	var unseen_candidates: Array[Dictionary] = []
+	var seen_candidates: Array[Dictionary] = []
+
 	for character_data in PlayerState.get_mock_characters():
 		var character: Dictionary = character_data
 		var character_id := str(character.get("id", ""))
 		if used_ids.has(character_id):
 			continue
-		var is_seen := PlayerState.has_seen_mock_character(character_id)
-		if not _supports_distance_in_selection(character, distance, not is_seen):
-			continue
-		if is_seen:
-			seen_candidates.append(character)
-		else:
-			unseen_candidates.append(character)
 
-	if not seen_candidates.is_empty():
-		seen_candidates.shuffle()
-		return seen_candidates[0]
+		var is_seen := PlayerState.has_seen_mock_character(character_id)
+		if is_seen:
+			if _supports_distance_in_selection(character, distance, false):
+				seen_candidates.append(character)
+			continue
+
+		if not _supports_distance_in_selection(character, distance, true):
+			continue
+		if not force_first_appearance_unlocks and not bool(first_appearance_rolls.get(character_id, false)):
+			continue
+		unseen_candidates.append(character)
+
 	if not unseen_candidates.is_empty():
 		unseen_candidates.shuffle()
 		return unseen_candidates[0]
+	if not seen_candidates.is_empty():
+		seen_candidates.shuffle()
+		return seen_candidates[0]
 	return {}
 
 
-func _supports_short_trip(character: Dictionary, is_first_appearance: bool) -> bool:
-	return _supports_distance_in_selection(character, "short", is_first_appearance)
+func _build_first_appearance_rolls(force_first_appearance_unlocks: bool) -> Dictionary:
+	var first_appearance_rolls: Dictionary = {}
+	for character_data in PlayerState.get_mock_characters():
+		var character: Dictionary = character_data
+		var character_id := str(character.get("id", ""))
+		if PlayerState.has_seen_mock_character(character_id):
+			continue
+		first_appearance_rolls[character_id] = force_first_appearance_unlocks or rng.randf() <= float(character.get("first_appearance_chance", 1.0))
+	return first_appearance_rolls
+
+
+func _ordered_distances_for_generation() -> Array[String]:
+	var ordered_distances: Array[String] = []
+	if PlayerState.gas <= 4:
+		ordered_distances.append("short")
+	if not ordered_distances.has(selected_distance):
+		ordered_distances.append(selected_distance)
+	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
+		var difficulty := str(difficulty_variant)
+		if not ordered_distances.has(difficulty):
+			ordered_distances.append(difficulty)
+	return ordered_distances
+
+
+func _has_distance_coverage(character_pools: Dictionary) -> bool:
+	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
+		var difficulty := str(difficulty_variant)
+		if _count_non_empty_cards(character_pools.get(difficulty, [])) <= 0:
+			return false
+	return true
+
+
+func _count_non_empty_cards(card_results: Array) -> int:
+	var count := 0
+	for card_variant in card_results:
+		var card: Dictionary = card_variant as Dictionary
+		if not card.is_empty():
+			count += 1
+	return count
 
 
 func _supports_distance_in_selection(character: Dictionary, distance: String, is_first_appearance: bool) -> bool:
@@ -342,17 +293,25 @@ func _supports_distance_in_selection(character: Dictionary, distance: String, is
 	return eligible_distances.has(distance)
 
 
-func _character_supports_distance(character: Dictionary, distance: String) -> bool:
-	return _supports_distance_in_selection(character, distance, bool(character.get("is_first_appearance", false)))
-
-
-func _lock_character_for_selection(picked_character: Dictionary) -> Dictionary:
+func _lock_character_for_selection(picked_character: Dictionary, active_distance: String) -> Dictionary:
 	var was_seen_before_roll := PlayerState.has_seen_mock_character(str(picked_character["id"]))
 	PlayerState.mark_mock_character_seen(str(picked_character["id"]))
 	var locked_character: Dictionary = picked_character.duplicate(true)
+	locked_character["active_distance"] = active_distance
 	locked_character["stage_traffic"] = PlayerState.get_random_stage_traffic_type()
 	locked_character["is_first_appearance"] = not was_seen_before_roll
 	return locked_character
+
+
+func _get_pool_for_distance(distance: String) -> Array[Dictionary]:
+	var locked_pool: Array = locked_character_pools.get(distance, [])
+	var card_results: Array[Dictionary] = []
+	for card_variant in locked_pool:
+		var card := card_variant as Dictionary
+		card_results.append(card)
+	while card_results.size() < 3:
+		card_results.append({})
+	return card_results
 
 
 func _on_card_gui_input(event: InputEvent, card_index: int) -> void:
@@ -360,32 +319,9 @@ func _on_card_gui_input(event: InputEvent, card_index: int) -> void:
 		_choose_character(card_index)
 
 
-func _is_character_available(character: Dictionary) -> bool:
-	if character.is_empty():
-		return false
-
-	if bool(character.get("is_first_appearance", false)):
-		return selected_distance == str(character.get("first_distance", ""))
-
-	var eligible_distances: Array = character.get("eligible_distances", [])
-	return eligible_distances.has(selected_distance)
-
-
-func _preview_distance_for_character(character: Dictionary) -> String:
-	var preview_distance := selected_distance
-	if bool(character.get("is_first_appearance", false)):
-		preview_distance = str(character.get("first_distance", selected_distance))
-	elif not _is_character_available(character):
-		var eligible_distances: Array = character.get("eligible_distances", [])
-		if not eligible_distances.is_empty():
-			preview_distance = str(eligible_distances[0])
-
-	return preview_distance
-
-
 func _preview_stage_type(character: Dictionary) -> String:
 	return PlayerState.build_stage_type(
-		_preview_distance_for_character(character),
+		str(character.get("active_distance", selected_distance)),
 		PlayerState.get_next_stage_time(_transition_mode()),
 		str(character.get("stage_traffic", "chill"))
 	)
@@ -398,9 +334,6 @@ func _choose_character(card_index: int) -> void:
 	var character: Dictionary = displayed_characters[card_index]
 	if character.is_empty():
 		status_label.text = "That slot is empty."
-		return
-	if not _is_character_available(character):
-		status_label.text = "%s is unavailable for %s trips." % [character["name"], selected_distance]
 		return
 
 	var transition_mode := _transition_mode()

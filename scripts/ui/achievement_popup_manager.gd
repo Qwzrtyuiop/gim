@@ -89,6 +89,7 @@ func _show_next_popup() -> void:
 		return
 
 	is_showing = true
+	UIAudioManager.play_press()
 	title_label.text = str(achievement_data.get("title", achievement_id)).to_upper()
 	subtitle_label.text = str(achievement_data.get("subtitle", ""))
 	popup_frame.position = Vector2(56.0, -10.0)

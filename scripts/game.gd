@@ -5,6 +5,12 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
+const STAGE_BGM_MORNING_CHILL_PATH := "res://assets/stagebgm/morning_chill.mp3"
+const STAGE_BGM_NIGHT_CHILL_PATH := "res://assets/stagebgm/night_chill.mp3"
+const STAGE_BGM_NORMAL_PATH := "res://assets/stagebgm/normalstage1.mp3"
+const STAGE_BGM_SPEEDER_A_PATH := "res://assets/stagebgm/speeder.mp3"
+const STAGE_BGM_SPEEDER_B_PATH := "res://assets/stagebgm/speeder2.mp3"
+const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/stagebgm/traffic_jam.mp3"
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
@@ -36,6 +42,10 @@ const PLAYER_HITBOX_INSET := Vector4(0.08, 0.08, 0.08, 0.0)
 const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const NPC_LANE_CHANGE_WARNING_PULSES := 3
 const NPC_LANE_CHANGE_WARNING_INTERVAL := 0.28
+const POST_DAY_SEVEN_SPAWN_DELAY_X := 0.90
+const POST_DAY_SEVEN_BUSY_CAR_CHANCE_MAIN := 0.10
+const POST_DAY_SEVEN_BUSY_CAR_CHANCE_SHOULDER := 0.08
+const POST_DAY_SEVEN_BUSY_CAR_LANE_CHANGE_CHANCE_PER_SECOND := 0.035
 const TIME_FILTER_Z_INDEX := 760
 const NIGHT_MASK_Z_INDEX := 790
 const HEADLIGHT_Z_INDEX := 820
@@ -391,6 +401,7 @@ var weekly_goal_label: Label
 var debt_goal_label: Label
 var speeder_warning_label: Label
 var speeder_beep_player: AudioStreamPlayer
+var stage_bgm_player: AudioStreamPlayer
 var fade_rect: ColorRect
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
@@ -435,6 +446,7 @@ func _ready() -> void:
 	_create_noon_glow()
 	_create_night_visibility_mask()
 	_create_ui()
+	_start_stage_bgm()
 	_layout_scene()
 	_begin_gameplay_entry_fade()
 	if use_player_state_stage_sequence:
@@ -777,11 +789,53 @@ func _create_ui() -> void:
 	beep_stream.buffer_length = 0.12
 	speeder_beep_player.stream = beep_stream
 	add_child(speeder_beep_player)
+	AudioSettingsManager.register_player(speeder_beep_player, "sfx")
+
+	stage_bgm_player = AudioStreamPlayer.new()
+	stage_bgm_player.name = "StageBGMPlayer"
+	stage_bgm_player.bus = "Master"
+	add_child(stage_bgm_player)
+	AudioSettingsManager.register_player(stage_bgm_player, "music")
 
 	fade_rect = ColorRect.new()
 	fade_rect.color = Color(0.0, 0.0, 0.0, 1.0 if gameplay_entry_fade_seconds > 0.0 else 0.0)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(fade_rect)
+
+
+func _start_stage_bgm() -> void:
+	if stage_bgm_player == null:
+		return
+
+	var bgm_pool := _get_stage_bgm_pool()
+	if bgm_pool.is_empty():
+		return
+
+	stage_bgm_player.stream = bgm_pool[rng.randi_range(0, bgm_pool.size() - 1)]
+	stage_bgm_player.play()
+
+
+func _get_stage_bgm_pool() -> Array:
+	match stage_traffic:
+		"speeders":
+			return [_load_audio_stream(STAGE_BGM_SPEEDER_A_PATH), _load_audio_stream(STAGE_BGM_SPEEDER_B_PATH)]
+		"traffic-jam":
+			return [_load_audio_stream(STAGE_BGM_TRAFFIC_JAM_PATH)]
+		"busy":
+			return [_load_audio_stream(STAGE_BGM_NORMAL_PATH), _load_audio_stream(STAGE_BGM_TRAFFIC_JAM_PATH)]
+		"chill":
+			if stage_time_of_day == "night":
+				return [_load_audio_stream(STAGE_BGM_NIGHT_CHILL_PATH)]
+			return [_load_audio_stream(STAGE_BGM_MORNING_CHILL_PATH), _load_audio_stream(STAGE_BGM_NORMAL_PATH)]
+		"normal":
+			if stage_time_of_day == "night":
+				return [_load_audio_stream(STAGE_BGM_NIGHT_CHILL_PATH), _load_audio_stream(STAGE_BGM_NORMAL_PATH)]
+			return [_load_audio_stream(STAGE_BGM_NORMAL_PATH), _load_audio_stream(STAGE_BGM_MORNING_CHILL_PATH)]
+	return [_load_audio_stream(STAGE_BGM_NORMAL_PATH)]
+
+
+func _load_audio_stream(path: String):
+	return load(path)
 
 
 func _begin_gameplay_entry_fade() -> void:
@@ -1040,14 +1094,19 @@ func _next_spawn_delay(lane_index: int, progress: float) -> float:
 
 
 func _spawn_delay_range_for_lane(lane_index: int) -> Vector2:
+	var delay_range := Vector2(1.0, 2.0)
 	match lane_index:
 		0:
-			return Vector2(incoming_spawn_min_delay, incoming_spawn_max_delay)
+			delay_range = Vector2(incoming_spawn_min_delay, incoming_spawn_max_delay)
 		1:
-			return Vector2(main_spawn_min_delay, main_spawn_max_delay)
+			delay_range = Vector2(main_spawn_min_delay, main_spawn_max_delay)
 		2:
-			return Vector2(shoulder_spawn_min_delay, shoulder_spawn_max_delay)
-	return Vector2(1.0, 2.0)
+			delay_range = Vector2(shoulder_spawn_min_delay, shoulder_spawn_max_delay)
+
+	if _is_post_day_seven_traffic_ramp():
+		delay_range *= POST_DAY_SEVEN_SPAWN_DELAY_X
+
+	return delay_range
 
 
 func _lane_has_spawn_room(lane_index: int) -> bool:
@@ -1064,6 +1123,7 @@ func _spawn_entity(lane_index: int) -> void:
 	var vehicle_key := ""
 	var world_speed := 0.0
 	var fallback_height := 80.0
+	var is_busy_car := false
 
 	match lane_index:
 		0:
@@ -1087,6 +1147,9 @@ func _spawn_entity(lane_index: int) -> void:
 			else:
 				world_speed = rng.randf_range(shoulder_vehicle_min_speed, shoulder_vehicle_max_speed)
 			fallback_height = 90.0
+
+	if world_speed > 0.0 and lane_index in [1, 2]:
+		is_busy_car = _is_post_day_seven_traffic_ramp() and rng.randf() < _get_post_day_busy_car_chance(lane_index)
 
 	sprite.texture = VEHICLE_TEXTURES[vehicle_key]
 	sprite.centered = true
@@ -1112,6 +1175,7 @@ func _spawn_entity(lane_index: int) -> void:
 		"kind": "traffic",
 		"desired_world_speed": world_speed,
 		"world_speed": world_speed,
+		"is_busy_car": is_busy_car,
 		"lane_change_cooldown": rng.randf_range(0.6, 2.0),
 		"lane_change_warning_active": false,
 	})
@@ -1287,7 +1351,8 @@ func _spawn_speeder() -> void:
 
 
 func _update_random_lane_changes(delta: float) -> void:
-	if not npc_random_lane_change_enabled:
+	var post_day_seven_traffic_ramp := _is_post_day_seven_traffic_ramp()
+	if not npc_random_lane_change_enabled and not post_day_seven_traffic_ramp:
 		return
 
 	for entity in active_entities:
@@ -1305,7 +1370,16 @@ func _update_random_lane_changes(delta: float) -> void:
 		entity["lane_change_cooldown"] = maxf(0.0, float(entity.get("lane_change_cooldown", 0.0)) - delta)
 		if float(entity["lane_change_cooldown"]) > 0.0:
 			continue
-		if rng.randf() > npc_lane_change_chance_per_second * delta:
+
+		var is_busy_car := bool(entity.get("is_busy_car", false))
+		if not npc_random_lane_change_enabled and not is_busy_car:
+			continue
+
+		var lane_change_chance := npc_lane_change_chance_per_second if npc_random_lane_change_enabled else 0.0
+		if is_busy_car:
+			lane_change_chance = maxf(lane_change_chance, POST_DAY_SEVEN_BUSY_CAR_LANE_CHANGE_CHANCE_PER_SECOND)
+
+		if rng.randf() > lane_change_chance * delta:
 			continue
 
 		var target_lane := 2 if lane_index == 1 else 1
@@ -1352,6 +1426,7 @@ func _pulse_entity_lane_warning(entity: Dictionary) -> void:
 	tween.tween_property(warning_label, "modulate", Color(1.0, 0.2, 0.12, 1.0), 0.08)
 	tween.tween_property(warning_label, "modulate", Color(1.0, 0.94, 0.2, 0.0), 0.1)
 	tween.tween_callback(Callable(warning_label, "hide"))
+	_play_speeder_beep()
 
 
 func _finish_warned_lane_change(entity: Dictionary) -> void:
@@ -1366,6 +1441,19 @@ func _finish_warned_lane_change(entity: Dictionary) -> void:
 		entity["sprite"].z_index = _z_for_lane(target_lane)
 
 	entity["lane_change_cooldown"] = rng.randf_range(1.2, 3.5)
+
+
+func _is_post_day_seven_traffic_ramp() -> bool:
+	return use_player_state_stage_sequence and PlayerState.get_current_day() > 7
+
+
+func _get_post_day_busy_car_chance(lane_index: int) -> float:
+	match lane_index:
+		1:
+			return POST_DAY_SEVEN_BUSY_CAR_CHANCE_MAIN
+		2:
+			return POST_DAY_SEVEN_BUSY_CAR_CHANCE_SHOULDER
+	return 0.0
 
 
 func _get_entity_lane_warning_label(entity: Dictionary) -> Label:
@@ -1622,10 +1710,9 @@ func _update_ui() -> void:
 		weekly_goal_label.text = "WEEKLY GOAL: PhP %d" % PlayerState.get_current_weekly_goal()
 
 	if debt_goal_label:
-		debt_goal_label.text = "Debt Remaining: PhP %d\nCollector in %d %s" % [
+		debt_goal_label.text = "Debt Remaining: PhP %d\n%s" % [
 			PlayerState.get_total_debt_goal(),
-			PlayerState.get_days_until_debt_collection(),
-			"day" if PlayerState.get_days_until_debt_collection() == 1 else "days",
+			PlayerState.get_debt_due_text(),
 		]
 
 

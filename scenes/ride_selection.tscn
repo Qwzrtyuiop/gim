@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://qhu5e84en4g1"]
 
-[ext_resource type="Script" uid="uid://dftndwfmpicou" path="res://scripts/ride_selection.gd" id="1_ride"]
+[ext_resource type="Script" uid="uid://c5bh465ilb2xj" path="res://scripts/ride_selection.gd" id="1_ride"]
 [ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
 [ext_resource type="Texture2D" uid="uid://fbv070ai7fu6" path="res://assets/bg/rideselectbg.png" id="3_bg"]
 [ext_resource type="Texture2D" uid="uid://buwkwy70ahfgb" path="res://assets/ui/button_generic.png" id="4_generic"]

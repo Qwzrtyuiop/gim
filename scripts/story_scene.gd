@@ -6,6 +6,7 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
+const DEFAULT_MUSIC_FADE_SECONDS := 0.35
 const DEFAULT_CONTINUE_HINT := "ENTER / CLICK"
 const DEFAULT_BG_CAMERA_DURATION := 0.0
 const DEFAULT_BG_FADE_SECONDS := 0.24
@@ -53,6 +54,7 @@ var choice_buttons: Array[BaseButton] = []
 var background_zoom := 1.0
 var background_pan := Vector2.ZERO
 var background_motion_tween: Tween
+var bgm_fade_tween: Tween
 var is_input_locked := false
 
 
@@ -475,6 +477,8 @@ func _apply_theme() -> void:
 	bgm_player.bus = &"Master"
 	sfx_player.autoplay = false
 	sfx_player.bus = &"Master"
+	AudioSettingsManager.register_player(bgm_player, "music")
+	AudioSettingsManager.register_player(sfx_player, "sfx")
 
 
 func _apply_label_theme(label: Label, font_size: int, font_color: Color, outline_color: Color, outline_size: int) -> void:
@@ -547,9 +551,9 @@ func _run_story_action(action_data: Dictionary) -> void:
 				float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS))
 			)
 		"play_music", "music_play":
-			_play_music_action(action_data)
+			await _play_music_action(action_data)
 		"stop_music", "music_stop":
-			bgm_player.stop()
+			await _stop_music_action(action_data)
 		"unlock_achievement", "achievement_unlock":
 			PlayerState.unlock_achievement(str(action_data.get("id", action_data.get("achievement_id", ""))))
 		"add_money", "gain_money":
@@ -604,12 +608,44 @@ func _play_music_action(action_data: Dictionary) -> void:
 	if stream == null:
 		return
 
+	var loop_enabled := bool(action_data.get("loop", action_data.get("loops", true)))
+	var fade_in_duration := float(action_data.get("fade_in", action_data.get("fade", DEFAULT_MUSIC_FADE_SECONDS)))
+	var fade_out_duration := float(action_data.get("fade_out", action_data.get("out_fade", fade_in_duration)))
+	var target_volume_db := float(action_data.get("volume_db", 0.0))
+	var effective_target_volume_db := AudioSettingsManager.resolve_effective_volume_db("music", target_volume_db)
 	var restart := bool(action_data.get("restart", true))
-	var should_play := restart or bgm_player.stream != stream or not bgm_player.playing
-	bgm_player.stream = stream
-	bgm_player.volume_db = float(action_data.get("volume_db", 0.0))
-	if should_play:
+	var configured_stream = _configure_audio_stream_loop(stream, loop_enabled)
+	var current_music_ref := str(bgm_player.get_meta("music_ref", ""))
+	var next_music_ref := _music_ref_key(stream_ref, configured_stream)
+	var current_loop_enabled := bool(bgm_player.get_meta("loop_enabled", true))
+	var should_swap_stream := current_music_ref != next_music_ref or current_loop_enabled != loop_enabled or bgm_player.stream == null
+	var should_restart := restart or should_swap_stream or not bgm_player.playing
+
+	if bgm_player.playing and should_swap_stream and fade_out_duration > 0.0:
+		await _fade_audio_player_volume(bgm_player, fade_out_duration, bgm_player.volume_db, AudioSettingsManager.SILENCE_DB)
+		bgm_player.stop()
+
+	bgm_player.stream = configured_stream
+	bgm_player.set_meta("music_ref", next_music_ref)
+	bgm_player.set_meta("loop_enabled", loop_enabled)
+	AudioSettingsManager.set_player_base_db(bgm_player, target_volume_db)
+	if should_restart:
+		bgm_player.volume_db = AudioSettingsManager.SILENCE_DB if fade_in_duration > 0.0 else effective_target_volume_db
 		bgm_player.play()
+	if fade_in_duration > 0.0:
+		await _fade_audio_player_volume(bgm_player, fade_in_duration, bgm_player.volume_db, effective_target_volume_db)
+	else:
+		AudioSettingsManager.apply_player_volume(bgm_player)
+
+
+func _stop_music_action(action_data: Dictionary) -> void:
+	if not bgm_player.playing:
+		return
+
+	var fade_out_duration := float(action_data.get("fade_out", action_data.get("fade", DEFAULT_MUSIC_FADE_SECONDS)))
+	if fade_out_duration > 0.0:
+		await _fade_audio_player_volume(bgm_player, fade_out_duration, bgm_player.volume_db, AudioSettingsManager.SILENCE_DB)
+	bgm_player.stop()
 
 
 func _play_sfx_action(action_data: Dictionary) -> void:
@@ -617,12 +653,52 @@ func _play_sfx_action(action_data: Dictionary) -> void:
 	var stream := _resolve_audio_stream(stream_ref)
 	if stream != null:
 		sfx_player.stream = stream
-		sfx_player.volume_db = float(action_data.get("volume_db", 0.0))
+		AudioSettingsManager.set_player_base_db(sfx_player, float(action_data.get("volume_db", 0.0)))
 		sfx_player.play()
 		return
 
 	if bool(action_data.get("fallback_beep", true)):
 		DisplayServer.beep()
+
+
+func _configure_audio_stream_loop(stream: AudioStream, loop_enabled: bool) -> AudioStream:
+	if stream == null:
+		return null
+
+	var configured_stream := stream.duplicate(true)
+	if configured_stream == null:
+		configured_stream = stream
+
+	if configured_stream != null:
+		var property_names: Dictionary = {}
+		for property_info in configured_stream.get_property_list():
+			property_names[str(property_info.get("name", ""))] = true
+		for property_name in ["loop", "loop_enabled"]:
+			if property_names.has(property_name):
+				configured_stream.set(property_name, loop_enabled)
+				break
+
+	return configured_stream
+
+
+func _music_ref_key(stream_ref, stream: AudioStream) -> String:
+	if stream_ref is String:
+		return str(stream_ref)
+	if stream != null and not str(stream.resource_path).is_empty():
+		return str(stream.resource_path)
+	return str(stream_ref)
+
+
+func _fade_audio_player_volume(player: AudioStreamPlayer, duration: float, from_db: float, to_db: float) -> void:
+	if player == null:
+		return
+	if bgm_fade_tween:
+		bgm_fade_tween.kill()
+	player.volume_db = from_db
+	bgm_fade_tween = create_tween()
+	bgm_fade_tween.tween_property(player, "volume_db", to_db, duration)
+	await bgm_fade_tween.finished
+	bgm_fade_tween = null
 
 
 func _apply_portrait_action(action_data: Dictionary) -> void:

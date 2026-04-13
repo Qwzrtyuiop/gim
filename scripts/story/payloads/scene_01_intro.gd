@@ -3,6 +3,10 @@ extends RefCounted
 const RETURN_SCENE := "res://scenes/main_menu.tscn"
 const INHOUSE_BACKGROUND := "res://assets/story/backgrounds/inhouse.png"
 const GARAGE_BACKGROUND := "res://assets/story/backgrounds/garagenormal.png"
+const CITY_AMBIENCE_MUSIC := "res://assets/story/music/city_ambience.mp3"
+const ALARM_SFX := "res://assets/story/music/alarm sfx.mp3"
+const RUNNING_SFX := "res://assets/story/music/running.mp3"
+const WIND_BREEZE_SFX := "res://assets/story/music/windbreeze.mp3"
 
 
 static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
@@ -25,23 +29,46 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 					"focus": "left",
 					"duration": 0.55,
 				},
+				"actions": [
+					{
+						"type": "play_music",
+						"path": CITY_AMBIENCE_MUSIC,
+						"loop": true,
+						"fade_in": 0.55,
+						"volume_db": -9.0,
+					}
+				],
 			},
 			{
-				"text": "The morning light, accompanied by a cold wind enters through the open window.",
+				"text": "The morning light spills from the open window.",
+			},
+			{	"actions": [
+					{
+						"type": "play_sfx",
+						"path": WIND_BREEZE_SFX,
+						"volume_db": -7.0,
+					}
+				],},
+			{
+				"text": "I pull my blanket closer to shield myself from the cold air.",
+
 			},
 			{
 				"text": "...",
 			},
 			{
 				"text": "....",
+				"actions": [
+					{
+						"type": "play_sfx",
+						"path": ALARM_SFX,
+						"volume_db": -3.0,
+					}
+				],
 			},
 			{
 				"text": "Ah!",
-				"actions": [
-					{
-						"type": "cue_phone_sound",
-					}
-				],
+
 			},
 			{
 				"text": "I jump off the couch, startled by my own alarm.",
@@ -49,6 +76,11 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 			{
 				"text": "Without reading the phone, I grabbed it and ran toward the door.",
 				"actions": [
+					{
+						"type": "play_sfx",
+						"path": RUNNING_SFX,
+						"volume_db": -4.0,
+					},
 					{
 						"type": "fade_to_black",
 						"duration": 0.22,
@@ -81,7 +113,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 					{
 						"type": "fade_from_black",
 						"duration": 0.22,
-					}
+					},
 				],
 			},
 		],

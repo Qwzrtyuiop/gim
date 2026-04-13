@@ -17,9 +17,11 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+AudioSettingsManager="*res://scripts/audio_settings_manager.gd"
 PlayerState="*res://scripts/player_state.gd"
 AchievementPopupManager="*res://scripts/ui/achievement_popup_manager.gd"
 PauseMenuManager="*res://scripts/ui/pause_menu_manager.gd"
+UIAudioManager="*res://scripts/ui/ui_audio_manager.gd"
 
 [display]
 

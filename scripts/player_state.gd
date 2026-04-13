@@ -236,7 +236,7 @@ func _ready() -> void:
 
 
 func _load_progress() -> void:
-	if not ResourceLoader.exists(SAVE_PATH):
+	if not FileAccess.file_exists(SAVE_PATH):
 		return
 
 	var loaded_resource := ResourceLoader.load(SAVE_PATH)
@@ -350,7 +350,7 @@ func get_last_seen_story_id() -> String:
 
 
 func has_save_data() -> bool:
-	return ResourceLoader.exists(SAVE_PATH)
+	return FileAccess.file_exists(SAVE_PATH)
 
 
 func set_resume_scene(scene_path: String) -> void:
@@ -434,11 +434,19 @@ func roll_stage_target_distance(difficulty: String) -> float:
 
 
 func get_debt_status_text(day_number := -1) -> String:
-	var days_left := get_days_until_debt_collection(day_number)
-	var day_label := "day" if days_left == 1 else "days"
-	return "WEEKLY GOAL: PhP %d\nDebt Remaining: PhP %d     Collector in %d %s" % [
+	return "WEEKLY GOAL: PhP %d\nDebt Remaining: PhP %d     %s" % [
 		get_current_weekly_goal(),
 		get_total_debt_goal(),
+		get_debt_due_text(day_number),
+	]
+
+
+func get_debt_due_text(day_number := -1) -> String:
+	var days_left := get_days_until_debt_collection(day_number)
+	if days_left <= 0:
+		return "Collection Day."
+	var day_label := "day" if days_left == 1 else "days"
+	return "Debt due in %d %s" % [
 		days_left,
 		day_label,
 	]
@@ -714,12 +722,15 @@ func get_run_fail_reason() -> String:
 func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE, allow_back := true) -> void:
 	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
 	locked_characters = locked_characters.duplicate(true)
+	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
 	var locked_distance := str(pending_trip_selection.get("selected_distance", ""))
 	pending_trip_selection = {
 		"return_scene": return_scene,
 		"transition_mode": normalize_transition_mode(str(transition_mode)),
 		"allow_back": bool(allow_back),
 	}
+	if not locked_character_pools.is_empty():
+		pending_trip_selection["locked_character_pools"] = locked_character_pools
 	if not locked_characters.is_empty():
 		pending_trip_selection["locked_characters"] = locked_characters
 	if STAGE_DIFFICULTIES.has(locked_distance):
@@ -732,11 +743,29 @@ func get_pending_trip_selection() -> Dictionary:
 
 
 func has_locked_pending_trip_selection() -> bool:
+	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {}))
+	for difficulty_variant in STAGE_DIFFICULTIES:
+		var difficulty := str(difficulty_variant)
+		var pool: Array = locked_character_pools.get(difficulty, [])
+		if not pool.is_empty():
+			return true
 	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
 	return not locked_characters.is_empty()
 
 
+func get_locked_pending_trip_character_pools() -> Dictionary:
+	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {}))
+	return locked_character_pools.duplicate(true)
+
+
 func get_locked_pending_trip_characters() -> Array:
+	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {}))
+	if not locked_character_pools.is_empty():
+		var selected_distance := get_locked_pending_trip_distance()
+		if selected_distance.is_empty():
+			selected_distance = "short"
+		var selected_pool: Array = locked_character_pools.get(selected_distance, [])
+		return selected_pool.duplicate(true)
 	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
 	return locked_characters.duplicate(true)
 
@@ -746,8 +775,13 @@ func get_locked_pending_trip_distance() -> String:
 	return locked_distance if STAGE_DIFFICULTIES.has(locked_distance) else ""
 
 
-func lock_pending_trip_selection(displayed_characters: Array, selected_distance: String) -> void:
-	pending_trip_selection["locked_characters"] = displayed_characters.duplicate(true)
+func lock_pending_trip_selection(locked_character_data, selected_distance: String) -> void:
+	pending_trip_selection.erase("locked_characters")
+	pending_trip_selection.erase("locked_character_pools")
+	if locked_character_data is Dictionary:
+		pending_trip_selection["locked_character_pools"] = Dictionary(locked_character_data).duplicate(true)
+	elif locked_character_data is Array:
+		pending_trip_selection["locked_characters"] = Array(locked_character_data).duplicate(true)
 	pending_trip_selection["selected_distance"] = selected_distance if STAGE_DIFFICULTIES.has(selected_distance) else "short"
 	save_progress()
 
@@ -1019,8 +1053,10 @@ func get_unlocked_achievement_ids() -> Array[String]:
 
 
 func reset() -> void:
+	_is_loading_save = true
 	money = 0
 	energy = 3
+	max_energy = 5
 	max_gas = DEFAULT_STARTING_GAS
 	gas = DEFAULT_STARTING_GAS
 	gas_price = DEFAULT_GAS_PRICE
@@ -1043,8 +1079,10 @@ func reset() -> void:
 	achievements.clear()
 	last_seen_story_sections.clear()
 	last_seen_story_id = ""
+	resume_scene_path = ""
 	_reset_story_triggers()
-	save_progress()
+	_is_loading_save = false
+	_delete_save_file()
 
 
 func _reset_story_triggers() -> void:
@@ -1058,6 +1096,12 @@ func _reset_story_triggers() -> void:
 	})
 	consumed_story_triggers.clear()
 	save_progress()
+
+
+func _delete_save_file() -> void:
+	if not FileAccess.file_exists(SAVE_PATH):
+		return
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
 
 
 func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_number: int, context: Dictionary = {}) -> bool:

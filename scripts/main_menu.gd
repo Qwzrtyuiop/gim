@@ -9,8 +9,10 @@ const STORE_SCENE := "res://scenes/store.tscn"
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
 const Scene01IntroPayload := preload("res://scripts/story/payloads/scene_01_intro.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const GENERIC_BUTTON_TEXTURE := preload("res://assets/ui/button_generic.png")
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
 	"gray_sedan": preload("res://assets/vehicles/gray_sedan.png"),
@@ -45,6 +47,9 @@ var reset_message_time := 0.0
 var blocked_start_message_time := 0.0
 var start_confirm_dialog: ConfirmationDialog
 var is_start_transitioning := false
+var audio_panel_refs: Dictionary = {}
+var audio_toggle_button: TextureButton
+var audio_toggle_label: Label
 
 
 func _ready() -> void:
@@ -62,6 +67,7 @@ func _ready() -> void:
 	ButtonGlow.attach(self, achievements_button)
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu_trace_lines.visible = false
+	_build_audio_panel()
 	_create_dialogs()
 	_spawn_menu_traffic()
 	hint_label.text = _default_hint_text()
@@ -171,6 +177,57 @@ func _apply_button_font(button: BaseButton) -> void:
 	button.add_theme_color_override("font_focus_color", Color(0.18, 0.08, 0.05, 1.0))
 	button.add_theme_color_override("font_outline_color", Color.BLACK)
 	button.add_theme_constant_override("outline_size", 1)
+
+
+func _build_audio_panel() -> void:
+	audio_panel_refs = AudioSettingsPanel.create(
+		self,
+		self,
+		UI_FONT,
+		Vector2(26.0, 84.0),
+		Vector2(356.0, 222.0),
+		"AUDIO SETTINGS"
+	)
+	var audio_panel := audio_panel_refs.get("panel") as Panel
+	if audio_panel:
+		audio_panel.visible = false
+
+	audio_toggle_button = TextureButton.new()
+	audio_toggle_button.z_index = 10
+	audio_toggle_button.texture_normal = GENERIC_BUTTON_TEXTURE
+	audio_toggle_button.texture_pressed = GENERIC_BUTTON_TEXTURE
+	audio_toggle_button.texture_hover = GENERIC_BUTTON_TEXTURE
+	audio_toggle_button.texture_focused = GENERIC_BUTTON_TEXTURE
+	audio_toggle_button.ignore_texture_size = true
+	audio_toggle_button.stretch_mode = TextureButton.STRETCH_SCALE
+	audio_toggle_button.position = Vector2(26.0, 22.0)
+	audio_toggle_button.size = Vector2(240.0, 48.0)
+	audio_toggle_button.tooltip_text = "Toggle Audio Settings"
+	add_child(audio_toggle_button)
+
+	audio_toggle_label = Label.new()
+	audio_toggle_label.anchor_right = 1.0
+	audio_toggle_label.anchor_bottom = 1.0
+	audio_toggle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	audio_toggle_label.text = "AUDIO"
+	audio_toggle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	audio_toggle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	audio_toggle_label.add_theme_font_override("font", UI_FONT)
+	audio_toggle_label.add_theme_font_size_override("font_size", 14)
+	audio_toggle_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
+	audio_toggle_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	audio_toggle_label.add_theme_constant_override("outline_size", 1)
+	audio_toggle_button.add_child(audio_toggle_label)
+	ButtonGlow.attach(self, audio_toggle_button)
+	audio_toggle_button.pressed.connect(_toggle_audio_panel)
+
+
+func _toggle_audio_panel() -> void:
+	var audio_panel := audio_panel_refs.get("panel") as Panel
+	if audio_panel == null:
+		return
+	audio_panel.visible = not audio_panel.visible
+	audio_toggle_label.text = "AUDIO  -" if audio_panel.visible else "AUDIO"
 
 func _fade_to_intro_story() -> void:
 	var tween := create_tween()

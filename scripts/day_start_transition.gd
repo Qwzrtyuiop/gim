@@ -18,9 +18,7 @@ func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/day_start_transition.tscn")
 	day_label.text = "DAY %d" % PlayerState.get_current_day()
 	debt_label.text = "PhP %d remaining debt" % PlayerState.get_total_debt_goal()
-	var days_left := PlayerState.get_days_until_debt_collection()
-	var day_suffix := "day" if days_left == 1 else "days"
-	collector_label.text = "Collector in %d %s" % [days_left, day_suffix]
+	collector_label.text = PlayerState.get_debt_due_text()
 	day_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	debt_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	collector_label.modulate = Color(1.0, 1.0, 1.0, 0.0)

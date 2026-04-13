@@ -6,6 +6,7 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
 const BUTTON_TEXTURE := preload("res://assets/ui/button_generic.png")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
 
 var overlay: ColorRect
 var menu_panel: Panel
@@ -25,6 +26,7 @@ var detail_title: Label
 var detail_subtitle: Label
 var detail_body: Label
 var detail_close_button: Button
+var audio_panel_refs: Dictionary = {}
 
 
 func _ready() -> void:
@@ -100,9 +102,9 @@ func _build_ui() -> void:
 	menu_panel.anchor_right = 0.5
 	menu_panel.anchor_bottom = 0.5
 	menu_panel.offset_left = -250.0
-	menu_panel.offset_top = -175.0
+	menu_panel.offset_top = -255.0
 	menu_panel.offset_right = 250.0
-	menu_panel.offset_bottom = 175.0
+	menu_panel.offset_bottom = 255.0
 	menu_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_apply_panel_theme(menu_panel, Color(0.10, 0.09, 0.08, 0.95))
 	overlay.add_child(menu_panel)
@@ -133,6 +135,15 @@ func _build_ui() -> void:
 	exit_button = _make_texture_button("EXIT", Vector2(110.0, 240.0))
 	exit_button.pressed.connect(_exit_to_main_menu)
 	menu_panel.add_child(exit_button)
+
+	audio_panel_refs = AudioSettingsPanel.create(
+		self,
+		menu_panel,
+		UI_FONT,
+		Vector2(56.0, 316.0),
+		Vector2(388.0, 170.0),
+		"AUDIO"
+	)
 
 	library_panel = Panel.new()
 	library_panel.visible = false

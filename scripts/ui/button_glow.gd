@@ -15,6 +15,12 @@ static func attach(
 	if button == null:
 		return
 
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree and tree.root:
+		var audio_manager := tree.root.get_node_or_null("UIAudioManager")
+		if audio_manager and audio_manager.has_method("attach_button"):
+			audio_manager.attach_button(button)
+
 	button.modulate = normal_modulate
 	button.mouse_entered.connect(func() -> void:
 		set_state(host, button, true, normal_modulate, glow_modulate, duration)

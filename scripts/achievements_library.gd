@@ -20,6 +20,7 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 func _ready() -> void:
 	back_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ButtonGlow.attach(self, back_button)
+	UIAudioManager.attach_button(close_button)
 	_apply_button_theme(close_button)
 	_apply_panel_theme(main_panel, Color(0.10, 0.09, 0.08, 0.92))
 	_apply_panel_theme(detail_panel, Color(0.11, 0.10, 0.08, 0.96))

@@ -5,6 +5,7 @@ const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const STORE_BGM_PATH := "res://assets/stagebgm/store.mp3"
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
 const TIER_BORDER_COLOR := Color(0.23, 0.16, 0.10, 0.92)
@@ -77,6 +78,7 @@ const STORE_ITEMS := [
 
 var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
+var bgm_player: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -87,6 +89,7 @@ func _ready() -> void:
 	ride_button.pressed.connect(_attempt_ride)
 	ButtonGlow.attach(self, back_button)
 	ButtonGlow.attach(self, ride_button)
+	_start_store_bgm()
 	_create_dialogs()
 	_build_items()
 	_refresh_header()
@@ -137,6 +140,7 @@ func _build_items() -> void:
 		button.text = "BUY"
 		_apply_button_font(button)
 		_apply_store_buy_button_style(button)
+		UIAudioManager.attach_button(button)
 		button.pressed.connect(_buy_item.bind(item, label, tier_container, button))
 		row.add_child(button)
 
@@ -192,6 +196,17 @@ func _refresh_header() -> void:
 		PlayerState.get_gas_price(),
 		PlayerState.get_debt_status_text(),
 	]
+
+
+func _start_store_bgm() -> void:
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.name = "StoreBGMPlayer"
+	bgm_player.stream = load(STORE_BGM_PATH)
+	bgm_player.bus = "Master"
+	bgm_player.autoplay = false
+	add_child(bgm_player)
+	AudioSettingsManager.register_player(bgm_player, "music")
+	bgm_player.play()
 
 
 func _ride() -> void:
