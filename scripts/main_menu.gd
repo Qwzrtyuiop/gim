@@ -17,6 +17,7 @@ const MAIN_LANE_SCALE := 1.0
 const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
 const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
 const RESET_HOLD_SECONDS := 1.4
+const LAST_ENERGY_WARNING := "Start the day with your last energy?\nIf this trip goes bad, the run ends."
 
 @onready var start_button: BaseButton = $Menu/StartButton
 @onready var quit_button: BaseButton = $Menu/QuitButton
@@ -30,6 +31,8 @@ var menu_vehicles: Array = []
 var texture_hitbox_cache := {}
 var reset_hold_time := 0.0
 var reset_message_time := 0.0
+var blocked_start_message_time := 0.0
+var start_confirm_dialog: ConfirmationDialog
 
 
 func _ready() -> void:
@@ -43,6 +46,7 @@ func _ready() -> void:
 	_connect_button_glow(quit_button)
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu_trace_lines.visible = false
+	_create_dialogs()
 	_spawn_menu_traffic()
 
 
@@ -72,11 +76,33 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _start_game() -> void:
 	PlayerState.begin_stage_sequence()
+	if PlayerState.energy == 1:
+		start_confirm_dialog.popup_centered()
+		return
+
+	_confirm_start_game()
+
+
+func _confirm_start_game() -> void:
+	if not PlayerState.prepare_stage_start():
+		blocked_start_message_time = 1.8
+		hint_label.text = "No energy left. Hold R to reset progress"
+		return
 	get_tree().change_scene_to_file(GAME_SCENE)
 
 
 func _quit_game() -> void:
 	get_tree().quit()
+
+
+func _create_dialogs() -> void:
+	start_confirm_dialog = ConfirmationDialog.new()
+	start_confirm_dialog.title = "Last Energy"
+	start_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
+	start_confirm_dialog.get_ok_button().text = "START"
+	start_confirm_dialog.get_cancel_button().text = "BACK"
+	start_confirm_dialog.confirmed.connect(_confirm_start_game)
+	add_child(start_confirm_dialog)
 
 
 func _apply_button_font(button: BaseButton) -> void:
@@ -122,6 +148,9 @@ func _update_reset_progress(delta: float) -> void:
 		if reset_message_time > 0.0:
 			reset_message_time -= delta
 			hint_label.text = "Progress reset"
+		elif blocked_start_message_time > 0.0:
+			blocked_start_message_time -= delta
+			hint_label.text = "No energy left. Hold R to reset progress"
 		else:
 			hint_label.text = "ENTER start     ESC quit     HOLD R reset progress"
 

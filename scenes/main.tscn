@@ -10,14 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://c7iev2sfp8t65" path="res://assets/vehicles/motorcycle.png" id="8_kw13x"]
 [ext_resource type="Texture2D" uid="uid://vaarmdqhgc1" path="res://assets/vehicles/sedan.png" id="9_c7lel"]
 [ext_resource type="Texture2D" uid="uid://b5kbx25r7i86a" path="res://assets/vehicles/truck.png" id="10_1s5vf"]
-[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="11_rqqbv"]
-
-[sub_resource type="LabelSettings" id="LabelSettings_mf7tu"]
-font = ExtResource("11_rqqbv")
-font_size = 15
-font_color = Color(0.98, 0.96, 0.8, 1)
-outline_size = 4
-outline_color = Color(0, 0, 0, 0.82)
+[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="11_rqqbv"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_speed_preview"]
 font = ExtResource("11_rqqbv")
@@ -25,6 +18,13 @@ font_size = 12
 font_color = Color(0.95, 0.96, 0.88, 1)
 outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_mf7tu"]
+font = ExtResource("11_rqqbv")
+font_size = 15
+font_color = Color(0.98, 0.96, 0.8, 1)
+outline_size = 4
+outline_color = Color(0, 0, 0, 0.82)
 
 [node name="Main" type="Node2D" unique_id=817588642]
 script = ExtResource("1_yc7bn")
@@ -148,36 +148,36 @@ offset_right = 322.0
 offset_bottom = 202.0
 color = Color(0.06, 0.07, 0.08, 0)
 
-[node name="SpeedArcBackPreview" type="Line2D" parent="EditorPreview"]
+[node name="SpeedArcBackPreview" type="Line2D" parent="EditorPreview" unique_id=53268707]
 position = Vector2(118, 124)
 points = PackedVector2Array(-65.8179, 38, -74.0208, 17.2715, -74.0208, -17.2715, -65.8179, -38, -38, -65.8179, -17.2715, -74.0208, 17.2715, -74.0208, 38, -65.8179, 65.8179, -38)
 width = 16.0
 default_color = Color(0, 0, 0, 0.64)
 
-[node name="SpeedArcGreenPreview" type="Line2D" parent="EditorPreview"]
+[node name="SpeedArcGreenPreview" type="Line2D" parent="EditorPreview" unique_id=450972833]
 position = Vector2(118, 124)
 points = PackedVector2Array(-65.8179, 38, -74.0208, 17.2715, -74.0208, -17.2715, -65.8179, -38)
 width = 12.0
 default_color = Color(0.26, 0.88, 0.3, 1)
 
-[node name="SpeedArcYellowPreview" type="Line2D" parent="EditorPreview"]
+[node name="SpeedArcYellowPreview" type="Line2D" parent="EditorPreview" unique_id=483667700]
 position = Vector2(118, 124)
 points = PackedVector2Array(-38, -65.8179, -17.2715, -74.0208, 17.2715, -74.0208)
 width = 12.0
 default_color = Color(0.94, 0.82, 0.22, 1)
 
-[node name="SpeedArcRedPreview" type="Line2D" parent="EditorPreview"]
+[node name="SpeedArcRedPreview" type="Line2D" parent="EditorPreview" unique_id=1278044740]
 position = Vector2(118, 124)
 points = PackedVector2Array(38, -65.8179, 65.8179, -38)
 width = 12.0
 default_color = Color(0.82, 0.2, 0.18, 1)
 
-[node name="SpeedNeedlePreview" type="Line2D" parent="EditorPreview"]
+[node name="SpeedNeedlePreview" type="Line2D" parent="EditorPreview" unique_id=891859075]
 points = PackedVector2Array(108, 126, 158, 78)
 width = 5.0
 default_color = Color(0.96, 0.18, 0.15, 1)
 
-[node name="SpeedNeedleCenterPreview" type="Polygon2D" parent="EditorPreview"]
+[node name="SpeedNeedleCenterPreview" type="Polygon2D" parent="EditorPreview" unique_id=177235377]
 color = Color(0.95, 0.92, 0.72, 1)
 polygon = PackedVector2Array(110, 116, 118, 112, 126, 116, 130, 124, 126, 132, 118, 136, 110, 132, 106, 124)
 

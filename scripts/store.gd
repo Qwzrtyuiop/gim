@@ -4,9 +4,17 @@ const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
 const UI_FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
 const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
 const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
-const TIER_FILLED_COLOR := Color(0.98, 0.82, 0.24, 1.0)
-const TIER_EMPTY_COLOR := Color(0.16, 0.15, 0.13, 0.92)
-const TIER_BORDER_COLOR := Color(0.0, 0.0, 0.0, 0.92)
+const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
+const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
+const TIER_BORDER_COLOR := Color(0.23, 0.16, 0.10, 0.92)
+const LAST_ENERGY_WARNING := "Start the next day with your last energy?\nIf this trip goes bad, the run ends."
+const ROW_BG_COLOR := Color(0.93, 0.88, 0.78, 0.76)
+const ROW_BORDER_COLOR := Color(0.34, 0.22, 0.12, 0.86)
+const BUY_BUTTON_BG := Color(0.46, 0.29, 0.17, 0.95)
+const BUY_BUTTON_HOVER_BG := Color(0.80, 0.60, 0.28, 0.98)
+const BUY_BUTTON_PRESSED_BG := Color(0.36, 0.53, 0.30, 0.98)
+const BUY_BUTTON_DISABLED_BG := Color(0.42, 0.37, 0.32, 0.86)
+const BUY_BUTTON_BORDER := Color(0.20, 0.12, 0.07, 0.96)
 
 const STORE_ITEMS := [
 	{
@@ -14,6 +22,7 @@ const STORE_ITEMS := [
 		"name": "Engine Tune",
 		"description": "+8% acceleration, +4% top speed per level",
 		"cost": 120,
+		"cost_step": 70,
 		"type": "upgrade",
 		"max_level": 5,
 	},
@@ -22,6 +31,7 @@ const STORE_ITEMS := [
 		"name": "Brake Kit",
 		"description": "+10% braking per level",
 		"cost": 90,
+		"cost_step": 55,
 		"type": "upgrade",
 		"max_level": 5,
 	},
@@ -30,6 +40,7 @@ const STORE_ITEMS := [
 		"name": "Tire Grip",
 		"description": "+8% lane switching per level",
 		"cost": 100,
+		"cost_step": 60,
 		"type": "upgrade",
 		"max_level": 5,
 	},
@@ -56,29 +67,44 @@ const STORE_ITEMS := [
 @onready var item_list: VBoxContainer = $ItemList
 @onready var ride_button: BaseButton = $RideButton
 
+var ride_confirm_dialog: ConfirmationDialog
+
 
 func _ready() -> void:
-	ride_button.pressed.connect(_ride)
+	ride_button.pressed.connect(_attempt_ride)
 	_connect_button_glow(ride_button)
+	_create_dialogs()
 	_build_items()
 	_refresh_header()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept") and ride_button.has_focus():
-		_ride()
+		_attempt_ride()
 
 
 func _build_items() -> void:
 	for item in STORE_ITEMS:
+		var row_frame := PanelContainer.new()
+		row_frame.custom_minimum_size = Vector2(0.0, 92.0)
+		row_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row_frame.add_theme_stylebox_override("panel", _make_store_row_style())
+		item_list.add_child(row_frame)
+
+		var row_margin := MarginContainer.new()
+		row_margin.add_theme_constant_override("margin_left", 16)
+		row_margin.add_theme_constant_override("margin_top", 12)
+		row_margin.add_theme_constant_override("margin_right", 16)
+		row_margin.add_theme_constant_override("margin_bottom", 12)
+		row_frame.add_child(row_margin)
+
 		var row := HBoxContainer.new()
-		row.custom_minimum_size = Vector2(0.0, 74.0)
 		row.add_theme_constant_override("separation", 14)
-		item_list.add_child(row)
+		row_margin.add_child(row)
 
 		var label := Label.new()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.label_settings = _make_label_settings(22, Color(0.98, 0.95, 0.78, 1.0))
+		label.label_settings = _make_label_settings(22, Color(0.24, 0.16, 0.10, 1.0))
 		label.text = _item_text(item)
 		row.add_child(label)
 
@@ -89,6 +115,7 @@ func _build_items() -> void:
 		button.custom_minimum_size = Vector2(145.0, 48.0)
 		button.text = "BUY"
 		_apply_button_font(button)
+		_apply_store_buy_button_style(button)
 		button.pressed.connect(_buy_item.bind(item, label, tier_container, button))
 		row.add_child(button)
 
@@ -96,7 +123,7 @@ func _build_items() -> void:
 
 
 func _item_text(item: Dictionary) -> String:
-	var text := "%s  PhP %d\n%s" % [item["name"], item["cost"], item["description"]]
+	var text := "%s  PhP %d\n%s" % [item["name"], _item_cost(item), item["description"]]
 	if item["type"] == "upgrade":
 		text += "  Lv %d/%d" % [
 			PlayerState.get_upgrade_level(item["id"]),
@@ -112,7 +139,8 @@ func _buy_item(item: Dictionary, label: Label, tier_container: HBoxContainer, bu
 			status_label.text = "%s is already maxed." % item["name"]
 			return
 
-	if not PlayerState.spend_money(int(item["cost"])):
+	var item_cost := _item_cost(item)
+	if not PlayerState.spend_money(item_cost):
 		status_label.text = "Not enough money."
 		return
 
@@ -139,19 +167,32 @@ func _refresh_header() -> void:
 
 
 func _ride() -> void:
-	PlayerState.advance_to_random_stage()
+	if not PlayerState.prepare_stage_start():
+		status_label.text = "No energy. Buy food first."
+		return
+	PlayerState.advance_to_next_stage()
 	get_tree().change_scene_to_file(NEXT_STAGE_SCENE)
 
 
 func _apply_button_font(button: Button) -> void:
 	button.add_theme_font_override("font", UI_FONT)
 	button.add_theme_font_size_override("font_size", 24)
-	button.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(0.18, 0.08, 0.05, 1.0))
-	button.add_theme_color_override("font_pressed_color", Color(0.18, 0.08, 0.05, 1.0))
-	button.add_theme_color_override("font_focus_color", Color(0.18, 0.08, 0.05, 1.0))
-	button.add_theme_color_override("font_outline_color", Color.BLACK)
+	button.add_theme_color_override("font_color", Color(0.97, 0.92, 0.80, 1.0))
+	button.add_theme_color_override("font_hover_color", Color(0.20, 0.11, 0.06, 1.0))
+	button.add_theme_color_override("font_pressed_color", Color(0.12, 0.08, 0.05, 1.0))
+	button.add_theme_color_override("font_focus_color", Color(0.20, 0.11, 0.06, 1.0))
+	button.add_theme_color_override("font_disabled_color", Color(0.78, 0.73, 0.68, 0.86))
+	button.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.95))
 	button.add_theme_constant_override("outline_size", 2)
+
+
+func _item_cost(item: Dictionary) -> int:
+	if item["type"] != "upgrade":
+		return int(item["cost"])
+
+	var current_level := PlayerState.get_upgrade_level(item["id"])
+	var cost_step := int(item.get("cost_step", 0))
+	return int(item["cost"]) + current_level * cost_step
 
 
 func _refresh_buy_button(item: Dictionary, button: Button) -> void:
@@ -237,5 +278,64 @@ func _make_label_settings(font_size: int, color: Color) -> LabelSettings:
 	settings.font_size = font_size
 	settings.font_color = color
 	settings.outline_size = 2
-	settings.outline_color = Color(0.0, 0.0, 0.0, 0.95)
+	settings.outline_color = Color(0.95, 0.92, 0.84, 0.92)
 	return settings
+
+
+func _make_store_row_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = ROW_BG_COLOR
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.border_color = ROW_BORDER_COLOR
+	style.corner_radius_top_left = 6
+	style.corner_radius_top_right = 6
+	style.corner_radius_bottom_right = 6
+	style.corner_radius_bottom_left = 6
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
+	style.shadow_size = 5
+	style.shadow_offset = Vector2(0, 2)
+	return style
+
+
+func _apply_store_buy_button_style(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _make_buy_button_style(BUY_BUTTON_BG))
+	button.add_theme_stylebox_override("hover", _make_buy_button_style(BUY_BUTTON_HOVER_BG))
+	button.add_theme_stylebox_override("pressed", _make_buy_button_style(BUY_BUTTON_PRESSED_BG))
+	button.add_theme_stylebox_override("focus", _make_buy_button_style(BUY_BUTTON_HOVER_BG))
+	button.add_theme_stylebox_override("disabled", _make_buy_button_style(BUY_BUTTON_DISABLED_BG))
+
+
+func _make_buy_button_style(color: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = color
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.border_color = BUY_BUTTON_BORDER
+	style.corner_radius_top_left = 5
+	style.corner_radius_top_right = 5
+	style.corner_radius_bottom_right = 5
+	style.corner_radius_bottom_left = 5
+	return style
+
+
+func _attempt_ride() -> void:
+	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy == 1:
+		ride_confirm_dialog.popup_centered()
+		return
+
+	_ride()
+
+
+func _create_dialogs() -> void:
+	ride_confirm_dialog = ConfirmationDialog.new()
+	ride_confirm_dialog.title = "Last Energy"
+	ride_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
+	ride_confirm_dialog.get_ok_button().text = "START DAY"
+	ride_confirm_dialog.get_cancel_button().text = "BACK"
+	ride_confirm_dialog.confirmed.connect(_ride)
+	add_child(ride_confirm_dialog)

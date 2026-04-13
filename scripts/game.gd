@@ -4,6 +4,7 @@ const BG_TEXTURE := preload("res://assets/background/bg1_loop.png")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
+const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const PLAYER_TEXTURE := preload("res://assets/vehicles/player_tricycle.png")
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
@@ -31,8 +32,43 @@ const PLAYER_HITBOX_INSET := Vector4(0.08, 0.08, 0.08, 0.0)
 const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const NPC_LANE_CHANGE_WARNING_PULSES := 3
 const NPC_LANE_CHANGE_WARNING_INTERVAL := 0.28
+const TIME_FILTER_Z_INDEX := 760
+const NIGHT_MASK_Z_INDEX := 790
+const HEADLIGHT_Z_INDEX := 820
 const ROAD_ACTOR_Z_BASE := 10
 const ROAD_ACTOR_Z_STEP := 10
+const NIGHT_VISIBILITY_SHADER_CODE := "
+shader_type canvas_item;
+
+uniform vec2 focus_center = vec2(0.32, 0.68);
+uniform vec2 outer_radius = vec2(0.36, 0.24);
+uniform float inner_ratio = 0.42;
+uniform vec4 shade_color : source_color = vec4(0.0, 0.0, 0.0, 0.78);
+
+void fragment() {
+	vec2 delta = SCREEN_UV - focus_center;
+	vec2 normalized = delta / max(outer_radius, vec2(0.0001));
+	float ellipse_distance = length(normalized);
+	float shade = smoothstep(inner_ratio, 1.0, ellipse_distance);
+	COLOR = vec4(shade_color.rgb, shade_color.a * shade);
+}
+"
+const NOON_GLOW_SHADER_CODE := "
+shader_type canvas_item;
+
+uniform vec2 glow_center = vec2(0.5, 0.22);
+uniform vec2 glow_radius = vec2(0.72, 0.54);
+uniform vec4 glow_color : source_color = vec4(1.0, 0.85, 0.32, 0.18);
+
+void fragment() {
+	vec2 delta = SCREEN_UV - glow_center;
+	vec2 normalized = delta / max(glow_radius, vec2(0.0001));
+	float dist = length(normalized);
+	float alpha = max(0.0, 1.0 - dist);
+	alpha = alpha * alpha * 0.85;
+	COLOR = vec4(glow_color.rgb, glow_color.a * alpha);
+}
+"
 const FIRST_STAGE_TYPE := "easy-morning-chill"
 const DEFAULT_STAGE_PROFILE := {
 	"target_distance": 1000.0,
@@ -288,6 +324,7 @@ const BACKGROUND_PROFILES := {
 @export_group("Stage Rewards")
 @export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.08
 @export_range(0.0, 100.0, 0.5) var time_bonus_php_per_second := 2.0
+@export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
 
 @export_group("Perspective")
 @export_range(0.2, 2.0, 0.01) var incoming_lane_scale := 0.78
@@ -295,16 +332,42 @@ const BACKGROUND_PROFILES := {
 @export_range(0.2, 2.0, 0.01) var shoulder_lane_scale := 1.18
 @export_range(1.0, 20.0, 0.5) var player_perspective_lerp_speed := 9.0
 
+@export_group("Time Filters")
+@export var morning_filter_color := Color(0.0, 0.0, 0.0, 0.0)
+@export var noon_filter_color := Color(1.0, 0.84, 0.26, 0.26)
+@export var night_filter_color := Color(0.0, 0.02, 0.10, 0.62)
+@export_range(0.0, 1.0, 0.01) var morning_headlight_alpha := 0.0
+@export_range(0.0, 1.0, 0.01) var noon_headlight_alpha := 0.0
+@export_range(0.0, 1.0, 0.01) var night_headlight_alpha := 0.84
+@export_range(0.2, 5.0, 0.05) var headlight_cone_length_x := 3.35
+@export_range(0.1, 2.0, 0.05) var headlight_cone_height_x := 1.18
+@export var noon_glow_color := Color(1.0, 0.86, 0.30, 0.22)
+@export var noon_glow_center := Vector2(0.52, 0.22)
+@export var noon_glow_radius := Vector2(0.72, 0.56)
+
+@export_group("Night Visibility")
+@export var night_visibility_shade_color := Color(0.0, 0.0, 0.0, 0.86)
+@export var night_visibility_focus_offset := Vector2(170.0, -20.0)
+@export var night_visibility_outer_radius := Vector2(0.34, 0.24)
+@export_range(0.1, 0.95, 0.01) var night_visibility_inner_ratio := 0.34
+
 var rng := RandomNumberGenerator.new()
 var background_layer: Node2D
 var bg_a: Sprite2D
 var bg_b: Sprite2D
 var bg_width := 1280.0
+var time_filter_rect: ColorRect
+var noon_glow_rect: ColorRect
+var noon_glow_material: ShaderMaterial
+var night_visibility_rect: ColorRect
+var night_visibility_material: ShaderMaterial
+var headlight_cone_texture: Texture2D
 var player: Sprite2D
 var player_lane := 1
 var player_speed := 0.0
 var distance := 0.0
 var time_left := 0.0
+var overtime_seconds := 0.0
 var active_entities: Array = []
 var spawn_timers := [0.4, 0.8, 1.2]
 var game_state := "playing"
@@ -313,6 +376,7 @@ var player_is_stage_clear_exiting := false
 var bottom_bar: ColorRect
 var speedometer: Control
 var help_label: Label
+var footer_stats_label: Label
 var status_label: Label
 var stage_label: Label
 var speeder_warning_label: Label
@@ -329,6 +393,13 @@ var speeder_warning_timer := 0.0
 var speeder_warning_flash_timer := 0.0
 var speeder_warning_beeps_remaining := 0
 var speeder_warning_active := false
+var speeder_lane_change_warning_label: Label
+var speeder_lane_change_warning_timer := 0.0
+var speeder_lane_change_warning_beeps_remaining := 0
+var speeder_lane_change_warning_active := false
+var speeder_lane_change_warning_target_lane := -1
+var pending_speeder_lane_change_sprite: Sprite2D
+var special_mode_hidden_modifiers := {}
 
 
 func _ready() -> void:
@@ -340,11 +411,18 @@ func _ready() -> void:
 	_apply_player_upgrades()
 	_reset_speeder_timer()
 	time_left = time_limit
+	overtime_seconds = 0.0
 	player_speed = player_start_speed
+	headlight_cone_texture = _make_headlight_cone_texture()
 	_create_background()
 	_create_player()
+	_create_time_filter()
+	_create_noon_glow()
+	_create_night_visibility_mask()
 	_create_ui()
 	_layout_scene()
+	if use_player_state_stage_sequence:
+		PlayerState.confirm_stage_started()
 	set_process(true)
 
 
@@ -365,6 +443,8 @@ func _apply_stage_profile() -> void:
 
 	for setting_name in profile.keys():
 		set(setting_name, profile[setting_name])
+
+	_apply_hidden_special_modifiers()
 
 
 func _parse_stage_type(type_name: String) -> Dictionary:
@@ -407,6 +487,52 @@ func _apply_player_upgrades() -> void:
 	player_lane_lerp_x *= 1.0 + tires_level * 0.08
 
 
+func _apply_hidden_special_modifiers() -> void:
+	special_mode_hidden_modifiers.clear()
+
+	match stage_traffic:
+		"traffic-jam":
+			special_mode_hidden_modifiers = {
+				"jam_density_x": rng.randf_range(0.88, 1.16),
+				"jam_lock_x": rng.randf_range(0.90, 1.14),
+				"shoulder_clutter_x": rng.randf_range(0.94, 1.10),
+			}
+			main_spawn_min_delay *= special_mode_hidden_modifiers["jam_density_x"]
+			main_spawn_max_delay *= special_mode_hidden_modifiers["jam_density_x"]
+			npc_follow_gap *= special_mode_hidden_modifiers["jam_lock_x"]
+			shoulder_parked_chance = clampf(
+				shoulder_parked_chance * special_mode_hidden_modifiers["shoulder_clutter_x"],
+				0.0,
+				1.0
+			)
+		"busy":
+			special_mode_hidden_modifiers = {
+				"busy_density_x": rng.randf_range(0.82, 1.10),
+				"lane_weave_x": rng.randf_range(0.88, 1.35),
+				"close_call_x": rng.randf_range(0.92, 1.20),
+			}
+			incoming_spawn_min_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			incoming_spawn_max_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			main_spawn_min_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			main_spawn_max_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			shoulder_spawn_min_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			shoulder_spawn_max_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			npc_lane_change_chance_per_second *= special_mode_hidden_modifiers["lane_weave_x"]
+			npc_collision_lookahead *= special_mode_hidden_modifiers["close_call_x"]
+		"speeders":
+			special_mode_hidden_modifiers = {
+				"speeder_rate_x": rng.randf_range(0.84, 1.12),
+				"speeder_speed_x": rng.randf_range(0.92, 1.14),
+				"speeder_hunt_x": rng.randf_range(0.88, 1.22),
+			}
+			speeder_spawn_min_delay *= special_mode_hidden_modifiers["speeder_rate_x"]
+			speeder_spawn_max_delay *= special_mode_hidden_modifiers["speeder_rate_x"]
+			speeder_vehicle_speed *= special_mode_hidden_modifiers["speeder_speed_x"]
+			speeder_avoid_lookahead *= special_mode_hidden_modifiers["speeder_hunt_x"]
+			main_spawn_min_delay *= rng.randf_range(0.92, 1.10)
+			main_spawn_max_delay *= rng.randf_range(0.92, 1.10)
+
+
 func _hide_editor_preview() -> void:
 	var editor_preview := get_node_or_null("EditorPreview")
 	if editor_preview:
@@ -420,6 +546,10 @@ func _notification(what: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_any_press(event) and game_state == "GAME OVER":
+		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_UP, KEY_W:
@@ -430,7 +560,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if game_state == "YOU MADE IT":
 					_go_to_profit_screen()
 				elif game_state != "playing":
-					_reset_game()
+					_try_retry_stage()
 
 
 func _process(delta: float) -> void:
@@ -439,6 +569,7 @@ func _process(delta: float) -> void:
 		_update_progress(delta)
 		_update_spawns(delta)
 		_update_speeder_warning(delta)
+		_update_speeder_lane_change_warning(delta)
 		_update_lane_change_warnings(delta)
 		_update_random_lane_changes(delta)
 		_update_speeder_ai()
@@ -454,6 +585,7 @@ func _process(delta: float) -> void:
 		_update_player(delta)
 
 	_update_background()
+	_update_night_visibility_mask()
 	_update_ui()
 	queue_redraw()
 
@@ -494,6 +626,45 @@ func _create_player() -> void:
 	player.centered = true
 	player.z_index = _z_for_lane(player_lane, 1)
 	add_child(player)
+	_apply_vehicle_headlight(player, PLAYER_HITBOX_INSET)
+
+
+func _create_time_filter() -> void:
+	time_filter_rect = ColorRect.new()
+	time_filter_rect.z_index = TIME_FILTER_Z_INDEX
+	time_filter_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	time_filter_rect.color = _current_time_filter_color()
+	add_child(time_filter_rect)
+
+
+func _create_noon_glow() -> void:
+	noon_glow_rect = ColorRect.new()
+	noon_glow_rect.z_index = TIME_FILTER_Z_INDEX + 4
+	noon_glow_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	noon_glow_rect.color = Color.WHITE
+
+	var shader := Shader.new()
+	shader.code = NOON_GLOW_SHADER_CODE
+	noon_glow_material = ShaderMaterial.new()
+	noon_glow_material.shader = shader
+	noon_glow_rect.material = noon_glow_material
+	add_child(noon_glow_rect)
+	_update_noon_glow()
+
+
+func _create_night_visibility_mask() -> void:
+	night_visibility_rect = ColorRect.new()
+	night_visibility_rect.z_index = NIGHT_MASK_Z_INDEX
+	night_visibility_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	night_visibility_rect.color = Color.WHITE
+
+	var shader := Shader.new()
+	shader.code = NIGHT_VISIBILITY_SHADER_CODE
+	night_visibility_material = ShaderMaterial.new()
+	night_visibility_material.shader = shader
+	night_visibility_rect.material = night_visibility_material
+	add_child(night_visibility_rect)
+	_update_night_visibility_mask()
 
 
 func _create_ui() -> void:
@@ -512,6 +683,10 @@ func _create_ui() -> void:
 	help_label = _make_label(13, Color(0.95, 0.96, 0.88, 1.0), 4)
 	ui.add_child(help_label)
 
+	footer_stats_label = _make_label(13, Color(1.0, 0.97, 0.82, 1.0), 4)
+	footer_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	ui.add_child(footer_stats_label)
+
 	status_label = _make_label(22, Color(1.0, 0.97, 0.82, 1.0), 6)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -519,7 +694,7 @@ func _create_ui() -> void:
 
 	stage_label = _make_label(12, Color(0.92, 0.95, 0.88, 1.0), 4)
 	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	stage_label.text = stage_type.to_upper()
+	stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 	ui.add_child(stage_label)
 
 	speeder_warning_label = _make_label(48, Color(1.0, 0.92, 0.2, 1.0), 7)
@@ -528,6 +703,13 @@ func _create_ui() -> void:
 	speeder_warning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	speeder_warning_label.visible = false
 	ui.add_child(speeder_warning_label)
+
+	speeder_lane_change_warning_label = _make_label(48, Color(1.0, 0.92, 0.2, 1.0), 7)
+	speeder_lane_change_warning_label.text = "!"
+	speeder_lane_change_warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	speeder_lane_change_warning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	speeder_lane_change_warning_label.visible = false
+	ui.add_child(speeder_lane_change_warning_label)
 
 	speeder_beep_player = AudioStreamPlayer.new()
 	var beep_stream := AudioStreamGenerator.new()
@@ -552,6 +734,83 @@ func _make_label(font_size: int, color: Color, outline_size: int) -> Label:
 	return label
 
 
+func _current_time_filter_color() -> Color:
+	match stage_time_of_day:
+		"night":
+			return night_filter_color
+	return morning_filter_color
+
+
+func _current_headlight_alpha() -> float:
+	match stage_time_of_day:
+		"noon":
+			return noon_headlight_alpha
+		"night":
+			return night_headlight_alpha
+	return morning_headlight_alpha
+
+
+func _make_headlight_cone_texture() -> Texture2D:
+	var width := 256
+	var height := 96
+	var image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	var warm_color := Color(1.0, 0.95, 0.78, 0.0)
+
+	for y in range(height):
+		for x in range(width):
+			var x_ratio := float(x) / float(width - 1)
+			var center_y := (height - 1) * 0.5
+			var half_height := lerpf(3.0, height * 0.46, x_ratio)
+			var y_offset := absf(float(y) - center_y) / maxf(1.0, half_height)
+			if y_offset > 1.0:
+				continue
+
+			var longitudinal_falloff := pow(1.0 - x_ratio, 1.35)
+			var lateral_falloff := pow(1.0 - y_offset, 1.8)
+			var core_glow := exp(-pow((x_ratio - 0.18) / 0.24, 2.0)) * 0.42
+			var alpha := clampf(longitudinal_falloff * lateral_falloff + core_glow * lateral_falloff, 0.0, 1.0)
+			image.set_pixel(x, y, Color(warm_color.r, warm_color.g, warm_color.b, alpha))
+
+	return ImageTexture.create_from_image(image)
+
+
+func _update_noon_glow() -> void:
+	if noon_glow_rect == null or noon_glow_material == null:
+		return
+
+	noon_glow_rect.visible = stage_time_of_day == "noon"
+	if not noon_glow_rect.visible:
+		return
+
+	noon_glow_material.set_shader_parameter("glow_center", noon_glow_center)
+	noon_glow_material.set_shader_parameter("glow_radius", noon_glow_radius)
+	noon_glow_material.set_shader_parameter("glow_color", noon_glow_color)
+
+
+func _update_night_visibility_mask() -> void:
+	if night_visibility_rect == null or night_visibility_material == null or player == null:
+		return
+
+	var is_night := stage_time_of_day == "night"
+	night_visibility_rect.visible = is_night
+	if not is_night:
+		return
+
+	var viewport_size := get_viewport_rect().size
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return
+
+	var focus_position := player.global_position + night_visibility_focus_offset
+	var focus_center := Vector2(
+		clampf(focus_position.x / viewport_size.x, 0.0, 1.0),
+		clampf(focus_position.y / viewport_size.y, 0.0, 1.0)
+	)
+	night_visibility_material.set_shader_parameter("focus_center", focus_center)
+	night_visibility_material.set_shader_parameter("outer_radius", night_visibility_outer_radius)
+	night_visibility_material.set_shader_parameter("inner_ratio", night_visibility_inner_ratio)
+	night_visibility_material.set_shader_parameter("shade_color", night_visibility_shade_color)
+
+
 func _layout_scene() -> void:
 	if bg_a == null or bg_b == null or player == null:
 		return
@@ -569,6 +828,7 @@ func _layout_scene() -> void:
 		player_lane
 	)
 	_apply_vehicle_shadow(player, PLAYER_HITBOX_INSET)
+	_apply_vehicle_headlight(player, PLAYER_HITBOX_INSET)
 	player.position = Vector2(player_x, _sprite_y_for_hitbox_bottom(player, _lane_y(player_lane, size), PLAYER_HITBOX_INSET))
 
 	if speedometer:
@@ -580,16 +840,20 @@ func _layout_scene() -> void:
 		bottom_bar.size = Vector2(size.x, 58.0)
 
 	if help_label:
-		help_label.text = "UP/DOWN lane     LEFT/RIGHT speed     SPACE/R restart"
+		help_label.text = "UP/DOWN switch lane     LEFT/RIGHT adjust speed     SPACE/R menu action"
 		help_label.position = Vector2(28.0, size.y - 45.0)
-		help_label.size = Vector2(size.x - 56.0, 34.0)
+		help_label.size = Vector2(size.x * 0.56, 34.0)
+
+	if footer_stats_label:
+		footer_stats_label.position = Vector2(size.x * 0.56, size.y - 45.0)
+		footer_stats_label.size = Vector2(size.x * 0.40 - 28.0, 34.0)
 
 	if status_label:
 		status_label.position = Vector2(0.0, size.y * 0.37)
 		status_label.size = Vector2(size.x, 120.0)
 
 	if stage_label:
-		stage_label.text = stage_type.to_upper()
+		stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 		stage_label.position = Vector2(size.x - 560.0, 18.0)
 		stage_label.size = Vector2(530.0, 28.0)
 
@@ -597,9 +861,28 @@ func _layout_scene() -> void:
 		speeder_warning_label.position = Vector2(player_x + 105.0, _lane_y(1, size) - 92.0)
 		speeder_warning_label.size = Vector2(90.0, 90.0)
 
+	if speeder_lane_change_warning_label:
+		speeder_lane_change_warning_label.position = Vector2(player_x + 105.0, _lane_y(max(player_lane, 1), size) - 92.0)
+		speeder_lane_change_warning_label.size = Vector2(90.0, 90.0)
+
 	if fade_rect:
 		fade_rect.position = Vector2.ZERO
 		fade_rect.size = size
+
+	if time_filter_rect:
+		time_filter_rect.position = Vector2.ZERO
+		time_filter_rect.size = size
+		time_filter_rect.color = _current_time_filter_color()
+
+	if noon_glow_rect:
+		noon_glow_rect.position = Vector2.ZERO
+		noon_glow_rect.size = size
+		_update_noon_glow()
+
+	if night_visibility_rect:
+		night_visibility_rect.position = Vector2.ZERO
+		night_visibility_rect.size = size
+		_update_night_visibility_mask()
 
 
 func _handle_speed(delta: float) -> void:
@@ -622,15 +905,28 @@ func _player_lane_acceleration_x() -> float:
 	return 1.0
 
 
+func _is_any_press(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		return event.pressed and not event.echo
+	if event is InputEventMouseButton:
+		return event.pressed
+	if event is InputEventJoypadButton:
+		return event.pressed
+	return false
+
+
 func _update_progress(delta: float) -> void:
 	distance += player_speed * _distance_scale() * delta
-	time_left -= delta
+	if time_left > 0.0:
+		time_left -= delta
+		if time_left < 0.0:
+			overtime_seconds += -time_left
+			time_left = 0.0
+	else:
+		overtime_seconds += delta
 
 	if distance >= target_distance:
 		_end_game("YOU MADE IT", "Target distance reached. Space/R to profit screen.")
-	elif time_left <= 0.0:
-		time_left = 0.0
-		_end_game("TIME OUT", "You ran out of time. Space/R to retry.")
 
 
 func _update_spawns(delta: float) -> void:
@@ -707,6 +1003,7 @@ func _spawn_entity(lane_index: int) -> void:
 		lane_index
 	)
 	_apply_vehicle_shadow(sprite, VEHICLE_HITBOX_INSET)
+	_apply_vehicle_headlight(sprite, VEHICLE_HITBOX_INSET)
 	sprite.position = Vector2(
 		size.x + rng.randf_range(90.0, 360.0),
 		_sprite_y_for_hitbox_bottom(sprite, _lane_y(lane_index, size), VEHICLE_HITBOX_INSET)
@@ -755,6 +1052,72 @@ func _update_speeder_warning(delta: float) -> void:
 		speeder_warning_active = true
 		speeder_warning_beeps_remaining = 3
 		speeder_warning_timer = 0.0
+
+
+func _update_speeder_lane_change_warning(delta: float) -> void:
+	if speeder_lane_change_warning_label:
+		speeder_lane_change_warning_label.visible = false
+
+	if not speeder_lane_change_warning_active:
+		return
+
+	var lane_to_warn := speeder_lane_change_warning_target_lane if speeder_lane_change_warning_target_lane >= 0 else player_lane
+	if speeder_lane_change_warning_label:
+		speeder_lane_change_warning_label.position = Vector2(
+			player_x + 105.0,
+			_lane_y(lane_to_warn, get_viewport_rect().size) - 92.0
+		)
+		speeder_lane_change_warning_label.visible = speeder_lane_change_warning_beeps_remaining >= 0
+
+	speeder_lane_change_warning_timer -= delta
+	if speeder_lane_change_warning_timer > 0.0:
+		return
+
+	if speeder_lane_change_warning_beeps_remaining > 0:
+		_pulse_speeder_lane_change_warning()
+		speeder_lane_change_warning_beeps_remaining -= 1
+		speeder_lane_change_warning_timer = 0.28
+	else:
+		_complete_speeder_lane_change_warning()
+
+
+func _pulse_speeder_lane_change_warning() -> void:
+	if speeder_lane_change_warning_label:
+		speeder_lane_change_warning_label.visible = true
+		speeder_lane_change_warning_label.modulate = Color(1.0, 0.94, 0.2, 1.0)
+		var tween := create_tween()
+		tween.tween_property(speeder_lane_change_warning_label, "modulate", Color(1.0, 0.24, 0.12, 1.0), 0.09)
+		tween.tween_property(speeder_lane_change_warning_label, "modulate", Color(1.0, 0.94, 0.2, 1.0), 0.09)
+	_play_speeder_beep()
+
+
+func _start_speeder_lane_change_warning(sprite: Sprite2D, target_lane: int) -> void:
+	if speeder_lane_change_warning_active and pending_speeder_lane_change_sprite == sprite:
+		return
+
+	speeder_lane_change_warning_active = true
+	speeder_lane_change_warning_timer = 0.0
+	speeder_lane_change_warning_beeps_remaining = 3
+	speeder_lane_change_warning_target_lane = target_lane
+	pending_speeder_lane_change_sprite = sprite
+
+
+func _complete_speeder_lane_change_warning() -> void:
+	var entity := _find_entity_by_sprite(pending_speeder_lane_change_sprite)
+	if not entity.is_empty():
+		var target_lane := speeder_lane_change_warning_target_lane
+		if _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+			entity["lane"] = target_lane
+			entity["target_lane"] = target_lane
+			entity["sprite"].z_index = _z_for_lane(target_lane, 2)
+
+	speeder_lane_change_warning_active = false
+	speeder_lane_change_warning_timer = 0.0
+	speeder_lane_change_warning_beeps_remaining = 0
+	speeder_lane_change_warning_target_lane = -1
+	pending_speeder_lane_change_sprite = null
+	if speeder_lane_change_warning_label:
+		speeder_lane_change_warning_label.visible = false
 
 
 func _pulse_speeder_warning() -> void:
@@ -810,6 +1173,7 @@ func _spawn_speeder() -> void:
 		lane_index
 	)
 	_apply_vehicle_shadow(sprite, VEHICLE_HITBOX_INSET)
+	_apply_vehicle_headlight(sprite, VEHICLE_HITBOX_INSET)
 	sprite.position = Vector2(
 		-220.0,
 		_sprite_y_for_hitbox_bottom(sprite, _lane_y(lane_index, size), VEHICLE_HITBOX_INSET)
@@ -923,7 +1287,8 @@ func _get_entity_lane_warning_label(entity: Dictionary) -> Label:
 	warning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	warning_label.text = "!"
 	warning_label.size = Vector2(80.0, 70.0)
-	warning_label.z_index = 40
+	warning_label.z_as_relative = false
+	warning_label.z_index = HEADLIGHT_Z_INDEX + 10
 	warning_label.visible = false
 	sprite.add_child(warning_label)
 	_position_entity_lane_warning(entity, warning_label)
@@ -950,16 +1315,20 @@ func _update_speeder_ai() -> void:
 			continue
 
 		var lane_index := int(entity["lane"])
-		if _speeder_lane_blocked(entity, lane_index):
+		if _speeder_needs_lane_change(entity, lane_index):
 			var target_lane := 2 if lane_index == 1 else 1
 			if _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
-				entity["lane"] = target_lane
-				entity["target_lane"] = target_lane
-				entity["sprite"].z_index = _z_for_lane(target_lane, 2)
+				if target_lane == player_lane:
+					_start_speeder_lane_change_warning(entity["sprite"], target_lane)
+				elif not speeder_lane_change_warning_active or pending_speeder_lane_change_sprite != entity["sprite"]:
+					entity["lane"] = target_lane
+					entity["target_lane"] = target_lane
+					entity["sprite"].z_index = _z_for_lane(target_lane, 2)
 
 
-func _speeder_lane_blocked(speeder: Dictionary, lane_index: int) -> bool:
+func _speeder_needs_lane_change(speeder: Dictionary, lane_index: int) -> bool:
 	var speeder_rect := _collision_rect(speeder["sprite"], VEHICLE_HITBOX_INSET)
+	var speeder_speed := float(speeder.get("world_speed", speeder_vehicle_speed))
 	for entity in active_entities:
 		if entity == speeder or entity.get("kind", "traffic") == "speeder":
 			continue
@@ -967,8 +1336,12 @@ func _speeder_lane_blocked(speeder: Dictionary, lane_index: int) -> bool:
 			continue
 
 		var entity_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
+		var entity_speed := float(entity.get("world_speed", 0.0))
 		var gap := entity_rect.position.x - (speeder_rect.position.x + speeder_rect.size.x)
-		if gap > 0.0 and gap < speeder_avoid_lookahead:
+		var closing_speed := maxf(0.0, speeder_speed - entity_speed)
+		var predicted_close_distance := closing_speed * 0.42
+		var emergency_gap := maxf(speeder_safe_gap * 0.82, predicted_close_distance)
+		if gap > 0.0 and gap <= emergency_gap:
 			return true
 	return false
 
@@ -985,6 +1358,16 @@ func _lane_is_safe_for_entity(moving_entity: Dictionary, target_lane: int, safe_
 		if absf(entity_rect.get_center().x - moving_rect.get_center().x) < safe_gap:
 			return false
 	return true
+
+
+func _find_entity_by_sprite(sprite: Sprite2D) -> Dictionary:
+	if sprite == null:
+		return {}
+
+	for entity in active_entities:
+		if entity.get("sprite") == sprite:
+			return entity
+	return {}
 
 
 func _update_npc_following() -> void:
@@ -1066,6 +1449,7 @@ func _update_player(delta: float, move_forward := false) -> void:
 	)
 	player.scale = player.scale.lerp(target_scale, minf(1.0, delta * player_perspective_lerp_speed))
 	_apply_vehicle_shadow(player, PLAYER_HITBOX_INSET)
+	_apply_vehicle_headlight(player, PLAYER_HITBOX_INSET)
 
 	var target_y := _sprite_y_for_hitbox_bottom(player, _lane_y(player_lane, get_viewport_rect().size), PLAYER_HITBOX_INSET)
 	var wiggle_amount := _player_wiggle_amount()
@@ -1114,8 +1498,15 @@ func _update_ui() -> void:
 	else:
 		status_label.text = "%s\n%s" % [game_state, end_message]
 
+	if footer_stats_label:
+		footer_stats_label.text = "Money PhP %d     Energy %d/%d" % [
+			PlayerState.money,
+			PlayerState.energy,
+			PlayerState.max_energy,
+		]
+
 	if stage_label:
-		stage_label.text = stage_type.to_upper()
+		stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 
 
 func _check_collisions() -> void:
@@ -1133,8 +1524,12 @@ func _check_collisions() -> void:
 func _end_game(title: String, detail: String) -> void:
 	if game_state != "playing":
 		return
-	game_state = title
-	end_message = detail
+	if (title == "CRASH" or title == "TIME OUT") and PlayerState.energy <= 0:
+		game_state = "GAME OVER"
+		end_message = "Out of energy. Press any key to return to menu."
+	else:
+		game_state = title
+		end_message = detail
 	if speeder_warning_label:
 		speeder_warning_label.visible = false
 	speeder_warning_active = false
@@ -1142,6 +1537,13 @@ func _end_game(title: String, detail: String) -> void:
 		player_is_stage_clear_exiting = true
 		_store_stage_result()
 		_remove_vehicles_behind_player()
+
+
+func _try_retry_stage() -> void:
+	if use_player_state_stage_sequence and not PlayerState.spend_energy(1):
+		end_message = "No energy left. Visit the store or reset progress."
+		return
+	_reset_game()
 
 
 func _reset_game() -> void:
@@ -1155,6 +1557,7 @@ func _reset_game() -> void:
 	player_speed = player_start_speed
 	distance = 0.0
 	time_left = time_limit
+	overtime_seconds = 0.0
 	game_state = "playing"
 	end_message = ""
 	player_is_stage_clear_exiting = false
@@ -1225,21 +1628,27 @@ func _go_to_profit_screen() -> void:
 
 
 func _store_stage_result() -> void:
-	var completed_distance := floori(minf(distance, target_distance))
-	var fare := roundi(completed_distance * fare_php_per_meter)
-	var bonus := roundi(maxf(0.0, time_left) * time_bonus_php_per_second)
-	var total := fare + bonus
+	var completed_distance: int = floori(minf(distance, target_distance))
+	var base_fare: int = roundi(completed_distance * fare_php_per_meter)
+	var fare_penalty: int = roundi(overtime_seconds * overtime_fare_penalty_php_per_second)
+	var fare: int = maxi(0, base_fare - fare_penalty)
+	var bonus: int = roundi(maxf(0.0, time_left) * time_bonus_php_per_second)
+	var total: int = fare + bonus
 
 	PlayerState.set_last_stage_result({
+		"day": PlayerState.get_current_day(),
 		"stage_type": stage_type,
 		"difficulty": stage_difficulty,
 		"time_of_day": stage_time_of_day,
 		"traffic": stage_traffic,
 		"distance": completed_distance,
+		"base_fare": base_fare,
+		"fare_penalty": fare_penalty,
 		"fare": fare,
 		"bonus": bonus,
 		"total": total,
 		"time_left": time_left,
+		"overtime": overtime_seconds,
 	})
 
 
@@ -1341,6 +1750,41 @@ func _apply_vehicle_shadow(sprite: Sprite2D, inset: Vector4) -> void:
 		Vector2(center_x, center_y + half_height * 0.86),
 		Vector2(center_x - half_width * 0.72, center_y + half_height),
 	])
+
+
+func _apply_vehicle_headlight(sprite: Sprite2D, inset: Vector4) -> void:
+	var cone := sprite.get_node_or_null("HeadlightCone") as Sprite2D
+	if cone == null:
+		cone = Sprite2D.new()
+		cone.name = "HeadlightCone"
+		cone.texture = headlight_cone_texture
+		cone.centered = false
+		cone.z_as_relative = false
+		cone.z_index = HEADLIGHT_Z_INDEX
+		var headlight_material := CanvasItemMaterial.new()
+		headlight_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		cone.material = headlight_material
+		sprite.add_child(cone)
+
+	if headlight_cone_texture == null:
+		return
+
+	var alpha := _current_headlight_alpha()
+	cone.visible = stage_time_of_day == "night" and alpha > 0.0 and game_state != "CRASH" and game_state != "TIME OUT" and game_state != "GAME OVER"
+	if not cone.visible:
+		return
+
+	var local_rect := _local_hitbox_rect(sprite, inset)
+	var cone_width := maxf(74.0, local_rect.size.x * headlight_cone_length_x)
+	var cone_height := maxf(26.0, local_rect.size.y * headlight_cone_height_x)
+	var scale_x := cone_width / headlight_cone_texture.get_width()
+	var scale_y := cone_height / headlight_cone_texture.get_height()
+	var front_x := local_rect.position.x + local_rect.size.x if not sprite.flip_h else local_rect.position.x
+	var cone_y := local_rect.position.y + local_rect.size.y * 0.46 - cone_height * 0.5
+
+	cone.modulate = Color(1.0, 0.96, 0.82, alpha)
+	cone.position = Vector2(front_x, cone_y)
+	cone.scale = Vector2(scale_x if not sprite.flip_h else -scale_x, scale_y)
 
 
 func _scale_for_height(texture: Texture2D, target_height: float) -> Vector2:
