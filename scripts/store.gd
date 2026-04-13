@@ -1,6 +1,7 @@
 extends Control
 
-const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
+const STORE_SCENE := "res://scenes/store.tscn"
+const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const UI_FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
 const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
 const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
@@ -15,7 +16,6 @@ const BUY_BUTTON_HOVER_BG := Color(0.80, 0.60, 0.28, 0.98)
 const BUY_BUTTON_PRESSED_BG := Color(0.36, 0.53, 0.30, 0.98)
 const BUY_BUTTON_DISABLED_BG := Color(0.42, 0.37, 0.32, 0.86)
 const BUY_BUTTON_BORDER := Color(0.20, 0.12, 0.07, 0.96)
-
 const STORE_ITEMS := [
 	{
 		"id": "engine_tune",
@@ -159,19 +159,17 @@ func _buy_item(item: Dictionary, label: Label, tier_container: HBoxContainer, bu
 
 
 func _refresh_header() -> void:
-	money_label.text = "Money: PhP %d     Energy: %d/%d" % [
+	money_label.text = "Money: PhP %d     Energy: %d/%d\n%s" % [
 		PlayerState.money,
 		PlayerState.energy,
 		PlayerState.max_energy,
+		PlayerState.get_debt_status_text(),
 	]
 
 
 func _ride() -> void:
-	if not PlayerState.prepare_stage_start():
-		status_label.text = "No energy. Buy food first."
-		return
-	PlayerState.advance_to_next_stage()
-	get_tree().change_scene_to_file(NEXT_STAGE_SCENE)
+	PlayerState.set_pending_trip_selection(STORE_SCENE, PlayerState.TRANSITION_RIDE)
+	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _apply_button_font(button: Button) -> void:

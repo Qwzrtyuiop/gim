@@ -48,6 +48,7 @@ func _ready() -> void:
 	menu_trace_lines.visible = false
 	_create_dialogs()
 	_spawn_menu_traffic()
+	hint_label.text = _default_hint_text()
 
 
 func _process(delta: float) -> void:
@@ -75,6 +76,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _start_game() -> void:
+	if PlayerState.is_run_failed():
+		blocked_start_message_time = 1.8
+		hint_label.text = _default_hint_text()
+		return
+
 	PlayerState.begin_stage_sequence()
 	if PlayerState.energy == 1:
 		start_confirm_dialog.popup_centered()
@@ -150,9 +156,15 @@ func _update_reset_progress(delta: float) -> void:
 			hint_label.text = "Progress reset"
 		elif blocked_start_message_time > 0.0:
 			blocked_start_message_time -= delta
-			hint_label.text = "No energy left. Hold R to reset progress"
+			hint_label.text = _default_hint_text() if PlayerState.is_run_failed() else "No energy left. Hold R to reset progress"
 		else:
-			hint_label.text = "ENTER start     ESC quit     HOLD R reset progress"
+			hint_label.text = _default_hint_text()
+
+
+func _default_hint_text() -> String:
+	if PlayerState.is_run_failed():
+		return "%s" % PlayerState.get_run_fail_reason()
+	return "ENTER start     ESC quit     HOLD R reset progress"
 
 
 func _spawn_menu_traffic() -> void:

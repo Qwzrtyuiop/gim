@@ -1,7 +1,8 @@
 extends Control
 
-const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
+const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
+const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const UI_FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
 const BUTTON_NORMAL_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
 const BUTTON_GLOW_MODULATE := Color(1.35, 1.18, 0.62, 1.0)
@@ -58,45 +59,56 @@ func _render_results(result: Dictionary) -> void:
 		total,
 	]
 
-	var allow_rest := time_of_day == "morning"
+	var allow_rest := PlayerState.can_rest_after_stage()
 	rest_button.visible = allow_rest
 	if allow_rest:
 		rest_button.grab_focus()
 	else:
 		ride_button.grab_focus()
 
-	_refresh_status()
+	var rest_note := ""
+	if allow_rest:
+		if time_of_day == "morning":
+			rest_note = "Rest: skip to night and recover +1 energy."
+		elif time_of_day == "noon":
+			rest_note = "Rest: skip to next day and recover +3 energy."
+	elif time_of_day == "morning" or time_of_day == "noon":
+		rest_note = "Rest already used for Day %d." % PlayerState.get_current_day()
+
+	_refresh_status(rest_note)
 
 
 func _rest_then_next_stage() -> void:
-	if not rest_button.visible:
+	if not PlayerState.can_rest_after_stage():
 		return
 
-	PlayerState.add_energy(1)
-	if not PlayerState.prepare_stage_start():
-		_refresh_status("Not enough energy.")
-		return
-	PlayerState.advance_to_next_stage(true)
-	get_tree().change_scene_to_file(NEXT_STAGE_SCENE)
+	var transition_mode := PlayerState.TRANSITION_REST_TO_NIGHT
+	if PlayerState.get_current_time_of_day() == "noon":
+		transition_mode = PlayerState.TRANSITION_REST_TO_NEXT_DAY
+
+	_begin_trip_selection(transition_mode)
 
 
 func _next_stage() -> void:
-	if not PlayerState.prepare_stage_start():
-		_refresh_status("No energy. Buy food in the store.")
-		return
-	PlayerState.advance_to_next_stage()
-	get_tree().change_scene_to_file(NEXT_STAGE_SCENE)
+	_begin_trip_selection(PlayerState.TRANSITION_RIDE)
+
+
+func _begin_trip_selection(transition_mode: String) -> void:
+	PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, transition_mode)
+	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _open_store() -> void:
+	PlayerState.clear_pending_trip_selection()
 	get_tree().change_scene_to_file(STORE_SCENE)
 
 
 func _refresh_status(note := "") -> void:
-	status_label.text = "Money: PhP %d     Energy: %d/%d" % [
+	status_label.text = "Money: PhP %d     Energy: %d/%d\n%s" % [
 		PlayerState.money,
 		PlayerState.energy,
 		PlayerState.max_energy,
+		PlayerState.get_debt_status_text(),
 	]
 	if not note.is_empty():
 		status_label.text += "\n%s" % note

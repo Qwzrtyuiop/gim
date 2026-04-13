@@ -69,7 +69,7 @@ void fragment() {
 	COLOR = vec4(glow_color.rgb, glow_color.a * alpha);
 }
 "
-const FIRST_STAGE_TYPE := "easy-morning-chill"
+const FIRST_STAGE_TYPE := "short-morning-chill"
 const DEFAULT_STAGE_PROFILE := {
 	"target_distance": 1000.0,
 	"time_limit": 45.0,
@@ -130,7 +130,7 @@ const DEFAULT_STAGE_PROFILE := {
 	"speeder_safe_gap": 150.0,
 }
 const DIFFICULTY_PROFILES := {
-	"easy": {},
+	"short": {},
 	"medium": {
 		"target_distance": 1500.0,
 		"time_limit": 58.0,
@@ -212,21 +212,21 @@ const BACKGROUND_PROFILES := {
 
 @export_group("Stage")
 @export_enum(
-	"easy-morning-chill",
-	"easy-morning-normal",
-	"easy-morning-traffic-jam",
-	"easy-morning-busy",
-	"easy-morning-speeders",
-	"easy-noon-chill",
-	"easy-noon-normal",
-	"easy-noon-traffic-jam",
-	"easy-noon-busy",
-	"easy-noon-speeders",
-	"easy-night-chill",
-	"easy-night-normal",
-	"easy-night-traffic-jam",
-	"easy-night-busy",
-	"easy-night-speeders",
+	"short-morning-chill",
+	"short-morning-normal",
+	"short-morning-traffic-jam",
+	"short-morning-busy",
+	"short-morning-speeders",
+	"short-noon-chill",
+	"short-noon-normal",
+	"short-noon-traffic-jam",
+	"short-noon-busy",
+	"short-noon-speeders",
+	"short-night-chill",
+	"short-night-normal",
+	"short-night-traffic-jam",
+	"short-night-busy",
+	"short-night-speeders",
 	"medium-morning-chill",
 	"medium-morning-normal",
 	"medium-morning-traffic-jam",
@@ -257,7 +257,7 @@ const BACKGROUND_PROFILES := {
 	"long-night-traffic-jam",
 	"long-night-busy",
 	"long-night-speeders"
-) var stage_type := "easy-morning-chill"
+) var stage_type := "short-morning-chill"
 @export_enum("barangay-streets") var background_type := "barangay-streets"
 @export var use_stage_profile := true
 @export var use_player_state_stage_sequence := true
@@ -378,14 +378,16 @@ var speedometer: Control
 var help_label: Label
 var footer_stats_label: Label
 var status_label: Label
+var top_right_info_panel: Panel
 var stage_label: Label
+var debt_goal_label: Label
 var speeder_warning_label: Label
 var speeder_beep_player: AudioStreamPlayer
 var fade_rect: ColorRect
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
 var stage_clear_fade_time := 0.0
-var stage_difficulty := "easy"
+var stage_difficulty := "short"
 var stage_time_of_day := "morning"
 var stage_traffic := "chill"
 var speeder_spawn_timer := 0.0
@@ -451,7 +453,7 @@ func _parse_stage_type(type_name: String) -> Dictionary:
 	var parts := type_name.split("-")
 	if parts.size() < 3:
 		return {
-			"difficulty": "easy",
+			"difficulty": "short",
 			"time": "morning",
 			"traffic": "chill",
 		}
@@ -462,8 +464,10 @@ func _parse_stage_type(type_name: String) -> Dictionary:
 			traffic_name += "-"
 		traffic_name += parts[index]
 
+	if parts[0] == "easy":
+		parts[0] = "short"
 	if not DIFFICULTY_PROFILES.has(parts[0]):
-		parts[0] = "easy"
+		parts[0] = "short"
 	if not TIME_PROFILES.has(parts[1]):
 		parts[1] = "morning"
 	if not TRAFFIC_PROFILES.has(traffic_name):
@@ -685,6 +689,7 @@ func _create_ui() -> void:
 
 	footer_stats_label = _make_label(13, Color(1.0, 0.97, 0.82, 1.0), 4)
 	footer_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	footer_stats_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(footer_stats_label)
 
 	status_label = _make_label(22, Color(1.0, 0.97, 0.82, 1.0), 6)
@@ -692,10 +697,31 @@ func _create_ui() -> void:
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(status_label)
 
+	top_right_info_panel = Panel.new()
+	top_right_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var top_right_panel_style := StyleBoxFlat.new()
+	top_right_panel_style.bg_color = Color(0.14, 0.14, 0.14, 0.42)
+	top_right_panel_style.border_width_left = 1
+	top_right_panel_style.border_width_top = 1
+	top_right_panel_style.border_width_right = 1
+	top_right_panel_style.border_width_bottom = 1
+	top_right_panel_style.border_color = Color(0.82, 0.82, 0.82, 0.16)
+	top_right_panel_style.corner_radius_top_left = 6
+	top_right_panel_style.corner_radius_top_right = 6
+	top_right_panel_style.corner_radius_bottom_right = 6
+	top_right_panel_style.corner_radius_bottom_left = 6
+	ui.add_child(top_right_info_panel)
+	top_right_info_panel.add_theme_stylebox_override("panel", top_right_panel_style)
+
 	stage_label = _make_label(12, Color(0.92, 0.95, 0.88, 1.0), 4)
 	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 	ui.add_child(stage_label)
+
+	debt_goal_label = _make_label(12, Color(0.98, 0.92, 0.74, 1.0), 4)
+	debt_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	debt_goal_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ui.add_child(debt_goal_label)
 
 	speeder_warning_label = _make_label(48, Color(1.0, 0.92, 0.2, 1.0), 7)
 	speeder_warning_label.text = "!"
@@ -852,10 +878,18 @@ func _layout_scene() -> void:
 		status_label.position = Vector2(0.0, size.y * 0.37)
 		status_label.size = Vector2(size.x, 120.0)
 
+	if top_right_info_panel:
+		top_right_info_panel.position = Vector2(size.x - 610.0, 10.0)
+		top_right_info_panel.size = Vector2(580.0, 74.0)
+
 	if stage_label:
 		stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
-		stage_label.position = Vector2(size.x - 560.0, 18.0)
-		stage_label.size = Vector2(530.0, 28.0)
+		stage_label.position = Vector2(size.x - 578.0, 20.0)
+		stage_label.size = Vector2(526.0, 26.0)
+
+	if debt_goal_label:
+		debt_goal_label.position = Vector2(size.x - 578.0, 48.0)
+		debt_goal_label.size = Vector2(526.0, 22.0)
 
 	if speeder_warning_label:
 		speeder_warning_label.position = Vector2(player_x + 105.0, _lane_y(1, size) - 92.0)
@@ -1508,6 +1542,9 @@ func _update_ui() -> void:
 	if stage_label:
 		stage_label.text = "DAY %d   %s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 
+	if debt_goal_label:
+		debt_goal_label.text = PlayerState.get_debt_status_text()
+
 
 func _check_collisions() -> void:
 	var player_rect := _collision_rect(player, PLAYER_HITBOX_INSET)
@@ -1631,8 +1668,11 @@ func _store_stage_result() -> void:
 	var completed_distance: int = floori(minf(distance, target_distance))
 	var base_fare: int = roundi(completed_distance * fare_php_per_meter)
 	var fare_penalty: int = roundi(overtime_seconds * overtime_fare_penalty_php_per_second)
-	var fare: int = maxi(0, base_fare - fare_penalty)
-	var bonus: int = roundi(maxf(0.0, time_left) * time_bonus_php_per_second)
+	var raw_fare: int = maxi(0, base_fare - fare_penalty)
+	var raw_bonus: int = roundi(maxf(0.0, time_left) * time_bonus_php_per_second)
+	var earnings_adjustment: Dictionary = PlayerState.apply_stage_earnings_modifiers(raw_fare, raw_bonus, stage_time_of_day, stage_traffic)
+	var fare: int = int(earnings_adjustment.get("fare", raw_fare))
+	var bonus: int = int(earnings_adjustment.get("bonus", raw_bonus))
 	var total: int = fare + bonus
 
 	PlayerState.set_last_stage_result({
@@ -1644,9 +1684,12 @@ func _store_stage_result() -> void:
 		"distance": completed_distance,
 		"base_fare": base_fare,
 		"fare_penalty": fare_penalty,
+		"raw_fare": raw_fare,
+		"raw_bonus": raw_bonus,
 		"fare": fare,
 		"bonus": bonus,
 		"total": total,
+		"earnings_multiplier": float(earnings_adjustment.get("multiplier", 1.0)),
 		"time_left": time_left,
 		"overtime": overtime_seconds,
 	})
