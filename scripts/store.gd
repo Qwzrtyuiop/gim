@@ -2,6 +2,7 @@ extends Control
 
 const STORE_SCENE := "res://scenes/store.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
+const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -48,7 +49,7 @@ const STORE_ITEMS := [
 	{
 		"id": "yosi",
 		"name": "Warlboro Blue",
-		"description": "Restore 1 energy. May cause negative effects",
+		"description": "Restore energy. May cause negative effects",
 		"cost": 25,
 		"type": "energy",
 		"energy": 1,
@@ -119,7 +120,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _build_items() -> void:
 	for item in STORE_ITEMS:
 		var row_frame := PanelContainer.new()
-		row_frame.custom_minimum_size = Vector2(0.0, 92.0)
+		row_frame.custom_minimum_size = Vector2(0.0, 108.0)
 		row_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row_frame.add_theme_stylebox_override("panel", _make_store_row_style())
 		item_list.add_child(row_frame)
@@ -135,9 +136,18 @@ func _build_items() -> void:
 		row.add_theme_constant_override("separation", 14)
 		row_margin.add_child(row)
 
-		var label := Label.new()
+		var label := RichTextLabel.new()
 		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		label.label_settings = _make_label_settings(14, Color(0.24, 0.16, 0.10, 1.0))
+		label.bbcode_enabled = false
+		label.fit_content = true
+		label.scroll_active = false
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size = Vector2(0.0, 66.0)
+		label.add_theme_font_override("normal_font", UI_FONT)
+		label.add_theme_font_size_override("normal_font_size", 14)
+		label.add_theme_color_override("default_color", Color(0.24, 0.16, 0.10, 1.0))
+		label.add_theme_color_override("font_outline_color", Color(0.95, 0.92, 0.84, 0.92))
+		label.add_theme_constant_override("outline_size", 1)
 		label.text = _item_text(item)
 		row.add_child(label)
 
@@ -157,7 +167,13 @@ func _build_items() -> void:
 
 
 func _item_text(item: Dictionary) -> String:
-	var text := "%s  PhP %d\n%s" % [item["name"], _item_cost(item), item["description"]]
+	var description := str(item["description"])
+	if str(item.get("id", "")) == "yosi":
+		if PlayerState.has_achievement("maninigarilyo"):
+			description = "Restore %d energy. Continued usage will lead to severe consequences." % PlayerState.get_yosi_energy_restore()
+		else:
+			description = "Restore %d energy. May cause negative effects" % PlayerState.get_yosi_energy_restore()
+	var text := "%s  PhP %d\n%s" % [item["name"], _item_cost(item), description]
 	if item["type"] == "upgrade":
 		text += "  Lv %d/%d" % [
 			PlayerState.get_upgrade_level(item["id"]),
@@ -166,7 +182,7 @@ func _item_text(item: Dictionary) -> String:
 	return text
 
 
-func _buy_item(item: Dictionary, label: Label, tier_container: HBoxContainer, button: Button) -> void:
+func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
 	if item["type"] == "upgrade":
 		var current_level := PlayerState.get_upgrade_level(item["id"])
 		if current_level >= int(item["max_level"]):
@@ -184,12 +200,20 @@ func _buy_item(item: Dictionary, label: Label, tier_container: HBoxContainer, bu
 	if item["type"] == "upgrade":
 		var next_level := PlayerState.get_upgrade_level(item["id"]) + 1
 		PlayerState.set_upgrade_level(item["id"], next_level)
+		PlayerState.record_store_purchase(str(item["type"]))
 		status_label.text = "%s upgraded to Lv %d." % [item["name"], next_level]
 		_refresh_tier_bars(tier_container, next_level, int(item["max_level"]))
 	elif item["type"] == "energy":
-		PlayerState.add_energy(int(item["energy"]))
+		var restored_energy := int(item["energy"])
+		if str(item.get("id", "")) == "yosi":
+			restored_energy = PlayerState.get_yosi_energy_restore()
+		PlayerState.add_energy(restored_energy)
+		PlayerState.record_store_purchase(str(item["type"]))
 		if str(item.get("id", "")) == "yosi":
 			PlayerState.record_yosi_purchase()
+			if PlayerState.is_run_failed():
+				get_tree().change_scene_to_file(GAME_OVER_SCENE)
+				return
 		status_label.text = "%s restored energy." % item["name"]
 	elif item["type"] == "gas":
 		var gas_before := PlayerState.gas

@@ -46,6 +46,11 @@ const ACHIEVEMENT_ORDER := [
 	"mapagsamantala",
 	"maninigarilyo",
 	"tamad",
+	"matipid",
+	"masipag",
+	"maparaan",
+	"matiyaga",
+	"maingat",
 ]
 const ACHIEVEMENT_DEFINITIONS := {
 	"mapagsamantala": {
@@ -63,9 +68,35 @@ const ACHIEVEMENT_DEFINITIONS := {
 		"subtitle": "Lazy",
 		"description": "todo placeholder",
 	},
+	"matipid": {
+		"title": "Matipid",
+		"subtitle": "Frugal",
+		"description": "He reached the first collection day without spending on anything except gas.",
+	},
+	"masipag": {
+		"title": "Masipag",
+		"subtitle": "Diligent",
+		"description": "John stayed on the road and finished three long rides in a single day.",
+	},
+	"maparaan": {
+		"title": "Maparaan",
+		"subtitle": "Resourceful",
+		"description": "John completed a ride while down to one energy or less and four gas or less.",
+	},
+	"matiyaga": {
+		"title": "Matiyaga",
+		"subtitle": "Persevering",
+		"description": "John completed a ride while running low on either energy or gas.",
+	},
+	"maingat": {
+		"title": "Maingat",
+		"subtitle": "Careful",
+		"description": "Five stages in a row, no crashes. John kept the tricycle steady.",
+	},
 }
 const SMOKER_YOSI_GOAL := 10
 const SMOKER_MAX_ENERGY_PENALTY := 1
+const SMOKER_DANGER_YOSI_TOTAL := 50
 const SAVE_PATH := "user://progress_save.tres"
 const SAVE_VERSION := 1
 const REST_ENERGY_BONUSES := {
@@ -263,8 +294,15 @@ var consumed_seeded_rider_rules: Dictionary = {}
 var last_rest_day := 0
 var yosi_bought_today := 0
 var yosi_bought_day := 1
+var yosi_bought_total := 0
 var rests_taken_today := 0
 var rests_taken_day := 1
+var rides_completed_today := 0
+var rides_completed_day := 1
+var non_gas_store_purchases_this_week := 0
+var clean_stage_streak := 0
+var current_trip_low_energy := false
+var current_trip_low_gas := false
 var debt_goal_index := 0
 var last_debt_collection_day := 0
 var remaining_debt := TOTAL_DEBT_GOAL
@@ -354,8 +392,15 @@ func _load_progress() -> void:
 	last_rest_day = int(save_data.get("last_rest_day", last_rest_day))
 	yosi_bought_today = int(save_data.get("yosi_bought_today", yosi_bought_today))
 	yosi_bought_day = int(save_data.get("yosi_bought_day", yosi_bought_day))
+	yosi_bought_total = int(save_data.get("yosi_bought_total", yosi_bought_total))
 	rests_taken_today = int(save_data.get("rests_taken_today", rests_taken_today))
 	rests_taken_day = int(save_data.get("rests_taken_day", rests_taken_day))
+	rides_completed_today = int(save_data.get("rides_completed_today", rides_completed_today))
+	rides_completed_day = int(save_data.get("rides_completed_day", rides_completed_day))
+	non_gas_store_purchases_this_week = int(save_data.get("non_gas_store_purchases_this_week", non_gas_store_purchases_this_week))
+	clean_stage_streak = int(save_data.get("clean_stage_streak", clean_stage_streak))
+	current_trip_low_energy = bool(save_data.get("current_trip_low_energy", current_trip_low_energy))
+	current_trip_low_gas = bool(save_data.get("current_trip_low_gas", current_trip_low_gas))
 	debt_goal_index = int(save_data.get("debt_goal_index", debt_goal_index))
 	last_debt_collection_day = int(save_data.get("last_debt_collection_day", last_debt_collection_day))
 	remaining_debt = int(save_data.get("remaining_debt", remaining_debt))
@@ -406,8 +451,15 @@ func save_progress() -> void:
 		"last_rest_day": last_rest_day,
 		"yosi_bought_today": yosi_bought_today,
 		"yosi_bought_day": yosi_bought_day,
+		"yosi_bought_total": yosi_bought_total,
 		"rests_taken_today": rests_taken_today,
 		"rests_taken_day": rests_taken_day,
+		"rides_completed_today": rides_completed_today,
+		"rides_completed_day": rides_completed_day,
+		"non_gas_store_purchases_this_week": non_gas_store_purchases_this_week,
+		"clean_stage_streak": clean_stage_streak,
+		"current_trip_low_energy": current_trip_low_energy,
+		"current_trip_low_gas": current_trip_low_gas,
 		"debt_goal_index": debt_goal_index,
 		"last_debt_collection_day": last_debt_collection_day,
 		"remaining_debt": remaining_debt,
@@ -473,8 +525,15 @@ func begin_stage_sequence() -> void:
 	last_rest_day = 0
 	yosi_bought_today = 0
 	yosi_bought_day = 1
+	yosi_bought_total = 0
 	rests_taken_today = 0
 	rests_taken_day = 1
+	rides_completed_today = 0
+	rides_completed_day = 1
+	non_gas_store_purchases_this_week = 0
+	clean_stage_streak = 0
+	current_trip_low_energy = false
+	current_trip_low_gas = false
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL
@@ -658,6 +717,8 @@ func prepare_stage_start(stage_descriptor := "") -> bool:
 
 	spend_energy(1)
 	spend_gas(trip_gas_cost)
+	current_trip_low_energy = energy <= 1
+	current_trip_low_gas = gas <= 4
 	pending_stage_energy_cost = true
 	save_progress()
 	return true
@@ -1257,7 +1318,10 @@ func _resolve_debt_collection_for_day(day_number: int) -> bool:
 		return false
 
 	spend_money(goal_amount)
+	if debt_goal_index == 0 and non_gas_store_purchases_this_week == 0:
+		unlock_achievement("matipid")
 	remaining_debt = maxi(0, remaining_debt - goal_amount)
+	non_gas_store_purchases_this_week = 0
 	if debt_goal_index < WEEKLY_DEBT_GOALS.size() - 1:
 		debt_goal_index += 1
 	save_progress()
@@ -1322,20 +1386,27 @@ func get_upgrade_level(upgrade_id: String) -> int:
 	return int(upgrades.get(upgrade_id, 0))
 
 
+func get_yosi_energy_restore() -> int:
+	return 2 if has_achievement("maninigarilyo") else 1
+
+
 func record_yosi_purchase(amount := 1) -> int:
 	var purchase_amount := maxi(0, int(amount))
 	if purchase_amount <= 0:
-		return yosi_bought_today
+		return yosi_bought_total
 
 	if yosi_bought_day != get_current_day():
 		_reset_daily_consumable_counters(get_current_day())
 
 	yosi_bought_day = get_current_day()
 	yosi_bought_today += purchase_amount
+	yosi_bought_total += purchase_amount
 	if yosi_bought_today >= SMOKER_YOSI_GOAL:
 		unlock_achievement("maninigarilyo")
+	if yosi_bought_total >= SMOKER_DANGER_YOSI_TOTAL:
+		fail_run("John finally had to be taken to the hospital.\n\nThe cigarettes caught up with him long before the debt ever did, and the treatment only left him buried under even more bills.")
 	save_progress()
-	return yosi_bought_today
+	return yosi_bought_total
 
 
 func record_rest(amount := 1) -> int:
@@ -1354,6 +1425,45 @@ func record_rest(amount := 1) -> int:
 	return rests_taken_today
 
 
+func record_store_purchase(item_type: String) -> void:
+	var safe_item_type := str(item_type).strip_edges().to_lower()
+	if safe_item_type.is_empty() or safe_item_type == "gas":
+		return
+	non_gas_store_purchases_this_week += 1
+	save_progress()
+
+
+func record_stage_completion() -> void:
+	if rides_completed_day != get_current_day():
+		_reset_daily_consumable_counters(get_current_day())
+
+	rides_completed_day = get_current_day()
+	if str(get_last_stage_result().get("difficulty", "")) == "long":
+		rides_completed_today += 1
+	if rides_completed_today >= 3:
+		unlock_achievement("masipag")
+
+	clean_stage_streak += 1
+	if clean_stage_streak >= 5:
+		unlock_achievement("maingat")
+
+	if current_trip_low_energy or current_trip_low_gas:
+		unlock_achievement("matiyaga")
+	if current_trip_low_energy and current_trip_low_gas:
+		unlock_achievement("maparaan")
+
+	current_trip_low_energy = false
+	current_trip_low_gas = false
+	save_progress()
+
+
+func record_stage_failure() -> void:
+	clean_stage_streak = 0
+	current_trip_low_energy = false
+	current_trip_low_gas = false
+	save_progress()
+
+
 func unlock_achievement(achievement_id: String) -> void:
 	var safe_id := str(achievement_id).strip_edges().to_lower()
 	if not ACHIEVEMENT_DEFINITIONS.has(safe_id):
@@ -1364,6 +1474,13 @@ func unlock_achievement(achievement_id: String) -> void:
 	achievements[safe_id] = true
 	_apply_achievement_effects(safe_id)
 	achievement_unlocked.emit(safe_id)
+	save_progress()
+
+
+func fail_run(reason: String) -> void:
+	var safe_reason := str(reason).strip_edges()
+	run_failed = true
+	run_fail_reason = safe_reason if not safe_reason.is_empty() else "John's run came to an end."
 	save_progress()
 
 
@@ -1404,6 +1521,8 @@ func _reset_daily_consumable_counters(day_number: int) -> void:
 	yosi_bought_today = 0
 	rests_taken_day = max(1, day_number)
 	rests_taken_today = 0
+	rides_completed_day = max(1, day_number)
+	rides_completed_today = 0
 
 
 func reset() -> void:
@@ -1429,8 +1548,15 @@ func reset() -> void:
 	last_rest_day = 0
 	yosi_bought_today = 0
 	yosi_bought_day = 1
+	yosi_bought_total = 0
 	rests_taken_today = 0
 	rests_taken_day = 1
+	rides_completed_today = 0
+	rides_completed_day = 1
+	non_gas_store_purchases_this_week = 0
+	clean_stage_streak = 0
+	current_trip_low_energy = false
+	current_trip_low_gas = false
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL

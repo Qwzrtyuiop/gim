@@ -1731,6 +1731,8 @@ func _check_collisions() -> void:
 func _end_game(title: String, detail: String) -> void:
 	if game_state != "playing":
 		return
+	if title == "CRASH" or title == "TIME OUT":
+		PlayerState.record_stage_failure()
 	if (title == "CRASH" or title == "TIME OUT") and PlayerState.energy <= 0:
 		game_state = "GAME OVER"
 		end_message = "Out of energy. Press any key to return to menu."
@@ -1884,6 +1886,7 @@ func _store_stage_result() -> void:
 		"time_left": time_left,
 		"overtime": overtime_seconds,
 	})
+	PlayerState.record_stage_completion()
 
 
 func _change_lane(direction: int) -> void:
