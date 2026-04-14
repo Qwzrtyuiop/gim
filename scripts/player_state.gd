@@ -314,6 +314,7 @@ var consumed_story_triggers: Dictionary = {}
 var last_seen_story_sections: Dictionary = {}
 var last_seen_story_id := ""
 var resume_scene_path := ""
+var ride_select_tutorial_shown := false
 var _is_loading_save := false
 
 var money := 0:
@@ -418,6 +419,7 @@ func _load_progress() -> void:
 	last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	resume_scene_path = str(save_data.get("resume_scene_path", ""))
+	ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", ride_select_tutorial_shown))
 	_is_loading_save = false
 
 
@@ -473,6 +475,7 @@ func save_progress() -> void:
 		"last_seen_story_sections": last_seen_story_sections.duplicate(true),
 		"last_seen_story_id": last_seen_story_id,
 		"resume_scene_path": resume_scene_path,
+		"ride_select_tutorial_shown": ride_select_tutorial_shown,
 	}
 	ResourceSaver.save(save_resource, SAVE_PATH)
 
@@ -511,6 +514,17 @@ func set_resume_scene(scene_path: String) -> void:
 
 func get_resume_scene() -> String:
 	return resume_scene_path
+
+
+func has_ride_select_tutorial_shown() -> bool:
+	return ride_select_tutorial_shown
+
+
+func mark_ride_select_tutorial_shown() -> void:
+	if ride_select_tutorial_shown:
+		return
+	ride_select_tutorial_shown = true
+	save_progress()
 
 
 func begin_stage_sequence() -> void:
@@ -1567,6 +1581,7 @@ func reset() -> void:
 	last_seen_story_sections.clear()
 	last_seen_story_id = ""
 	resume_scene_path = ""
+	ride_select_tutorial_shown = false
 	_reset_story_triggers()
 	_is_loading_save = false
 	_delete_save_file()

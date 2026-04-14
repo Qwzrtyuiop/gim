@@ -5,6 +5,8 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
+const TUTORIAL_IMAGE := preload("res://assets/tutorial/tutorial.png")
+const TUTORIAL_DELAY_SECONDS := 2.0
 const STAGE_BGM_MORNING_CHILL_PATH := "res://assets/stagebgm/morning_chill.mp3"
 const STAGE_BGM_NIGHT_CHILL_PATH := "res://assets/stagebgm/night_chill.mp3"
 const STAGE_BGM_NORMAL_PATH := "res://assets/stagebgm/normalstage1.mp3"
@@ -403,6 +405,18 @@ var speeder_warning_label: Label
 var speeder_beep_player: AudioStreamPlayer
 var stage_bgm_player: AudioStreamPlayer
 var fade_rect: ColorRect
+var tutorial_layer: CanvasLayer
+var tutorial_overlay: Control
+var tutorial_image_rect: TextureRect
+var tutorial_hint_label: Label
+var tutorial_arrow_up_label: Label
+var tutorial_arrow_down_label: Label
+var tutorial_arrow_left_label: Label
+var tutorial_arrow_right_label: Label
+var tutorial_phase := ""
+var tutorial_active := false
+var tutorial_timer_started := false
+var tutorial_input_lock_active := false
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
 var stage_clear_fade_time := 0.0
@@ -449,6 +463,7 @@ func _ready() -> void:
 	_start_stage_bgm()
 	_layout_scene()
 	_begin_gameplay_entry_fade()
+	_schedule_stage_tutorial()
 	if use_player_state_stage_sequence:
 		PlayerState.confirm_stage_started()
 	set_process(true)
@@ -588,6 +603,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 		return
 
+	if tutorial_input_lock_active:
+		return
+
+	if tutorial_active:
+		if tutorial_phase == "image" and _is_any_press(event):
+			_set_tutorial_phase("move")
+		elif tutorial_phase == "move" and _is_up_down_input(event):
+			_set_tutorial_phase("speed")
+		elif tutorial_phase == "speed" and _is_left_right_input(event):
+			_end_stage_tutorial()
+		return
+
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_UP, KEY_W:
@@ -602,6 +629,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	if tutorial_active:
+		_update_tutorial_overlay_positions()
+		_update_ui()
+		return
+	if tutorial_input_lock_active:
+		_update_background()
+		_update_night_visibility_mask()
+		_update_ui()
+		queue_redraw()
+		return
+
 	if game_state == "playing":
 		_handle_speed(delta)
 		_update_progress(delta)
@@ -803,6 +841,7 @@ func _create_ui() -> void:
 	ui.add_child(fade_rect)
 
 
+
 func _start_stage_bgm() -> void:
 	if stage_bgm_player == null:
 		return
@@ -847,6 +886,196 @@ func _begin_gameplay_entry_fade() -> void:
 
 	var tween := create_tween()
 	tween.tween_property(fade_rect, "color:a", 0.0, gameplay_entry_fade_seconds)
+
+
+func _schedule_stage_tutorial() -> void:
+	if tutorial_timer_started:
+		return
+	if not _should_show_stage_tutorial():
+		return
+	tutorial_timer_started = true
+	tutorial_input_lock_active = true
+	var timer := get_tree().create_timer(TUTORIAL_DELAY_SECONDS)
+	timer.timeout.connect(func() -> void:
+		_show_stage_tutorial()
+	)
+
+
+func _should_show_stage_tutorial() -> bool:
+	if not use_player_state_stage_sequence:
+		return false
+	if PlayerState.get_current_day() > 1:
+		return false
+	if int(PlayerState.stage_round) > 1:
+		return false
+	return true
+
+
+func _show_stage_tutorial() -> void:
+	if tutorial_active:
+		return
+	if game_state != "playing":
+		return
+	if not _should_show_stage_tutorial():
+		return
+	if tutorial_overlay == null:
+		_build_tutorial_overlay()
+	tutorial_active = true
+	tutorial_input_lock_active = false
+	_set_tutorial_phase("image")
+
+
+func _end_stage_tutorial() -> void:
+	tutorial_active = false
+	tutorial_phase = ""
+	if tutorial_overlay != null:
+		tutorial_overlay.visible = false
+	tutorial_input_lock_active = false
+
+
+func _set_tutorial_phase(phase: String) -> void:
+	tutorial_phase = phase
+	if tutorial_overlay == null:
+		return
+	tutorial_overlay.visible = true
+	if tutorial_image_rect != null:
+		tutorial_image_rect.visible = phase == "image"
+	if tutorial_arrow_up_label != null:
+		tutorial_arrow_up_label.visible = phase == "move"
+	if tutorial_arrow_down_label != null:
+		tutorial_arrow_down_label.visible = phase == "move"
+	if tutorial_arrow_left_label != null:
+		tutorial_arrow_left_label.visible = phase == "speed"
+	if tutorial_arrow_right_label != null:
+		tutorial_arrow_right_label.visible = phase == "speed"
+	if tutorial_hint_label != null:
+		match phase:
+			"image":
+				tutorial_hint_label.text = "Press any key to close tutorial"
+			"move":
+				tutorial_hint_label.text = "Press UP or DOWN to continue"
+			"speed":
+				tutorial_hint_label.text = "Press LEFT or RIGHT to continue"
+			_:
+				tutorial_hint_label.text = ""
+		tutorial_hint_label.visible = not tutorial_hint_label.text.is_empty()
+	_update_tutorial_overlay_positions()
+
+
+func _update_tutorial_overlay_positions() -> void:
+	if not tutorial_active:
+		return
+	if player == null:
+		return
+	var base := player.global_position
+	if tutorial_arrow_up_label != null and tutorial_arrow_up_label.visible:
+		tutorial_arrow_up_label.position = base + Vector2(-110.0, -150.0)
+	if tutorial_arrow_down_label != null and tutorial_arrow_down_label.visible:
+		tutorial_arrow_down_label.position = base + Vector2(-110.0, 40.0)
+	if tutorial_arrow_left_label != null and tutorial_arrow_left_label.visible:
+		tutorial_arrow_left_label.position = base + Vector2(-320.0, -20.0)
+	if tutorial_arrow_right_label != null and tutorial_arrow_right_label.visible:
+		tutorial_arrow_right_label.position = base + Vector2(80.0, -20.0)
+
+
+func _is_up_down_input(event: InputEvent) -> bool:
+	if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
+		return true
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_UP, KEY_W, KEY_DOWN, KEY_S:
+				return true
+	return false
+
+
+func _is_left_right_input(event: InputEvent) -> bool:
+	if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		return true
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_LEFT, KEY_A, KEY_RIGHT, KEY_D:
+				return true
+	return false
+
+
+func _build_tutorial_overlay() -> void:
+	tutorial_layer = CanvasLayer.new()
+	tutorial_layer.layer = 950
+	add_child(tutorial_layer)
+
+	tutorial_overlay = Control.new()
+	tutorial_overlay.anchor_right = 1.0
+	tutorial_overlay.anchor_bottom = 1.0
+	tutorial_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	tutorial_overlay.visible = false
+	tutorial_layer.add_child(tutorial_overlay)
+
+	var backdrop := ColorRect.new()
+	backdrop.anchor_right = 1.0
+	backdrop.anchor_bottom = 1.0
+	backdrop.color = Color(0.0, 0.0, 0.0, 0.65)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	tutorial_overlay.add_child(backdrop)
+
+	tutorial_image_rect = TextureRect.new()
+	tutorial_image_rect.texture = TUTORIAL_IMAGE
+	tutorial_image_rect.anchor_left = 0.5
+	tutorial_image_rect.anchor_top = 0.5
+	tutorial_image_rect.anchor_right = 0.5
+	tutorial_image_rect.anchor_bottom = 0.5
+	tutorial_image_rect.offset_left = -401.5
+	tutorial_image_rect.offset_top = -253.0
+	tutorial_image_rect.offset_right = 401.5
+	tutorial_image_rect.offset_bottom = 193.0
+	tutorial_image_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tutorial_image_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	tutorial_image_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tutorial_overlay.add_child(tutorial_image_rect)
+
+	tutorial_hint_label = _make_label(14, Color(0.98, 0.96, 0.88, 1.0), 3)
+	tutorial_hint_label.anchor_left = 0.5
+	tutorial_hint_label.anchor_right = 0.5
+	tutorial_hint_label.anchor_top = 0.5
+	tutorial_hint_label.anchor_bottom = 0.5
+	tutorial_hint_label.offset_left = -260.0
+	tutorial_hint_label.offset_top = 210.0
+	tutorial_hint_label.offset_right = 260.0
+	tutorial_hint_label.offset_bottom = 250.0
+	tutorial_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_overlay.add_child(tutorial_hint_label)
+
+	tutorial_arrow_up_label = _make_label(13, Color(0.98, 0.96, 0.88, 1.0), 3)
+	tutorial_arrow_up_label.text = "UP ARROW\nMOVE UP"
+	tutorial_arrow_up_label.size = Vector2(220.0, 52.0)
+	tutorial_arrow_up_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_arrow_up_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_arrow_up_label.visible = false
+	tutorial_overlay.add_child(tutorial_arrow_up_label)
+
+	tutorial_arrow_down_label = _make_label(13, Color(0.98, 0.96, 0.88, 1.0), 3)
+	tutorial_arrow_down_label.text = "DOWN ARROW\nMOVE DOWN"
+	tutorial_arrow_down_label.size = Vector2(220.0, 52.0)
+	tutorial_arrow_down_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_arrow_down_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_arrow_down_label.visible = false
+	tutorial_overlay.add_child(tutorial_arrow_down_label)
+
+	tutorial_arrow_left_label = _make_label(13, Color(0.98, 0.96, 0.88, 1.0), 3)
+	tutorial_arrow_left_label.text = "LEFT ARROW\nDECELERATE"
+	tutorial_arrow_left_label.size = Vector2(240.0, 52.0)
+	tutorial_arrow_left_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_arrow_left_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_arrow_left_label.visible = false
+	tutorial_overlay.add_child(tutorial_arrow_left_label)
+
+	tutorial_arrow_right_label = _make_label(13, Color(0.98, 0.96, 0.88, 1.0), 3)
+	tutorial_arrow_right_label.text = "RIGHT ARROW\nACCELERATE"
+	tutorial_arrow_right_label.size = Vector2(240.0, 52.0)
+	tutorial_arrow_right_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tutorial_arrow_right_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	tutorial_arrow_right_label.visible = false
+	tutorial_overlay.add_child(tutorial_arrow_right_label)
 
 
 func _make_label(font_size: int, color: Color, outline_size: int) -> Label:

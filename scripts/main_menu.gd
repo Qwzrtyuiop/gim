@@ -48,6 +48,7 @@ var texture_hitbox_cache := {}
 var reset_hold_time := 0.0
 var reset_message_time := 0.0
 var blocked_start_message_time := 0.0
+var reset_hold_completed := false
 var start_confirm_dialog: ConfirmationDialog
 var is_start_transitioning := false
 var audio_panel_refs: Dictionary = {}
@@ -136,7 +137,7 @@ func _confirm_start_game() -> void:
 	start_button.disabled = true
 	quit_button.disabled = true
 	PlayerState.set_pending_story(Scene01IntroPayload.build(
-		DAY_START_SCENE,
+		HOUSE_DAY_START_SCENE,
 		PlayerState.get_current_stage_type()
 	))
 	_fade_to_intro_story()
@@ -279,6 +280,8 @@ func _saved_resume_scene() -> String:
 
 func _update_reset_progress(delta: float) -> void:
 	if Input.is_key_pressed(KEY_R):
+		if reset_hold_completed:
+			return
 		reset_hold_time += delta
 		var percent := clampf(reset_hold_time / RESET_HOLD_SECONDS, 0.0, 1.0)
 		hint_label.text = "HOLD R reset progress  %d%%" % roundi(percent * 100.0)
@@ -286,8 +289,10 @@ func _update_reset_progress(delta: float) -> void:
 			PlayerState.reset()
 			reset_hold_time = 0.0
 			reset_message_time = 1.8
+			reset_hold_completed = true
 	else:
 		reset_hold_time = 0.0
+		reset_hold_completed = false
 		if reset_message_time > 0.0:
 			reset_message_time -= delta
 			hint_label.text = "Progress reset"
