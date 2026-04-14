@@ -122,7 +122,12 @@ func _finish_transition() -> void:
 
 
 func _launch_story_trigger(phase: String, day_number: int, resume_step: String) -> bool:
-	var trigger_data := PlayerState.find_story_trigger_for_phase(phase, day_number)
+	var context := {
+		"time_of_day": PlayerState.get_current_time_of_day(),
+		"current_time_of_day": PlayerState.get_current_time_of_day(),
+		"current_stage_type": PlayerState.get_current_stage_type(),
+	}
+	var trigger_data := PlayerState.find_story_trigger_for_phase(phase, day_number, context)
 	if trigger_data.is_empty():
 		return false
 

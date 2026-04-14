@@ -1,6 +1,7 @@
 extends Node
 
 const Day02StationBillPayload := preload("res://scripts/story/payloads/day_02_station_bill.gd")
+const Scene03Day7NightPayload := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
 
 signal money_changed(amount: int)
@@ -56,7 +57,7 @@ const ACHIEVEMENT_DEFINITIONS := {
 	"mapagsamantala": {
 		"title": "Mapagsamantala",
 		"subtitle": "Opportunistic",
-		"description": "Taking advantage when the opportunity presents itself\nespecially when it costs someone else more than it costs you.\n\nJohn saw the opening and took it.\nWhether it was right or not didn’t matter, he needed the money more than them.",
+		"description": "Taking advantage when the opportunity presents itself\nespecially when it costs someone else more than it costs you.\n\nJohn saw the opening and took it.\nWhether it was right or not didnâ€™t matter, he needed the money more than them.",
 	},
 	"maninigarilyo": {
 		"title": "Maninigarilyo",
@@ -66,37 +67,52 @@ const ACHIEVEMENT_DEFINITIONS := {
 	"tamad": {
 		"title": "Tamad",
 		"subtitle": "Lazy",
-		"description": "todo placeholder",
+		"description": "In Filipino culture, pagiging tamad is often criticized because it burdens the family and community.
+
+John chose to rest when the road still called.",
 	},
 	"matipid": {
 		"title": "Matipid",
 		"subtitle": "Frugal",
-		"description": "He reached the first collection day without spending on anything except gas.",
+		"description": "Pagiging matipid is a valued Filipino virtue, stretching limited resources to keep the household afloat.
+
+John reached the first collection day without spending on anything except gas.",
 	},
 	"masipag": {
 		"title": "Masipag",
 		"subtitle": "Diligent",
-		"description": "John stayed on the road and finished three long rides in a single day.",
+		"description": "Masipag is the admired Filipino work ethic of showing up and pushing through hardship for the family.
+
+John stayed on the road and finished three long rides in a single day.",
 	},
 	"maparaan": {
 		"title": "Maparaan",
 		"subtitle": "Resourceful",
-		"description": "John completed a ride while down to one energy or less and four gas or less.",
+		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.
+
+John completed five rides while down to one energy or less and two gas or less.",
 	},
 	"matiyaga": {
 		"title": "Matiyaga",
 		"subtitle": "Persevering",
-		"description": "John completed a ride while running low on either energy or gas.",
+		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.
+
+John completed five rides while running low on either energy (1 or less) or gas (2 or less).",
 	},
 	"maingat": {
 		"title": "Maingat",
 		"subtitle": "Careful",
-		"description": "Five stages in a row, no crashes. John kept the tricycle steady.",
+		"description": "Being maingat means acting with care for safety, a practical virtue on Filipino roads.
+
+Five stages in a row, no crashes. John kept the tricycle steady.",
 	},
 }
 const SMOKER_YOSI_GOAL := 10
 const SMOKER_MAX_ENERGY_PENALTY := 1
 const SMOKER_DANGER_YOSI_TOTAL := 50
+const LOW_ENERGY_THRESHOLD := 1
+const LOW_GAS_THRESHOLD := 2
+const LOW_RESOURCE_STREAK_TARGET := 5
 const SAVE_PATH := "user://progress_save.tres"
 const SAVE_VERSION := 1
 const REST_ENERGY_BONUSES := {
@@ -303,6 +319,8 @@ var non_gas_store_purchases_this_week := 0
 var clean_stage_streak := 0
 var current_trip_low_energy := false
 var current_trip_low_gas := false
+var low_resource_trip_count := 0
+var low_both_resource_trip_count := 0
 var debt_goal_index := 0
 var last_debt_collection_day := 0
 var remaining_debt := TOTAL_DEBT_GOAL
@@ -402,6 +420,8 @@ func _load_progress() -> void:
 	clean_stage_streak = int(save_data.get("clean_stage_streak", clean_stage_streak))
 	current_trip_low_energy = bool(save_data.get("current_trip_low_energy", current_trip_low_energy))
 	current_trip_low_gas = bool(save_data.get("current_trip_low_gas", current_trip_low_gas))
+	low_resource_trip_count = int(save_data.get("low_resource_trip_count", low_resource_trip_count))
+	low_both_resource_trip_count = int(save_data.get("low_both_resource_trip_count", low_both_resource_trip_count))
 	debt_goal_index = int(save_data.get("debt_goal_index", debt_goal_index))
 	last_debt_collection_day = int(save_data.get("last_debt_collection_day", last_debt_collection_day))
 	remaining_debt = int(save_data.get("remaining_debt", remaining_debt))
@@ -413,6 +433,21 @@ func _load_progress() -> void:
 	for trigger_data in saved_story_triggers:
 		if trigger_data is Dictionary:
 			story_triggers.append((trigger_data as Dictionary).duplicate(true))
+	var needs_story_trigger_save := false
+	var has_scene_03 := false
+	for trigger_data in story_triggers:
+		if str((trigger_data as Dictionary).get("id", "")) == "day_7_night_scene_03":
+			has_scene_03 = true
+			break
+	if not has_scene_03:
+		story_triggers.append({
+			"id": "day_7_night_scene_03",
+			"phase": STORY_TRIGGER_DAY_END,
+			"day": 7,
+			"time_of_day": "night",
+			"payload": Scene03Day7NightPayload.build(),
+		})
+		needs_story_trigger_save = true
 	consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
 	upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
 	achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
@@ -421,6 +456,8 @@ func _load_progress() -> void:
 	resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", ride_select_tutorial_shown))
 	_is_loading_save = false
+	if needs_story_trigger_save:
+		save_progress()
 
 
 func save_progress() -> void:
@@ -462,6 +499,8 @@ func save_progress() -> void:
 		"clean_stage_streak": clean_stage_streak,
 		"current_trip_low_energy": current_trip_low_energy,
 		"current_trip_low_gas": current_trip_low_gas,
+		"low_resource_trip_count": low_resource_trip_count,
+		"low_both_resource_trip_count": low_both_resource_trip_count,
 		"debt_goal_index": debt_goal_index,
 		"last_debt_collection_day": last_debt_collection_day,
 		"remaining_debt": remaining_debt,
@@ -548,6 +587,8 @@ func begin_stage_sequence() -> void:
 	clean_stage_streak = 0
 	current_trip_low_energy = false
 	current_trip_low_gas = false
+	low_resource_trip_count = 0
+	low_both_resource_trip_count = 0
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL
@@ -731,8 +772,8 @@ func prepare_stage_start(stage_descriptor := "") -> bool:
 
 	spend_energy(1)
 	spend_gas(trip_gas_cost)
-	current_trip_low_energy = energy <= 1
-	current_trip_low_gas = gas <= 4
+	current_trip_low_energy = energy <= LOW_ENERGY_THRESHOLD
+	current_trip_low_gas = gas <= LOW_GAS_THRESHOLD
 	pending_stage_energy_cost = true
 	save_progress()
 	return true
@@ -1462,9 +1503,13 @@ func record_stage_completion() -> void:
 		unlock_achievement("maingat")
 
 	if current_trip_low_energy or current_trip_low_gas:
-		unlock_achievement("matiyaga")
+		low_resource_trip_count += 1
+		if low_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
+			unlock_achievement("matiyaga")
 	if current_trip_low_energy and current_trip_low_gas:
-		unlock_achievement("maparaan")
+		low_both_resource_trip_count += 1
+		if low_both_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
+			unlock_achievement("maparaan")
 
 	current_trip_low_energy = false
 	current_trip_low_gas = false
@@ -1571,6 +1616,8 @@ func reset() -> void:
 	clean_stage_streak = 0
 	current_trip_low_energy = false
 	current_trip_low_gas = false
+	low_resource_trip_count = 0
+	low_both_resource_trip_count = 0
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL
@@ -1764,6 +1811,13 @@ func _reset_story_triggers() -> void:
 		"day": 2,
 		"time_of_day": "morning",
 		"payload": Day02StationBillPayload.build(),
+	})
+	story_triggers.append({
+		"id": "day_7_night_scene_03",
+		"phase": STORY_TRIGGER_DAY_END,
+		"day": 7,
+		"time_of_day": "night",
+		"payload": Scene03Day7NightPayload.build(),
 	})
 	consumed_story_triggers.clear()
 	save_progress()

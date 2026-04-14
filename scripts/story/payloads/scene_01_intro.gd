@@ -1,12 +1,7 @@
 extends RefCounted
 
 const RETURN_SCENE := "res://scenes/main_menu.tscn"
-const INHOUSE_BACKGROUND := "res://assets/story/backgrounds/inhouse.png"
-const GARAGE_BACKGROUND := "res://assets/story/backgrounds/garagenormal.png"
-const CITY_AMBIENCE_MUSIC := "res://assets/story/music/city_ambience.mp3"
-const ALARM_SFX := "res://assets/story/music/alarm sfx.mp3"
-const RUNNING_SFX := "res://assets/story/music/running.mp3"
-const WIND_BREEZE_SFX := "res://assets/story/music/windbreeze.mp3"
+const StoryConstants := preload("res://scripts/story/story_constants.gd")
 
 
 static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
@@ -17,10 +12,10 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 		"next_scene": next_scene,
 		"prepare_stage_start": true,
 		"stage_descriptor": stage_descriptor,
-		"background": INHOUSE_BACKGROUND,
+		"background": StoryConstants.BACKGROUND_INHOUSE,
 		"composition": [
 			{
-				"background": INHOUSE_BACKGROUND,
+				"background": StoryConstants.BACKGROUND_INHOUSE,
 				"pause_before": 0.16,
 				"background_fade": 0.26,
 				"text": "I open my eyes.",
@@ -32,7 +27,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				"actions": [
 					{
 						"type": "play_music",
-						"path": CITY_AMBIENCE_MUSIC,
+						"path": StoryConstants.MUSIC_CITY_AMBIENCE,
 						"loop": true,
 						"fade_in": 0.55,
 						"volume_db": -9.0,
@@ -45,7 +40,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 			{	"actions": [
 					{
 						"type": "play_sfx",
-						"path": WIND_BREEZE_SFX,
+						"path": StoryConstants.MUSIC_WIND_BREEZE_SFX,
 						"volume_db": -7.0,
 					}
 				],},
@@ -61,7 +56,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				"actions": [
 					{
 						"type": "play_sfx",
-						"path": ALARM_SFX,
+						"path": StoryConstants.MUSIC_ALARM_SFX,
 						"volume_db": -3.0,
 					}
 				],
@@ -78,7 +73,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				"actions": [
 					{
 						"type": "play_sfx",
-						"path": RUNNING_SFX,
+						"path": StoryConstants.MUSIC_RUNNING_SFX,
 						"volume_db": -4.0,
 					},
 					{
@@ -103,7 +98,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				"speaker": "John Toda",
 				"pause_before": 0.16,
 				"text": "My first day as a tricycle driver starts now.",
-				"background": GARAGE_BACKGROUND,
+				"background": StoryConstants.BACKGROUND_GARAGE_NORMAL,
 				"camera": {
 					"zoom": 1.0,
 					"focus": "right",

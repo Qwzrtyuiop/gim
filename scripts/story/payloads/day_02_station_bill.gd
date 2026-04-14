@@ -1,24 +1,22 @@
 extends RefCounted
 
-const STATION_BACKGROUND := "res://assets/story/backgrounds/station.png"
-const CITY_AMBIENCE_MUSIC := "res://assets/story/music/city_ambience.mp3"
-const DRUM_MUSIC := "res://assets/story/music/drum.mp3"
+const StoryConstants := preload("res://scripts/story/story_constants.gd")
 
 static func build() -> Dictionary:
 	return {
 		"story_id": "day_02_station_bill",
 		"chapter_title": "Day 2",
-		"background": STATION_BACKGROUND,
+		"background": StoryConstants.BACKGROUND_STATION,
 		"music": {
 			"type": "play_music",
-			"path": CITY_AMBIENCE_MUSIC,
+			"path": StoryConstants.MUSIC_CITY_AMBIENCE,
 			"loop": true,
 			"fade_in": 0.55,
 			"volume_db": -9.0,
 		},
 		"composition": [
 			{
-				"background": STATION_BACKGROUND,
+				"background": StoryConstants.BACKGROUND_STATION,
 				"background_fade": 0.28,
 				"pause_before": 0.14,
 				"text": "At the station, one passenger steps off in a hurry.",
@@ -116,7 +114,7 @@ static func build() -> Dictionary:
 				"actions": [
 					{
 						"type": "play_music",
-						"path": DRUM_MUSIC,
+						"path": StoryConstants.MUSIC_DRUM,
 						"loop": false,
 						"fade_out": 0.25,
 						"volume_db": -6.0,
