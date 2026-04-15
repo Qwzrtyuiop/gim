@@ -1,23 +1,24 @@
 extends Node2D
 
-const PARALLAX_SKY_TEXTURE := preload("res://assets/background/parallax/sky.png")
-const PARALLAX_MOUNTAIN_TEXTURE := preload("res://assets/background/parallax/mountain.png")
-const PARALLAX_MAIN_TEXTURE := preload("res://assets/background/parallax/mainlayer.png")
+const BACKGROUND_LOOP_TEXTURE := preload("res://assets/background/bg1_loop.png")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
 const TUTORIAL_IMAGE := preload("res://assets/tutorial/tutorial.png")
-const STAGE_BGM_MORNING_CHILL_PATH := "res://assets/stagebgm/morning_chill.mp3"
-const STAGE_BGM_NIGHT_CHILL_PATH := "res://assets/stagebgm/night_chill.mp3"
-const STAGE_BGM_NORMAL_PATH := "res://assets/stagebgm/normalstage1.mp3"
-const STAGE_BGM_SPEEDER_A_PATH := "res://assets/stagebgm/speeder.mp3"
-const STAGE_BGM_SPEEDER_B_PATH := "res://assets/stagebgm/speeder2.mp3"
-const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/stagebgm/traffic_jam.mp3"
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
+const BackgroundScroller := preload("res://scripts/game/background_scroller.gd")
+const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
+const GameAudioManager := preload("res://scripts/game/game_audio_manager.gd")
+const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
+const GameInput := preload("res://scripts/game/game_input.gd")
+const GameRenderer := preload("res://scripts/game/game_renderer.gd")
+const PlayerVehicleBehavior := preload("res://scripts/game/player_vehicle_behavior.gd")
+const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
+const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
 const PLAYER_TEXTURE := preload("res://assets/vehicles/player_tricycle.png")
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
@@ -53,6 +54,14 @@ const PARKED_VEHICLE_KEYS := ["truck", "jeepney", "sedan"]
 const PARKED_VEHICLE_Y_OFFSET := 26.0
 const PARKED_COLLISION_MIN_KMH := 40
 const PARKED_VEHICLE_Z_OFFSET := 4
+const SPEEDER_PLAYER_LANE_CHANGE_BUFFER := 260.0
+const SPAWN_ROOM_EDGE_BUFFER := 120.0
+const SPAWN_MIN_OFFSET := 90.0
+const SPAWN_MAX_OFFSET := 360.0
+const FAST_SPEED_SPAWN_DELAY_X := 0.35
+const BLOCKED_SPAWN_RETRY_MIN_DELAY := 0.18
+const BLOCKED_SPAWN_RETRY_MAX_DELAY := 0.55
+const FAST_SPAWN_ROOM_EXTRA := 260.0
 const TIME_FILTER_Z_INDEX := 760
 const NIGHT_MASK_Z_INDEX := 790
 const HEADLIGHT_Z_INDEX := 820
@@ -90,149 +99,9 @@ void fragment() {
 	COLOR = vec4(glow_color.rgb, glow_color.a * alpha);
 }
 "
-const FIRST_STAGE_TYPE := "short-morning-chill"
 const SPEEDOMETER_MAX_KMH := 180
 const SPEEDOMETER_REFERENCE_MAX_SPEED := 560.0
 const SPEEDOMETER_BASE_MAX_KMH := 60.0
-const DEFAULT_STAGE_PROFILE := {
-	"target_distance": 1000.0,
-	"time_limit": 45.0,
-	"player_x": 220.0,
-	"player_start_speed": 320.0,
-	"player_min_cruise_speed": 180.0,
-	"player_max_speed": 560.0,
-	"player_acceleration": 230.0,
-	"player_acceleration_x": 1.0,
-	"bottom_lane_player_acceleration_x": 1.0,
-	"player_brake_deceleration": 230.0,
-	"player_brake_x": 1.0,
-	"player_coast_deceleration": 85.0,
-	"player_coast_x": 1.0,
-	"player_lane_lerp_speed": 9.0,
-	"player_lane_lerp_x": 1.0,
-	"player_distance_gain_x": 1.0,
-	"player_wiggle_stop_speed": 45.0,
-	"player_wiggle_x_pixels": 2.0,
-	"player_wiggle_x_frequency": 0.012,
-	"player_wiggle_rotation_radians": 0.012,
-	"player_wiggle_rotation_frequency": 0.018,
-	"player_wiggle_intensity_x": 1.0,
-	"incoming_spawn_min_delay": 18.0,
-	"incoming_spawn_max_delay": 28.0,
-	"main_spawn_min_delay": 6.0,
-	"main_spawn_max_delay": 9.5,
-	"shoulder_spawn_min_delay": 18.0,
-	"shoulder_spawn_max_delay": 30.0,
-	"spawn_delay_progress_reduction": 0.0,
-	"incoming_vehicle_min_speed": 360.0,
-	"incoming_vehicle_max_speed": 610.0,
-	"main_vehicle_min_speed": 190.0,
-	"main_vehicle_max_speed": 280.0,
-	"shoulder_vehicle_min_speed": 35.0,
-	"shoulder_vehicle_max_speed": 95.0,
-	"shoulder_parked_chance": 0.55,
-	"npc_follow_gap": 46.0,
-	"npc_collision_lookahead": 1.1,
-	"stage_clear_min_exit_speed": 180.0,
-	"stage_clear_player_exit_speed": 120.0,
-	"stage_clear_fade_seconds": 0.9,
-	"fare_php_per_meter": 0.08,
-	"time_bonus_php_per_second": 2.0,
-	"incoming_lane_scale": 0.78,
-	"main_lane_scale": 1.0,
-	"shoulder_lane_scale": 1.18,
-	"player_perspective_lerp_speed": 9.0,
-	"npc_random_lane_change_enabled": false,
-	"npc_lane_change_chance_per_second": 0.0,
-	"npc_lane_change_lerp_speed": 5.0,
-	"speeder_enabled": false,
-	"speeder_spawn_min_delay": 9.0,
-	"speeder_spawn_max_delay": 14.0,
-	"speeder_vehicle_speed": 780.0,
-	"speeder_lane_change_lerp_speed": 8.0,
-	"speeder_avoid_lookahead": 360.0,
-	"speeder_safe_gap": 150.0,
-}
-const DIFFICULTY_PROFILES := {
-	"short": {},
-	"medium": {
-		"target_distance": 1500.0,
-		"time_limit": 58.0,
-		"spawn_delay_progress_reduction": 0.15,
-		"fare_php_per_meter": 0.10,
-	},
-	"long": {
-		"target_distance": 2300.0,
-		"time_limit": 82.0,
-		"spawn_delay_progress_reduction": 0.25,
-		"fare_php_per_meter": 0.12,
-	},
-}
-const TIME_PROFILES := {
-	"morning": {},
-	"noon": {
-		"player_coast_deceleration": 96.0,
-		"incoming_vehicle_min_speed": 390.0,
-		"incoming_vehicle_max_speed": 650.0,
-	},
-	"night": {
-		"player_max_speed": 600.0,
-		"incoming_vehicle_min_speed": 420.0,
-		"incoming_vehicle_max_speed": 690.0,
-		"time_bonus_php_per_second": 2.5,
-	},
-}
-const TRAFFIC_PROFILES := {
-	"chill": {},
-	"normal": {
-		"incoming_spawn_min_delay": 13.0,
-		"incoming_spawn_max_delay": 20.0,
-		"main_spawn_min_delay": 4.5,
-		"main_spawn_max_delay": 7.0,
-		"shoulder_spawn_min_delay": 14.0,
-		"shoulder_spawn_max_delay": 22.0,
-		"spawn_delay_progress_reduction": 0.15,
-	},
-	"traffic-jam": {
-		"incoming_spawn_min_delay": 13.0,
-		"incoming_spawn_max_delay": 20.0,
-		"main_spawn_min_delay": 1.4,
-		"main_spawn_max_delay": 2.4,
-		"shoulder_spawn_min_delay": 11.0,
-		"shoulder_spawn_max_delay": 18.0,
-		"main_vehicle_min_speed": 105.0,
-		"main_vehicle_max_speed": 180.0,
-		"npc_follow_gap": 36.0,
-		"shoulder_parked_chance": 0.65,
-	},
-	"busy": {
-		"incoming_spawn_min_delay": 5.0,
-		"incoming_spawn_max_delay": 8.0,
-		"main_spawn_min_delay": 2.8,
-		"main_spawn_max_delay": 4.6,
-		"shoulder_spawn_min_delay": 5.5,
-		"shoulder_spawn_max_delay": 9.0,
-		"spawn_delay_progress_reduction": 0.25,
-		"npc_random_lane_change_enabled": true,
-		"npc_lane_change_chance_per_second": 0.12,
-	},
-	"speeders": {
-		"incoming_spawn_min_delay": 11.0,
-		"incoming_spawn_max_delay": 18.0,
-		"main_spawn_min_delay": 5.0,
-		"main_spawn_max_delay": 7.5,
-		"shoulder_spawn_min_delay": 13.0,
-		"shoulder_spawn_max_delay": 22.0,
-		"speeder_enabled": true,
-		"speeder_spawn_min_delay": 7.5,
-		"speeder_spawn_max_delay": 12.0,
-	},
-}
-const BACKGROUND_PROFILES := {
-	"barangay-streets": {
-		"bottom_lane_player_acceleration_x": 0.45,
-	}
-}
 
 @export_group("Stage")
 @export_enum(
@@ -326,12 +195,18 @@ const BACKGROUND_PROFILES := {
 @export_range(50.0, 900.0, 5.0) var main_vehicle_max_speed := 280.0
 @export_range(0.0, 300.0, 5.0) var shoulder_vehicle_min_speed := 35.0
 @export_range(0.0, 300.0, 5.0) var shoulder_vehicle_max_speed := 95.0
+@export_range(0.2, 12.0, 0.1) var vehicle_speed_change_min_delay := 1.2
+@export_range(0.2, 12.0, 0.1) var vehicle_speed_change_max_delay := 3.8
+@export_range(10.0, 600.0, 5.0) var vehicle_speed_acceleration := 120.0
 @export_range(0.0, 1.0, 0.05) var shoulder_parked_chance := 0.55
 @export_range(0.0, 240.0, 5.0) var npc_follow_gap := 46.0
 @export_range(0.0, 4.0, 0.05) var npc_collision_lookahead := 1.1
 @export var npc_random_lane_change_enabled := false
 @export_range(0.0, 2.0, 0.01) var npc_lane_change_chance_per_second := 0.0
 @export_range(1.0, 20.0, 0.5) var npc_lane_change_lerp_speed := 5.0
+@export_range(0.0, 2.0, 0.01) var npc_overtake_chance_per_second := 0.45
+@export_range(0.0, 500.0, 5.0) var npc_overtake_speed_boost := 170.0
+@export_range(0.1, 5.0, 0.1) var npc_overtake_speed_boost_seconds := 1.6
 @export_range(0.0, 600.0, 5.0) var stage_clear_min_exit_speed := 180.0
 @export_range(0.0, 600.0, 5.0) var stage_clear_player_exit_speed := 120.0
 @export_range(0.1, 5.0, 0.05) var stage_clear_fade_seconds := 0.9
@@ -340,7 +215,8 @@ const BACKGROUND_PROFILES := {
 @export var speeder_enabled := false
 @export_range(1.0, 60.0, 0.5) var speeder_spawn_min_delay := 9.0
 @export_range(1.0, 60.0, 0.5) var speeder_spawn_max_delay := 14.0
-@export_range(100.0, 1400.0, 10.0) var speeder_vehicle_speed := 780.0
+@export_range(100.0, 1400.0, 10.0) var speeder_vehicle_min_speed := 700.0
+@export_range(100.0, 1400.0, 10.0) var speeder_vehicle_max_speed := 860.0
 @export_range(1.0, 20.0, 0.5) var speeder_lane_change_lerp_speed := 8.0
 @export_range(80.0, 800.0, 10.0) var speeder_avoid_lookahead := 360.0
 @export_range(40.0, 400.0, 10.0) var speeder_safe_gap := 150.0
@@ -376,8 +252,7 @@ const BACKGROUND_PROFILES := {
 @export_range(0.1, 0.95, 0.01) var night_visibility_inner_ratio := 0.34
 
 var rng := RandomNumberGenerator.new()
-var background_layer: Node2D
-var parallax_layers: Array[Dictionary] = []
+var background_scroller
 var time_filter_rect: ColorRect
 var noon_glow_rect: ColorRect
 var noon_glow_material: ShaderMaterial
@@ -412,8 +287,7 @@ var stage_label: Label
 var weekly_goal_label: Label
 var debt_goal_label: Label
 var speeder_warning_label: Label
-var speeder_beep_player: AudioStreamPlayer
-var stage_bgm_player: AudioStreamPlayer
+var audio_manager
 var fade_rect: ColorRect
 var tutorial_layer: CanvasLayer
 var tutorial_overlay: Control
@@ -464,13 +338,14 @@ func _ready() -> void:
 	overtime_seconds = 0.0
 	player_speed = player_start_speed
 	headlight_cone_texture = _make_headlight_cone_texture()
+	_create_audio_manager()
 	_create_background()
 	_create_player()
 	_create_time_filter()
 	_create_noon_glow()
 	_create_night_visibility_mask()
 	_create_ui()
-	_start_stage_bgm()
+	audio_manager.start_stage_bgm(stage_time_of_day, stage_traffic, rng)
 	_layout_scene()
 	_begin_gameplay_entry_fade()
 	_schedule_stage_tutorial()
@@ -488,11 +363,11 @@ func _apply_stage_profile() -> void:
 	stage_time_of_day = parts["time"]
 	stage_traffic = parts["traffic"]
 
-	var profile: Dictionary = DEFAULT_STAGE_PROFILE.duplicate()
-	profile.merge(DIFFICULTY_PROFILES.get(stage_difficulty, {}), true)
-	profile.merge(TIME_PROFILES.get(stage_time_of_day, {}), true)
-	profile.merge(TRAFFIC_PROFILES.get(stage_traffic, {}), true)
-	profile.merge(BACKGROUND_PROFILES.get(background_type, {}), true)
+	var profile: Dictionary = StageProfiles.DEFAULT_STAGE_PROFILE.duplicate()
+	profile.merge(StageProfiles.DIFFICULTY_PROFILES.get(stage_difficulty, {}), true)
+	profile.merge(StageProfiles.TIME_PROFILES.get(stage_time_of_day, {}), true)
+	profile.merge(StageProfiles.TRAFFIC_PROFILES.get(stage_traffic, {}), true)
+	profile.merge(StageProfiles.BACKGROUND_PROFILES.get(background_type, {}), true)
 
 	for setting_name in profile.keys():
 		set(setting_name, profile[setting_name])
@@ -518,11 +393,11 @@ func _parse_stage_type(type_name: String) -> Dictionary:
 
 	if parts[0] == "easy":
 		parts[0] = "short"
-	if not DIFFICULTY_PROFILES.has(parts[0]):
+	if not StageProfiles.DIFFICULTY_PROFILES.has(parts[0]):
 		parts[0] = "short"
-	if not TIME_PROFILES.has(parts[1]):
+	if not StageProfiles.TIME_PROFILES.has(parts[1]):
 		parts[1] = "morning"
-	if not TRAFFIC_PROFILES.has(traffic_name):
+	if not StageProfiles.TRAFFIC_PROFILES.has(traffic_name):
 		traffic_name = "chill"
 
 	return {
@@ -540,14 +415,11 @@ func _apply_target_distance_roll() -> void:
 
 
 func _apply_player_upgrades() -> void:
-	var engine_level := PlayerState.get_upgrade_level("engine_tune")
-	var brakes_level := PlayerState.get_upgrade_level("brake_kit")
-	var tires_level := PlayerState.get_upgrade_level("tire_grip")
-
-	player_acceleration_x *= 1.0 + engine_level * 0.2
-	player_max_speed *= 1.0 + engine_level * 0.75
-	player_brake_x *= 1.0 + brakes_level * 0.10
-	player_lane_lerp_x *= 1.0 + tires_level * 0.08
+	var modifiers := GameEconomyManager.player_upgrade_modifiers()
+	player_acceleration_x *= float(modifiers["player_acceleration_x"])
+	player_max_speed *= float(modifiers["player_max_speed"])
+	player_brake_x *= float(modifiers["player_brake_x"])
+	player_lane_lerp_x *= float(modifiers["player_lane_lerp_x"])
 
 
 func _apply_hidden_special_modifiers() -> void:
@@ -571,6 +443,7 @@ func _apply_hidden_special_modifiers() -> void:
 		"busy":
 			special_mode_hidden_modifiers = {
 				"busy_density_x": rng.randf_range(0.82, 1.10),
+				"busy_speed_x": rng.randf_range(1.0, 1.18),
 				"lane_weave_x": rng.randf_range(0.88, 1.35),
 				"close_call_x": rng.randf_range(0.92, 1.20),
 			}
@@ -580,6 +453,12 @@ func _apply_hidden_special_modifiers() -> void:
 			main_spawn_max_delay *= special_mode_hidden_modifiers["busy_density_x"]
 			shoulder_spawn_min_delay *= special_mode_hidden_modifiers["busy_density_x"]
 			shoulder_spawn_max_delay *= special_mode_hidden_modifiers["busy_density_x"]
+			incoming_vehicle_min_speed *= special_mode_hidden_modifiers["busy_speed_x"]
+			incoming_vehicle_max_speed *= special_mode_hidden_modifiers["busy_speed_x"]
+			main_vehicle_min_speed *= special_mode_hidden_modifiers["busy_speed_x"]
+			main_vehicle_max_speed *= special_mode_hidden_modifiers["busy_speed_x"]
+			shoulder_vehicle_min_speed *= special_mode_hidden_modifiers["busy_speed_x"]
+			shoulder_vehicle_max_speed *= special_mode_hidden_modifiers["busy_speed_x"]
 			npc_lane_change_chance_per_second *= special_mode_hidden_modifiers["lane_weave_x"]
 			npc_collision_lookahead *= special_mode_hidden_modifiers["close_call_x"]
 		"speeders":
@@ -590,7 +469,8 @@ func _apply_hidden_special_modifiers() -> void:
 			}
 			speeder_spawn_min_delay *= special_mode_hidden_modifiers["speeder_rate_x"]
 			speeder_spawn_max_delay *= special_mode_hidden_modifiers["speeder_rate_x"]
-			speeder_vehicle_speed *= special_mode_hidden_modifiers["speeder_speed_x"]
+			speeder_vehicle_min_speed *= special_mode_hidden_modifiers["speeder_speed_x"]
+			speeder_vehicle_max_speed *= special_mode_hidden_modifiers["speeder_speed_x"]
 			speeder_avoid_lookahead *= special_mode_hidden_modifiers["speeder_hunt_x"]
 			main_spawn_min_delay *= rng.randf_range(0.92, 1.10)
 			main_spawn_max_delay *= rng.randf_range(0.92, 1.10)
@@ -609,7 +489,7 @@ func _notification(what: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _is_any_press(event) and game_state == "GAME OVER":
+	if GameInput.is_any_press(event) and game_state == "GAME OVER":
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 		return
 
@@ -617,11 +497,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if tutorial_active:
-		if tutorial_phase == "image" and _is_any_press(event):
+		if tutorial_phase == "image" and GameInput.is_any_press(event):
 			_set_tutorial_phase("move")
-		elif tutorial_phase == "move" and _is_up_down_input(event):
+		elif tutorial_phase == "move" and GameInput.is_up_down_input(event):
 			_set_tutorial_phase("speed")
-		elif tutorial_phase == "speed" and _is_left_right_input(event):
+		elif tutorial_phase == "speed" and GameInput.is_left_right_input(event):
 			_end_stage_tutorial()
 		return
 
@@ -658,8 +538,13 @@ func _process(delta: float) -> void:
 		_update_speeder_lane_change_warning(delta)
 		_update_lane_change_warnings(delta)
 		_update_random_lane_changes(delta)
+		_update_vehicle_speeds(delta)
+		if stage_traffic != "busy":
+			_update_vehicle_overtake_ai(delta)
+		_update_busy_vehicle_ai(delta)
 		_update_speeder_ai()
 		_update_npc_following()
+		VehicleBehaviors.update_overtake_speed_boosts(active_entities, delta)
 		_update_entities(delta)
 		_update_player(delta)
 		_check_collisions()
@@ -677,44 +562,17 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	pass
-
-
-func _draw_dashed_lane_line(y: float, width: float) -> void:
-	var dash_w := 54.0
-	var gap_w := 36.0
-	var phase := fmod(distance * 3.2, dash_w + gap_w)
-	var x := -dash_w - phase
-	while x < width + dash_w:
-		draw_rect(Rect2(x, y - 3.0, dash_w, 6.0), Color(1.0, 1.0, 1.0, 0.68))
-		x += dash_w + gap_w
+	GameRenderer.draw(self, distance)
 
 
 func _create_background() -> void:
-	background_layer = Node2D.new()
-	background_layer.z_index = -100
-	add_child(background_layer)
+	background_scroller = BackgroundScroller.new()
+	background_scroller.setup(self, BACKGROUND_LOOP_TEXTURE)
 
-	parallax_layers.clear()
-	for layer_data in [
-		{"texture": PARALLAX_SKY_TEXTURE, "speed": 0.03},
-		{"texture": PARALLAX_MOUNTAIN_TEXTURE, "speed": 0.12},
-		{"texture": PARALLAX_MAIN_TEXTURE, "speed": 1.0},
-	]:
-		var sprites: Array[Sprite2D] = []
-		for copy_index in range(2):
-			var sprite := Sprite2D.new()
-			sprite.texture = layer_data["texture"]
-			sprite.centered = false
-			sprite.z_index = parallax_layers.size()
-			background_layer.add_child(sprite)
-			sprites.append(sprite)
-		parallax_layers.append({
-			"sprites": sprites,
-			"texture": layer_data["texture"],
-			"speed": float(layer_data["speed"]),
-			"width": 1280.0,
-		})
+
+func _create_audio_manager() -> void:
+	audio_manager = GameAudioManager.new()
+	audio_manager.setup(self)
 
 
 func _create_player() -> void:
@@ -860,60 +718,11 @@ func _create_ui() -> void:
 	speeder_lane_change_warning_label.visible = false
 	ui.add_child(speeder_lane_change_warning_label)
 
-	speeder_beep_player = AudioStreamPlayer.new()
-	var beep_stream := AudioStreamGenerator.new()
-	beep_stream.mix_rate = 22050.0
-	beep_stream.buffer_length = 0.12
-	speeder_beep_player.stream = beep_stream
-	add_child(speeder_beep_player)
-	AudioSettingsManager.register_player(speeder_beep_player, "sfx")
-
-	stage_bgm_player = AudioStreamPlayer.new()
-	stage_bgm_player.name = "StageBGMPlayer"
-	stage_bgm_player.bus = "Master"
-	add_child(stage_bgm_player)
-	AudioSettingsManager.register_player(stage_bgm_player, "music")
-
 	fade_rect = ColorRect.new()
 	fade_rect.color = Color(0.0, 0.0, 0.0, 1.0 if gameplay_entry_fade_seconds > 0.0 else 0.0)
 	fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui.add_child(fade_rect)
 
-
-
-func _start_stage_bgm() -> void:
-	if stage_bgm_player == null:
-		return
-
-	var bgm_pool := _get_stage_bgm_pool()
-	if bgm_pool.is_empty():
-		return
-
-	stage_bgm_player.stream = bgm_pool[rng.randi_range(0, bgm_pool.size() - 1)]
-	stage_bgm_player.play()
-
-
-func _get_stage_bgm_pool() -> Array:
-	match stage_traffic:
-		"speeders":
-			return [_load_audio_stream(STAGE_BGM_SPEEDER_A_PATH), _load_audio_stream(STAGE_BGM_SPEEDER_B_PATH)]
-		"traffic-jam":
-			return [_load_audio_stream(STAGE_BGM_TRAFFIC_JAM_PATH)]
-		"busy":
-			return [_load_audio_stream(STAGE_BGM_NORMAL_PATH), _load_audio_stream(STAGE_BGM_TRAFFIC_JAM_PATH)]
-		"chill":
-			if stage_time_of_day == "night":
-				return [_load_audio_stream(STAGE_BGM_NIGHT_CHILL_PATH)]
-			return [_load_audio_stream(STAGE_BGM_MORNING_CHILL_PATH), _load_audio_stream(STAGE_BGM_NORMAL_PATH)]
-		"normal":
-			if stage_time_of_day == "night":
-				return [_load_audio_stream(STAGE_BGM_NIGHT_CHILL_PATH), _load_audio_stream(STAGE_BGM_NORMAL_PATH)]
-			return [_load_audio_stream(STAGE_BGM_NORMAL_PATH), _load_audio_stream(STAGE_BGM_MORNING_CHILL_PATH)]
-	return [_load_audio_stream(STAGE_BGM_NORMAL_PATH)]
-
-
-func _load_audio_stream(path: String):
-	return load(path)
 
 
 func _begin_gameplay_entry_fade() -> void:
@@ -1015,26 +824,6 @@ func _update_tutorial_overlay_positions() -> void:
 		tutorial_arrow_left_label.position = lane_center + Vector2(-250.0, -32.0)
 	if tutorial_arrow_right_label != null and tutorial_arrow_right_label.visible:
 		tutorial_arrow_right_label.position = lane_center + Vector2(10.0, -32.0)
-
-
-func _is_up_down_input(event: InputEvent) -> bool:
-	if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
-		return true
-	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_UP, KEY_W, KEY_DOWN, KEY_S:
-				return true
-	return false
-
-
-func _is_left_right_input(event: InputEvent) -> bool:
-	if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
-		return true
-	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_LEFT, KEY_A, KEY_RIGHT, KEY_D:
-				return true
-	return false
 
 
 func _build_tutorial_overlay() -> void:
@@ -1215,11 +1004,13 @@ func _update_night_visibility_mask() -> void:
 
 
 func _layout_scene() -> void:
-	if parallax_layers.is_empty() or player == null:
+	if background_scroller == null or not background_scroller.is_ready() or player == null:
 		return
 
 	var size := get_viewport_rect().size
-	_layout_parallax_layers(size)
+	if stage_traffic == "busy":
+		player_x = BusyTrafficBehavior.player_x(size)
+	background_scroller.layout(size)
 
 	player.scale = _scale_for_vehicle_in_lane(
 		"player_tricycle",
@@ -1313,37 +1104,27 @@ func _layout_scene() -> void:
 
 
 func _handle_speed(delta: float) -> void:
-	var accelerating := Input.is_action_pressed("ui_right") or Input.is_key_pressed(KEY_D)
-	var braking := Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A)
-
-	if accelerating and not braking:
-		player_speed += player_acceleration * player_acceleration_x * _player_lane_acceleration_x() * delta
-	elif braking and not accelerating:
-		player_speed -= player_brake_deceleration * player_brake_x * delta
-	else:
-		player_speed = move_toward(player_speed, player_min_cruise_speed, player_coast_deceleration * player_coast_x * delta)
-
-	player_speed = clampf(player_speed, 0.0, player_max_speed)
-
-
-func _player_lane_acceleration_x() -> float:
-	if background_type == "barangay-streets" and player_lane == 2:
-		return bottom_lane_player_acceleration_x
-	return 1.0
-
-
-func _is_any_press(event: InputEvent) -> bool:
-	if event is InputEventKey:
-		return event.pressed and not event.echo
-	if event is InputEventMouseButton:
-		return event.pressed
-	if event is InputEventJoypadButton:
-		return event.pressed
-	return false
+	player_speed = PlayerVehicleBehavior.next_speed(
+		player_speed,
+		delta,
+		GameInput.is_accelerating(),
+		GameInput.is_braking(),
+		player_lane,
+		background_type,
+		player_acceleration,
+		player_acceleration_x,
+		bottom_lane_player_acceleration_x,
+		player_brake_deceleration,
+		player_brake_x,
+		player_min_cruise_speed,
+		player_coast_deceleration,
+		player_coast_x,
+		player_max_speed
+	)
 
 
 func _update_progress(delta: float) -> void:
-	distance += player_speed * _distance_scale() * delta
+	distance += PlayerVehicleBehavior.distance_delta(player_speed, _distance_scale(), delta)
 	if time_left > 0.0:
 		time_left -= delta
 		if time_left < 0.0:
@@ -1361,16 +1142,25 @@ func _update_spawns(delta: float) -> void:
 	for lane_index in range(3):
 		spawn_timers[lane_index] -= delta
 		if spawn_timers[lane_index] <= 0.0:
-			if _lane_has_spawn_room(lane_index):
-				_spawn_entity(lane_index)
-			spawn_timers[lane_index] = _next_spawn_delay(lane_index, progress)
+			var spawn_side := _vehicle_spawn_side()
+			if _lane_has_spawn_room(lane_index, spawn_side):
+				_spawn_entity(lane_index, spawn_side)
+				spawn_timers[lane_index] = _next_spawn_delay(lane_index, progress)
+			else:
+				spawn_timers[lane_index] = _blocked_spawn_retry_delay()
 
 
 func _next_spawn_delay(lane_index: int, progress: float) -> float:
 	var delay_range := _spawn_delay_range_for_lane(lane_index)
-	var min_delay := maxf(0.05, delay_range.x - progress * spawn_delay_progress_reduction)
-	var max_delay := maxf(min_delay, delay_range.y - progress * spawn_delay_progress_reduction)
+	var speed_spawn_x := lerpf(1.0, FAST_SPEED_SPAWN_DELAY_X, _player_speed_ratio())
+	var min_delay := maxf(0.05, (delay_range.x - progress * spawn_delay_progress_reduction) * speed_spawn_x)
+	var max_delay := maxf(min_delay, (delay_range.y - progress * spawn_delay_progress_reduction) * speed_spawn_x)
 	return rng.randf_range(min_delay, max_delay)
+
+
+func _blocked_spawn_retry_delay() -> float:
+	var speed_spawn_x := lerpf(1.0, FAST_SPEED_SPAWN_DELAY_X, _player_speed_ratio())
+	return rng.randf_range(BLOCKED_SPAWN_RETRY_MIN_DELAY, BLOCKED_SPAWN_RETRY_MAX_DELAY) * speed_spawn_x
 
 
 func _spawn_delay_range_for_lane(lane_index: int) -> Vector2:
@@ -1389,19 +1179,37 @@ func _spawn_delay_range_for_lane(lane_index: int) -> Vector2:
 	return delay_range
 
 
-func _lane_has_spawn_room(lane_index: int) -> bool:
-	var right_edge := get_viewport_rect().size.x - 240.0
+func _vehicle_spawn_side() -> String:
+	if stage_traffic == "busy":
+		return BusyTrafficBehavior.spawn_side(rng, player_speed, player_max_speed)
+	return BusyTrafficBehavior.RIGHT_SPAWN_SIDE
+
+
+func _lane_has_spawn_room(lane_index: int, spawn_side := BusyTrafficBehavior.RIGHT_SPAWN_SIDE) -> bool:
+	if stage_traffic == "busy":
+		return BusyTrafficBehavior.lane_has_spawn_room(
+			active_entities,
+			lane_index,
+			get_viewport_rect().size,
+			spawn_side,
+			player_speed,
+			player_max_speed
+		)
+
+	var right_edge := get_viewport_rect().size.x - SPAWN_ROOM_EDGE_BUFFER + FAST_SPAWN_ROOM_EXTRA * _player_speed_ratio()
 	for entity in active_entities:
 		if entity["lane"] == lane_index and entity["sprite"].position.x > right_edge:
 			return false
 	return true
 
 
-func _spawn_entity(lane_index: int) -> void:
+func _spawn_entity(lane_index: int, spawn_side := BusyTrafficBehavior.RIGHT_SPAWN_SIDE) -> void:
 	var size := get_viewport_rect().size
 	var sprite := Sprite2D.new()
 	var vehicle_key := ""
 	var world_speed := 0.0
+	var min_world_speed := 0.0
+	var max_world_speed := 0.0
 	var fallback_height := 80.0
 	var is_busy_car := false
 	var is_parked := false
@@ -1409,15 +1217,18 @@ func _spawn_entity(lane_index: int) -> void:
 	match lane_index:
 		0:
 			vehicle_key = _choose(["blue_truck", "jeepney", "sedan", "truck"])
-			world_speed = rng.randf_range(incoming_vehicle_min_speed, incoming_vehicle_max_speed)
+			min_world_speed = minf(incoming_vehicle_min_speed, incoming_vehicle_max_speed)
+			max_world_speed = maxf(incoming_vehicle_min_speed, incoming_vehicle_max_speed)
 			fallback_height = 96.0
-			sprite.flip_h = true
+			sprite.flip_h = spawn_side == BusyTrafficBehavior.RIGHT_SPAWN_SIDE
 		1:
 			vehicle_key = _choose(["gray_sedan", "jeepney", "sedan", "motorcycle"])
-			world_speed = rng.randf_range(main_vehicle_min_speed, main_vehicle_max_speed)
+			min_world_speed = minf(main_vehicle_min_speed, main_vehicle_max_speed)
+			max_world_speed = maxf(main_vehicle_min_speed, main_vehicle_max_speed)
 			fallback_height = 96.0
 		2:
-			if rng.randf() < shoulder_parked_chance:
+			var can_spawn_parked := stage_traffic != "busy" or spawn_side != BusyTrafficBehavior.LEFT_SPAWN_SIDE
+			if can_spawn_parked and rng.randf() < shoulder_parked_chance:
 				is_parked = true
 				vehicle_key = _choose(PARKED_VEHICLE_KEYS)
 				world_speed = 0.0
@@ -1429,8 +1240,15 @@ func _spawn_entity(lane_index: int) -> void:
 					"jeepney": 4.0,
 					"sedan": 4.0,
 				})
-				world_speed = rng.randf_range(shoulder_vehicle_min_speed, shoulder_vehicle_max_speed)
+				min_world_speed = minf(shoulder_vehicle_min_speed, shoulder_vehicle_max_speed)
+				max_world_speed = maxf(shoulder_vehicle_min_speed, shoulder_vehicle_max_speed)
 				fallback_height = 90.0
+
+	if not is_parked:
+		var speed_range := _vehicle_speed_range_for_spawn_side(min_world_speed, max_world_speed, spawn_side)
+		min_world_speed = speed_range.x
+		max_world_speed = speed_range.y
+		world_speed = rng.randf_range(min_world_speed, max_world_speed)
 
 	if world_speed > 0.0 and lane_index in [1, 2]:
 		is_busy_car = _is_post_day_seven_traffic_ramp() and rng.randf() < _get_post_day_busy_car_chance(lane_index)
@@ -1445,7 +1263,7 @@ func _spawn_entity(lane_index: int) -> void:
 	_apply_vehicle_shadow(sprite, VEHICLE_HITBOX_INSET)
 	_apply_vehicle_headlight(sprite, VEHICLE_HITBOX_INSET)
 	sprite.position = Vector2(
-		size.x + rng.randf_range(90.0, 360.0),
+		_vehicle_spawn_x(size, spawn_side),
 		_sprite_y_for_hitbox_bottom(sprite, _entity_lane_y(lane_index, size, is_parked), VEHICLE_HITBOX_INSET)
 	)
 	sprite.z_index = _z_for_lane(lane_index, PARKED_VEHICLE_Z_OFFSET if is_parked else 0)
@@ -1456,11 +1274,18 @@ func _spawn_entity(lane_index: int) -> void:
 		"lane": lane_index,
 		"target_lane": lane_index,
 		"vehicle_key": vehicle_key,
+		"fallback_height": fallback_height,
 		"kind": "traffic",
+		"spawn_side": spawn_side,
 		"desired_world_speed": world_speed,
 		"world_speed": world_speed,
+		"min_world_speed": min_world_speed,
+		"max_world_speed": max_world_speed,
+		"speed_change_timer": _next_vehicle_speed_change_delay(),
 		"is_parked": is_parked,
 		"is_busy_car": is_busy_car,
+		"overtake_speed_timer": 0.0,
+		"pending_overtake_speed_boost": false,
 		"lane_change_cooldown": rng.randf_range(0.6, 2.0),
 		"lane_change_warning_active": false,
 	})
@@ -1548,7 +1373,7 @@ func _complete_speeder_lane_change_warning() -> void:
 	var entity := _find_entity_by_sprite(pending_speeder_lane_change_sprite)
 	if not entity.is_empty():
 		var target_lane := speeder_lane_change_warning_target_lane
-		if _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+		if _speeder_target_lane_is_safe(entity, target_lane):
 			entity["lane"] = target_lane
 			entity["target_lane"] = target_lane
 			entity["sprite"].z_index = _z_for_lane(target_lane, 2)
@@ -1574,22 +1399,7 @@ func _pulse_speeder_warning() -> void:
 
 
 func _play_speeder_beep() -> void:
-	if speeder_beep_player == null:
-		return
-
-	speeder_beep_player.play()
-	var playback := speeder_beep_player.get_stream_playback() as AudioStreamGeneratorPlayback
-	if playback == null:
-		return
-
-	playback.clear_buffer()
-	var sample_rate := 22050.0
-	var frequency := 880.0
-	var frames := int(sample_rate * 0.08)
-	for frame_index in range(frames):
-		var fade := 1.0 - float(frame_index) / float(frames)
-		var sample := sin(TAU * frequency * float(frame_index) / sample_rate) * 0.18 * fade
-		playback.push_frame(Vector2(sample, sample))
+	audio_manager.play_speeder_beep()
 
 
 func _reset_speeder_timer() -> void:
@@ -1606,6 +1416,9 @@ func _spawn_speeder() -> void:
 	var size := get_viewport_rect().size
 	var lane_index := 1
 	var vehicle_key := _choose(["sedan", "gray_sedan"])
+	var min_world_speed := minf(speeder_vehicle_min_speed, speeder_vehicle_max_speed)
+	var max_world_speed := maxf(speeder_vehicle_min_speed, speeder_vehicle_max_speed)
+	var world_speed := rng.randf_range(min_world_speed, max_world_speed)
 	var sprite := Sprite2D.new()
 	sprite.texture = VEHICLE_TEXTURES[vehicle_key]
 	sprite.centered = true
@@ -1628,9 +1441,13 @@ func _spawn_speeder() -> void:
 		"lane": lane_index,
 		"target_lane": lane_index,
 		"vehicle_key": vehicle_key,
+		"fallback_height": 92.0,
 		"kind": "speeder",
-		"desired_world_speed": speeder_vehicle_speed,
-		"world_speed": speeder_vehicle_speed,
+		"desired_world_speed": world_speed,
+		"world_speed": world_speed,
+		"min_world_speed": min_world_speed,
+		"max_world_speed": max_world_speed,
+		"speed_change_timer": _next_vehicle_speed_change_delay(),
 		"lane_change_cooldown": 0.0,
 	})
 
@@ -1672,6 +1489,41 @@ func _update_random_lane_changes(delta: float) -> void:
 			_start_lane_change_warning(entity, target_lane)
 
 		entity["lane_change_cooldown"] = rng.randf_range(1.2, 3.5)
+
+
+func _update_vehicle_speeds(delta: float) -> void:
+	VehicleBehaviors.update_speed_targets(
+		active_entities,
+		delta,
+		rng,
+		vehicle_speed_change_min_delay,
+		vehicle_speed_change_max_delay,
+		vehicle_speed_acceleration
+	)
+
+
+func _next_vehicle_speed_change_delay() -> float:
+	return rng.randf_range(
+		minf(vehicle_speed_change_min_delay, vehicle_speed_change_max_delay),
+		maxf(vehicle_speed_change_min_delay, vehicle_speed_change_max_delay)
+	)
+
+
+func _vehicle_spawn_x(size: Vector2, spawn_side: String) -> float:
+	if stage_traffic == "busy":
+		return BusyTrafficBehavior.spawn_x(size, spawn_side, rng, player_speed, player_max_speed)
+
+	return size.x + rng.randf_range(SPAWN_MIN_OFFSET, SPAWN_MAX_OFFSET)
+
+
+func _player_speed_ratio() -> float:
+	return clampf(player_speed / maxf(1.0, player_max_speed), 0.0, 1.0)
+
+
+func _vehicle_speed_range_for_spawn_side(min_speed: float, max_speed: float, spawn_side: String) -> Vector2:
+	if stage_traffic == "busy":
+		return BusyTrafficBehavior.speed_range_for_spawn_side(min_speed, max_speed, spawn_side, player_speed)
+	return Vector2(min_speed, max_speed)
 
 
 func _update_lane_change_warnings(delta: float) -> void:
@@ -1720,11 +1572,14 @@ func _finish_warned_lane_change(entity: Dictionary) -> void:
 	warning_label.visible = false
 	entity["lane_change_warning_active"] = false
 
-	if _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+	if _target_lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
 		entity["lane"] = target_lane
 		entity["target_lane"] = target_lane
 		entity["sprite"].z_index = _z_for_lane(target_lane)
+		if bool(entity.get("pending_overtake_speed_boost", false)):
+			_boost_vehicle_for_overtake(entity)
 
+	entity["pending_overtake_speed_boost"] = false
 	entity["lane_change_cooldown"] = rng.randf_range(1.2, 3.5)
 
 
@@ -1782,44 +1637,173 @@ func _update_speeder_ai() -> void:
 
 		var lane_index := int(entity["lane"])
 		if _speeder_needs_lane_change(entity, lane_index):
-			var avoid_target_lane := 2 if lane_index == 1 else 1
-			_try_set_speeder_target_lane(entity, avoid_target_lane)
+			var changed_lane := false
+			for avoid_target_lane in VehicleBehaviors.speeder_overtake_lane_order(lane_index):
+				if _try_set_speeder_target_lane(entity, avoid_target_lane):
+					changed_lane = true
+					break
+			if not changed_lane:
+				_slow_speeder_near_player(entity)
 			continue
 
 		if lane_index != 1:
 			_try_set_speeder_target_lane(entity, 1)
 
 
-func _speeder_needs_lane_change(speeder: Dictionary, lane_index: int) -> bool:
-	var speeder_rect := _collision_rect(speeder["sprite"], VEHICLE_HITBOX_INSET)
-	var speeder_speed := float(speeder.get("world_speed", speeder_vehicle_speed))
+func _update_busy_vehicle_ai(delta: float) -> void:
+	if stage_traffic != "busy":
+		return
+
 	for entity in active_entities:
-		if entity == speeder or entity.get("kind", "traffic") == "speeder":
+		if entity.get("kind", "traffic") != "traffic":
 			continue
-		if int(entity["lane"]) != lane_index:
+		if bool(entity.get("is_parked", false)):
+			continue
+		if bool(entity.get("lane_change_warning_active", false)):
 			continue
 
-		var entity_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
-		var entity_speed := float(entity.get("world_speed", 0.0))
-		var gap := entity_rect.position.x - (speeder_rect.position.x + speeder_rect.size.x)
-		var closing_speed := maxf(0.0, speeder_speed - entity_speed)
-		var predicted_close_distance := closing_speed * 0.42
-		var emergency_gap := maxf(speeder_safe_gap * 0.82, predicted_close_distance)
-		if gap > 0.0 and gap <= emergency_gap:
-			return true
-	return false
+		entity["lane_change_cooldown"] = maxf(0.0, float(entity.get("lane_change_cooldown", 0.0)) - delta)
+		var lane_index := int(entity["lane"])
+		var cooldown_ready := float(entity["lane_change_cooldown"]) <= 0.0
+		if cooldown_ready and BusyTrafficBehavior.is_left_car(entity) and lane_index == 0:
+			if _try_warn_vehicle_lane_change(entity, 1):
+				continue
+
+		if not _vehicle_needs_lane_change(entity, lane_index):
+			continue
+
+		var changed_lane := false
+		for target_lane in BusyTrafficBehavior.overtake_lane_order(lane_index):
+			if _try_warn_vehicle_lane_change(entity, target_lane):
+				entity["pending_overtake_speed_boost"] = true
+				changed_lane = true
+				break
+		if not changed_lane:
+			_slow_vehicle_for_front_car(entity, lane_index)
+
+
+func _update_vehicle_overtake_ai(delta: float) -> void:
+	for entity in active_entities:
+		if entity.get("kind", "traffic") != "traffic":
+			continue
+		if bool(entity.get("is_parked", false)):
+			continue
+		if bool(entity.get("lane_change_warning_active", false)):
+			continue
+		if float(entity.get("world_speed", 0.0)) <= 0.0:
+			continue
+
+		var lane_index := int(entity["lane"])
+		entity["lane_change_cooldown"] = maxf(0.0, float(entity.get("lane_change_cooldown", 0.0)) - delta)
+		if float(entity["lane_change_cooldown"]) > 0.0:
+			continue
+
+		if lane_index == 0:
+			_try_warn_vehicle_lane_change(entity, 1)
+			continue
+		if lane_index != 1 and lane_index != 2:
+			continue
+		if not _vehicle_needs_lane_change(entity, lane_index):
+			continue
+
+		if rng.randf() > npc_overtake_chance_per_second * delta:
+			continue
+
+		for target_lane in VehicleBehaviors.overtake_lane_order(lane_index):
+			if _try_warn_overtake_lane_change(entity, target_lane):
+				break
+
+
+func _vehicle_needs_lane_change(vehicle: Dictionary, lane_index: int) -> bool:
+	return VehicleBehaviors.vehicle_needs_lane_change(
+		vehicle,
+		lane_index,
+		active_entities,
+		npc_collision_lookahead,
+		npc_follow_gap,
+		VEHICLE_HITBOX_INSET,
+		Callable(self, "_collision_rect")
+	)
+
+
+func _try_warn_overtake_lane_change(entity: Dictionary, target_lane: int) -> bool:
+	if int(entity.get("lane", target_lane)) == target_lane:
+		return false
+	if not _target_lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+		return false
+
+	entity["pending_overtake_speed_boost"] = true
+	_start_lane_change_warning(entity, target_lane)
+	return true
+
+
+func _try_warn_vehicle_lane_change(entity: Dictionary, target_lane: int) -> bool:
+	if int(entity.get("lane", target_lane)) == target_lane:
+		return false
+	if not _target_lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+		return false
+
+	_start_lane_change_warning(entity, target_lane)
+	return true
+
+
+func _boost_vehicle_for_overtake(entity: Dictionary) -> void:
+	VehicleBehaviors.boost_for_overtake(entity, npc_overtake_speed_boost, npc_overtake_speed_boost_seconds)
+
+
+func _slow_vehicle_for_front_car(entity: Dictionary, lane_index: int) -> void:
+	var front_speed := VehicleBehaviors.front_vehicle_speed(
+		entity,
+		lane_index,
+		active_entities,
+		npc_follow_gap,
+		VEHICLE_HITBOX_INSET,
+		Callable(self, "_collision_rect")
+	)
+	if front_speed >= 0.0:
+		entity["world_speed"] = minf(float(entity.get("world_speed", front_speed)), front_speed)
+
+
+func _speeder_needs_lane_change(speeder: Dictionary, lane_index: int) -> bool:
+	return VehicleBehaviors.speeder_needs_lane_change(
+		speeder,
+		lane_index,
+		active_entities,
+		speeder_vehicle_max_speed,
+		speeder_safe_gap,
+		VEHICLE_HITBOX_INSET,
+		Callable(self, "_collision_rect")
+	)
 
 
 func _lane_is_safe_for_entity(moving_entity: Dictionary, target_lane: int, safe_gap: float) -> bool:
-	var moving_rect := _collision_rect(moving_entity["sprite"], VEHICLE_HITBOX_INSET)
-	for entity in active_entities:
-		if entity == moving_entity:
+	return (
+		VehicleBehaviors.is_lane_safe(
+			moving_entity,
+			target_lane,
+			safe_gap,
+			active_entities,
+			VEHICLE_HITBOX_INSET,
+			Callable(self, "_collision_rect")
+		)
+		and _target_lane_hitboxes_clear(moving_entity, target_lane)
+	)
+
+
+func _target_lane_is_safe_for_entity(moving_entity: Dictionary, target_lane: int, safe_gap: float) -> bool:
+	return _lane_is_safe_for_entity(moving_entity, target_lane, safe_gap)
+
+
+func _target_lane_hitboxes_clear(entity: Dictionary, target_lane: int) -> bool:
+	var moving_rect := _projected_entity_collision_rect(entity, target_lane)
+	for other_entity in active_entities:
+		if other_entity == entity:
 			continue
-		if int(entity["lane"]) != target_lane:
+		if int(other_entity.get("lane", -1)) != target_lane:
 			continue
 
-		var entity_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
-		if absf(entity_rect.get_center().x - moving_rect.get_center().x) < safe_gap:
+		var other_rect := _collision_rect(other_entity["sprite"], VEHICLE_HITBOX_INSET)
+		if moving_rect.intersects(other_rect):
 			return false
 	return true
 
@@ -1827,7 +1811,7 @@ func _lane_is_safe_for_entity(moving_entity: Dictionary, target_lane: int, safe_
 func _try_set_speeder_target_lane(entity: Dictionary, target_lane: int) -> bool:
 	if int(entity.get("lane", target_lane)) == target_lane:
 		return false
-	if not _lane_is_safe_for_entity(entity, target_lane, speeder_safe_gap):
+	if not _speeder_target_lane_is_safe(entity, target_lane):
 		return false
 
 	if target_lane == player_lane:
@@ -1843,6 +1827,61 @@ func _try_set_speeder_target_lane(entity: Dictionary, target_lane: int) -> bool:
 	return true
 
 
+func _speeder_lane_change_safe_gap(target_lane: int) -> float:
+	return VehicleBehaviors.speeder_lane_change_safe_gap(target_lane, speeder_safe_gap, speeder_avoid_lookahead)
+
+
+func _speeder_target_lane_is_safe(entity: Dictionary, target_lane: int) -> bool:
+	return (
+		_lane_is_safe_for_entity(entity, target_lane, _speeder_lane_change_safe_gap(target_lane))
+		and _speeder_has_player_lane_change_clearance(entity, target_lane)
+	)
+
+
+func _projected_entity_collision_rect(entity: Dictionary, lane_index: int) -> Rect2:
+	var sprite: Sprite2D = entity["sprite"]
+	var original_position := sprite.position
+	var original_scale := sprite.scale
+	sprite.scale = _target_scale_for_entity(entity, lane_index)
+	sprite.position.y = _sprite_y_for_hitbox_bottom(
+		sprite,
+		_entity_lane_y(lane_index, get_viewport_rect().size, bool(entity.get("is_parked", false))),
+		VEHICLE_HITBOX_INSET
+	)
+	var projected_rect := _collision_rect(sprite, VEHICLE_HITBOX_INSET)
+	sprite.position = original_position
+	sprite.scale = original_scale
+	return projected_rect
+
+
+func _speeder_has_player_lane_change_clearance(entity: Dictionary, target_lane: int) -> bool:
+	if player == null or not is_instance_valid(player):
+		return true
+
+	var current_lane := int(entity.get("lane", target_lane))
+	if current_lane != player_lane and target_lane != player_lane:
+		return true
+
+	var speeder_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
+	var player_rect := _collision_rect(player, PLAYER_HITBOX_INSET)
+	var center_gap := absf(speeder_rect.get_center().x - player_rect.get_center().x)
+	return center_gap >= SPEEDER_PLAYER_LANE_CHANGE_BUFFER
+
+
+func _slow_speeder_near_player(entity: Dictionary) -> void:
+	if player == null or not is_instance_valid(player):
+		return
+	if int(entity.get("lane", -1)) != player_lane:
+		return
+
+	var speeder_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
+	var player_rect := _collision_rect(player, PLAYER_HITBOX_INSET)
+	var speeder_is_behind_player := speeder_rect.get_center().x < player_rect.get_center().x
+	var center_gap := absf(speeder_rect.get_center().x - player_rect.get_center().x)
+	if speeder_is_behind_player and center_gap < SPEEDER_PLAYER_LANE_CHANGE_BUFFER:
+		entity["world_speed"] = minf(float(entity.get("world_speed", speeder_vehicle_max_speed)), player_speed)
+
+
 func _find_entity_by_sprite(sprite: Sprite2D) -> Dictionary:
 	if sprite == null:
 		return {}
@@ -1854,39 +1893,13 @@ func _find_entity_by_sprite(sprite: Sprite2D) -> Dictionary:
 
 
 func _update_npc_following() -> void:
-	for entity in active_entities:
-		if not entity.has("desired_world_speed"):
-			entity["desired_world_speed"] = entity["world_speed"]
-		entity["world_speed"] = entity["desired_world_speed"]
-
-	for lane_index in [1, 2]:
-		var lane_entities := []
-		for entity in active_entities:
-			if entity.get("kind", "traffic") == "traffic" and entity["lane"] == lane_index:
-				lane_entities.append(entity)
-
-		lane_entities.sort_custom(_sort_entities_front_to_back)
-
-		for index in range(1, lane_entities.size()):
-			var front_entity = lane_entities[index - 1]
-			var rear_entity = lane_entities[index]
-			var rear_desired_speed: float = rear_entity["desired_world_speed"]
-			var front_speed: float = front_entity["world_speed"]
-			var closing_speed := rear_desired_speed - front_speed
-			if closing_speed <= 0.0:
-				continue
-
-			var front_rect := _collision_rect(front_entity["sprite"], VEHICLE_HITBOX_INSET)
-			var rear_rect := _collision_rect(rear_entity["sprite"], VEHICLE_HITBOX_INSET)
-			var gap := front_rect.position.x - (rear_rect.position.x + rear_rect.size.x)
-			var predicted_closing_distance := closing_speed * npc_collision_lookahead
-
-			if gap <= npc_follow_gap or gap <= predicted_closing_distance:
-				rear_entity["world_speed"] = front_speed
-
-
-func _sort_entities_front_to_back(a: Dictionary, b: Dictionary) -> bool:
-	return a["sprite"].position.x > b["sprite"].position.x
+	VehicleBehaviors.update_npc_following(
+		active_entities,
+		npc_follow_gap,
+		npc_collision_lookahead,
+		VEHICLE_HITBOX_INSET,
+		Callable(self, "_collision_rect")
+	)
 
 
 func _update_entities(delta: float) -> void:
@@ -1897,10 +1910,13 @@ func _update_entities(delta: float) -> void:
 		var world_speed: float = entity["world_speed"]
 		var screen_velocity := 0.0
 
-		if lane_index == 0:
-			screen_velocity = -(player_speed + world_speed)
-		else:
-			screen_velocity = world_speed - player_speed
+		screen_velocity = VehicleBehaviors.screen_velocity_for_spawn_side(
+			lane_index,
+			str(entity.get("kind", "traffic")),
+			str(entity.get("spawn_side", "")),
+			world_speed,
+			player_speed
+		)
 
 		sprite.position.x += screen_velocity * delta
 		_update_entity_lane_position(entity, delta)
@@ -1924,6 +1940,18 @@ func _update_entity_lane_position(entity: Dictionary, delta: float) -> void:
 	)
 	var lerp_speed := speeder_lane_change_lerp_speed if entity.get("kind", "traffic") == "speeder" else npc_lane_change_lerp_speed
 	sprite.position.y = lerpf(sprite.position.y, target_y, minf(1.0, delta * lerp_speed))
+	sprite.scale = sprite.scale.lerp(_target_scale_for_entity(entity, target_lane), minf(1.0, delta * lerp_speed))
+
+
+func _target_scale_for_entity(entity: Dictionary, lane_index: int) -> Vector2:
+	var sprite: Sprite2D = entity["sprite"]
+	var vehicle_key := str(entity.get("vehicle_key", ""))
+	var fallback_height := float(entity.get("fallback_height", 92.0))
+	return _scale_for_vehicle_in_lane(
+		vehicle_key,
+		_scale_for_height(sprite.texture, fallback_height),
+		lane_index
+	)
 
 
 func _update_player(delta: float, move_forward := false) -> void:
@@ -1937,65 +1965,38 @@ func _update_player(delta: float, move_forward := false) -> void:
 	_apply_vehicle_headlight(player, PLAYER_HITBOX_INSET)
 
 	var target_y := _sprite_y_for_hitbox_bottom(player, _lane_y(player_lane, get_viewport_rect().size), PLAYER_HITBOX_INSET)
-	var wiggle_amount := _player_wiggle_amount()
-	if move_forward:
-		player.position.x += stage_clear_player_exit_speed * delta
-	else:
-		player.position.x = player_x + sin(Time.get_ticks_msec() * player_wiggle_x_frequency) * player_wiggle_x_pixels * wiggle_amount
-	player.position.y = lerpf(player.position.y, target_y, minf(1.0, delta * player_lane_lerp_speed * player_lane_lerp_x))
-	player.rotation = sin(Time.get_ticks_msec() * player_wiggle_rotation_frequency) * player_wiggle_rotation_radians * wiggle_amount
-
-
-func _player_wiggle_amount() -> float:
-	if game_state != "playing" and not player_is_stage_clear_exiting:
-		return 0.0
-	var stop_speed := maxf(0.001, player_wiggle_stop_speed)
-	var wiggle_speed := stage_clear_player_exit_speed if player_is_stage_clear_exiting else player_speed
-	return clampf(wiggle_speed / stop_speed, 0.0, 1.0) * player_wiggle_intensity_x
+	var wiggle_amount := PlayerVehicleBehavior.wiggle_amount(
+		game_state,
+		player_is_stage_clear_exiting,
+		player_wiggle_stop_speed,
+		stage_clear_player_exit_speed,
+		player_speed,
+		player_wiggle_intensity_x
+	)
+	PlayerVehicleBehavior.apply_motion(
+		player,
+		delta,
+		move_forward,
+		player_x,
+		target_y,
+		stage_clear_player_exit_speed,
+		player_lane_lerp_speed,
+		player_lane_lerp_x,
+		player_wiggle_x_frequency,
+		player_wiggle_x_pixels,
+		player_wiggle_rotation_frequency,
+		player_wiggle_rotation_radians,
+		wiggle_amount
+	)
 
 
 func _distance_scale() -> float:
 	return BASE_DISTANCE_SCALE * player_distance_gain_x
 
 
-func _layout_parallax_layers(size: Vector2) -> void:
-	for layer in parallax_layers:
-		var texture := layer["texture"] as Texture2D
-		if texture == null:
-			continue
-		var layer_scale := _background_cover_scale(texture, size)
-		layer["width"] = texture.get_width() * layer_scale
-		var layer_y := _background_y(texture, layer_scale, size)
-		var sprites: Array = layer.get("sprites", [])
-		for sprite_variant in sprites:
-			var sprite := sprite_variant as Sprite2D
-			if sprite == null:
-				continue
-			sprite.scale = Vector2(layer_scale, layer_scale)
-			sprite.position.y = layer_y
-
-
-func _background_cover_scale(texture: Texture2D, size: Vector2) -> float:
-	return maxf(size.x / texture.get_width(), size.y / texture.get_height())
-
-
-func _background_y(texture: Texture2D, bg_scale: float, size: Vector2) -> float:
-	return (size.y - texture.get_height() * bg_scale) * 0.5
-
-
 func _update_background() -> void:
-	for layer in parallax_layers:
-		var layer_width := float(layer.get("width", 1280.0))
-		if layer_width <= 0.0:
-			continue
-		var layer_speed := float(layer.get("speed", 1.0))
-		var bg_x := -fmod(distance * 16.0 * layer_speed, layer_width)
-		var sprites: Array = layer.get("sprites", [])
-		for index in range(sprites.size()):
-			var sprite := sprites[index] as Sprite2D
-			if sprite == null:
-				continue
-			sprite.position.x = bg_x + layer_width * index
+	if background_scroller:
+		background_scroller.update(distance)
 
 
 func _update_ui() -> void:
@@ -2061,6 +2062,8 @@ func _is_safe_low_speed_parked_contact(entity: Dictionary) -> bool:
 func _end_game(title: String, detail: String) -> void:
 	if game_state != "playing":
 		return
+	if title == "CRASH":
+		_play_crash_sfx()
 	if title == "CRASH" or title == "TIME OUT":
 		PlayerState.record_stage_failure()
 	if (title == "CRASH" or title == "TIME OUT") and PlayerState.energy <= 0:
@@ -2076,6 +2079,10 @@ func _end_game(title: String, detail: String) -> void:
 		player_is_stage_clear_exiting = true
 		_store_stage_result()
 		_remove_vehicles_behind_player()
+
+
+func _play_crash_sfx() -> void:
+	audio_manager.play_crash_sfx()
 
 
 func _try_retry_stage() -> void:
@@ -2163,66 +2170,34 @@ func _update_stage_clear_transition(delta: float) -> void:
 
 
 func _go_to_profit_screen() -> void:
-	var stage_story_trigger := PlayerState.find_story_trigger_for_phase(
-		PlayerState.STORY_TRIGGER_STAGE_COMPLETE,
-		PlayerState.get_current_day(),
-		{
-			"stage_type": stage_type,
-			"difficulty": stage_difficulty,
-			"time_of_day": stage_time_of_day,
-			"traffic": stage_traffic,
-			"character_id": PlayerState.get_current_mock_character_id(),
-		}
-	)
-	if not stage_story_trigger.is_empty():
-		var story_payload := PlayerState.get_story_payload_for_trigger(stage_story_trigger)
-		if not story_payload.is_empty():
-			story_payload["return_scene"] = STAGE_RESULTS_SCENE
-			story_payload["next_scene"] = STAGE_RESULTS_SCENE
-			PlayerState.set_pending_story(story_payload)
-			PlayerState.consume_story_trigger(stage_story_trigger)
-			get_tree().change_scene_to_file(STORY_SCENE)
-			return
+	var story_payload := GameEconomyManager.stage_complete_story_payload(stage_type, stage_difficulty, stage_time_of_day, stage_traffic)
+	if not story_payload.is_empty():
+		get_tree().change_scene_to_file(STORY_SCENE)
+		return
 
 	get_tree().change_scene_to_file(STAGE_RESULTS_SCENE)
 
 
 func _store_stage_result() -> void:
-	var completed_distance: int = floori(minf(distance, target_distance))
-	var base_fare: int = roundi(completed_distance * fare_php_per_meter)
-	var fare_penalty: int = roundi(overtime_seconds * overtime_fare_penalty_php_per_second)
-	var raw_fare: int = maxi(0, base_fare - fare_penalty)
-	var raw_bonus: int = roundi(maxf(0.0, time_left) * time_bonus_php_per_second)
-	var earnings_adjustment: Dictionary = PlayerState.apply_stage_earnings_modifiers(raw_fare, raw_bonus, stage_time_of_day, stage_traffic)
-	var fare: int = int(earnings_adjustment.get("fare", raw_fare))
-	var bonus: int = int(earnings_adjustment.get("bonus", raw_bonus))
-	var total: int = fare + bonus
-
-	PlayerState.set_last_stage_result({
-		"day": PlayerState.get_current_day(),
-		"stage_type": stage_type,
-		"difficulty": stage_difficulty,
-		"time_of_day": stage_time_of_day,
-		"traffic": stage_traffic,
-		"distance": completed_distance,
-		"base_fare": base_fare,
-		"fare_penalty": fare_penalty,
-		"raw_fare": raw_fare,
-		"raw_bonus": raw_bonus,
-		"fare": fare,
-		"bonus": bonus,
-		"total": total,
-		"earnings_multiplier": float(earnings_adjustment.get("multiplier", 1.0)),
-		"time_left": time_left,
-		"overtime": overtime_seconds,
-	})
-	PlayerState.record_stage_completion()
+	GameEconomyManager.store_stage_result(
+		stage_type,
+		stage_difficulty,
+		stage_time_of_day,
+		stage_traffic,
+		distance,
+		target_distance,
+		fare_php_per_meter,
+		overtime_seconds,
+		overtime_fare_penalty_php_per_second,
+		time_left,
+		time_bonus_php_per_second
+	)
 
 
 func _change_lane(direction: int) -> void:
 	if game_state != "playing":
 		return
-	player_lane = clampi(player_lane + direction, 0, 2)
+	player_lane = PlayerVehicleBehavior.changed_lane(player_lane, direction)
 	player.z_index = _z_for_lane(player_lane, 1)
 
 
