@@ -391,7 +391,11 @@ var end_message := ""
 var player_is_stage_clear_exiting := false
 var bottom_bar: ColorRect
 var speedometer: Control
+var time_label: Label
 var help_label: Label
+var distance_progress_bg: ColorRect
+var distance_progress_fill: ColorRect
+var distance_label: Label
 var footer_stats_row: HBoxContainer
 var footer_money_label: Label
 var footer_energy_label: Label
@@ -748,9 +752,14 @@ func _create_ui() -> void:
 	add_child(ui)
 
 	speedometer = SPEEDOMETER_GAUGE.new()
-	speedometer.position = Vector2(12.0, 12.0)
-	speedometer.size = Vector2(310.0, 190.0)
+	speedometer.position = Vector2(932.0, 470.0)
+	speedometer.size = Vector2(340.0, 200.0)
 	ui.add_child(speedometer)
+
+	time_label = _make_label(16, Color(0.78, 0.92, 0.94, 1.0), 4)
+	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ui.add_child(time_label)
 
 	bottom_bar = ColorRect.new()
 	bottom_bar.color = Color(0.06, 0.07, 0.08, 0.90)
@@ -758,6 +767,19 @@ func _create_ui() -> void:
 
 	help_label = _make_label(13, Color(0.95, 0.96, 0.88, 1.0), 4)
 	ui.add_child(help_label)
+
+	distance_progress_bg = ColorRect.new()
+	distance_progress_bg.color = Color(0.12, 0.14, 0.16, 0.92)
+	ui.add_child(distance_progress_bg)
+
+	distance_progress_fill = ColorRect.new()
+	distance_progress_fill.color = Color(0.32, 0.92, 0.66, 1.0)
+	ui.add_child(distance_progress_fill)
+
+	distance_label = _make_label(14, Color(0.60, 0.95, 0.80, 1.0), 4)
+	distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	distance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	ui.add_child(distance_label)
 
 	footer_stats_row = HBoxContainer.new()
 	footer_stats_row.alignment = BoxContainer.ALIGNMENT_END
@@ -1196,8 +1218,8 @@ func _layout_scene() -> void:
 	player.position = Vector2(player_x, _sprite_y_for_hitbox_bottom(player, _lane_y(player_lane, size), PLAYER_HITBOX_INSET))
 
 	if speedometer:
-		speedometer.position = Vector2(12.0, 12.0)
-		speedometer.size = Vector2(310.0, 190.0)
+		speedometer.position = Vector2(size.x - 340.0 - 4.0, size.y - 272.0)
+		speedometer.size = Vector2(340.0, 200.0)
 
 	if bottom_bar:
 		bottom_bar.position = Vector2(0.0, size.y - 58.0)
@@ -1206,32 +1228,48 @@ func _layout_scene() -> void:
 	if help_label:
 		help_label.text = "UP/DOWN switch lane    LEFT/RIGHT adjust speed    SPACE/R action"
 		help_label.position = Vector2(28.0, size.y - 45.0)
-		help_label.size = Vector2(size.x * 0.56, 34.0)
+		help_label.size = Vector2(size.x * 0.34, 34.0)
+
+	if time_label:
+		time_label.position = Vector2(size.x * 0.5 - 120.0, 18.0)
+		time_label.size = Vector2(240.0, 32.0)
+
+	if distance_progress_bg:
+		distance_progress_bg.position = Vector2(size.x * 0.5 - 160.0, size.y - 86.0)
+		distance_progress_bg.size = Vector2(320.0, 10.0)
+
+	if distance_progress_fill:
+		distance_progress_fill.position = Vector2(size.x * 0.5 - 160.0, size.y - 86.0)
+		distance_progress_fill.size = Vector2.ZERO
+
+	if distance_label:
+		distance_label.position = Vector2(size.x * 0.5 - 180.0, size.y - 70.0)
+		distance_label.size = Vector2(360.0, 30.0)
 
 	if footer_stats_row:
-		footer_stats_row.position = Vector2(size.x * 0.40, size.y - 50.0)
-		footer_stats_row.size = Vector2(size.x * 0.56 - 24.0, 40.0)
+		footer_stats_row.position = Vector2(size.x * 0.64, size.y - 50.0)
+		footer_stats_row.size = Vector2(size.x * 0.34 - 24.0, 40.0)
 
 	if status_label:
 		status_label.position = Vector2(0.0, size.y * 0.37)
 		status_label.size = Vector2(size.x, 120.0)
 
 	if top_right_info_panel:
-		top_right_info_panel.position = Vector2(size.x - 414.0, 10.0)
-		top_right_info_panel.size = Vector2(396.0, 164.0)
+		top_right_info_panel.position = Vector2(18.0, 10.0)
+		top_right_info_panel.size = Vector2(312.0, 128.0)
 
 		if stage_label:
 			stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
-			stage_label.position = Vector2(size.x - 382.0, 34.0)
-			stage_label.size = Vector2(332.0, 60.0)
+			stage_label.position = Vector2(40.0, 26.0)
+			stage_label.size = Vector2(268.0, 42.0)
 
 		if weekly_goal_label:
-			weekly_goal_label.position = Vector2(size.x - 382.0, 100.0)
-			weekly_goal_label.size = Vector2(332.0, 32.0)
+			weekly_goal_label.position = Vector2(40.0, 70.0)
+			weekly_goal_label.size = Vector2(268.0, 22.0)
 
 		if debt_goal_label:
-			debt_goal_label.position = Vector2(size.x - 382.0, 132.0)
-			debt_goal_label.size = Vector2(332.0, 32.0)
+			debt_goal_label.position = Vector2(40.0, 92.0)
+			debt_goal_label.size = Vector2(268.0, 24.0)
 
 	if speeder_warning_label:
 		speeder_warning_label.position = Vector2(player_x + 105.0, _lane_y(1, size) - 92.0)
@@ -1931,6 +1969,14 @@ func _update_ui() -> void:
 		footer_energy_label.text = "%d/%d" % [PlayerState.energy, PlayerState.max_energy]
 	if footer_gas_label:
 		footer_gas_label.text = "%d/%d" % [PlayerState.gas, PlayerState.max_gas]
+	if time_label:
+		time_label.text = "TIME  %04.1f SEC" % time_left
+	if distance_progress_fill and distance_progress_bg:
+		var distance_ratio := clampf(distance / maxf(1.0, target_distance), 0.0, 1.0)
+		distance_progress_fill.position = distance_progress_bg.position
+		distance_progress_fill.size = Vector2(distance_progress_bg.size.x * distance_ratio, distance_progress_bg.size.y)
+	if distance_label:
+		distance_label.text = "DISTANCE  %04dM / %04dM" % [floori(distance), floori(target_distance)]
 
 	if stage_label:
 		stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]

@@ -468,6 +468,9 @@ func _build_tutorial() -> void:
 func _start_tutorial() -> void:
 	if tutorial_overlay == null or tutorial_steps.is_empty():
 		return
+	if PlayerState.has_ride_select_tutorial_shown():
+		return
+	PlayerState.mark_ride_select_tutorial_shown()
 	_set_tutorial_active(true)
 	_show_tutorial_step(0)
 

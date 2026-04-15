@@ -3,14 +3,8 @@ extends Control
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const SPEED_COLOR := Color(0.98, 0.86, 0.32, 1.0)
 const LABEL_COLOR := Color(0.95, 0.96, 0.88, 1.0)
-const DISTANCE_LABEL_COLOR := Color(0.72, 0.92, 0.88, 1.0)
-const DISTANCE_VALUE_COLOR := Color(0.60, 0.95, 0.80, 1.0)
-const TIME_LABEL_COLOR := Color(0.78, 0.92, 0.94, 1.0)
-const PANEL_BORDER_COLOR := Color(0.46, 0.38, 0.22, 0.92)
-const PANEL_BG_COLOR := Color(0.04, 0.05, 0.06, 0.94)
-const PANEL_INNER_COLOR := Color(0.10, 0.12, 0.14, 0.94)
-const BAR_BG_COLOR := Color(0.12, 0.14, 0.16, 0.92)
-const BAR_FILL_COLOR := Color(0.32, 0.92, 0.66, 1.0)
+const DIAL_BG_COLOR := Color(0.03, 0.04, 0.05, 0.92)
+const DIAL_BG_RING_COLOR := Color(0.16, 0.18, 0.20, 0.88)
 
 var speed_kmh := 0
 var speed_ratio := 0.0
@@ -20,7 +14,7 @@ var time_left_s := 45.0
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(420.0, 190.0)
+	custom_minimum_size = Vector2(340.0, 200.0)
 
 
 func set_values(new_speed_kmh: int, new_speed_ratio: float, new_distance_m: int, new_target_distance_m: int, new_time_left_s: float) -> void:
@@ -33,36 +27,19 @@ func set_values(new_speed_kmh: int, new_speed_ratio: float, new_distance_m: int,
 
 
 func _draw() -> void:
-	var outer := Rect2(Vector2.ZERO, size)
-	if outer.size.x <= 0.0 or outer.size.y <= 0.0:
+	var bounds := Rect2(Vector2.ZERO, size)
+	if bounds.size.x <= 0.0 or bounds.size.y <= 0.0:
 		return
 
-	draw_rect(outer, PANEL_BG_COLOR, true)
-	draw_rect(outer, PANEL_BORDER_COLOR, false, 2.0)
-
-	var inner := outer.grow(-6.0)
-	draw_rect(inner, PANEL_INNER_COLOR, true)
-
-	var padding := 10.0
-	var gap := 16.0
-	var left_width := inner.size.x * 0.40
-	var left_rect := Rect2(inner.position + Vector2(padding, padding), Vector2(left_width - padding, inner.size.y - padding * 2.0))
-	var right_rect := Rect2(
-		Vector2(inner.position.x + left_width + gap, inner.position.y + padding),
-		Vector2(inner.size.x - left_width - gap - padding, inner.size.y - padding * 2.0)
-	)
-	draw_line(
-		Vector2(right_rect.position.x - gap * 0.5, inner.position.y + 10.0),
-		Vector2(right_rect.position.x - gap * 0.5, inner.position.y + inner.size.y - 10.0),
-		Color(0.0, 0.0, 0.0, 0.45),
-		1.0
-	)
-
-	var center := left_rect.position + Vector2(left_rect.size.x * 0.5, left_rect.size.y * 0.50)
-	var radius := minf(left_rect.size.x, left_rect.size.y) * 0.34
+	var dial_rect := bounds.grow(-6.0)
+	var center := dial_rect.position + Vector2(dial_rect.size.x * 0.5, dial_rect.size.y * 0.54)
+	var radius := minf(dial_rect.size.x, dial_rect.size.y) * 0.40
 	var start_angle := deg_to_rad(210.0)
 	var end_angle := deg_to_rad(510.0)
 
+	draw_circle(center + Vector2(0.0, 8.0), radius + 26.0, Color(0.0, 0.0, 0.0, 0.28))
+	draw_circle(center, radius + 24.0, DIAL_BG_COLOR)
+	draw_arc(center, radius + 24.0, 0.0, TAU, 64, DIAL_BG_RING_COLOR, 3.0)
 	draw_arc(center, radius + 6.0, start_angle, end_angle, 44, Color(0.0, 0.0, 0.0, 0.6), 14.0)
 	_draw_speed_segments(center, radius, start_angle, end_angle)
 	_draw_ticks(center, radius, start_angle, end_angle)
@@ -71,34 +48,9 @@ func _draw() -> void:
 	draw_circle(center, 6.0, Color(0.70, 0.64, 0.48, 1.0))
 	draw_circle(center, 3.0, Color(0.04, 0.05, 0.06, 1.0))
 
-	_draw_text("SPEED", left_rect.position + Vector2(0.0, 4.0), 10, LABEL_COLOR, left_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	var speed_plate_size := Vector2(left_rect.size.x * 0.62, 24.0)
-	var speed_plate_pos := Vector2(
-		center.x - speed_plate_size.x * 0.5,
-		center.y + radius * 0.52
-	)
-	draw_rect(Rect2(speed_plate_pos, speed_plate_size), Color(0.02, 0.03, 0.04, 0.85), true)
-	draw_rect(Rect2(speed_plate_pos, speed_plate_size), Color(0.0, 0.0, 0.0, 0.65), false, 1.0)
-	_draw_text("%03d" % speed_kmh, speed_plate_pos + Vector2(0.0, 2.0), 18, SPEED_COLOR, speed_plate_size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_draw_text("KM/H", left_rect.position + Vector2(0.0, left_rect.size.y - 20.0), 9, LABEL_COLOR, left_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-
-	var distance_label_y := right_rect.position.y + 2.0
-	_draw_text("DISTANCE", Vector2(right_rect.position.x, distance_label_y), 8, DISTANCE_LABEL_COLOR, right_rect.size.x, HORIZONTAL_ALIGNMENT_LEFT)
-
-	var bar_rect := Rect2(right_rect.position + Vector2(0.0, 20.0), Vector2(right_rect.size.x, 14.0))
-	draw_rect(bar_rect, BAR_BG_COLOR, true)
-	draw_rect(bar_rect, Color(0.0, 0.0, 0.0, 0.65), false, 1.0)
-	var distance_ratio := 0.0
-	if target_distance_m > 0:
-		distance_ratio = clampf(float(distance_m) / float(target_distance_m), 0.0, 1.0)
-	var fill_rect := Rect2(bar_rect.position, Vector2(bar_rect.size.x * distance_ratio, bar_rect.size.y))
-	draw_rect(fill_rect, BAR_FILL_COLOR, true)
-
-	_draw_text("%04dM / %04dM" % [distance_m, target_distance_m], right_rect.position + Vector2(0.0, 42.0), 11, DISTANCE_VALUE_COLOR, right_rect.size.x, HORIZONTAL_ALIGNMENT_LEFT)
-
-	var time_label_y := right_rect.position.y + 72.0
-	_draw_text("TIME LEFT", Vector2(right_rect.position.x, time_label_y), 8, TIME_LABEL_COLOR, right_rect.size.x, HORIZONTAL_ALIGNMENT_LEFT)
-	_draw_text("%04.1f" % time_left_s, right_rect.position + Vector2(0.0, time_label_y + 18.0), 17, LABEL_COLOR, right_rect.size.x, HORIZONTAL_ALIGNMENT_LEFT)
+	_draw_text("SPEED", Vector2(dial_rect.position.x, dial_rect.position.y + 6.0), 10, LABEL_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_draw_text("%03d" % speed_kmh, Vector2(dial_rect.position.x, center.y + radius * 0.60), 22, SPEED_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_draw_text("KM/H", Vector2(dial_rect.position.x, dial_rect.position.y + dial_rect.size.y - 18.0), 10, LABEL_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _draw_speed_segments(center: Vector2, radius: float, start_angle: float, end_angle: float) -> void:

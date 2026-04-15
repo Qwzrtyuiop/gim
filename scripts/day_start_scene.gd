@@ -28,7 +28,12 @@ func _ready() -> void:
 		get_tree().change_scene_to_file(GAME_OVER_SCENE)
 		return
 	var current_time := PlayerState.get_current_time_of_day()
-	if PlayerState.get_current_day() <= 1 or (current_time != "morning" and current_time != "noon" and current_time != "night"):
+	var has_pending_trip_selection := not PlayerState.get_pending_trip_selection().is_empty()
+	if current_time != "morning" and current_time != "noon" and current_time != "night":
+		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
+		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
+		return
+	if PlayerState.get_current_day() <= 1 and not has_pending_trip_selection:
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 		return

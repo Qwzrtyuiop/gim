@@ -110,6 +110,7 @@ Five stages in a row, no crashes. John kept the tricycle steady.",
 const SMOKER_YOSI_GOAL := 10
 const SMOKER_MAX_ENERGY_PENALTY := 1
 const SMOKER_DANGER_YOSI_TOTAL := 50
+const TAMAD_REQUIRED_REST_TIMES := ["morning", "noon", "night"]
 const LOW_ENERGY_THRESHOLD := 1
 const LOW_GAS_THRESHOLD := 2
 const LOW_RESOURCE_STREAK_TARGET := 5
@@ -313,6 +314,8 @@ var yosi_bought_day := 1
 var yosi_bought_total := 0
 var rests_taken_today := 0
 var rests_taken_day := 1
+var tamad_rest_times_today: Array[String] = []
+var tamad_rest_day := 1
 var rides_completed_today := 0
 var rides_completed_day := 1
 var non_gas_store_purchases_this_week := 0
@@ -414,6 +417,14 @@ func _load_progress() -> void:
 	yosi_bought_total = int(save_data.get("yosi_bought_total", yosi_bought_total))
 	rests_taken_today = int(save_data.get("rests_taken_today", rests_taken_today))
 	rests_taken_day = int(save_data.get("rests_taken_day", rests_taken_day))
+	tamad_rest_day = int(save_data.get("tamad_rest_day", tamad_rest_day))
+	tamad_rest_times_today.clear()
+	var saved_tamad_rest_times: Array = save_data.get("tamad_rest_times_today", [])
+	for rest_time_variant in saved_tamad_rest_times:
+		var normalized_rest_time := _normalize_tamad_rest_time(str(rest_time_variant))
+		if normalized_rest_time.is_empty() or tamad_rest_times_today.has(normalized_rest_time):
+			continue
+		tamad_rest_times_today.append(normalized_rest_time)
 	rides_completed_today = int(save_data.get("rides_completed_today", rides_completed_today))
 	rides_completed_day = int(save_data.get("rides_completed_day", rides_completed_day))
 	non_gas_store_purchases_this_week = int(save_data.get("non_gas_store_purchases_this_week", non_gas_store_purchases_this_week))
@@ -493,6 +504,8 @@ func save_progress() -> void:
 		"yosi_bought_total": yosi_bought_total,
 		"rests_taken_today": rests_taken_today,
 		"rests_taken_day": rests_taken_day,
+		"tamad_rest_day": tamad_rest_day,
+		"tamad_rest_times_today": tamad_rest_times_today.duplicate(),
 		"rides_completed_today": rides_completed_today,
 		"rides_completed_day": rides_completed_day,
 		"non_gas_store_purchases_this_week": non_gas_store_purchases_this_week,
@@ -581,6 +594,8 @@ func begin_stage_sequence() -> void:
 	yosi_bought_total = 0
 	rests_taken_today = 0
 	rests_taken_day = 1
+	tamad_rest_day = 1
+	tamad_rest_times_today.clear()
 	rides_completed_today = 0
 	rides_completed_day = 1
 	non_gas_store_purchases_this_week = 0
@@ -1464,7 +1479,7 @@ func record_yosi_purchase(amount := 1) -> int:
 	return yosi_bought_total
 
 
-func record_rest(amount := 1) -> int:
+func record_rest(amount := 1, time_of_day := "") -> int:
 	var rest_amount := maxi(0, int(amount))
 	if rest_amount <= 0:
 		return rests_taken_today
@@ -1474,8 +1489,7 @@ func record_rest(amount := 1) -> int:
 
 	rests_taken_day = get_current_day()
 	rests_taken_today += rest_amount
-	if rests_taken_today >= 3:
-		unlock_achievement("tamad")
+	_record_tamad_rest_time(str(time_of_day))
 	save_progress()
 	return rests_taken_today
 
@@ -1580,6 +1594,8 @@ func _reset_daily_consumable_counters(day_number: int) -> void:
 	yosi_bought_today = 0
 	rests_taken_day = max(1, day_number)
 	rests_taken_today = 0
+	tamad_rest_day = max(1, day_number)
+	tamad_rest_times_today.clear()
 	rides_completed_day = max(1, day_number)
 	rides_completed_today = 0
 
@@ -1610,6 +1626,8 @@ func reset() -> void:
 	yosi_bought_total = 0
 	rests_taken_today = 0
 	rests_taken_day = 1
+	tamad_rest_day = 1
+	tamad_rest_times_today.clear()
 	rides_completed_today = 0
 	rides_completed_day = 1
 	non_gas_store_purchases_this_week = 0
@@ -1685,6 +1703,36 @@ func _normalize_seeded_rider_rule(rule_data: Dictionary) -> Dictionary:
 	if normalized_rule.has("traffic"):
 		normalized_rule["traffic"] = _normalize_seeded_traffic(str(normalized_rule.get("traffic", "")))
 	return normalized_rule
+
+
+func _record_tamad_rest_time(time_of_day: String) -> void:
+	var rest_time := _normalize_tamad_rest_time(time_of_day)
+	if rest_time.is_empty():
+		rest_time = _normalize_tamad_rest_time(get_current_time_of_day())
+	if rest_time.is_empty():
+		return
+
+	if tamad_rest_day != get_current_day():
+		tamad_rest_day = get_current_day()
+		tamad_rest_times_today.clear()
+
+	if not tamad_rest_times_today.has(rest_time):
+		tamad_rest_times_today.append(rest_time)
+
+	if _has_all_tamad_rest_times():
+		unlock_achievement("tamad")
+
+
+func _has_all_tamad_rest_times() -> bool:
+	for rest_time in TAMAD_REQUIRED_REST_TIMES:
+		if not tamad_rest_times_today.has(rest_time):
+			return false
+	return true
+
+
+func _normalize_tamad_rest_time(time_of_day: String) -> String:
+	var safe_time := str(time_of_day).strip_edges().to_lower()
+	return safe_time if TAMAD_REQUIRED_REST_TIMES.has(safe_time) else ""
 
 
 func _seeded_rider_rule_matches(rule_data: Dictionary, selection_context: Dictionary) -> bool:
