@@ -3,6 +3,7 @@ extends Node
 const Day02StationBillPayload := preload("res://scripts/story/payloads/day_02_station_bill.gd")
 const Scene03Day7NightPayload := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 
 signal money_changed(amount: int)
 signal energy_changed(amount: int)
@@ -340,6 +341,7 @@ var story_triggers: Array[Dictionary] = []
 var consumed_story_triggers: Dictionary = {}
 var last_seen_story_sections: Dictionary = {}
 var last_seen_story_id := ""
+var event_values: Dictionary = {}
 var resume_scene_path := ""
 var ride_select_tutorial_shown := false
 var _is_loading_save := false
@@ -470,6 +472,7 @@ func _load_progress() -> void:
 	achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
 	last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
+	event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
 	resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", ride_select_tutorial_shown))
 	_is_loading_save = false
@@ -532,6 +535,7 @@ func save_progress() -> void:
 		"achievements": achievements.duplicate(true),
 		"last_seen_story_sections": last_seen_story_sections.duplicate(true),
 		"last_seen_story_id": last_seen_story_id,
+		"event_values": event_values.duplicate(true),
 		"resume_scene_path": resume_scene_path,
 		"ride_select_tutorial_shown": ride_select_tutorial_shown,
 	}
@@ -556,6 +560,42 @@ func get_last_seen_story_section(story_id: String) -> int:
 
 func get_last_seen_story_id() -> String:
 	return last_seen_story_id
+
+
+func set_event_value(event_id: String, value) -> void:
+	if not StoryEventHandler.set_event_value(event_values, event_id, value):
+		return
+	save_progress()
+
+
+func set_event_values(values: Dictionary) -> void:
+	if not StoryEventHandler.set_event_values(event_values, values):
+		return
+	save_progress()
+
+
+func get_event_value(event_id: String, default_value = null):
+	return StoryEventHandler.get_event_value(event_values, event_id, default_value)
+
+
+func has_event_value(event_id: String) -> bool:
+	return StoryEventHandler.has_event_value(event_values, event_id)
+
+
+func clear_event_value(event_id: String) -> void:
+	if not StoryEventHandler.clear_event_value(event_values, event_id):
+		return
+	save_progress()
+
+
+func get_event_values() -> Dictionary:
+	return StoryEventHandler.get_event_values(event_values)
+
+
+func clear_event_values() -> void:
+	if not StoryEventHandler.clear_event_values(event_values):
+		return
+	save_progress()
 
 
 func has_save_data() -> bool:
@@ -1651,6 +1691,7 @@ func reset() -> void:
 	achievements.clear()
 	last_seen_story_sections.clear()
 	last_seen_story_id = ""
+	event_values.clear()
 	resume_scene_path = ""
 	ride_select_tutorial_shown = false
 	_reset_story_triggers()
@@ -1862,8 +1903,9 @@ func _reset_story_triggers() -> void:
 	story_triggers.append({
 		"id": "day_2_station_bill",
 		"phase": STORY_TRIGGER_STAGE_COMPLETE,
-		"day": 2,
-		"time_of_day": "morning",
+		"min_day": 2,
+		"times": ["morning", "noon"],
+		"forbidden_events": ["day_2_station_bill"],
 		"payload": Day02StationBillPayload.build(),
 	})
 	story_triggers.append({
@@ -1938,6 +1980,14 @@ func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_number:
 		return false
 	if not _trigger_matches_context_array(trigger_data.get("character_ids", []), context.get("character_id", null)):
 		return false
+	if not _trigger_matches_required_events(trigger_data.get("required_events", [])):
+		return false
+	if not _trigger_matches_forbidden_events(trigger_data.get("forbidden_events", [])):
+		return false
+	if not _trigger_matches_event_values(trigger_data.get("required_event_values", {}), true):
+		return false
+	if not _trigger_matches_event_values(trigger_data.get("forbidden_event_values", {}), false):
+		return false
 
 	return true
 
@@ -1962,6 +2012,18 @@ func _trigger_matches_context_array(expected_values, actual_value) -> bool:
 		if str(value).strip_edges() == actual_text:
 			return true
 	return false
+
+
+func _trigger_matches_required_events(required_events) -> bool:
+	return StoryEventHandler.matches_required_events(event_values, required_events)
+
+
+func _trigger_matches_forbidden_events(forbidden_events) -> bool:
+	return StoryEventHandler.matches_forbidden_events(event_values, forbidden_events)
+
+
+func _trigger_matches_event_values(expected_values, should_match: bool) -> bool:
+	return StoryEventHandler.matches_event_values(event_values, expected_values, should_match)
 
 
 func _story_trigger_id(trigger_data: Dictionary) -> String:

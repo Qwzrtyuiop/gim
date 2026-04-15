@@ -162,6 +162,11 @@ static func build() -> Dictionary:
 				"pause_after": 1.4,
 				"actions": [
 					{
+						"type": "set_event_value",
+						"id": "day_2_station_bill",
+						"value": 2,
+					},
+					{
 						"type": "add_karma",
 						"amount": -1,
 					},
@@ -191,6 +196,11 @@ static func build() -> Dictionary:
 				"text": "Karma went up.",
 				"pause_after": 1.4,
 				"actions": [
+					{
+						"type": "set_event_value",
+						"id": "day_2_station_bill",
+						"value": 1,
+					},
 					{
 						"type": "add_karma",
 						"amount": 1,

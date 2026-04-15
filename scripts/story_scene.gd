@@ -3,6 +3,7 @@ extends Control
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -279,6 +280,16 @@ func _render_choices(line: Dictionary) -> void:
 
 
 func _run_choice_actions(choice_data: Dictionary) -> void:
+	if choice_data.has("event_values"):
+		PlayerState.set_event_values(choice_data.get("event_values", {}))
+	elif choice_data.has("event_id") or choice_data.has("event_value") or choice_data.has("key"):
+		PlayerState.set_event_values(
+			StoryEventHandler.build_single_event_values(
+				str(choice_data.get("event_id", choice_data.get("key", ""))),
+				choice_data.get("event_value", choice_data.get("value", 1))
+			)
+		)
+
 	var raw_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
 	for action_data_variant in raw_actions:
 		if action_data_variant is Dictionary:
@@ -627,6 +638,14 @@ func _run_story_action(action_data: Dictionary) -> void:
 			await _stop_music_action(action_data)
 		"unlock_achievement", "achievement_unlock":
 			PlayerState.unlock_achievement(str(action_data.get("id", action_data.get("achievement_id", ""))))
+		"set_event_value", "story_event", "event_value":
+			_apply_set_event_value_action(action_data)
+		"set_event_values", "story_events", "event_values":
+			_apply_set_event_values_action(action_data)
+		"clear_event_value", "erase_event_value":
+			PlayerState.clear_event_value(str(action_data.get("id", action_data.get("event_id", action_data.get("key", "")))))
+		"clear_event_values", "erase_event_values":
+			PlayerState.clear_event_values()
 		"add_money", "gain_money":
 			PlayerState.add_money(int(action_data.get("amount", 0)))
 		"add_karma", "change_karma":
@@ -738,6 +757,25 @@ func _apply_character_progress_action(action_data: Dictionary) -> void:
 	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
 	var amount := int(action_data.get("amount", action_data.get("value", 1)))
 	PlayerState.increment_unique_character_progress(character_id, amount)
+
+
+func _apply_set_event_value_action(action_data: Dictionary) -> void:
+	var event_id := str(action_data.get("id", action_data.get("event_id", action_data.get("key", ""))))
+	if event_id.is_empty():
+		return
+	PlayerState.set_event_values(
+		StoryEventHandler.build_single_event_values(
+			event_id,
+			action_data.get("value", action_data.get("amount", 1))
+		)
+	)
+
+
+func _apply_set_event_values_action(action_data: Dictionary) -> void:
+	var values := action_data.get("values", action_data.get("events", {}))
+	if not values is Dictionary:
+		return
+	PlayerState.set_event_values((values as Dictionary).duplicate(true))
 
 
 func _configure_audio_stream_loop(stream: AudioStream, loop_enabled: bool) -> AudioStream:
