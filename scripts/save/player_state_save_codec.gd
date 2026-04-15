@@ -1,0 +1,153 @@
+extends RefCounted
+class_name PlayerStateSaveCodec
+
+const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
+
+
+static func load_from_path(player_state, save_path: String) -> bool:
+	if not FileAccess.file_exists(save_path):
+		return false
+
+	var loaded_resource := ResourceLoader.load(save_path)
+	if not loaded_resource is GameSaveResource:
+		return false
+
+	var save_resource := loaded_resource as GameSaveResource
+	var save_data: Dictionary = save_resource.data.duplicate(true)
+	if save_data.is_empty():
+		return false
+
+	player_state._is_loading_save = true
+	player_state.money = int(save_data.get("money", player_state.money))
+	player_state.max_energy = int(save_data.get("max_energy", player_state.max_energy))
+	player_state.energy = int(save_data.get("energy", player_state.energy))
+	player_state.max_gas = int(save_data.get("max_gas", player_state.max_gas))
+	player_state.gas = int(save_data.get("gas", player_state.gas))
+	player_state.gas_price = int(save_data.get("gas_price", player_state.gas_price))
+	player_state.karma = int(save_data.get("karma", player_state.karma))
+	player_state.current_stage_type = str(save_data.get("current_stage_type", player_state.current_stage_type))
+	player_state.current_day = int(save_data.get("current_day", player_state.current_day))
+	player_state.stage_round = int(save_data.get("stage_round", player_state.stage_round))
+	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
+	player_state.pending_trip_selection = Dictionary(save_data.get("pending_trip_selection", {})).duplicate(true)
+	player_state.pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
+	player_state.pending_sleep_transition_state = Dictionary(save_data.get("pending_sleep_transition_state", {})).duplicate(true)
+	player_state.pending_gameplay_entry_fade_duration = float(save_data.get("pending_gameplay_entry_fade_duration", player_state.pending_gameplay_entry_fade_duration))
+	player_state.current_mock_character_id = str(save_data.get("current_mock_character_id", player_state.current_mock_character_id))
+	player_state.seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
+	player_state.unique_character_progress = Dictionary(save_data.get("unique_character_progress", {})).duplicate(true)
+	player_state.seeded_rider_rules.clear()
+	var saved_seeded_rider_rules: Array = save_data.get("seeded_rider_rules", [])
+	for rule_data in saved_seeded_rider_rules:
+		if rule_data is Dictionary:
+			player_state.seeded_rider_rules.append((rule_data as Dictionary).duplicate(true))
+	player_state.consumed_seeded_rider_rules = Dictionary(save_data.get("consumed_seeded_rider_rules", {})).duplicate(true)
+	player_state.last_rest_day = int(save_data.get("last_rest_day", player_state.last_rest_day))
+	player_state.yosi_bought_today = int(save_data.get("yosi_bought_today", player_state.yosi_bought_today))
+	player_state.yosi_bought_day = int(save_data.get("yosi_bought_day", player_state.yosi_bought_day))
+	player_state.yosi_bought_total = int(save_data.get("yosi_bought_total", player_state.yosi_bought_total))
+	player_state.rests_taken_today = int(save_data.get("rests_taken_today", player_state.rests_taken_today))
+	player_state.rests_taken_day = int(save_data.get("rests_taken_day", player_state.rests_taken_day))
+	player_state.tamad_rest_day = int(save_data.get("tamad_rest_day", player_state.tamad_rest_day))
+	player_state.tamad_rest_times_today.clear()
+	var saved_tamad_rest_times: Array = save_data.get("tamad_rest_times_today", [])
+	for rest_time_variant in saved_tamad_rest_times:
+		var normalized_rest_time: String = player_state._normalize_tamad_rest_time(str(rest_time_variant))
+		if normalized_rest_time.is_empty() or player_state.tamad_rest_times_today.has(normalized_rest_time):
+			continue
+		player_state.tamad_rest_times_today.append(normalized_rest_time)
+	player_state.rides_completed_today = int(save_data.get("rides_completed_today", player_state.rides_completed_today))
+	player_state.rides_completed_day = int(save_data.get("rides_completed_day", player_state.rides_completed_day))
+	player_state.non_gas_store_purchases_this_week = int(save_data.get("non_gas_store_purchases_this_week", player_state.non_gas_store_purchases_this_week))
+	player_state.clean_stage_streak = int(save_data.get("clean_stage_streak", player_state.clean_stage_streak))
+	player_state.current_trip_low_energy = bool(save_data.get("current_trip_low_energy", player_state.current_trip_low_energy))
+	player_state.current_trip_low_gas = bool(save_data.get("current_trip_low_gas", player_state.current_trip_low_gas))
+	player_state.low_resource_trip_count = int(save_data.get("low_resource_trip_count", player_state.low_resource_trip_count))
+	player_state.low_both_resource_trip_count = int(save_data.get("low_both_resource_trip_count", player_state.low_both_resource_trip_count))
+	player_state.debt_goal_index = int(save_data.get("debt_goal_index", player_state.debt_goal_index))
+	player_state.last_debt_collection_day = int(save_data.get("last_debt_collection_day", player_state.last_debt_collection_day))
+	player_state.remaining_debt = int(save_data.get("remaining_debt", player_state.remaining_debt))
+	player_state.run_failed = bool(save_data.get("run_failed", player_state.run_failed))
+	player_state.run_fail_reason = str(save_data.get("run_fail_reason", player_state.run_fail_reason))
+	player_state.last_stage_result = Dictionary(save_data.get("last_stage_result", {})).duplicate(true)
+	player_state.story_triggers.clear()
+	var saved_story_triggers: Array = save_data.get("story_triggers", [])
+	for trigger_data in saved_story_triggers:
+		if trigger_data is Dictionary:
+			player_state.story_triggers.append((trigger_data as Dictionary).duplicate(true))
+	var needs_story_trigger_save := StoryTriggerService.ensure_required_story_triggers(player_state.story_triggers)
+	player_state.consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
+	player_state.upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
+	player_state.achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
+	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
+	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
+	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
+	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
+	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
+	player_state._is_loading_save = false
+	if needs_story_trigger_save:
+		player_state.save_progress()
+	return true
+
+
+static func save_to_path(player_state, save_path: String, save_version: int) -> void:
+	if player_state._is_loading_save:
+		return
+
+	var save_resource := GameSaveResource.new()
+	save_resource.version = save_version
+	save_resource.data = {
+		"money": player_state.money,
+		"max_energy": player_state.max_energy,
+		"energy": player_state.energy,
+		"max_gas": player_state.max_gas,
+		"gas": player_state.gas,
+		"gas_price": player_state.gas_price,
+		"karma": player_state.karma,
+		"current_stage_type": player_state.current_stage_type,
+		"current_day": player_state.current_day,
+		"stage_round": player_state.stage_round,
+		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,
+		"pending_trip_selection": player_state.pending_trip_selection.duplicate(true),
+		"pending_story": player_state.pending_story.duplicate(true),
+		"pending_sleep_transition_state": player_state.pending_sleep_transition_state.duplicate(true),
+		"pending_gameplay_entry_fade_duration": player_state.pending_gameplay_entry_fade_duration,
+		"current_mock_character_id": player_state.current_mock_character_id,
+		"seen_mock_characters": player_state.seen_mock_characters.duplicate(true),
+		"unique_character_progress": player_state.unique_character_progress.duplicate(true),
+		"seeded_rider_rules": player_state.seeded_rider_rules.duplicate(true),
+		"consumed_seeded_rider_rules": player_state.consumed_seeded_rider_rules.duplicate(true),
+		"last_rest_day": player_state.last_rest_day,
+		"yosi_bought_today": player_state.yosi_bought_today,
+		"yosi_bought_day": player_state.yosi_bought_day,
+		"yosi_bought_total": player_state.yosi_bought_total,
+		"rests_taken_today": player_state.rests_taken_today,
+		"rests_taken_day": player_state.rests_taken_day,
+		"tamad_rest_day": player_state.tamad_rest_day,
+		"tamad_rest_times_today": player_state.tamad_rest_times_today.duplicate(),
+		"rides_completed_today": player_state.rides_completed_today,
+		"rides_completed_day": player_state.rides_completed_day,
+		"non_gas_store_purchases_this_week": player_state.non_gas_store_purchases_this_week,
+		"clean_stage_streak": player_state.clean_stage_streak,
+		"current_trip_low_energy": player_state.current_trip_low_energy,
+		"current_trip_low_gas": player_state.current_trip_low_gas,
+		"low_resource_trip_count": player_state.low_resource_trip_count,
+		"low_both_resource_trip_count": player_state.low_both_resource_trip_count,
+		"debt_goal_index": player_state.debt_goal_index,
+		"last_debt_collection_day": player_state.last_debt_collection_day,
+		"remaining_debt": player_state.remaining_debt,
+		"run_failed": player_state.run_failed,
+		"run_fail_reason": player_state.run_fail_reason,
+		"last_stage_result": player_state.last_stage_result.duplicate(true),
+		"story_triggers": player_state.story_triggers.duplicate(true),
+		"consumed_story_triggers": player_state.consumed_story_triggers.duplicate(true),
+		"upgrades": player_state.upgrades.duplicate(true),
+		"achievements": player_state.achievements.duplicate(true),
+		"last_seen_story_sections": player_state.last_seen_story_sections.duplicate(true),
+		"last_seen_story_id": player_state.last_seen_story_id,
+		"event_values": player_state.event_values.duplicate(true),
+		"resume_scene_path": player_state.resume_scene_path,
+		"ride_select_tutorial_shown": player_state.ride_select_tutorial_shown,
+	}
+	ResourceSaver.save(save_resource, save_path)

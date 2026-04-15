@@ -1,9 +1,10 @@
 extends Node
 
-const Day02StationBillPayload := preload("res://scripts/story/payloads/day_02_station_bill.gd")
-const Scene03Day7NightPayload := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
-const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const AchievementService := preload("res://scripts/achievement_service.gd")
+const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
+const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 
 signal money_changed(amount: int)
 signal energy_changed(amount: int)
@@ -44,83 +45,6 @@ const STAGE_DISTANCE_RANGES := {
 	"medium": Vector2(1200.0, 1800.0),
 	"long": Vector2(1800.0, 2800.0),
 }
-const ACHIEVEMENT_ORDER := [
-	"mapagsamantala",
-	"tapat",
-	"maninigarilyo",
-	"tamad",
-	"matipid",
-	"masipag",
-	"maparaan",
-	"matiyaga",
-	"maingat",
-]
-const ACHIEVEMENT_DEFINITIONS := {
-	"mapagsamantala": {
-		"title": "Mapagsamantala",
-		"subtitle": "Opportunistic",
-		"description": "Taking advantage when the opportunity presents itself\nespecially when it costs someone else more than it costs you.\n\nJohn saw the opening and took it.\nWhether it was right or not didnâ€™t matter, he needed the money more than them.",
-	},
-	"tapat": {
-		"title": "Tapat",
-		"subtitle": "Honesty",
-		"description": "Tapat is the Filipino virtue of staying honest even when hardship makes the wrong choice feel easier.\n\nJohn gave the money back, even when he badly needed it himself.",
-	},
-	"maninigarilyo": {
-		"title": "Maninigarilyo",
-		"subtitle": "Smoker",
-		"description": "In the Philippines, approximately 18.5% to 19.5% of Filipino adults are current tobacco users.\n\nToday John became one.",
-	},
-	"tamad": {
-		"title": "Tamad",
-		"subtitle": "Lazy",
-		"description": "In Filipino culture, pagiging tamad is often criticized because it burdens the family and community.
-
-John chose to rest when the road still called.",
-	},
-	"matipid": {
-		"title": "Matipid",
-		"subtitle": "Frugal",
-		"description": "Pagiging matipid is a valued Filipino virtue, stretching limited resources to keep the household afloat.
-
-John reached the first collection day without spending on anything except gas.",
-	},
-	"masipag": {
-		"title": "Masipag",
-		"subtitle": "Diligent",
-		"description": "Masipag is the admired Filipino work ethic of showing up and pushing through hardship for the family.
-
-John stayed on the road and finished three long rides in a single day.",
-	},
-	"maparaan": {
-		"title": "Maparaan",
-		"subtitle": "Resourceful",
-		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.
-
-John completed five rides while down to one energy or less and two gas or less.",
-	},
-	"matiyaga": {
-		"title": "Matiyaga",
-		"subtitle": "Persevering",
-		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.
-
-John completed five rides while running low on either energy (1 or less) or gas (2 or less).",
-	},
-	"maingat": {
-		"title": "Maingat",
-		"subtitle": "Careful",
-		"description": "Being maingat means acting with care for safety, a practical virtue on Filipino roads.
-
-Five stages in a row, no crashes. John kept the tricycle steady.",
-	},
-}
-const SMOKER_YOSI_GOAL := 10
-const SMOKER_MAX_ENERGY_PENALTY := 1
-const SMOKER_DANGER_YOSI_TOTAL := 50
-const TAMAD_REQUIRED_REST_TIMES := ["morning", "noon", "night"]
-const LOW_ENERGY_THRESHOLD := 1
-const LOW_GAS_THRESHOLD := 2
-const LOW_RESOURCE_STREAK_TARGET := 5
 const SAVE_PATH := "user://progress_save.tres"
 const SAVE_VERSION := 1
 const REST_ENERGY_BONUSES := {
@@ -161,144 +85,6 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 	"busy": 1.24,
 	"speeders": 1.34,
 }
-const GENERIC_PASSENGERS := [
-	{
-		"id": "generic_guy",
-		"name": "Guy",
-		"blurb": "Just another rider heading somewhere.",
-		"is_generic": true,
-		"first_distance": "short",
-		"first_appearance_chance": 1.0,
-		"eligible_distances": ["short", "medium", "long"],
-	},
-	{
-		"id": "generic_vendor",
-		"name": "Vendor",
-		"blurb": "A market seller with goods to move.",
-		"is_generic": true,
-		"first_distance": "short",
-		"first_appearance_chance": 1.0,
-		"eligible_distances": ["short", "medium", "long"],
-	},
-	{
-		"id": "generic_student",
-		"name": "Student",
-		"blurb": "A student on the way to class or home.",
-		"is_generic": true,
-		"first_distance": "medium",
-		"first_appearance_chance": 1.0,
-		"eligible_distances": ["short", "medium", "long"],
-	},
-	{
-		"id": "generic_worker",
-		"name": "Worker",
-		"blurb": "A worker chasing the next shift.",
-		"is_generic": true,
-		"first_distance": "medium",
-		"first_appearance_chance": 1.0,
-		"eligible_distances": ["short", "medium", "long"],
-	},
-	{
-		"id": "generic_elder",
-		"name": "Elder",
-		"blurb": "An elder traveling at their own pace.",
-		"is_generic": true,
-		"first_distance": "short",
-		"first_appearance_chance": 1.0,
-		"eligible_distances": ["short", "medium"],
-	},
-	{
-		"id": "generic_parent_child",
-		"name": "Parent with Child",
-		"blurb": "A parent trying to get their child across town.",
-		"is_generic": true,
-		"first_distance": "long",
-		"first_appearance_chance": 1.0,
-		"eligible_distances": ["medium", "long"],
-	},
-]
-const MOCK_CHARACTERS := [
-	{
-		"id": "alma",
-		"name": "Alma D.",
-		"blurb": "Market regular with a sharp tongue.",
-		"first_distance": "short",
-		"first_appearance_chance": 0.85,
-		"eligible_distances": ["short", "medium"],
-	},
-	{
-		"id": "benny",
-		"name": "Benny R.",
-		"blurb": "Former class clown turned fixer.",
-		"first_distance": "medium",
-		"first_appearance_chance": 0.70,
-		"eligible_distances": ["medium", "long"],
-	},
-	{
-		"id": "cel",
-		"name": "Cel V.",
-		"blurb": "Clinic aide who notices everything.",
-		"first_distance": "short",
-		"first_appearance_chance": 0.55,
-		"eligible_distances": ["short", "medium", "long"],
-	},
-	{
-		"id": "dante",
-		"name": "Dante K.",
-		"blurb": "Night shift mechanic with secrets.",
-		"first_distance": "long",
-		"first_appearance_chance": 0.65,
-		"eligible_distances": ["medium", "long"],
-	},
-	{
-		"id": "ely",
-		"name": "Ely S.",
-		"blurb": "Teacher who knew your father well.",
-		"first_distance": "short",
-		"first_appearance_chance": 0.45,
-		"eligible_distances": ["short", "long"],
-	},
-	{
-		"id": "faye",
-		"name": "Faye M.",
-		"blurb": "Salon owner with city gossip.",
-		"first_distance": "medium",
-		"first_appearance_chance": 0.80,
-		"eligible_distances": ["short", "medium"],
-	},
-	{
-		"id": "gardo",
-		"name": "Gardo T.",
-		"blurb": "Debt collector's runner, all smiles.",
-		"first_distance": "long",
-		"first_appearance_chance": 0.40,
-		"eligible_distances": ["long"],
-	},
-	{
-		"id": "hana",
-		"name": "Hana P.",
-		"blurb": "Student journalist chasing rumors.",
-		"first_distance": "medium",
-		"first_appearance_chance": 0.60,
-		"eligible_distances": ["medium", "long"],
-	},
-	{
-		"id": "ito",
-		"name": "Ito L.",
-		"blurb": "Barangay aide with missing files.",
-		"first_distance": "long",
-		"first_appearance_chance": 0.35,
-		"eligible_distances": ["short", "medium", "long"],
-	},
-	{
-		"id": "jessa",
-		"name": "Jessa N.",
-		"blurb": "Quiet vendor who keeps showing up.",
-		"first_distance": "short",
-		"first_appearance_chance": 0.75,
-		"eligible_distances": ["short", "medium"],
-	},
-]
 var last_stage_result: Dictionary = {}
 var max_energy := 5
 var max_gas := DEFAULT_STARTING_GAS
@@ -382,164 +168,11 @@ func _ready() -> void:
 
 
 func _load_progress() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
-		return
-
-	var loaded_resource := ResourceLoader.load(SAVE_PATH)
-	if not loaded_resource is GameSaveResource:
-		return
-
-	var save_resource := loaded_resource as GameSaveResource
-	var save_data: Dictionary = save_resource.data.duplicate(true)
-	if save_data.is_empty():
-		return
-
-	_is_loading_save = true
-	money = int(save_data.get("money", money))
-	max_energy = int(save_data.get("max_energy", max_energy))
-	energy = int(save_data.get("energy", energy))
-	max_gas = int(save_data.get("max_gas", max_gas))
-	gas = int(save_data.get("gas", gas))
-	gas_price = int(save_data.get("gas_price", gas_price))
-	karma = int(save_data.get("karma", karma))
-	current_stage_type = str(save_data.get("current_stage_type", current_stage_type))
-	current_day = int(save_data.get("current_day", current_day))
-	stage_round = int(save_data.get("stage_round", stage_round))
-	pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", pending_stage_energy_cost))
-	pending_trip_selection = Dictionary(save_data.get("pending_trip_selection", {})).duplicate(true)
-	pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
-	pending_sleep_transition_state = Dictionary(save_data.get("pending_sleep_transition_state", {})).duplicate(true)
-	pending_gameplay_entry_fade_duration = float(save_data.get("pending_gameplay_entry_fade_duration", pending_gameplay_entry_fade_duration))
-	current_mock_character_id = str(save_data.get("current_mock_character_id", current_mock_character_id))
-	seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
-	unique_character_progress = Dictionary(save_data.get("unique_character_progress", {})).duplicate(true)
-	seeded_rider_rules.clear()
-	var saved_seeded_rider_rules: Array = save_data.get("seeded_rider_rules", [])
-	for rule_data in saved_seeded_rider_rules:
-		if rule_data is Dictionary:
-			seeded_rider_rules.append((rule_data as Dictionary).duplicate(true))
-	consumed_seeded_rider_rules = Dictionary(save_data.get("consumed_seeded_rider_rules", {})).duplicate(true)
-	last_rest_day = int(save_data.get("last_rest_day", last_rest_day))
-	yosi_bought_today = int(save_data.get("yosi_bought_today", yosi_bought_today))
-	yosi_bought_day = int(save_data.get("yosi_bought_day", yosi_bought_day))
-	yosi_bought_total = int(save_data.get("yosi_bought_total", yosi_bought_total))
-	rests_taken_today = int(save_data.get("rests_taken_today", rests_taken_today))
-	rests_taken_day = int(save_data.get("rests_taken_day", rests_taken_day))
-	tamad_rest_day = int(save_data.get("tamad_rest_day", tamad_rest_day))
-	tamad_rest_times_today.clear()
-	var saved_tamad_rest_times: Array = save_data.get("tamad_rest_times_today", [])
-	for rest_time_variant in saved_tamad_rest_times:
-		var normalized_rest_time := _normalize_tamad_rest_time(str(rest_time_variant))
-		if normalized_rest_time.is_empty() or tamad_rest_times_today.has(normalized_rest_time):
-			continue
-		tamad_rest_times_today.append(normalized_rest_time)
-	rides_completed_today = int(save_data.get("rides_completed_today", rides_completed_today))
-	rides_completed_day = int(save_data.get("rides_completed_day", rides_completed_day))
-	non_gas_store_purchases_this_week = int(save_data.get("non_gas_store_purchases_this_week", non_gas_store_purchases_this_week))
-	clean_stage_streak = int(save_data.get("clean_stage_streak", clean_stage_streak))
-	current_trip_low_energy = bool(save_data.get("current_trip_low_energy", current_trip_low_energy))
-	current_trip_low_gas = bool(save_data.get("current_trip_low_gas", current_trip_low_gas))
-	low_resource_trip_count = int(save_data.get("low_resource_trip_count", low_resource_trip_count))
-	low_both_resource_trip_count = int(save_data.get("low_both_resource_trip_count", low_both_resource_trip_count))
-	debt_goal_index = int(save_data.get("debt_goal_index", debt_goal_index))
-	last_debt_collection_day = int(save_data.get("last_debt_collection_day", last_debt_collection_day))
-	remaining_debt = int(save_data.get("remaining_debt", remaining_debt))
-	run_failed = bool(save_data.get("run_failed", run_failed))
-	run_fail_reason = str(save_data.get("run_fail_reason", run_fail_reason))
-	last_stage_result = Dictionary(save_data.get("last_stage_result", {})).duplicate(true)
-	story_triggers.clear()
-	var saved_story_triggers: Array = save_data.get("story_triggers", [])
-	for trigger_data in saved_story_triggers:
-		if trigger_data is Dictionary:
-			story_triggers.append((trigger_data as Dictionary).duplicate(true))
-	var needs_story_trigger_save := false
-	var has_scene_03 := false
-	for trigger_data in story_triggers:
-		if str((trigger_data as Dictionary).get("id", "")) == "day_7_night_scene_03":
-			has_scene_03 = true
-			break
-	if not has_scene_03:
-		story_triggers.append({
-			"id": "day_7_night_scene_03",
-			"phase": STORY_TRIGGER_DAY_END,
-			"day": 7,
-			"time_of_day": "night",
-			"payload": Scene03Day7NightPayload.build(),
-		})
-		needs_story_trigger_save = true
-	consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
-	upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
-	achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
-	last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
-	last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
-	event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
-	resume_scene_path = str(save_data.get("resume_scene_path", ""))
-	ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", ride_select_tutorial_shown))
-	_is_loading_save = false
-	if needs_story_trigger_save:
-		save_progress()
+	PlayerStateSaveCodec.load_from_path(self, SAVE_PATH)
 
 
 func save_progress() -> void:
-	if _is_loading_save:
-		return
-
-	var save_resource := GameSaveResource.new()
-	save_resource.version = SAVE_VERSION
-	save_resource.data = {
-		"money": money,
-		"max_energy": max_energy,
-		"energy": energy,
-		"max_gas": max_gas,
-		"gas": gas,
-		"gas_price": gas_price,
-		"karma": karma,
-		"current_stage_type": current_stage_type,
-		"current_day": current_day,
-		"stage_round": stage_round,
-		"pending_stage_energy_cost": pending_stage_energy_cost,
-		"pending_trip_selection": pending_trip_selection.duplicate(true),
-		"pending_story": pending_story.duplicate(true),
-		"pending_sleep_transition_state": pending_sleep_transition_state.duplicate(true),
-		"pending_gameplay_entry_fade_duration": pending_gameplay_entry_fade_duration,
-		"current_mock_character_id": current_mock_character_id,
-		"seen_mock_characters": seen_mock_characters.duplicate(true),
-		"unique_character_progress": unique_character_progress.duplicate(true),
-		"seeded_rider_rules": seeded_rider_rules.duplicate(true),
-		"consumed_seeded_rider_rules": consumed_seeded_rider_rules.duplicate(true),
-		"last_rest_day": last_rest_day,
-		"yosi_bought_today": yosi_bought_today,
-		"yosi_bought_day": yosi_bought_day,
-		"yosi_bought_total": yosi_bought_total,
-		"rests_taken_today": rests_taken_today,
-		"rests_taken_day": rests_taken_day,
-		"tamad_rest_day": tamad_rest_day,
-		"tamad_rest_times_today": tamad_rest_times_today.duplicate(),
-		"rides_completed_today": rides_completed_today,
-		"rides_completed_day": rides_completed_day,
-		"non_gas_store_purchases_this_week": non_gas_store_purchases_this_week,
-		"clean_stage_streak": clean_stage_streak,
-		"current_trip_low_energy": current_trip_low_energy,
-		"current_trip_low_gas": current_trip_low_gas,
-		"low_resource_trip_count": low_resource_trip_count,
-		"low_both_resource_trip_count": low_both_resource_trip_count,
-		"debt_goal_index": debt_goal_index,
-		"last_debt_collection_day": last_debt_collection_day,
-		"remaining_debt": remaining_debt,
-		"run_failed": run_failed,
-		"run_fail_reason": run_fail_reason,
-		"last_stage_result": last_stage_result.duplicate(true),
-		"story_triggers": story_triggers.duplicate(true),
-		"consumed_story_triggers": consumed_story_triggers.duplicate(true),
-		"upgrades": upgrades.duplicate(true),
-		"achievements": achievements.duplicate(true),
-		"last_seen_story_sections": last_seen_story_sections.duplicate(true),
-		"last_seen_story_id": last_seen_story_id,
-		"event_values": event_values.duplicate(true),
-		"resume_scene_path": resume_scene_path,
-		"ride_select_tutorial_shown": ride_select_tutorial_shown,
-	}
-	ResourceSaver.save(save_resource, SAVE_PATH)
+	PlayerStateSaveCodec.save_to_path(self, SAVE_PATH, SAVE_VERSION)
 
 
 func set_last_seen_story_section(story_id: String, section_index: int) -> void:
@@ -833,8 +466,8 @@ func prepare_stage_start(stage_descriptor := "") -> bool:
 
 	spend_energy(1)
 	spend_gas(trip_gas_cost)
-	current_trip_low_energy = energy <= LOW_ENERGY_THRESHOLD
-	current_trip_low_gas = gas <= LOW_GAS_THRESHOLD
+	current_trip_low_energy = energy <= AchievementService.LOW_ENERGY_THRESHOLD
+	current_trip_low_gas = gas <= AchievementService.LOW_GAS_THRESHOLD
 	pending_stage_energy_cost = true
 	save_progress()
 	return true
@@ -1291,10 +924,7 @@ func get_story_triggers() -> Array:
 
 
 func normalize_story_trigger_phase(phase: String) -> String:
-	match phase:
-		STORY_TRIGGER_DAY_END, STORY_TRIGGER_SLEEP_MIDPOINT, STORY_TRIGGER_DAY_START, STORY_TRIGGER_STAGE_COMPLETE:
-			return phase
-	return ""
+	return StoryTriggerService.normalize_story_trigger_phase(phase)
 
 
 func find_story_trigger_for_phase(phase: String, day_number := -1, context: Dictionary = {}) -> Dictionary:
@@ -1303,12 +933,14 @@ func find_story_trigger_for_phase(phase: String, day_number := -1, context: Dict
 		return {}
 
 	var effective_day := int(day_number) if int(day_number) > 0 else get_current_day()
-	for trigger_data in story_triggers:
-		var trigger: Dictionary = trigger_data
-		if _story_trigger_matches(trigger, safe_phase, effective_day, context):
-			return trigger.duplicate(true)
-
-	return {}
+	return StoryTriggerService.find_story_trigger_for_phase(
+		story_triggers,
+		consumed_story_triggers,
+		event_values,
+		safe_phase,
+		effective_day,
+		context
+	)
 
 
 func has_story_trigger_for_phase(phase: String, day_number := -1, context: Dictionary = {}) -> bool:
@@ -1316,55 +948,29 @@ func has_story_trigger_for_phase(phase: String, day_number := -1, context: Dicti
 
 
 func get_story_payload_for_trigger(trigger_data: Dictionary) -> Dictionary:
-	if trigger_data.is_empty():
-		return {}
-
-	var payload_variant = trigger_data.get("payload", {})
-	if payload_variant is Dictionary:
-		return (payload_variant as Dictionary).duplicate(true)
-	return {}
+	return StoryTriggerService.get_story_payload_for_trigger(trigger_data)
 
 
 func consume_story_trigger(trigger_data: Dictionary) -> void:
-	if trigger_data.is_empty() or bool(trigger_data.get("repeatable", false)):
+	if not StoryTriggerService.consume_story_trigger(consumed_story_triggers, trigger_data):
 		return
-
-	var trigger_id := _story_trigger_id(trigger_data)
-	if not trigger_id.is_empty():
-		consumed_story_triggers[trigger_id] = true
 	save_progress()
 
 
 func get_mock_characters() -> Array:
-	var combined_characters: Array = []
-	combined_characters.append_array(get_generic_passengers())
-	combined_characters.append_array(get_unique_passengers())
-	return combined_characters
+	return StoryCatalog.get_mock_characters(self)
 
 
 func get_character_by_id(character_id: String) -> Dictionary:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	if safe_id.is_empty():
-		return {}
-	for character_data in get_mock_characters():
-		if not character_data is Dictionary:
-			continue
-		var character: Dictionary = character_data
-		if str(character.get("id", "")).strip_edges().to_lower() == safe_id:
-			return character.duplicate(true)
-	return {}
+	return StoryCatalog.get_character_by_id(self, character_id)
 
 
 func get_generic_passengers() -> Array:
-	return GENERIC_PASSENGERS.duplicate(true)
+	return StoryCatalog.get_generic_passengers()
 
 
 func get_unique_passengers() -> Array:
-	var unique_passengers: Array = []
-	for character_data in MOCK_CHARACTERS:
-		if character_data is Dictionary:
-			unique_passengers.append(_character_with_progress((character_data as Dictionary).duplicate(true)))
-	return unique_passengers
+	return StoryCatalog.get_unique_passengers(self)
 
 
 func get_random_stage_traffic_type() -> String:
@@ -1482,13 +1088,7 @@ func increment_unique_character_progress(character_id: String, amount := 1) -> i
 
 
 func is_unique_character(character_id: String) -> bool:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	for character_data in MOCK_CHARACTERS:
-		if not character_data is Dictionary:
-			continue
-		if str((character_data as Dictionary).get("id", "")).strip_edges().to_lower() == safe_id:
-			return true
-	return false
+	return StoryCatalog.is_unique_character(character_id)
 
 
 func set_upgrade_level(upgrade_id: String, level: int) -> void:
@@ -1503,41 +1103,15 @@ func get_upgrade_level(upgrade_id: String) -> int:
 
 
 func get_yosi_energy_restore() -> int:
-	return 2 if has_achievement("maninigarilyo") else 1
+	return AchievementService.get_yosi_energy_restore(self)
 
 
 func record_yosi_purchase(amount := 1) -> int:
-	var purchase_amount := maxi(0, int(amount))
-	if purchase_amount <= 0:
-		return yosi_bought_total
-
-	if yosi_bought_day != get_current_day():
-		_reset_daily_consumable_counters(get_current_day())
-
-	yosi_bought_day = get_current_day()
-	yosi_bought_today += purchase_amount
-	yosi_bought_total += purchase_amount
-	if yosi_bought_today >= SMOKER_YOSI_GOAL:
-		unlock_achievement("maninigarilyo")
-	if yosi_bought_total >= SMOKER_DANGER_YOSI_TOTAL:
-		fail_run("John finally had to be taken to the hospital.\n\nThe cigarettes caught up with him long before the debt ever did, and the treatment only left him buried under even more bills.")
-	save_progress()
-	return yosi_bought_total
+	return AchievementService.record_yosi_purchase(self, amount)
 
 
 func record_rest(amount := 1, time_of_day := "") -> int:
-	var rest_amount := maxi(0, int(amount))
-	if rest_amount <= 0:
-		return rests_taken_today
-
-	if rests_taken_day != get_current_day():
-		_reset_daily_consumable_counters(get_current_day())
-
-	rests_taken_day = get_current_day()
-	rests_taken_today += rest_amount
-	_record_tamad_rest_time(str(time_of_day))
-	save_progress()
-	return rests_taken_today
+	return AchievementService.record_rest(self, amount, time_of_day)
 
 
 func record_store_purchase(item_type: String) -> void:
@@ -1549,51 +1123,15 @@ func record_store_purchase(item_type: String) -> void:
 
 
 func record_stage_completion() -> void:
-	if rides_completed_day != get_current_day():
-		_reset_daily_consumable_counters(get_current_day())
-
-	rides_completed_day = get_current_day()
-	if str(get_last_stage_result().get("difficulty", "")) == "long":
-		rides_completed_today += 1
-	if rides_completed_today >= 3:
-		unlock_achievement("masipag")
-
-	clean_stage_streak += 1
-	if clean_stage_streak >= 5:
-		unlock_achievement("maingat")
-
-	if current_trip_low_energy or current_trip_low_gas:
-		low_resource_trip_count += 1
-		if low_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
-			unlock_achievement("matiyaga")
-	if current_trip_low_energy and current_trip_low_gas:
-		low_both_resource_trip_count += 1
-		if low_both_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
-			unlock_achievement("maparaan")
-
-	current_trip_low_energy = false
-	current_trip_low_gas = false
-	save_progress()
+	AchievementService.record_stage_completion(self)
 
 
 func record_stage_failure() -> void:
-	clean_stage_streak = 0
-	current_trip_low_energy = false
-	current_trip_low_gas = false
-	save_progress()
+	AchievementService.record_stage_failure(self)
 
 
 func unlock_achievement(achievement_id: String) -> void:
-	var safe_id := str(achievement_id).strip_edges().to_lower()
-	if not ACHIEVEMENT_DEFINITIONS.has(safe_id):
-		return
-	if achievements.get(safe_id, false):
-		return
-
-	achievements[safe_id] = true
-	_apply_achievement_effects(safe_id)
-	achievement_unlocked.emit(safe_id)
-	save_progress()
+	AchievementService.unlock_achievement(self, achievement_id)
 
 
 func fail_run(reason: String) -> void:
@@ -1604,46 +1142,23 @@ func fail_run(reason: String) -> void:
 
 
 func has_achievement(achievement_id: String) -> bool:
-	return bool(achievements.get(str(achievement_id).strip_edges().to_lower(), false))
+	return AchievementService.has_achievement(self, achievement_id)
 
 
 func get_achievement_data(achievement_id: String) -> Dictionary:
-	var safe_id := str(achievement_id).strip_edges().to_lower()
-	if not ACHIEVEMENT_DEFINITIONS.has(safe_id):
-		return {}
-
-	var achievement_data: Dictionary = ACHIEVEMENT_DEFINITIONS[safe_id]
-	var result := achievement_data.duplicate(true)
-	result["id"] = safe_id
-	result["unlocked"] = has_achievement(safe_id)
-	return result
+	return AchievementService.get_achievement_data(self, achievement_id)
 
 
 func get_unlocked_achievement_ids() -> Array[String]:
-	var unlocked_ids: Array[String] = []
-	for achievement_id in ACHIEVEMENT_ORDER:
-		var safe_id := str(achievement_id)
-		if has_achievement(safe_id):
-			unlocked_ids.append(safe_id)
-	return unlocked_ids
+	return AchievementService.get_unlocked_achievement_ids(self)
 
 
 func _apply_achievement_effects(achievement_id: String) -> void:
-	match achievement_id:
-		"maninigarilyo":
-			max_energy = maxi(1, max_energy - SMOKER_MAX_ENERGY_PENALTY)
-			energy = mini(energy, max_energy)
+	AchievementService.apply_achievement_effects(self, achievement_id)
 
 
 func _reset_daily_consumable_counters(day_number: int) -> void:
-	yosi_bought_day = max(1, day_number)
-	yosi_bought_today = 0
-	rests_taken_day = max(1, day_number)
-	rests_taken_today = 0
-	tamad_rest_day = max(1, day_number)
-	tamad_rest_times_today.clear()
-	rides_completed_day = max(1, day_number)
-	rides_completed_today = 0
+	AchievementService.reset_daily_consumable_counters(self, day_number)
 
 
 func reset() -> void:
@@ -1752,34 +1267,8 @@ func _normalize_seeded_rider_rule(rule_data: Dictionary) -> Dictionary:
 	return normalized_rule
 
 
-func _record_tamad_rest_time(time_of_day: String) -> void:
-	var rest_time := _normalize_tamad_rest_time(time_of_day)
-	if rest_time.is_empty():
-		rest_time = _normalize_tamad_rest_time(get_current_time_of_day())
-	if rest_time.is_empty():
-		return
-
-	if tamad_rest_day != get_current_day():
-		tamad_rest_day = get_current_day()
-		tamad_rest_times_today.clear()
-
-	if not tamad_rest_times_today.has(rest_time):
-		tamad_rest_times_today.append(rest_time)
-
-	if _has_all_tamad_rest_times():
-		unlock_achievement("tamad")
-
-
-func _has_all_tamad_rest_times() -> bool:
-	for rest_time in TAMAD_REQUIRED_REST_TIMES:
-		if not tamad_rest_times_today.has(rest_time):
-			return false
-	return true
-
-
 func _normalize_tamad_rest_time(time_of_day: String) -> String:
-	var safe_time := str(time_of_day).strip_edges().to_lower()
-	return safe_time if TAMAD_REQUIRED_REST_TIMES.has(safe_time) else ""
+	return AchievementService.normalize_tamad_rest_time(time_of_day)
 
 
 func _seeded_rider_rule_matches(rule_data: Dictionary, selection_context: Dictionary) -> bool:
@@ -1899,22 +1388,7 @@ func _normalize_seeded_traffic(traffic_type: String) -> String:
 
 
 func _reset_story_triggers() -> void:
-	story_triggers.clear()
-	story_triggers.append({
-		"id": "day_2_station_bill",
-		"phase": STORY_TRIGGER_STAGE_COMPLETE,
-		"min_day": 2,
-		"times": ["morning", "noon"],
-		"forbidden_events": ["day_2_station_bill"],
-		"payload": Day02StationBillPayload.build(),
-	})
-	story_triggers.append({
-		"id": "day_7_night_scene_03",
-		"phase": STORY_TRIGGER_DAY_END,
-		"day": 7,
-		"time_of_day": "night",
-		"payload": Scene03Day7NightPayload.build(),
-	})
+	story_triggers = StoryTriggerService.build_default_story_triggers()
 	consumed_story_triggers.clear()
 	save_progress()
 
@@ -1923,73 +1397,6 @@ func _delete_save_file() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
-
-
-func _character_with_progress(character_data: Dictionary) -> Dictionary:
-	var character_copy: Dictionary = character_data.duplicate(true)
-	character_copy["progress"] = get_unique_character_progress(str(character_copy.get("id", "")))
-	return character_copy
-
-
-func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_number: int, context: Dictionary = {}) -> bool:
-	if trigger_data.is_empty():
-		return false
-	if normalize_story_trigger_phase(str(trigger_data.get("phase", ""))) != phase:
-		return false
-	if get_story_payload_for_trigger(trigger_data).is_empty():
-		return false
-
-	var trigger_id := _story_trigger_id(trigger_data)
-	if not bool(trigger_data.get("repeatable", false)) and not trigger_id.is_empty() and bool(consumed_story_triggers.get(trigger_id, false)):
-		return false
-
-	if trigger_data.has("day") and int(trigger_data.get("day", 0)) != day_number:
-		return false
-	if trigger_data.has("min_day") and day_number < int(trigger_data.get("min_day", day_number)):
-		return false
-	if trigger_data.has("max_day") and day_number > int(trigger_data.get("max_day", day_number)):
-		return false
-
-	var days_variant = trigger_data.get("days", [])
-	if days_variant is Array and not (days_variant as Array).is_empty():
-		var valid_day := false
-		for listed_day in days_variant:
-			if int(listed_day) == day_number:
-				valid_day = true
-				break
-		if not valid_day:
-			return false
-
-	if not _trigger_matches_context_value(trigger_data.get("stage_type", null), context.get("stage_type", null)):
-		return false
-	if not _trigger_matches_context_array(trigger_data.get("stage_types", []), context.get("stage_type", null)):
-		return false
-	if not _trigger_matches_context_value(trigger_data.get("time_of_day", null), context.get("time_of_day", null)):
-		return false
-	if not _trigger_matches_context_array(trigger_data.get("times", []), context.get("time_of_day", null)):
-		return false
-	if not _trigger_matches_context_value(trigger_data.get("difficulty", null), context.get("difficulty", null)):
-		return false
-	if not _trigger_matches_context_array(trigger_data.get("difficulties", []), context.get("difficulty", null)):
-		return false
-	if not _trigger_matches_context_value(trigger_data.get("traffic", null), context.get("traffic", null)):
-		return false
-	if not _trigger_matches_context_array(trigger_data.get("traffic_types", []), context.get("traffic", null)):
-		return false
-	if not _trigger_matches_context_value(trigger_data.get("character_id", null), context.get("character_id", null)):
-		return false
-	if not _trigger_matches_context_array(trigger_data.get("character_ids", []), context.get("character_id", null)):
-		return false
-	if not _trigger_matches_required_events(trigger_data.get("required_events", [])):
-		return false
-	if not _trigger_matches_forbidden_events(trigger_data.get("forbidden_events", [])):
-		return false
-	if not _trigger_matches_event_values(trigger_data.get("required_event_values", {}), true):
-		return false
-	if not _trigger_matches_event_values(trigger_data.get("forbidden_event_values", {}), false):
-		return false
-
-	return true
 
 
 func _trigger_matches_context_value(expected_value, actual_value) -> bool:
@@ -2012,28 +1419,3 @@ func _trigger_matches_context_array(expected_values, actual_value) -> bool:
 		if str(value).strip_edges() == actual_text:
 			return true
 	return false
-
-
-func _trigger_matches_required_events(required_events) -> bool:
-	return StoryEventHandler.matches_required_events(event_values, required_events)
-
-
-func _trigger_matches_forbidden_events(forbidden_events) -> bool:
-	return StoryEventHandler.matches_forbidden_events(event_values, forbidden_events)
-
-
-func _trigger_matches_event_values(expected_values, should_match: bool) -> bool:
-	return StoryEventHandler.matches_event_values(event_values, expected_values, should_match)
-
-
-func _story_trigger_id(trigger_data: Dictionary) -> String:
-	var explicit_id := str(trigger_data.get("id", ""))
-	if not explicit_id.is_empty():
-		return explicit_id
-
-	var payload := get_story_payload_for_trigger(trigger_data)
-	return "%s:%s:%s" % [
-		str(trigger_data.get("phase", "")),
-		str(trigger_data.get("day", "")),
-		str(payload.get("chapter_title", "")),
-	]
