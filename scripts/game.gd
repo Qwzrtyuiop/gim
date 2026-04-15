@@ -6,7 +6,6 @@ const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
 const TUTORIAL_IMAGE := preload("res://assets/tutorial/tutorial.png")
-const TUTORIAL_DELAY_SECONDS := 2.0
 const STAGE_BGM_MORNING_CHILL_PATH := "res://assets/stagebgm/morning_chill.mp3"
 const STAGE_BGM_NIGHT_CHILL_PATH := "res://assets/stagebgm/night_chill.mp3"
 const STAGE_BGM_NORMAL_PATH := "res://assets/stagebgm/normalstage1.mp3"
@@ -48,6 +47,10 @@ const POST_DAY_SEVEN_SPAWN_DELAY_X := 0.90
 const POST_DAY_SEVEN_BUSY_CAR_CHANCE_MAIN := 0.10
 const POST_DAY_SEVEN_BUSY_CAR_CHANCE_SHOULDER := 0.08
 const POST_DAY_SEVEN_BUSY_CAR_LANE_CHANGE_CHANCE_PER_SECOND := 0.035
+const PARKED_VEHICLE_KEYS := ["truck", "jeepney", "sedan"]
+const PARKED_VEHICLE_Y_OFFSET := 26.0
+const PARKED_COLLISION_MIN_KMH := 40
+const PARKED_VEHICLE_Z_OFFSET := 4
 const TIME_FILTER_Z_INDEX := 760
 const NIGHT_MASK_Z_INDEX := 790
 const HEADLIGHT_Z_INDEX := 820
@@ -86,6 +89,9 @@ void fragment() {
 }
 "
 const FIRST_STAGE_TYPE := "short-morning-chill"
+const SPEEDOMETER_MAX_KMH := 180
+const SPEEDOMETER_REFERENCE_MAX_SPEED := 560.0
+const SPEEDOMETER_BASE_MAX_KMH := 60.0
 const DEFAULT_STAGE_PROFILE := {
 	"target_distance": 1000.0,
 	"time_limit": 45.0,
@@ -752,8 +758,8 @@ func _create_ui() -> void:
 	add_child(ui)
 
 	speedometer = SPEEDOMETER_GAUGE.new()
-	speedometer.position = Vector2(932.0, 470.0)
-	speedometer.size = Vector2(340.0, 200.0)
+	speedometer.position = Vector2(954.0, 510.0)
+	speedometer.size = Vector2(320.0, 150.0)
 	ui.add_child(speedometer)
 
 	time_label = _make_label(16, Color(0.78, 0.92, 0.94, 1.0), 4)
@@ -916,11 +922,7 @@ func _schedule_stage_tutorial() -> void:
 	if not _should_show_stage_tutorial():
 		return
 	tutorial_timer_started = true
-	tutorial_input_lock_active = true
-	var timer := get_tree().create_timer(TUTORIAL_DELAY_SECONDS)
-	timer.timeout.connect(func() -> void:
-		_show_stage_tutorial()
-	)
+	_show_stage_tutorial()
 
 
 func _should_show_stage_tutorial() -> bool:
@@ -989,15 +991,19 @@ func _update_tutorial_overlay_positions() -> void:
 		return
 	if player == null:
 		return
-	var base := player.global_position
+	var viewport_size := get_viewport_rect().size
+	var lane_center := Vector2(
+		clampf(player_x + 360.0, 260.0, viewport_size.x - 280.0),
+		_lane_y(1, viewport_size) - 72.0
+	)
 	if tutorial_arrow_up_label != null and tutorial_arrow_up_label.visible:
-		tutorial_arrow_up_label.position = base + Vector2(-110.0, -150.0)
+		tutorial_arrow_up_label.position = lane_center + Vector2(-230.0, -32.0)
 	if tutorial_arrow_down_label != null and tutorial_arrow_down_label.visible:
-		tutorial_arrow_down_label.position = base + Vector2(-110.0, 40.0)
+		tutorial_arrow_down_label.position = lane_center + Vector2(10.0, -32.0)
 	if tutorial_arrow_left_label != null and tutorial_arrow_left_label.visible:
-		tutorial_arrow_left_label.position = base + Vector2(-320.0, -20.0)
+		tutorial_arrow_left_label.position = lane_center + Vector2(-250.0, -32.0)
 	if tutorial_arrow_right_label != null and tutorial_arrow_right_label.visible:
-		tutorial_arrow_right_label.position = base + Vector2(80.0, -20.0)
+		tutorial_arrow_right_label.position = lane_center + Vector2(10.0, -32.0)
 
 
 func _is_up_down_input(event: InputEvent) -> bool:
@@ -1218,8 +1224,8 @@ func _layout_scene() -> void:
 	player.position = Vector2(player_x, _sprite_y_for_hitbox_bottom(player, _lane_y(player_lane, size), PLAYER_HITBOX_INSET))
 
 	if speedometer:
-		speedometer.position = Vector2(size.x - 340.0 - 4.0, size.y - 272.0)
-		speedometer.size = Vector2(340.0, 200.0)
+		speedometer.position = Vector2(size.x - 320.0 - 6.0, size.y - 180.0)
+		speedometer.size = Vector2(320.0, 150.0)
 
 	if bottom_bar:
 		bottom_bar.position = Vector2(0.0, size.y - 58.0)
@@ -1391,6 +1397,7 @@ func _spawn_entity(lane_index: int) -> void:
 	var world_speed := 0.0
 	var fallback_height := 80.0
 	var is_busy_car := false
+	var is_parked := false
 
 	match lane_index:
 		0:
@@ -1403,17 +1410,20 @@ func _spawn_entity(lane_index: int) -> void:
 			world_speed = rng.randf_range(main_vehicle_min_speed, main_vehicle_max_speed)
 			fallback_height = 96.0
 		2:
-			vehicle_key = _choose_weighted({
-				"vendor_tricycle": 46.0,
-				"motorcycle": 46.0,
-				"jeepney": 4.0,
-				"sedan": 4.0,
-			})
 			if rng.randf() < shoulder_parked_chance:
+				is_parked = true
+				vehicle_key = _choose(PARKED_VEHICLE_KEYS)
 				world_speed = 0.0
+				fallback_height = 96.0
 			else:
+				vehicle_key = _choose_weighted({
+					"vendor_tricycle": 46.0,
+					"motorcycle": 46.0,
+					"jeepney": 4.0,
+					"sedan": 4.0,
+				})
 				world_speed = rng.randf_range(shoulder_vehicle_min_speed, shoulder_vehicle_max_speed)
-			fallback_height = 90.0
+				fallback_height = 90.0
 
 	if world_speed > 0.0 and lane_index in [1, 2]:
 		is_busy_car = _is_post_day_seven_traffic_ramp() and rng.randf() < _get_post_day_busy_car_chance(lane_index)
@@ -1429,9 +1439,9 @@ func _spawn_entity(lane_index: int) -> void:
 	_apply_vehicle_headlight(sprite, VEHICLE_HITBOX_INSET)
 	sprite.position = Vector2(
 		size.x + rng.randf_range(90.0, 360.0),
-		_sprite_y_for_hitbox_bottom(sprite, _lane_y(lane_index, size), VEHICLE_HITBOX_INSET)
+		_sprite_y_for_hitbox_bottom(sprite, _entity_lane_y(lane_index, size, is_parked), VEHICLE_HITBOX_INSET)
 	)
-	sprite.z_index = _z_for_lane(lane_index)
+	sprite.z_index = _z_for_lane(lane_index, PARKED_VEHICLE_Z_OFFSET if is_parked else 0)
 	add_child(sprite)
 
 	active_entities.append({
@@ -1442,6 +1452,7 @@ func _spawn_entity(lane_index: int) -> void:
 		"kind": "traffic",
 		"desired_world_speed": world_speed,
 		"world_speed": world_speed,
+		"is_parked": is_parked,
 		"is_busy_car": is_busy_car,
 		"lane_change_cooldown": rng.randf_range(0.6, 2.0),
 		"lane_change_warning_active": false,
@@ -1897,9 +1908,11 @@ func _update_entities(delta: float) -> void:
 func _update_entity_lane_position(entity: Dictionary, delta: float) -> void:
 	var target_lane := int(entity.get("target_lane", entity["lane"]))
 	var sprite: Sprite2D = entity["sprite"]
+	if bool(entity.get("is_parked", false)):
+		sprite.z_index = _z_for_lane(target_lane, PARKED_VEHICLE_Z_OFFSET)
 	var target_y := _sprite_y_for_hitbox_bottom(
 		sprite,
-		_lane_y(target_lane, get_viewport_rect().size),
+		_entity_lane_y(target_lane, get_viewport_rect().size, bool(entity.get("is_parked", false))),
 		VEHICLE_HITBOX_INSET
 	)
 	var lerp_speed := speeder_lane_change_lerp_speed if entity.get("kind", "traffic") == "speeder" else npc_lane_change_lerp_speed
@@ -1954,9 +1967,9 @@ func _update_background() -> void:
 
 
 func _update_ui() -> void:
-	var speed_kmh := roundi(player_speed * _distance_scale() * 3.6)
-	var max_speed_kmh := maxf(1.0, player_max_speed * _distance_scale() * 3.6)
-	speedometer.set_values(speed_kmh, speed_kmh / max_speed_kmh, floori(distance), floori(target_distance), time_left)
+	var speed_kmh := _current_speed_kmh()
+	var speed_ratio := float(speed_kmh) / float(SPEEDOMETER_MAX_KMH)
+	speedometer.set_values(speed_kmh, speed_ratio, floori(distance), floori(target_distance), time_left)
 
 	if game_state == "playing":
 		status_label.text = ""
@@ -1991,16 +2004,26 @@ func _update_ui() -> void:
 		]
 
 
+func _current_speed_kmh() -> int:
+	return clampi(roundi(player_speed / SPEEDOMETER_REFERENCE_MAX_SPEED * SPEEDOMETER_BASE_MAX_KMH), 0, SPEEDOMETER_MAX_KMH)
+
+
 func _check_collisions() -> void:
 	var player_rect := _collision_rect(player, PLAYER_HITBOX_INSET)
 	for entity in active_entities:
 		if entity["lane"] != player_lane:
+			continue
+		if _is_safe_low_speed_parked_contact(entity):
 			continue
 
 		var entity_rect := _collision_rect(entity["sprite"], VEHICLE_HITBOX_INSET)
 		if player_rect.intersects(entity_rect):
 			_end_game("CRASH", "Collision in the %s lane. Space/R to retry." % LANE_NAMES[entity["lane"]])
 			return
+
+
+func _is_safe_low_speed_parked_contact(entity: Dictionary) -> bool:
+	return bool(entity.get("is_parked", false)) and _current_speed_kmh() < PARKED_COLLISION_MIN_KMH
 
 
 func _end_game(title: String, detail: String) -> void:
@@ -2371,6 +2394,13 @@ func _lane_y(lane_index: int, size: Vector2) -> float:
 
 	var fallback_lane_positions := [0.585, 0.675, 0.805]
 	return size.y * fallback_lane_positions[lane_index]
+
+
+func _entity_lane_y(lane_index: int, size: Vector2, is_parked := false) -> float:
+	var lane_y := _lane_y(lane_index, size)
+	if is_parked and lane_index == 2:
+		lane_y += PARKED_VEHICLE_Y_OFFSET
+	return lane_y
 
 
 func _z_for_lane(lane_index: int, offset := 0) -> int:

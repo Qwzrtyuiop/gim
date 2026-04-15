@@ -215,8 +215,12 @@ static func _record_tamad_rest_time(player_state, time_of_day: String) -> void:
 	if not player_state.tamad_rest_times_today.has(rest_time):
 		player_state.tamad_rest_times_today.append(rest_time)
 
-	if _has_all_tamad_rest_times(player_state):
+	if _is_day_one_morning_rest(player_state, rest_time) or _has_all_tamad_rest_times(player_state):
 		unlock_achievement(player_state, "tamad")
+
+
+static func _is_day_one_morning_rest(player_state, rest_time: String) -> bool:
+	return player_state.get_current_day() == 1 and rest_time == "morning"
 
 
 static func _has_all_tamad_rest_times(player_state) -> bool:

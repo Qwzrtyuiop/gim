@@ -57,6 +57,8 @@ func _ready() -> void:
 	selected_distance = PlayerState.get_locked_pending_trip_distance()
 	if selected_distance.is_empty():
 		selected_distance = "short"
+	if _is_forced_first_day_ride():
+		selected_distance = "short"
 	back_button.visible = _allow_back()
 	_create_stats_row()
 
@@ -135,7 +137,7 @@ func _refresh_subtitle() -> void:
 
 
 func _set_distance(difficulty: String) -> void:
-	selected_distance = difficulty
+	selected_distance = "short" if _is_forced_first_day_ride() else difficulty
 	displayed_characters = _get_pool_for_distance(selected_distance)
 	PlayerState.lock_pending_trip_selection(locked_character_pools, selected_distance)
 	_refresh_subtitle()
@@ -156,7 +158,7 @@ func _refresh_distance_buttons() -> void:
 		var button := button_data["button"] as BaseButton
 		var button_id: String = str(button_data["id"])
 		var is_selected: bool = button_id == selected_distance
-		button.disabled = is_selected
+		button.disabled = is_selected or (_is_forced_first_day_ride() and button_id != "short")
 		ButtonGlow.set_state(self, button, is_selected)
 
 
@@ -368,6 +370,8 @@ func _lock_character_for_selection(picked_character: Dictionary, active_distance
 	var locked_character: Dictionary = picked_character.duplicate(true)
 	locked_character["active_distance"] = active_distance
 	var selected_traffic := forced_traffic.strip_edges().to_lower()
+	if _is_forced_first_day_ride():
+		selected_traffic = "chill"
 	if not PlayerState.STAGE_TRAFFIC_TYPES.has(selected_traffic):
 		selected_traffic = PlayerState.get_random_stage_traffic_type()
 	locked_character["stage_traffic"] = selected_traffic
@@ -462,6 +466,22 @@ func _build_tutorial() -> void:
 	tutorial_steps.append({
 		"text": "Your status and trip notes appear here.",
 		"targets": [money_label, status_label],
+	})
+	tutorial_steps.append({
+		"text": "For the opening ride, start with this passenger. It keeps the first trip simple while you learn the road.",
+		"targets": [card_a],
+	})
+	tutorial_steps.append({
+		"text": "Stage information is written as distance, time, then modifier. In short-morning-chill, Short means the ride distance.",
+		"targets": [card_a_label],
+	})
+	tutorial_steps.append({
+		"text": "Morning tells you the time of day for this ride.",
+		"targets": [card_a_label],
+	})
+	tutorial_steps.append({
+		"text": "Chill is the modifier. It means this route should have lighter traffic and a calmer pace.",
+		"targets": [card_a_label],
 	})
 
 
@@ -673,6 +693,8 @@ func _on_card_gui_input(event: InputEvent, card_index: int) -> void:
 
 
 func _preview_stage_type(character: Dictionary) -> String:
+	if _is_forced_first_day_ride():
+		return PlayerState.FIRST_STAGE_TYPE
 	return PlayerState.build_stage_type(
 		str(character.get("active_distance", selected_distance)),
 		PlayerState.get_next_stage_time(_transition_mode()),
@@ -691,11 +713,13 @@ func _choose_character(card_index: int) -> void:
 
 	var transition_mode := _transition_mode()
 	var applied_bonus := PlayerState.apply_transition_energy_bonus(transition_mode)
+	var stage_distance := "short" if _is_forced_first_day_ride() else selected_distance
+	var stage_traffic := "chill" if _is_forced_first_day_ride() else str(character.get("stage_traffic", ""))
 
-	if not PlayerState.prepare_stage_start(selected_distance):
+	if not PlayerState.prepare_stage_start(stage_distance):
 		if applied_bonus > 0:
 			PlayerState.add_energy(-applied_bonus)
-		var start_error := PlayerState.get_stage_start_error(selected_distance)
+		var start_error := PlayerState.get_stage_start_error(stage_distance)
 		if _show_store_shortcut() and start_error == "Not enough gas for this trip.":
 			status_label.text = "Not enough gas for this trip. Visit the store to refuel."
 		else:
@@ -706,8 +730,8 @@ func _choose_character(card_index: int) -> void:
 	var should_show_day_start_transition := PlayerState.will_advance_day(transition_mode) and PlayerState.get_transition_display_day(transition_mode) <= 1
 	PlayerState.advance_to_next_stage(
 		transition_mode,
-		selected_distance,
-		str(character.get("stage_traffic", ""))
+		stage_distance,
+		stage_traffic
 	)
 	PlayerState.clear_pending_trip_selection()
 	if PlayerState.is_run_failed():
@@ -741,6 +765,14 @@ func _transition_mode() -> String:
 			return PlayerState.TRANSITION_REST_TO_NIGHT
 		return PlayerState.TRANSITION_RIDE
 	return PlayerState.normalize_transition_mode(transition_mode)
+
+
+func _is_forced_first_day_ride() -> bool:
+	return (
+		PlayerState.get_current_day() == 1
+		and int(PlayerState.stage_round) <= 0
+		and _transition_mode() == PlayerState.TRANSITION_CURRENT_STAGE
+	)
 
 
 func _allow_back() -> bool:

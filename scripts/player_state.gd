@@ -496,8 +496,10 @@ func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> i
 
 
 func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
-	var applied_bonus := mini(get_transition_energy_bonus(transition_mode), max_energy - energy)
-	record_rest()
+	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var applied_bonus := mini(get_transition_energy_bonus(safe_transition_mode), max_energy - energy)
+	if safe_transition_mode == TRANSITION_REST_TO_NIGHT or safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
+		record_rest(1, get_current_time_of_day())
 	if applied_bonus > 0:
 		add_energy(applied_bonus)
 	return applied_bonus

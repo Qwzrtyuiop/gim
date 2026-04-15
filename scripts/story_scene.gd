@@ -772,7 +772,7 @@ func _apply_set_event_value_action(action_data: Dictionary) -> void:
 
 
 func _apply_set_event_values_action(action_data: Dictionary) -> void:
-	var values := action_data.get("values", action_data.get("events", {}))
+	var values: Variant = action_data.get("values", action_data.get("events", {}))
 	if not values is Dictionary:
 		return
 	PlayerState.set_event_values((values as Dictionary).duplicate(true))
