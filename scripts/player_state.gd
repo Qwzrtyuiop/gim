@@ -45,6 +45,7 @@ const STAGE_DISTANCE_RANGES := {
 }
 const ACHIEVEMENT_ORDER := [
 	"mapagsamantala",
+	"tapat",
 	"maninigarilyo",
 	"tamad",
 	"matipid",
@@ -58,6 +59,11 @@ const ACHIEVEMENT_DEFINITIONS := {
 		"title": "Mapagsamantala",
 		"subtitle": "Opportunistic",
 		"description": "Taking advantage when the opportunity presents itself\nespecially when it costs someone else more than it costs you.\n\nJohn saw the opening and took it.\nWhether it was right or not didnâ€™t matter, he needed the money more than them.",
+	},
+	"tapat": {
+		"title": "Tapat",
+		"subtitle": "Honesty",
+		"description": "Tapat is the Filipino virtue of staying honest even when hardship makes the wrong choice feel easier.\n\nJohn gave the money back, even when he badly needed it himself.",
 	},
 	"maninigarilyo": {
 		"title": "Maninigarilyo",

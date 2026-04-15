@@ -129,6 +129,10 @@ static func build() -> Dictionary:
 				},
 				"choices": [
 					{
+						"text": "Return",
+						"next_index": 16,
+					},
+					{
 						"text": "Keep",
 						"next_index": 13,
 					},
@@ -164,6 +168,36 @@ static func build() -> Dictionary:
 					{
 						"type": "unlock_achievement",
 						"id": "mapagsamantala",
+					}
+				],
+			},
+			{
+				"speaker": "John Toda",
+				"text": "Wait. Sir! You dropped this.",
+			},
+			{
+				"text": "The passenger turns back, startled, then takes the bill with both hands.",
+			},
+			{
+				"text": "\"Thank you,\" they say before hurrying off again.",
+				"actions": [
+					{
+						"type": "fade_to_black",
+						"duration": 0.28,
+					}
+				],
+			},
+			{
+				"text": "Karma went up.",
+				"pause_after": 1.4,
+				"actions": [
+					{
+						"type": "add_karma",
+						"amount": 1,
+					},
+					{
+						"type": "unlock_achievement",
+						"id": "tapat",
 					}
 				],
 			},
