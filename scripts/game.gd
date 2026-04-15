@@ -1,6 +1,8 @@
 extends Node2D
 
-const BG_TEXTURE := preload("res://assets/background/bg1_loop.png")
+const PARALLAX_SKY_TEXTURE := preload("res://assets/background/parallax/sky.png")
+const PARALLAX_MOUNTAIN_TEXTURE := preload("res://assets/background/parallax/mountain.png")
+const PARALLAX_MAIN_TEXTURE := preload("res://assets/background/parallax/mainlayer.png")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
@@ -375,9 +377,7 @@ const BACKGROUND_PROFILES := {
 
 var rng := RandomNumberGenerator.new()
 var background_layer: Node2D
-var bg_a: Sprite2D
-var bg_b: Sprite2D
-var bg_width := 1280.0
+var parallax_layers: Array[Dictionary] = []
 var time_filter_rect: ColorRect
 var noon_glow_rect: ColorRect
 var noon_glow_material: ShaderMaterial
@@ -695,15 +695,26 @@ func _create_background() -> void:
 	background_layer.z_index = -100
 	add_child(background_layer)
 
-	bg_a = Sprite2D.new()
-	bg_a.texture = BG_TEXTURE
-	bg_a.centered = false
-	background_layer.add_child(bg_a)
-
-	bg_b = Sprite2D.new()
-	bg_b.texture = BG_TEXTURE
-	bg_b.centered = false
-	background_layer.add_child(bg_b)
+	parallax_layers.clear()
+	for layer_data in [
+		{"texture": PARALLAX_SKY_TEXTURE, "speed": 0.03},
+		{"texture": PARALLAX_MOUNTAIN_TEXTURE, "speed": 0.12},
+		{"texture": PARALLAX_MAIN_TEXTURE, "speed": 1.0},
+	]:
+		var sprites: Array[Sprite2D] = []
+		for copy_index in range(2):
+			var sprite := Sprite2D.new()
+			sprite.texture = layer_data["texture"]
+			sprite.centered = false
+			sprite.z_index = parallax_layers.size()
+			background_layer.add_child(sprite)
+			sprites.append(sprite)
+		parallax_layers.append({
+			"sprites": sprites,
+			"texture": layer_data["texture"],
+			"speed": float(layer_data["speed"]),
+			"width": 1280.0,
+		})
 
 
 func _create_player() -> void:
@@ -1204,15 +1215,11 @@ func _update_night_visibility_mask() -> void:
 
 
 func _layout_scene() -> void:
-	if bg_a == null or bg_b == null or player == null:
+	if parallax_layers.is_empty() or player == null:
 		return
 
 	var size := get_viewport_rect().size
-	var bg_scale := _background_cover_scale(size)
-	bg_width = BG_TEXTURE.get_width() * bg_scale
-	for bg in [bg_a, bg_b]:
-		bg.scale = Vector2(bg_scale, bg_scale)
-		bg.position.y = _background_y(bg_scale, size)
+	_layout_parallax_layers(size)
 
 	player.scale = _scale_for_vehicle_in_lane(
 		"player_tricycle",
@@ -1951,19 +1958,44 @@ func _distance_scale() -> float:
 	return BASE_DISTANCE_SCALE * player_distance_gain_x
 
 
-func _background_cover_scale(size: Vector2) -> float:
-	return maxf(size.x / BG_TEXTURE.get_width(), size.y / BG_TEXTURE.get_height())
+func _layout_parallax_layers(size: Vector2) -> void:
+	for layer in parallax_layers:
+		var texture := layer["texture"] as Texture2D
+		if texture == null:
+			continue
+		var layer_scale := _background_cover_scale(texture, size)
+		layer["width"] = texture.get_width() * layer_scale
+		var layer_y := _background_y(texture, layer_scale, size)
+		var sprites: Array = layer.get("sprites", [])
+		for sprite_variant in sprites:
+			var sprite := sprite_variant as Sprite2D
+			if sprite == null:
+				continue
+			sprite.scale = Vector2(layer_scale, layer_scale)
+			sprite.position.y = layer_y
 
 
-func _background_y(bg_scale: float, size: Vector2) -> float:
-	return (size.y - BG_TEXTURE.get_height() * bg_scale) * 0.5
+func _background_cover_scale(texture: Texture2D, size: Vector2) -> float:
+	return maxf(size.x / texture.get_width(), size.y / texture.get_height())
+
+
+func _background_y(texture: Texture2D, bg_scale: float, size: Vector2) -> float:
+	return (size.y - texture.get_height() * bg_scale) * 0.5
 
 
 func _update_background() -> void:
-	var bg_x := -fmod(distance * 16.0, bg_width)
-	var bg_y := _background_y(bg_a.scale.y, get_viewport_rect().size)
-	bg_a.position = Vector2(bg_x, bg_y)
-	bg_b.position = Vector2(bg_x + bg_width, bg_y)
+	for layer in parallax_layers:
+		var layer_width := float(layer.get("width", 1280.0))
+		if layer_width <= 0.0:
+			continue
+		var layer_speed := float(layer.get("speed", 1.0))
+		var bg_x := -fmod(distance * 16.0 * layer_speed, layer_width)
+		var sprites: Array = layer.get("sprites", [])
+		for index in range(sprites.size()):
+			var sprite := sprites[index] as Sprite2D
+			if sprite == null:
+				continue
+			sprite.position.x = bg_x + layer_width * index
 
 
 func _update_ui() -> void:

@@ -7,6 +7,7 @@ const DIAL_BG_COLOR := Color(0.03, 0.04, 0.05, 0.72)
 const DIAL_BG_RING_COLOR := Color(0.18, 0.20, 0.22, 0.76)
 const DIAL_START_DEGREES := 200.0
 const DIAL_END_DEGREES := 340.0
+const NEEDLE_SHAKE_MAX_DEGREES := 2.2
 
 var speed_kmh := 0
 var speed_ratio := 0.0
@@ -99,7 +100,9 @@ func _draw_ticks(center: Vector2, radius: float, start_angle: float, end_angle: 
 
 
 func _draw_needle(center: Vector2, radius: float, start_angle: float, end_angle: float) -> void:
-	var angle := lerpf(start_angle, end_angle, speed_ratio)
+	var shake_strength := clampf(speed_ratio, 0.08, 1.0)
+	var shake := sin(Time.get_ticks_msec() * 0.032) * deg_to_rad(NEEDLE_SHAKE_MAX_DEGREES) * shake_strength
+	var angle := lerpf(start_angle, end_angle, speed_ratio) + shake
 	var tip := center + Vector2(cos(angle), sin(angle)) * (radius - 20.0)
 	var tail := center - Vector2(cos(angle), sin(angle)) * 10.0
 	draw_line(tail, tip, Color(0.90, 0.26, 0.18, 1.0), 4.0)
