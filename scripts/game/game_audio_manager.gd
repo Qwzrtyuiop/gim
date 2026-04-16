@@ -94,4 +94,8 @@ func _get_stage_bgm_pool(stage_time_of_day: String, stage_traffic: String) -> Ar
 
 
 func _load_audio_stream(path: String):
-	return load(path)
+	var stream = load(path)
+	if stream is AudioStreamMP3:
+		stream = stream.duplicate()
+		stream.loop = true
+	return stream
