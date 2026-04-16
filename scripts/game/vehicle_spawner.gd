@@ -2,6 +2,7 @@ extends RefCounted
 
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameRandom := preload("res://scripts/game/game_random.gd")
+const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleSpawnScheduler := preload("res://scripts/game/vehicle_spawn_scheduler.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
@@ -86,7 +87,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 		)
 	)
 	sprite.z_index = VehicleGeometry.z_for_lane(owner, lane_index, owner.PARKED_VEHICLE_Z_OFFSET if is_parked else 0)
-	if not spawn_hitbox_is_clear(owner, sprite, lane_index):
+	if not spawn_hitbox_is_clear(owner, sprite, lane_index, spawn_side, world_speed):
 		return false
 
 	owner.add_child(sprite)
@@ -162,12 +163,15 @@ static func spawn_speeder(owner) -> void:
 	})
 
 
-static func spawn_hitbox_is_clear(owner, sprite: Sprite2D, lane_index: int) -> bool:
+static func spawn_hitbox_is_clear(owner, sprite: Sprite2D, lane_index: int, spawn_side: String, world_speed: float) -> bool:
 	var spawn_rect: Rect2 = VehicleGeometry.collision_rect(sprite, owner.VEHICLE_HITBOX_INSET, owner)
 	var padded_spawn_rect := Rect2(
 		spawn_rect.position - Vector2(SPAWN_HITBOX_CLEARANCE_X, 0.0),
 		spawn_rect.size + Vector2(SPAWN_HITBOX_CLEARANCE_X * 2.0, 0.0)
 	)
+	if not spawn_is_clear_of_player(owner, padded_spawn_rect, lane_index, spawn_side, world_speed):
+		return false
+
 	for entity in owner.active_entities:
 		if int(entity.get("lane", -1)) != lane_index:
 			continue
@@ -176,3 +180,33 @@ static func spawn_hitbox_is_clear(owner, sprite: Sprite2D, lane_index: int) -> b
 		if padded_spawn_rect.intersects(other_rect):
 			return false
 	return true
+
+
+static func spawn_is_clear_of_player(owner, spawn_rect: Rect2, lane_index: int, spawn_side: String, world_speed: float) -> bool:
+	if owner.player == null or not is_instance_valid(owner.player):
+		return true
+	if absi(lane_index - owner.player_lane) > 1:
+		return true
+
+	var future_rect := spawn_rect
+	var movement_side := BusyTrafficBehavior.LEFT_SPAWN_SIDE if lane_index != 0 or spawn_side == BusyTrafficBehavior.LEFT_SPAWN_SIDE else BusyTrafficBehavior.RIGHT_SPAWN_SIDE
+	var screen_velocity: float = VehicleBehaviors.screen_velocity_for_spawn_side(
+		lane_index,
+		"traffic",
+		movement_side,
+		world_speed,
+		owner.player_speed
+	)
+	future_rect.position.x += screen_velocity * owner.player_lane_change_prediction_seconds
+	var swept_spawn_rect := spawn_rect.merge(future_rect)
+	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
+	var player_safety_rect := Rect2(
+		player_rect.position - Vector2(owner.player_lane_change_back_padding, owner.player_lane_change_side_padding),
+		player_rect.size + Vector2(
+			owner.player_lane_change_back_padding + owner.player_lane_change_front_padding,
+			owner.player_lane_change_side_padding * 2.0
+		)
+	)
+	if lane_index == owner.player_lane:
+		return not swept_spawn_rect.intersects(player_safety_rect)
+	return not (swept_spawn_rect.position.x <= player_safety_rect.position.x + player_safety_rect.size.x and player_safety_rect.position.x <= swept_spawn_rect.position.x + swept_spawn_rect.size.x)

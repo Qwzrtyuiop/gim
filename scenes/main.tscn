@@ -88,7 +88,7 @@ color = Color(0, 0, 0, 0.34)
 polygon = PackedVector2Array(-260, 185, -187.2, 147.5, 0, 152.75, 187.2, 147.5, 260, 185, 187.2, 222.5, 0, 217.25, -187.2, 222.5)
 
 [node name="GraySedanReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1110818240]
-position = Vector2(150, 415)
+position = Vector2(904, 330.99997)
 scale = Vector2(0.38, 0.38)
 texture = ExtResource("6_vyico")
 
@@ -108,8 +108,8 @@ color = Color(0, 0, 0, 0.34)
 polygon = PackedVector2Array(-260, 125, -187.2, 97.5, 0, 101.35, 187.2, 97.5, 260, 125, 187.2, 152.5, 0, 148.65, -187.2, 152.5)
 
 [node name="MotorcycleReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=2134990558]
-position = Vector2(161.51128, 610.235)
-scale = Vector2(0.3812773, 0.38127735)
+position = Vector2(588.3779, 466.6175)
+scale = Vector2(0.34027374, 0.34027377)
 texture = ExtResource("8_kw13x")
 
 [node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/MotorcycleReference" unique_id=2113173698]
@@ -118,8 +118,8 @@ color = Color(0, 0, 0, 0.34)
 polygon = PackedVector2Array(-115, 105, -82.8, 82.5, 0, 85.65, 82.8, 82.5, 115, 105, 82.8, 127.5, 0, 124.35, -82.8, 127.5)
 
 [node name="SedanReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1264735215]
-position = Vector2(360, 205)
-scale = Vector2(0.38, 0.38)
+position = Vector2(189.00006, 400.00003)
+scale = Vector2(0.3924793, 0.3924793)
 texture = ExtResource("9_c7lel")
 
 [node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/SedanReference" unique_id=815794400]
@@ -138,8 +138,8 @@ color = Color(0, 0, 0, 0.34)
 polygon = PackedVector2Array(-260, 185, -187.2, 147.5, 0, 152.75, 187.2, 147.5, 260, 185, 187.2, 222.5, 0, 217.25, -187.2, 222.5)
 
 [node name="VendorTricycleReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1030399335]
-position = Vector2(369.85358, 426.77252)
-scale = Vector2(0.35853976, 0.35853976)
+position = Vector2(507, 464.99997)
+scale = Vector2(0.3179131, 0.3179131)
 texture = ExtResource("7_abbt5")
 
 [node name="Shadow" type="Polygon2D" parent="EditorPreview/VehicleScaleReferences/VendorTricycleReference" unique_id=379667320]
@@ -148,7 +148,7 @@ color = Color(0, 0, 0, 0.34)
 polygon = PackedVector2Array(-135, 135, -97.2, 110, 0, 113.5, 97.2, 110, 135, 135, 97.2, 160, 0, 156.5, -97.2, 160)
 
 [node name="BeetleReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=522359185]
-position = Vector2(903, 419)
+position = Vector2(766.99994, 337)
 scale = Vector2(0.38, 0.38)
 texture = ExtResource("12_beetle")
 
@@ -158,7 +158,7 @@ scale = Vector2(0.5341668, 0.5341668)
 texture = ExtResource("17_van")
 
 [node name="BusReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=1361351514]
-position = Vector2(431.99994, 494)
+position = Vector2(617, 302)
 scale = Vector2(0.52562946, 0.52562946)
 texture = ExtResource("13_bus")
 
@@ -173,7 +173,7 @@ scale = Vector2(0.35999998, 0.35999998)
 texture = ExtResource("15_parkedmoped")
 
 [node name="ParkedTruckReference" type="Sprite2D" parent="EditorPreview/VehicleScaleReferences" unique_id=665436007]
-position = Vector2(778.0568, 326.285)
+position = Vector2(588, 334.00003)
 scale = Vector2(0.42791852, 0.42791852)
 texture = ExtResource("16_parkedtruck")
 

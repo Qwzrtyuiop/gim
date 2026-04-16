@@ -71,7 +71,7 @@ static func overtake_lane_order(lane_index: int) -> Array[int]:
 		0:
 			return []
 		1:
-			return [2]
+			return [0, 2]
 		2:
 			return [1]
 	return [1, 2]

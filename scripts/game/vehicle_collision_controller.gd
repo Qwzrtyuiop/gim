@@ -7,6 +7,8 @@ const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_co
 static func collision_detail(owner) -> String:
 	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
 	for entity in owner.active_entities:
+		if VehicleTrafficController.entity_collision_disabled(entity):
+			continue
 		if entity["lane"] != owner.player_lane:
 			continue
 		if bool(entity.get("parked_hitbox_disabled", false)):
@@ -16,6 +18,9 @@ static func collision_detail(owner) -> String:
 		if player_rect.intersects(entity_rect):
 			if is_safe_low_speed_parked_contact(owner, entity):
 				entity["parked_hitbox_disabled"] = true
+				continue
+			if VehicleTrafficController.lane_change_fault_is_active(entity):
+				VehicleTrafficController.deflect_lane_change_fault(owner, entity)
 				continue
 			return "Collision in the %s lane. Space/R to retry." % owner.LANE_NAMES[entity["lane"]]
 	return ""

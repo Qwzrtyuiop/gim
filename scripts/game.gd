@@ -152,10 +152,10 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 900.0, 5.0) var player_start_speed := 320.0
 @export_range(0.0, 900.0, 5.0) var player_min_cruise_speed := 180.0
 @export_range(0.0, 1200.0, 5.0) var player_max_speed := 560.0
-@export_range(0.0, 1200.0, 5.0) var player_acceleration := 230.0
+@export_range(0.0, 1200.0, 5.0) var player_acceleration := 280.0
 @export_range(0.0, 5.0, 0.05) var player_acceleration_x := 1.0
 @export_range(0.0, 5.0, 0.05) var bottom_lane_player_acceleration_x := 1.0
-@export_range(0.0, 1200.0, 5.0) var player_brake_deceleration := 230.0
+@export_range(0.0, 1200.0, 5.0) var player_brake_deceleration := 280.0
 @export_range(0.0, 5.0, 0.05) var player_brake_x := 1.0
 @export_range(0.0, 1200.0, 5.0) var player_coast_deceleration := 85.0
 @export_range(0.0, 5.0, 0.05) var player_coast_x := 1.0
@@ -198,6 +198,8 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 2.0, 0.01) var npc_overtake_chance_per_second := 0.45
 @export_range(0.0, 500.0, 5.0) var npc_overtake_speed_boost := 170.0
 @export_range(0.1, 5.0, 0.1) var npc_overtake_speed_boost_seconds := 1.6
+@export_range(0.0, 700.0, 5.0) var top_lane_overtake_speed_boost := 280.0
+@export_range(0.1, 8.0, 0.1) var top_lane_overtake_speed_boost_seconds := 4.0
 @export_range(0.0, 600.0, 5.0) var stage_clear_min_exit_speed := 180.0
 @export_range(0.0, 600.0, 5.0) var stage_clear_player_exit_speed := 120.0
 @export_range(0.1, 5.0, 0.05) var stage_clear_fade_seconds := 0.9
@@ -211,6 +213,19 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(1.0, 20.0, 0.5) var speeder_lane_change_lerp_speed := 8.0
 @export_range(80.0, 800.0, 10.0) var speeder_avoid_lookahead := 360.0
 @export_range(40.0, 400.0, 10.0) var speeder_safe_gap := 150.0
+
+@export_group("Fairness")
+@export_range(0.0, 400.0, 5.0) var player_lane_change_front_padding := 120.0
+@export_range(0.0, 400.0, 5.0) var player_lane_change_back_padding := 150.0
+@export_range(0.0, 120.0, 2.0) var player_lane_change_side_padding := 36.0
+@export_range(0.0, 3.0, 0.05) var player_lane_change_prediction_seconds := 1.2
+@export_range(0.0, 220.0, 5.0) var npc_lane_change_planning_padding_x := 64.0
+@export_range(0.0, 80.0, 2.0) var npc_lane_change_planning_padding_y := 18.0
+@export_range(0.0, 2.0, 0.05) var npc_lane_change_fault_grace_seconds := 0.65
+@export_range(0.0, 260.0, 5.0) var pin_pressure_front_gap := 115.0
+@export_range(0.0, 260.0, 5.0) var pin_pressure_rear_gap := 155.0
+@export_range(0.0, 360.0, 5.0) var pin_pressure_escape_lane_gap := 190.0
+@export_range(0.0, 1.0, 0.05) var bottom_lane_lane_change_chance_x := 0.35
 
 @export_group("Stage Rewards")
 @export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.08

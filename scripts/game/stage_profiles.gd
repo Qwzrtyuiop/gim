@@ -9,10 +9,10 @@ const DEFAULT_STAGE_PROFILE := {
 	"player_start_speed": 320.0,
 	"player_min_cruise_speed": 180.0,
 	"player_max_speed": 560.0,
-	"player_acceleration": 230.0,
+	"player_acceleration": 280.0,
 	"player_acceleration_x": 1.0,
 	"bottom_lane_player_acceleration_x": 1.0,
-	"player_brake_deceleration": 230.0,
+	"player_brake_deceleration": 280.0,
 	"player_brake_x": 1.0,
 	"player_coast_deceleration": 85.0,
 	"player_coast_x": 1.0,
@@ -65,6 +65,19 @@ const DEFAULT_STAGE_PROFILE := {
 	"speeder_lane_change_lerp_speed": 8.0,
 	"speeder_avoid_lookahead": 360.0,
 	"speeder_safe_gap": 150.0,
+	"player_lane_change_front_padding": 120.0,
+	"player_lane_change_back_padding": 150.0,
+	"player_lane_change_side_padding": 36.0,
+	"player_lane_change_prediction_seconds": 1.2,
+	"npc_lane_change_planning_padding_x": 64.0,
+	"npc_lane_change_planning_padding_y": 18.0,
+	"npc_lane_change_fault_grace_seconds": 0.65,
+	"pin_pressure_front_gap": 115.0,
+	"pin_pressure_rear_gap": 155.0,
+	"pin_pressure_escape_lane_gap": 190.0,
+	"bottom_lane_lane_change_chance_x": 0.35,
+	"top_lane_overtake_speed_boost": 280.0,
+	"top_lane_overtake_speed_boost_seconds": 4.0,
 }
 
 const DIFFICULTY_PROFILES := {
@@ -165,6 +178,6 @@ const TRAFFIC_PROFILES := {
 
 const BACKGROUND_PROFILES := {
 	"barangay-streets": {
-		"bottom_lane_player_acceleration_x": 0.45,
+		"bottom_lane_player_acceleration_x": 0.65,
 	}
 }

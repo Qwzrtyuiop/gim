@@ -4,18 +4,18 @@ extends RefCounted
 static func speeder_overtake_lane_order(lane_index: int) -> Array[int]:
 	match lane_index:
 		0:
-			return []
+			return [1, 2]
 		1:
-			return [2]
+			return [0, 2]
 		2:
-			return [1]
-	return [1, 2]
+			return [0, 1]
+	return [0, 1, 2]
 
 
 static func overtake_lane_order(lane_index: int) -> Array[int]:
 	match lane_index:
 		1:
-			return [2]
+			return [0, 2]
 		2:
 			return [1]
 	return []
