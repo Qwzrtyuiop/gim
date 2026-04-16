@@ -38,6 +38,7 @@ const DEFAULT_STAGE_PROFILE := {
 	"main_vehicle_max_speed": 280.0,
 	"shoulder_vehicle_min_speed": 35.0,
 	"shoulder_vehicle_max_speed": 95.0,
+	"bottom_lane_vehicle_max_speed": 140.0,
 	"vehicle_speed_change_min_delay": 1.2,
 	"vehicle_speed_change_max_delay": 3.8,
 	"vehicle_speed_acceleration": 120.0,
@@ -98,7 +99,16 @@ const TIME_PROFILES := {
 }
 
 const TRAFFIC_PROFILES := {
-	"chill": {},
+	"chill": {
+		"incoming_spawn_min_delay": 22.0,
+		"incoming_spawn_max_delay": 34.0,
+		"main_spawn_min_delay": 8.0,
+		"main_spawn_max_delay": 12.5,
+		"shoulder_spawn_min_delay": 22.0,
+		"shoulder_spawn_max_delay": 36.0,
+		"spawn_delay_progress_reduction": 0.06,
+		"shoulder_parked_chance": 0.42,
+	},
 	"normal": {
 		"incoming_spawn_min_delay": 10.0,
 		"incoming_spawn_max_delay": 16.0,

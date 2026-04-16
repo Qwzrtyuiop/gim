@@ -10,7 +10,7 @@ static func player_upgrade_modifiers() -> Dictionary:
 	var tires_level := PlayerState.get_upgrade_level("tire_grip")
 	return {
 		"player_acceleration_x": 1.0 + engine_level * 0.2,
-		"player_max_speed": 1.0 + engine_level * 0.75,
+		"player_max_speed": 1.0 + engine_level * 0.2,
 		"player_brake_x": 1.0 + brakes_level * 0.10,
 		"player_lane_lerp_x": 1.0 + tires_level * 0.08,
 	}

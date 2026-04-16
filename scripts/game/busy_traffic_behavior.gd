@@ -69,9 +69,9 @@ static func speed_range_for_spawn_side(min_speed: float, max_speed: float, side:
 static func overtake_lane_order(lane_index: int) -> Array[int]:
 	match lane_index:
 		0:
-			return [1, 2]
+			return []
 		1:
-			return [0, 2]
+			return [2]
 		2:
-			return [1, 0]
-	return [1, 0, 2]
+			return [1]
+	return [1, 2]

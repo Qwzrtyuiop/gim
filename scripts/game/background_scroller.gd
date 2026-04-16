@@ -40,9 +40,9 @@ func layout(size: Vector2) -> void:
 		var tile_y := (size.y - texture.get_height() * tile_scale) * 0.5
 		var sprites: Array = tile.get("sprites", [])
 		for sprite_variant in sprites:
-			var sprite := sprite_variant as Sprite2D
-			if sprite == null:
+			if sprite_variant == null or not is_instance_valid(sprite_variant) or not sprite_variant is Sprite2D:
 				continue
+			var sprite: Sprite2D = sprite_variant
 			sprite.scale = Vector2(tile_scale, tile_scale)
 			sprite.position.y = tile_y
 
@@ -56,9 +56,10 @@ func update(distance: float) -> void:
 		var background_x := -fmod(distance * 16.0, tile_width)
 		var sprites: Array = tile.get("sprites", [])
 		for index in range(sprites.size()):
-			var sprite := sprites[index] as Sprite2D
-			if sprite == null:
+			var sprite_variant = sprites[index]
+			if sprite_variant == null or not is_instance_valid(sprite_variant) or not sprite_variant is Sprite2D:
 				continue
+			var sprite: Sprite2D = sprite_variant
 			sprite.position.x = background_x + tile_width * index
 
 
