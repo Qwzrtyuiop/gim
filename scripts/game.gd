@@ -381,6 +381,7 @@ func _ready() -> void:
 	GameEnvironmentController.create_ui(self, gameplay_entry_fade_seconds)
 	stage_tutorial = StageTutorialController.new()
 	audio_manager.start_stage_bgm(stage_time_of_day, stage_traffic, rng)
+	audio_manager.start_rain_loop_bgm(stage_weather)
 	GameEnvironmentController.layout_scene(self)
 	GameEnvironmentController.begin_gameplay_entry_fade(self)
 	StageTutorialController.schedule(self)

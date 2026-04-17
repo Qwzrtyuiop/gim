@@ -138,6 +138,8 @@ var last_seen_story_id := ""
 var event_values: Dictionary = {}
 var resume_scene_path := ""
 var ride_select_tutorial_shown := false
+var store_tutorial_shown := false
+var home_tutorial_shown := false
 var _is_loading_save := false
 var _suppress_auto_save := false
 var _has_deferred_save := false
@@ -282,6 +284,28 @@ func mark_ride_select_tutorial_shown() -> void:
 	if ride_select_tutorial_shown:
 		return
 	ride_select_tutorial_shown = true
+	save_progress()
+
+
+func has_store_tutorial_shown() -> bool:
+	return store_tutorial_shown
+
+
+func mark_store_tutorial_shown() -> void:
+	if store_tutorial_shown:
+		return
+	store_tutorial_shown = true
+	save_progress()
+
+
+func has_home_tutorial_shown() -> bool:
+	return home_tutorial_shown
+
+
+func mark_home_tutorial_shown() -> void:
+	if home_tutorial_shown:
+		return
+	home_tutorial_shown = true
 	save_progress()
 
 
@@ -1510,6 +1534,8 @@ func reset() -> void:
 	event_values.clear()
 	resume_scene_path = ""
 	ride_select_tutorial_shown = false
+	store_tutorial_shown = false
+	home_tutorial_shown = false
 	_has_deferred_save = false
 	_suppress_auto_save = false
 	_reset_story_triggers()

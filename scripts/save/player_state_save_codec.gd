@@ -108,6 +108,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
 	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
+	player_state.store_tutorial_shown = bool(save_data.get("store_tutorial_shown", player_state.store_tutorial_shown))
+	player_state.home_tutorial_shown = bool(save_data.get("home_tutorial_shown", player_state.home_tutorial_shown))
 	player_state._is_loading_save = false
 	if needs_story_trigger_save or needs_migration_save:
 		player_state.save_progress()
@@ -177,5 +179,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"event_values": player_state.event_values.duplicate(true),
 		"resume_scene_path": player_state.resume_scene_path,
 		"ride_select_tutorial_shown": player_state.ride_select_tutorial_shown,
+		"store_tutorial_shown": player_state.store_tutorial_shown,
+		"home_tutorial_shown": player_state.home_tutorial_shown,
 	}
 	ResourceSaver.save(save_resource, save_path)
