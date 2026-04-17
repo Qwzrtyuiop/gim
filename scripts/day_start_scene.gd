@@ -9,8 +9,13 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const HOME_REST_FADE_SECONDS := 0.28
+const CRT_LINE_SPACING := 7.0
+const CRT_LINE_ALPHA := 0.16
 
 @onready var header_label: Label = $HeaderLabel
+@onready var news_panel: Panel = $NewsPanel
+@onready var news_label: Label = $NewsPanel/NewsLabel
+@onready var crt_lines: Control = $NewsPanel/CrtLines
 @onready var status_label: Label = $StatusLabel
 @onready var night_filter: ColorRect = $NightFilter
 @onready var rest_button: BaseButton = $BreakButtons/RestButton
@@ -39,12 +44,14 @@ func _ready() -> void:
 		return
 
 	_create_stats_row()
+	PlayerState.ensure_daily_conditions_for_current_day()
 	ButtonGlow.attach(self, rest_button)
 	ButtonGlow.attach(self, store_button)
 	ButtonGlow.attach(self, ride_button)
 	rest_button.pressed.connect(_rest_then_noon)
 	store_button.pressed.connect(_open_store)
 	ride_button.pressed.connect(_ride_now)
+	call_deferred("_build_crt_lines")
 	_render_day_start()
 	rest_button.grab_focus()
 
@@ -67,19 +74,50 @@ func _render_day_start() -> void:
 	var current_time := PlayerState.get_current_time_of_day()
 	_refresh_stats_row()
 	night_filter.visible = current_time == "night"
+	_render_daily_news()
 	header_label.text = "DAY %d\n%s At Home" % [
 		PlayerState.get_current_day(),
 		current_time.capitalize(),
 	]
-	var rest_note := "Rest: stay home, recover +1 energy, and move to noon."
+	var rest_note := "Rest: stay home, recover +2 energy, and move to noon."
 	if current_time == "noon":
-		rest_note = "Rest: stay home, recover +1 energy, and move to night."
+		rest_note = "Rest: stay home, recover +2 energy, and move to night."
 	if current_time == "night":
-		rest_note = "Rest: sleep, recover +1 energy, then start the next day at home."
+		rest_note = "Rest: sleep, recover +3 energy, then start the next day at home."
 	status_label.text = "%s\n%s" % [
 		PlayerState.get_debt_status_text(),
 		rest_note,
 	]
+
+
+func _render_daily_news() -> void:
+	var should_show_news: bool = PlayerState.get_current_day() >= 2
+	news_panel.visible = should_show_news
+	if should_show_news:
+		news_label.text = PlayerState.get_daily_news_text()
+
+
+func _build_crt_lines() -> void:
+	if crt_lines == null:
+		return
+	for child in crt_lines.get_children():
+		child.queue_free()
+
+	var line_area_height: float = crt_lines.size.y
+	if line_area_height <= 0.0:
+		line_area_height = 150.0
+	var line_count: int = ceili(line_area_height / CRT_LINE_SPACING)
+	for index in range(line_count):
+		var line: ColorRect = ColorRect.new()
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.color = Color(0.0, 0.0, 0.0, CRT_LINE_ALPHA)
+		line.anchor_left = 0.0
+		line.anchor_right = 1.0
+		line.offset_left = 0.0
+		line.offset_right = 0.0
+		line.offset_top = float(index) * CRT_LINE_SPACING
+		line.offset_bottom = line.offset_top + 1.0
+		crt_lines.add_child(line)
 
 
 func _ride_now() -> void:
@@ -134,7 +172,7 @@ func _transition_home_rest(next_time: String) -> void:
 	_set_buttons_disabled(true)
 	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
 	PlayerState.record_rest()
-	PlayerState.add_energy(1)
+	PlayerState.add_energy(2)
 	PlayerState.set_current_stage_time(next_time)
 	_render_day_start()
 	await _fade_overlay_to(0.0, HOME_REST_FADE_SECONDS)

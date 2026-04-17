@@ -37,3 +37,7 @@ static func is_accelerating() -> bool:
 
 static func is_braking() -> bool:
 	return Input.is_action_pressed("ui_left") or Input.is_key_pressed(KEY_A)
+
+
+static func is_boosting() -> bool:
+	return Input.is_key_pressed(KEY_SHIFT)

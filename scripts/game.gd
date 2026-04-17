@@ -169,6 +169,11 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_frequency := 0.018
 @export_range(0.0, 4.0, 0.05) var player_wiggle_intensity_x := 1.0
 
+@export_group("Boost")
+@export_range(1.0, 2.0, 0.01) var player_boost_max_speed_x := 1.2
+@export_range(1.0, 3.0, 0.05) var player_boost_acceleration_x := 1.4
+@export_range(0.0, 20.0, 0.1) var boost_gas_consumption_percent_per_second := 1.5
+
 @export_group("Spawn Frequency")
 @export_range(0.15, 60.0, 0.05) var incoming_spawn_min_delay := 18.0
 @export_range(0.15, 60.0, 0.05) var incoming_spawn_max_delay := 28.0
@@ -318,6 +323,8 @@ var special_mode_hidden_modifiers := {}
 var gameplay_entry_fade_seconds := 0.0
 var rolled_target_distance := 0.0
 var rolled_target_stage_type := ""
+var boost_active := false
+var boost_gas_save_timer := 0.0
 
 
 func _ready() -> void:

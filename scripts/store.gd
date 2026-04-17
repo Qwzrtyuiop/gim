@@ -11,7 +11,7 @@ const FAIL_FADE_SECONDS := 0.35
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
 const TIER_BORDER_COLOR := Color(0.23, 0.16, 0.10, 0.92)
-const LAST_ENERGY_WARNING := "Start the next day with your last energy?\nIf this trip goes bad, the run ends."
+const LAST_ENERGY_WARNING := "Start the next day with critically low energy?\nYour vehicle will handle worse until John recovers."
 const ROW_BG_COLOR := Color(0.93, 0.88, 0.78, 0.76)
 const ROW_BORDER_COLOR := Color(0.34, 0.22, 0.12, 0.86)
 const BUY_BUTTON_BG := Color(0.46, 0.29, 0.17, 0.95)
@@ -53,31 +53,31 @@ const STORE_ITEMS := [
 		"description": "Restore energy. May cause negative effects",
 		"cost": 25,
 		"type": "energy",
-		"energy": 1,
+		"energy": 2,
 	},
 	
 	{
 		"id": "energy_snack",
 		"name": "Energy Bar",
-		"description": "Restore 1 energy",
+		"description": "Restore 2 energy",
 		"cost": 50,
 		"type": "energy",
-		"energy": 1,
+		"energy": 2,
 	},
 	{
 		"id": "full_meal",
 		"name": "Budget Meal",
-		"description": "Restore 3 energy",
+		"description": "Restore 5 energy",
 		"cost": 120,
 		"type": "energy",
-		"energy": 3,
+		"energy": 5,
 	},
 	{
 		"id": "gas_can",
 		"name": "Gas Can",
-		"description": "Add 1 gas",
+		"description": "Add 10% gas",
 		"type": "gas",
-		"gas": 1,
+		"gas": 10.0,
 	},
 ]
 
@@ -95,6 +95,7 @@ var bgm_player: AudioStreamPlayer
 
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/store.tscn")
+	PlayerState.ensure_daily_conditions_for_current_day()
 	_create_stats_row()
 	_refresh_back_button()
 	back_button.pressed.connect(_back_to_selection)
@@ -175,7 +176,10 @@ func _item_text(item: Dictionary) -> String:
 			description = "Restore %d energy. Continued usage will lead to severe consequences." % PlayerState.get_yosi_energy_restore()
 		else:
 			description = "Restore %d energy. May cause negative effects" % PlayerState.get_yosi_energy_restore()
-	var text := "%s  PhP %d\n%s" % [item["name"], _item_cost(item), description]
+	var cost_text: String = "PhP %d" % _item_cost(item)
+	if item["type"] == "gas":
+		cost_text = PlayerState.get_gas_price_text()
+	var text: String = "%s  %s\n%s" % [item["name"], cost_text, description]
 	if item["type"] == "upgrade":
 		text += "  Lv %d/%d" % [
 			PlayerState.get_upgrade_level(item["id"]),
@@ -219,8 +223,8 @@ func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxConta
 		status_label.text = "%s restored energy." % item["name"]
 	elif item["type"] == "gas":
 		var gas_before := PlayerState.gas
-		PlayerState.add_gas(int(item.get("gas", 0)))
-		status_label.text = "%s added %d gas." % [item["name"], PlayerState.gas - gas_before]
+		PlayerState.add_gas(float(item.get("gas", PlayerState.GAS_CAN_PERCENT)))
+		status_label.text = "%s added %.1f%% gas." % [item["name"], PlayerState.gas - gas_before]
 
 	label.text = _item_text(item)
 	_refresh_buy_button(item, button)
@@ -229,8 +233,8 @@ func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxConta
 
 func _refresh_header() -> void:
 	_refresh_stats_row()
-	money_label.text = "Gas Price: PhP %d\n%s" % [
-		PlayerState.get_gas_price(),
+	money_label.text = "Gas Price: %s / 10%%\n%s" % [
+		PlayerState.get_gas_price_text(),
 		PlayerState.get_debt_status_text(),
 	]
 
@@ -439,7 +443,7 @@ func _make_buy_button_style(color: Color) -> StyleBoxFlat:
 
 
 func _attempt_ride() -> void:
-	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy == 1:
+	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= 2:
 		ride_confirm_dialog.popup_centered()
 		return
 
@@ -448,7 +452,7 @@ func _attempt_ride() -> void:
 
 func _create_dialogs() -> void:
 	ride_confirm_dialog = ConfirmationDialog.new()
-	ride_confirm_dialog.title = "Last Energy"
+	ride_confirm_dialog.title = "Low Energy"
 	ride_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
 	ride_confirm_dialog.get_ok_button().text = "START DAY"
 	ride_confirm_dialog.get_cancel_button().text = "BACK"

@@ -29,7 +29,7 @@ const ROAD_ACTOR_Z_STEP := 10
 const INCOMING_LANE_SCALE := 0.78
 const MAIN_LANE_SCALE := 1.0
 const RESET_HOLD_SECONDS := 1.4
-const LAST_ENERGY_WARNING := "Start the day with your last energy?\nIf this trip goes bad, the run ends."
+const LAST_ENERGY_WARNING := "Start the day with critically low energy?\nYour vehicle will handle worse until John recovers."
 const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
@@ -120,7 +120,7 @@ func _start_game() -> void:
 		return
 
 	PlayerState.begin_stage_sequence()
-	if PlayerState.energy == 1:
+	if PlayerState.energy <= 2:
 		start_confirm_dialog.popup_centered()
 		return
 
@@ -165,7 +165,7 @@ func _open_achievements_library() -> void:
 
 func _create_dialogs() -> void:
 	start_confirm_dialog = ConfirmationDialog.new()
-	start_confirm_dialog.title = "Last Energy"
+	start_confirm_dialog.title = "Low Energy"
 	start_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
 	start_confirm_dialog.get_ok_button().text = "START"
 	start_confirm_dialog.get_cancel_button().text = "BACK"

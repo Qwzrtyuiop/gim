@@ -7,7 +7,7 @@ const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const LAST_ENERGY_WARNING := "Start the next day with your last energy?\nIf this trip goes bad, the run ends."
+const LAST_ENERGY_WARNING := "Start the next day with critically low energy?\nYour vehicle will handle worse until John recovers."
 
 @onready var results_label: Label = $ResultsLabel
 @onready var status_label: Label = $StatusLabel
@@ -17,10 +17,12 @@ const LAST_ENERGY_WARNING := "Start the next day with your last energy?\nIf this
 
 var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
+var earnings_summary_label: Label
 
 
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/stage_results.tscn")
+	_create_earnings_summary_label()
 	_create_stats_row()
 	ButtonGlow.attach(self, rest_button)
 	ButtonGlow.attach(self, store_button)
@@ -65,6 +67,7 @@ func _render_results(result: Dictionary) -> void:
 		bonus,
 		total,
 	]
+	_render_earnings_summary(total)
 
 	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage()
 	rest_button.visible = allow_rest
@@ -79,12 +82,12 @@ func _render_results(result: Dictionary) -> void:
 
 	var rest_note := ""
 	if is_night_stage:
-		rest_note = "Rest: sleep, recover +1 energy, then choose a morning trip."
+		rest_note = "Rest: sleep, recover +3 energy, then choose a morning trip."
 	elif allow_rest:
 		if time_of_day == "morning":
-			rest_note = "Rest: recover +1 energy, then return home for night."
+			rest_note = "Rest: recover +2 energy, then return home for night."
 		elif time_of_day == "noon":
-			rest_note = "Rest: sleep, recover +3 energy, then choose a morning trip."
+			rest_note = "Rest: sleep, recover +5 energy, then choose a morning trip."
 	elif time_of_day == "morning" or time_of_day == "noon":
 		rest_note = "Rest already used for Day %d." % PlayerState.get_current_day()
 
@@ -138,8 +141,24 @@ func _refresh_status(note := "") -> void:
 		status_label.text += "\n%s" % note
 
 
+func _render_earnings_summary(total: int) -> void:
+	if earnings_summary_label == null:
+		return
+
+	var weekly_goal := PlayerState.get_current_weekly_goal()
+	if weekly_goal <= 0:
+		earnings_summary_label.text = "You just earned PhP %d.\nWeekly goal already paid." % total
+		return
+
+	var goal_percent := float(total) / float(weekly_goal) * 100.0
+	earnings_summary_label.text = "You just earned PhP %d.\nThat's %.1f%% of your weekly goal." % [
+		total,
+		goal_percent,
+	]
+
+
 func _attempt_next_stage() -> void:
-	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy == 1:
+	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= 2:
 		ride_confirm_dialog.popup_centered()
 		return
 
@@ -148,12 +167,27 @@ func _attempt_next_stage() -> void:
 
 func _create_dialogs() -> void:
 	ride_confirm_dialog = ConfirmationDialog.new()
-	ride_confirm_dialog.title = "Last Energy"
+	ride_confirm_dialog.title = "Low Energy"
 	ride_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
 	ride_confirm_dialog.get_ok_button().text = "START DAY"
 	ride_confirm_dialog.get_cancel_button().text = "BACK"
 	ride_confirm_dialog.confirmed.connect(_next_stage)
 	add_child(ride_confirm_dialog)
+
+
+func _create_earnings_summary_label() -> void:
+	earnings_summary_label = Label.new()
+	earnings_summary_label.position = Vector2(180.0, 214.0)
+	earnings_summary_label.size = Vector2(920.0, 96.0)
+	earnings_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	earnings_summary_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	earnings_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	earnings_summary_label.add_theme_font_override("font", UI_FONT)
+	earnings_summary_label.add_theme_font_size_override("font_size", 15)
+	earnings_summary_label.add_theme_color_override("font_color", Color(0.25, 0.15, 0.08, 1.0))
+	earnings_summary_label.add_theme_color_override("font_outline_color", Color(0.95, 0.90, 0.78, 0.92))
+	earnings_summary_label.add_theme_constant_override("outline_size", 1)
+	add_child(earnings_summary_label)
 
 
 func _create_stats_row() -> void:
