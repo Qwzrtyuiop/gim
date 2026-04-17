@@ -11,13 +11,13 @@ static func collision_detail(owner) -> String:
 			continue
 		if entity["lane"] != owner.player_lane:
 			continue
-		if bool(entity.get("parked_hitbox_disabled", false)):
+		if bool(entity.get("low_speed_pass_hitbox_disabled", false)):
 			continue
 
 		var entity_rect: Rect2 = VehicleGeometry.collision_rect(entity["sprite"], owner.VEHICLE_HITBOX_INSET, owner)
 		if player_rect.intersects(entity_rect):
-			if is_safe_low_speed_parked_contact(owner, entity):
-				entity["parked_hitbox_disabled"] = true
+			if is_safe_low_speed_passing_contact(owner, entity):
+				entity["low_speed_pass_hitbox_disabled"] = true
 				continue
 			if VehicleTrafficController.lane_change_fault_is_active(entity):
 				VehicleTrafficController.deflect_lane_change_fault(owner, entity)
@@ -26,13 +26,16 @@ static func collision_detail(owner) -> String:
 	return ""
 
 
-static func is_safe_low_speed_parked_contact(owner, entity: Dictionary) -> bool:
+static func is_safe_low_speed_passing_contact(owner, entity: Dictionary) -> bool:
 	var speed_kmh := clampi(
 		roundi(owner.player_speed / owner.SPEEDOMETER_REFERENCE_MAX_SPEED * owner.SPEEDOMETER_BASE_MAX_KMH),
 		0,
 		owner.SPEEDOMETER_MAX_KMH
 	)
-	return bool(entity.get("is_parked", false)) and speed_kmh <= owner.PARKED_COLLISION_MIN_KMH
+	if speed_kmh > owner.PARKED_COLLISION_MIN_KMH:
+		return false
+
+	return bool(entity.get("is_parked", false))
 
 
 static func remove_vehicles_behind_player(owner) -> void:

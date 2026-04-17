@@ -177,13 +177,18 @@ func _create_dialogs() -> void:
 
 func _create_earnings_summary_label() -> void:
 	earnings_summary_label = Label.new()
-	earnings_summary_label.position = Vector2(180.0, 214.0)
-	earnings_summary_label.size = Vector2(920.0, 96.0)
+	earnings_summary_label.set_anchors_preset(Control.PRESET_CENTER)
+	earnings_summary_label.offset_left = -430.0
+	earnings_summary_label.offset_top = -46.0
+	earnings_summary_label.offset_right = 430.0
+	earnings_summary_label.offset_bottom = 18.0
+	earnings_summary_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	earnings_summary_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	earnings_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	earnings_summary_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	earnings_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	earnings_summary_label.add_theme_font_override("font", UI_FONT)
-	earnings_summary_label.add_theme_font_size_override("font_size", 15)
+	earnings_summary_label.add_theme_font_size_override("font_size", 13)
 	earnings_summary_label.add_theme_color_override("font_color", Color(0.25, 0.15, 0.08, 1.0))
 	earnings_summary_label.add_theme_color_override("font_outline_color", Color(0.95, 0.90, 0.78, 0.92))
 	earnings_summary_label.add_theme_constant_override("outline_size", 1)

@@ -64,6 +64,18 @@ static func apply_target_distance_roll(owner) -> void:
 	owner.target_distance = owner.rolled_target_distance
 
 
+static func apply_weather_modifiers(owner) -> void:
+	match owner.stage_weather:
+		"rain":
+			owner.player_brake_deceleration *= 0.85
+			owner.player_brake_x *= 0.85
+			owner.player_coast_deceleration *= 0.86
+		"heavy rain":
+			owner.player_brake_deceleration *= 0.72
+			owner.player_brake_x *= 0.75
+			owner.player_coast_deceleration *= 0.72
+
+
 static func apply_player_upgrades(owner) -> void:
 	var modifiers: Dictionary = GameEconomyManager.player_upgrade_modifiers()
 	owner.player_acceleration_x *= float(modifiers["player_acceleration_x"])

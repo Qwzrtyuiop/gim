@@ -45,6 +45,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.gas_price = int(save_data.get("gas_price", player_state.gas_price))
 	player_state.gas_price_delta = int(save_data.get("gas_price_delta", player_state.gas_price - player_state.DEFAULT_GAS_PRICE))
 	player_state.current_weather = str(save_data.get("current_weather", player_state.current_weather))
+	player_state.weather_forecasts = Dictionary(save_data.get("weather_forecasts", player_state.weather_forecasts)).duplicate(true)
+	player_state.weather_phase_cache = Dictionary(save_data.get("weather_phase_cache", player_state.weather_phase_cache)).duplicate(true)
 	player_state.daily_conditions_day = int(save_data.get("daily_conditions_day", 0))
 	player_state.karma = int(save_data.get("karma", player_state.karma))
 	player_state.current_stage_type = str(save_data.get("current_stage_type", player_state.current_stage_type))
@@ -127,6 +129,8 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"gas_price": player_state.gas_price,
 		"gas_price_delta": player_state.gas_price_delta,
 		"current_weather": player_state.current_weather,
+		"weather_forecasts": player_state.weather_forecasts.duplicate(true),
+		"weather_phase_cache": player_state.weather_phase_cache.duplicate(true),
 		"daily_conditions_day": player_state.daily_conditions_day,
 		"karma": player_state.karma,
 		"current_stage_type": player_state.current_stage_type,

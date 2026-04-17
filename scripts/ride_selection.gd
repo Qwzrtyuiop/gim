@@ -203,10 +203,11 @@ func _refresh_character_cards() -> void:
 
 		var preview_stage_type: String = _preview_stage_type(character)
 		panel.modulate = Color.WHITE
-		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d\nRisk: %s" % [
+		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d\nGas Est: ~%.1f%%\nRisk: %s" % [
 			str(character["name"]).to_upper(),
 			preview_stage_type,
 			PlayerState.estimate_stage_earnings(preview_stage_type),
+			PlayerState.estimate_stage_gas_usage(preview_stage_type),
 			_risk_label_for_stage_type(preview_stage_type),
 		]
 		if portrait != null:

@@ -25,12 +25,16 @@ const DEFAULT_MAX_ENERGY := 10
 const DEFAULT_STARTING_GAS_PERCENT := 100.0
 const DEFAULT_MAX_GAS_PERCENT := 100.0
 const GAS_CAN_PERCENT := 10.0
-const GAS_DRAIN_PERCENT_PER_1000_UNITS := 10.0
+const GAS_DRAIN_PERCENT_PER_1000_UNITS := 5.0
 const LOW_GAS_PERCENT_THRESHOLD := 20.0
 const DEFAULT_GAS_PRICE := 70
 const DAILY_GAS_PRICE_VARIANCE := 10
 const DEFAULT_WEATHER := "clear"
-const WEATHER_TYPES := ["clear", "cloudy", "rain", "heavy rain"]
+const WEATHER_CLOUDY := "cloudy"
+const WEATHER_RAIN := "rain"
+const WEATHER_HEAVY_RAIN := "heavy rain"
+const WEATHER_TYPES := [DEFAULT_WEATHER, WEATHER_CLOUDY, WEATHER_RAIN, WEATHER_HEAVY_RAIN]
+const WEATHER_SYSTEM_START_DAY := 2
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const TRANSITION_RIDE := "ride"
 const TRANSITION_CURRENT_STAGE := "current_stage"
@@ -159,6 +163,8 @@ var gas := DEFAULT_STARTING_GAS_PERCENT:
 var gas_price := DEFAULT_GAS_PRICE
 var gas_price_delta := 0
 var current_weather := DEFAULT_WEATHER
+var weather_forecasts: Dictionary = {}
+var weather_phase_cache: Dictionary = {}
 var daily_conditions_day := 1
 
 var karma := 0:
@@ -286,6 +292,9 @@ func begin_stage_sequence() -> void:
 	gas_price = DEFAULT_GAS_PRICE
 	gas_price_delta = 0
 	current_weather = DEFAULT_WEATHER
+	weather_forecasts.clear()
+	weather_forecasts[1] = DEFAULT_WEATHER
+	weather_phase_cache.clear()
 	daily_conditions_day = 1
 	pending_stage_energy_cost = false
 	clear_pending_trip_selection()
@@ -441,6 +450,12 @@ func get_distance_gas_cost(distance_units: float) -> float:
 	return maxf(0.0, distance_units) / 1000.0 * GAS_DRAIN_PERCENT_PER_1000_UNITS
 
 
+func estimate_stage_gas_usage(stage_type: String) -> float:
+	var parts := _parse_stage_type(stage_type)
+	var difficulty_key := str(parts.get("difficulty", "short"))
+	return get_distance_gas_cost(get_stage_distance_average(difficulty_key))
+
+
 func get_gas_price() -> int:
 	return max(0, gas_price)
 
@@ -467,29 +482,78 @@ func set_gas_price(price: int) -> void:
 
 
 func get_current_weather() -> String:
-	if WEATHER_TYPES.has(current_weather):
-		return current_weather
-	return DEFAULT_WEATHER
+	return get_stage_weather(get_current_time_of_day())
 
 
 func get_current_weather_text() -> String:
-	return get_current_weather().capitalize()
+	return weather_text(get_current_weather())
+
+
+func get_today_weather_forecast() -> String:
+	return get_weather_forecast_for_day(get_current_day())
+
+
+func get_tomorrow_weather_forecast() -> String:
+	return get_weather_forecast_for_day(get_current_day() + 1)
+
+
+func get_weather_forecast_for_day(day_number: int) -> String:
+	var safe_day: int = maxi(1, day_number)
+	_ensure_weather_forecast_for_day(safe_day)
+	return _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+
+
+func get_stage_weather(day_time := "") -> String:
+	var safe_day: int = get_current_day()
+	if safe_day < WEATHER_SYSTEM_START_DAY:
+		return DEFAULT_WEATHER
+
+	_ensure_weather_forecast_for_day(safe_day)
+	var safe_time: String = str(day_time).strip_edges().to_lower()
+	if not STAGE_TIMES.has(safe_time):
+		safe_time = get_current_time_of_day()
+	var phase_key: String = _weather_phase_key(safe_day, safe_time)
+	if not weather_phase_cache.has(phase_key):
+		weather_phase_cache[phase_key] = _roll_weather_for_phase(get_weather_forecast_for_day(safe_day), safe_time)
+		save_progress()
+
+	current_weather = _normalize_weather(str(weather_phase_cache.get(phase_key, DEFAULT_WEATHER)))
+	return current_weather
+
+
+func weather_text(weather_value: String) -> String:
+	var safe_weather: String = _normalize_weather(weather_value)
+	match safe_weather:
+		WEATHER_CLOUDY:
+			return "Cloudy"
+		WEATHER_RAIN:
+			return "Rain"
+		WEATHER_HEAVY_RAIN:
+			return "Heavy Rain"
+	return "Clear"
 
 
 func get_daily_news_text() -> String:
-	return "TODAY'S NEWS\nGas Price:   %s      10%%\nChange:   %s\nWeather:   %s" % [
+	return "TODAY'S NEWS\nGas Price:   %s      10%%\nChange:   %s\nToday:   %s\nTomorrow:   %s" % [
 		get_gas_price_text(),
 		get_gas_price_change_text(),
-		get_current_weather_text(),
+		weather_text(get_today_weather_forecast()),
+		weather_text(get_tomorrow_weather_forecast()),
 	]
 
 
 func ensure_daily_conditions_for_current_day() -> void:
 	var safe_day: int = get_current_day()
-	if daily_conditions_day == safe_day:
-		return
-	_roll_daily_conditions_for_day(safe_day)
-	save_progress()
+	var needs_save: bool = false
+	if daily_conditions_day != safe_day:
+		_roll_daily_conditions_for_day(safe_day)
+		needs_save = true
+	if _ensure_weather_forecast_for_day(safe_day):
+		needs_save = true
+	if _ensure_weather_forecast_for_day(safe_day + 1):
+		needs_save = true
+	if needs_save:
+		save_progress()
 
 
 func add_gas(amount: float) -> void:
@@ -1302,7 +1366,94 @@ func _roll_daily_conditions_for_day(day_number: int) -> void:
 	if safe_day > 1:
 		gas_price_delta = rng.randi_range(-DAILY_GAS_PRICE_VARIANCE, DAILY_GAS_PRICE_VARIANCE)
 	gas_price = max(0, DEFAULT_GAS_PRICE + gas_price_delta)
-	current_weather = DEFAULT_WEATHER
+	_ensure_weather_forecast_for_day(safe_day)
+	_ensure_weather_forecast_for_day(safe_day + 1)
+	current_weather = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+
+
+func _ensure_weather_forecast_for_day(day_number: int) -> bool:
+	var safe_day: int = maxi(1, day_number)
+	if weather_forecasts.has(safe_day):
+		weather_forecasts[safe_day] = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+		return false
+
+	if safe_day < WEATHER_SYSTEM_START_DAY:
+		weather_forecasts[safe_day] = DEFAULT_WEATHER
+	else:
+		weather_forecasts[safe_day] = _roll_weather_forecast()
+	return true
+
+
+func _roll_weather_forecast() -> String:
+	var roll: int = rng.randi_range(1, 100)
+	if roll <= 45:
+		return DEFAULT_WEATHER
+	if roll <= 70:
+		return WEATHER_CLOUDY
+	if roll <= 93:
+		return WEATHER_RAIN
+	return WEATHER_HEAVY_RAIN
+
+
+func _roll_weather_for_phase(day_forecast: String, day_time: String) -> String:
+	var safe_forecast: String = _normalize_weather(day_forecast)
+	var safe_time: String = day_time
+	if not STAGE_TIMES.has(safe_time):
+		safe_time = "morning"
+	if safe_time == "night":
+		return _roll_night_weather_for_forecast(safe_forecast)
+
+	var roll: int = rng.randi_range(1, 100)
+	match safe_forecast:
+		WEATHER_CLOUDY:
+			if roll <= 70:
+				return WEATHER_CLOUDY
+			return DEFAULT_WEATHER
+		WEATHER_RAIN:
+			if roll <= 68:
+				return WEATHER_RAIN
+			return WEATHER_CLOUDY
+		WEATHER_HEAVY_RAIN:
+			if roll <= 52:
+				return WEATHER_HEAVY_RAIN
+			if roll <= 87:
+				return WEATHER_RAIN
+			return WEATHER_CLOUDY
+	if roll <= 82:
+		return DEFAULT_WEATHER
+	return WEATHER_CLOUDY
+
+
+func _roll_night_weather_for_forecast(day_forecast: String) -> String:
+	var safe_forecast: String = _normalize_weather(day_forecast)
+	var roll: int = rng.randi_range(1, 100)
+	match safe_forecast:
+		WEATHER_CLOUDY:
+			if roll <= 18:
+				return WEATHER_RAIN
+			return DEFAULT_WEATHER
+		WEATHER_RAIN:
+			if roll <= 82:
+				return WEATHER_RAIN
+			return WEATHER_HEAVY_RAIN
+		WEATHER_HEAVY_RAIN:
+			if roll <= 62:
+				return WEATHER_HEAVY_RAIN
+			return WEATHER_RAIN
+	return DEFAULT_WEATHER
+
+
+func _weather_phase_key(day_number: int, day_time: String) -> String:
+	return "%d:%s" % [maxi(1, day_number), day_time]
+
+
+func _normalize_weather(weather_value: String) -> String:
+	var safe_weather: String = str(weather_value).strip_edges().to_lower()
+	if safe_weather == "heavy-rain" or safe_weather == "heavy_rain":
+		safe_weather = WEATHER_HEAVY_RAIN
+	if WEATHER_TYPES.has(safe_weather):
+		return safe_weather
+	return DEFAULT_WEATHER
 
 
 func reset() -> void:
@@ -1315,6 +1466,9 @@ func reset() -> void:
 	gas_price = DEFAULT_GAS_PRICE
 	gas_price_delta = 0
 	current_weather = DEFAULT_WEATHER
+	weather_forecasts.clear()
+	weather_forecasts[1] = DEFAULT_WEATHER
+	weather_phase_cache.clear()
 	daily_conditions_day = 1
 	karma = 0
 	begin_stage_sequence()
