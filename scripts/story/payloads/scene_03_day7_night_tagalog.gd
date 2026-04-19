@@ -13,13 +13,13 @@ static func build() -> Dictionary:
 				"background": StoryConstants.BACKGROUND_STORYDOOR,
 				"background_fade": 0.28,
 				"pause_before": 0.18,
-				"text": "pagsubok.",
+				"text": "test",
 			},
 			{
-				"text": "pagsubok.",
+				"text": "test",
 			},
 			{
-				"text": "pagsubok.",
+				"text": "test",
 			},
 		],
 	}

@@ -20,7 +20,7 @@ static func build() -> Dictionary:
 				"background": StoryConstants.BACKGROUND_STATION,
 				"background_fade": 0.28,
 				"pause_before": 0.14,
-				"text": "Sa terminal, may pasaherong nagmamadaling bumaba.",
+				"text": "Nagmamadaling bumaba ang pasahero mula sa aking tricycle.",
 				"camera": {
 					"zoom": 1.0,
 					"focus": "center",
@@ -28,15 +28,15 @@ static func build() -> Dictionary:
 				},
 			},
 			{
-				"text": "Isang nakatuping 200 peso bill ang nahulog mula sa bulsa niya at napadpad malapit sa paa ko.",
+				"text": "Isang nakatuping 200 peso bill ang nahulog mula sa bulsa niya.",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Dalawang daang piso. Nakalatag lang dito.",
+				"text": "Dalawang daang piso...",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Ano ngayon?",
+				"text": "Ano ang aking gagawin?",
 				"choices": [
 					{
 						"text": "Isauli",
@@ -50,11 +50,11 @@ static func build() -> Dictionary:
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Gusto ko naman, pero...",
+				"text": "Pwede ko itong ibalik, pero...",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Ano ngayon?",
+				"text": "Ano ang aking gagawin?",
 				"choices": [
 					{
 						"text": "Isauli",
@@ -68,11 +68,11 @@ static func build() -> Dictionary:
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Pero libreng pera ito.",
+				"text": "Pero sayang naman pag isasauli ko lang.",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Ano ngayon?",
+				"text": "Ano ang aking gagawin?",
 				"choices": [
 					{
 						"text": "Isauli",
@@ -104,11 +104,11 @@ static func build() -> Dictionary:
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Katangahan kung hindi ko kukunin. Dalawang daan lang naman. Hindi sila mamamatay sa ganitong halaga.",
+				"text": "Dalawang daan lang naman yan. Hindi sila mamamatay pag mawala sakanila yan.",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Ako, sa kabilang banda...",
+				"text": "Pero ako....",
 				"show_debt_overlay": {
 					"fade_in": 0.24,
 				},
@@ -141,7 +141,7 @@ static func build() -> Dictionary:
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Oo. Iyon nga.",
+				"text": "Sabi ko nga.",
 				"actions": [
 					{
 						"type": "fade_to_black",
@@ -159,7 +159,7 @@ static func build() -> Dictionary:
 				],
 			},
 			{
-				"text": "Bumaba ang karma.",
+				"text": "Bumaba ang iyong karma.",
 				"pause_after": 1.4,
 				"actions": [
 					{
@@ -179,13 +179,13 @@ static func build() -> Dictionary:
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Sandali. Sir! Nahulog ito sa inyo.",
+				"text": "Teka lang Sir! May nahulog po kayo.",
 			},
 			{
-				"text": "Lumingon ang pasahero, nagulat, at kinuha ang pera gamit ang dalawang kamay.",
+				"text": "Lumingon ang aking pasahero, at kinuha ang kanyang nahulog na pera.",
 			},
 			{
-				"text": "\"Salamat,\" sabi niya bago muling magmadaling umalis.",
+				"text": "\"Salamat,\" ang kanyang wika bago siya umalis muli.",
 				"actions": [
 					{
 						"type": "fade_to_black",
@@ -194,7 +194,7 @@ static func build() -> Dictionary:
 				],
 			},
 			{
-				"text": "Tumaas ang karma.",
+				"text": "Tumaas ang iyong karma.",
 				"pause_after": 1.4,
 				"actions": [
 					{

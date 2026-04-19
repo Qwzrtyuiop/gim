@@ -18,7 +18,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				"background": StoryConstants.BACKGROUND_INHOUSE,
 				"pause_before": 0.16,
 				"background_fade": 0.26,
-				"text": "Dumilat ako.",
+				"text": "Nagsisimula nanaman ang panibagong araw.",
 				"camera": {
 					"zoom": 1.0,
 					"focus": "left",
@@ -47,7 +47,7 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				],
 			},
 			{
-				"text": "Hinila ko palapit ang kumot para salagin ang malamig na hangin.",
+				"text": "Hinila ko pataas ang aking kumot para iwasan ang malamig na hangin.",
 			},
 			{
 				"text": "...",
@@ -63,13 +63,13 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				],
 			},
 			{
-				"text": "Ay!",
+				"text": "Anak nang-",
 			},
 			{
-				"text": "Napatalon ako mula sa sopa, nagulat sa sarili kong alarm.",
+				"text": "Napatalon ako mula sa aking sopa dahil sa tunog ng sarili kong alarm.",
 			},
 			{
-				"text": "Hindi ko na binasa ang phone. Dinampot ko ito at tumakbo papunta sa pinto.",
+				"text": "Hindi ko na binasa ang nakasulat sa aking cellphone. Dinampot ko ito sa aking tabi at tumakbo ako palabas sa pinto.",
 				"actions": [
 					{
 						"type": "play_sfx",
@@ -87,16 +87,16 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Bakit ba ako nagmamadali?",
+				"text": "Bakit nga ba ako nagmamadali?",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Kasi naman...",
+				"text": "Nagmamadali ako dahil-",
 			},
 			{
 				"speaker": "John Toda",
 				"pause_before": 0.16,
-				"text": "Unang araw ko bilang tricycle driver ngayon.",
+				"text": "Ngayon ang aking unang araw ng trabaho bilang isang Tricycle Driver.",
 				"background": StoryConstants.BACKGROUND_GARAGE_NORMAL,
 				"camera": {
 					"zoom": 1.0,
