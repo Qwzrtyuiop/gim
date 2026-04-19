@@ -53,9 +53,9 @@ const END_OF_DAY_ENERGY_BONUS := 2
 const NIGHT_SLEEP_ENERGY_BONUS := 3
 const ESTIMATED_BONUS_TIME_RATIO := 0.35
 const STAGE_DISTANCE_RANGES := {
-	"short": Vector2(800.0, 1200.0),
-	"medium": Vector2(1200.0, 1800.0),
-	"long": Vector2(1800.0, 2800.0),
+	"short": Vector2(400.0, 650.0),
+	"medium": Vector2(700.0, 1050.0),
+	"long": Vector2(1150.0, 1650.0),
 }
 const SAVE_PATH := "user://progress_save.tres"
 const SAVE_VERSION := 2
@@ -67,21 +67,21 @@ const REST_ENERGY_BONUSES := {
 }
 const ESTIMATED_STAGE_PROFILES := {
 	"short": {
-		"target_distance": 1000.0,
-		"time_limit": 106.0,
-		"fare_php_per_meter": 0.08,
+		"target_distance": 525.0,
+		"time_limit": 58.0,
+		"fare_php_per_meter": 0.15,
 		"time_bonus_php_per_second": 2.0,
 	},
 	"medium": {
-		"target_distance": 1500.0,
-		"time_limit": 136.5,
-		"fare_php_per_meter": 0.10,
+		"target_distance": 875.0,
+		"time_limit": 86.0,
+		"fare_php_per_meter": 0.17,
 		"time_bonus_php_per_second": 2.0,
 	},
 	"long": {
-		"target_distance": 2300.0,
-		"time_limit": 193.0,
-		"fare_php_per_meter": 0.12,
+		"target_distance": 1400.0,
+		"time_limit": 128.0,
+		"fare_php_per_meter": 0.20,
 		"time_bonus_php_per_second": 2.0,
 	},
 }

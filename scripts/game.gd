@@ -148,8 +148,8 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_enum("barangay-streets") var background_type := "barangay-streets"
 @export var use_stage_profile := true
 @export var use_player_state_stage_sequence := true
-@export_range(1.0, 10000.0, 1.0) var target_distance := 1000.0
-@export_range(1.0, 600.0, 0.5) var time_limit := 106.0
+@export_range(1.0, 10000.0, 1.0) var target_distance := 525.0
+@export_range(1.0, 600.0, 0.5) var time_limit := 58.0
 
 @export_group("Player Movement")
 @export_range(0.0, 600.0, 1.0) var player_x := 220.0
@@ -238,7 +238,7 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 1.0, 0.05) var bottom_lane_lane_change_chance_x := 0.35
 
 @export_group("Stage Rewards")
-@export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.08
+@export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.15
 @export_range(0.0, 100.0, 0.5) var time_bonus_php_per_second := 2.0
 @export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
 
