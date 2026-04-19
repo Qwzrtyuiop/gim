@@ -175,7 +175,7 @@ static func layout_scene(owner) -> void:
 
 static func update_background(owner) -> void:
 	if owner.background_scroller:
-		owner.background_scroller.update(owner.distance)
+		owner.background_scroller.update(owner.distance * owner.VISUAL_DISTANCE_SCALE)
 
 
 static func update_weather_effects(owner, delta: float) -> void:
@@ -233,9 +233,10 @@ static func update_floor_drops(owner, delta: float) -> void:
 		var age: float = float(drop.get_meta("age", 0.0)) + delta
 		var lifetime: float = maxf(0.001, float(drop.get_meta("lifetime", owner.rain_floor_drop_lifetime)))
 		var ratio: float = clampf(age / lifetime, 0.0, 1.0)
-		var spawn_distance: float = float(drop.get_meta("spawn_distance", owner.distance))
+		var visual_distance: float = owner.distance * owner.VISUAL_DISTANCE_SCALE
+		var spawn_distance: float = float(drop.get_meta("spawn_distance", visual_distance))
 		var spawn_x: float = float(drop.get_meta("spawn_x", drop.position.x))
-		var road_x: float = spawn_x - (owner.distance - spawn_distance) * 16.0
+		var road_x: float = spawn_x - (visual_distance - spawn_distance) * 16.0
 		drop.set_meta("age", age)
 		drop.position.x = road_x
 		drop.scale = Vector2.ONE * lerpf(0.45, owner.rain_floor_drop_max_scale, ratio)
@@ -264,7 +265,7 @@ static func spawn_floor_drop(owner) -> void:
 	drop.position = Vector2(spawn_x, local_y) - drop.pivot_offset
 	drop.set_meta("age", 0.0)
 	drop.set_meta("lifetime", owner.rain_floor_drop_lifetime * owner.rng.randf_range(0.82, 1.22))
-	drop.set_meta("spawn_distance", owner.distance)
+	drop.set_meta("spawn_distance", owner.distance * owner.VISUAL_DISTANCE_SCALE)
 	drop.set_meta("spawn_x", drop.position.x)
 	owner.rain_floor_drops_rect.add_child(drop)
 

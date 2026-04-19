@@ -34,7 +34,8 @@ const VEHICLE_TEXTURES := {
 }
 
 const LANE_NAMES := ["INCOMING", "MAIN", "SHOULDER"]
-const BASE_DISTANCE_SCALE := 0.07
+const BASE_DISTANCE_SCALE := 0.0297619
+const VISUAL_DISTANCE_SCALE := 2.35294
 const PLAYER_HITBOX_INSET := Vector4(0.08, 0.08, 0.08, 0.0)
 const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const NPC_LANE_CHANGE_WARNING_PULSES := 3
@@ -148,7 +149,7 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export var use_stage_profile := true
 @export var use_player_state_stage_sequence := true
 @export_range(1.0, 10000.0, 1.0) var target_distance := 1000.0
-@export_range(1.0, 600.0, 0.5) var time_limit := 45.0
+@export_range(1.0, 600.0, 0.5) var time_limit := 106.0
 
 @export_group("Player Movement")
 @export_range(0.0, 600.0, 1.0) var player_x := 220.0
@@ -479,4 +480,4 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	GameRenderer.draw(self, distance)
+	GameRenderer.draw(self, distance * VISUAL_DISTANCE_SCALE)

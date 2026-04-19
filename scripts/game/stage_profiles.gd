@@ -4,7 +4,7 @@ const FIRST_STAGE_TYPE := "short-morning-chill"
 
 const DEFAULT_STAGE_PROFILE := {
 	"target_distance": 1000.0,
-	"time_limit": 45.0,
+	"time_limit": 106.0,
 	"player_x": 220.0,
 	"player_start_speed": 320.0,
 	"player_min_cruise_speed": 180.0,
@@ -84,13 +84,13 @@ const DIFFICULTY_PROFILES := {
 	"short": {},
 	"medium": {
 		"target_distance": 1500.0,
-		"time_limit": 58.0,
+		"time_limit": 136.5,
 		"spawn_delay_progress_reduction": 0.15,
 		"fare_php_per_meter": 0.10,
 	},
 	"long": {
 		"target_distance": 2300.0,
-		"time_limit": 82.0,
+		"time_limit": 193.0,
 		"spawn_delay_progress_reduction": 0.25,
 		"fare_php_per_meter": 0.12,
 	},

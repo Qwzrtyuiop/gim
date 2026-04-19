@@ -68,19 +68,19 @@ const REST_ENERGY_BONUSES := {
 const ESTIMATED_STAGE_PROFILES := {
 	"short": {
 		"target_distance": 1000.0,
-		"time_limit": 45.0,
+		"time_limit": 106.0,
 		"fare_php_per_meter": 0.08,
 		"time_bonus_php_per_second": 2.0,
 	},
 	"medium": {
 		"target_distance": 1500.0,
-		"time_limit": 58.0,
+		"time_limit": 136.5,
 		"fare_php_per_meter": 0.10,
 		"time_bonus_php_per_second": 2.0,
 	},
 	"long": {
 		"target_distance": 2300.0,
-		"time_limit": 82.0,
+		"time_limit": 193.0,
 		"fare_php_per_meter": 0.12,
 		"time_bonus_php_per_second": 2.0,
 	},
