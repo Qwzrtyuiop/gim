@@ -8,6 +8,7 @@ const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const HOME_BGM_PATH := "res://assets/story/music/peace.mp3"
 const HOME_REST_FADE_SECONDS := 0.28
 const CRT_LINE_SPACING := 7.0
 const CRT_LINE_ALPHA := 0.16
@@ -25,6 +26,7 @@ const CRT_LINE_ALPHA := 0.16
 
 var stats_row_refs: Dictionary = {}
 var is_transitioning := false
+var bgm_player: AudioStreamPlayer
 var tutorial_overlay: Control
 var tutorial_highlight: Panel
 var tutorial_text_panel: Panel
@@ -59,6 +61,7 @@ func _ready() -> void:
 	rest_button.pressed.connect(_rest_then_noon)
 	store_button.pressed.connect(_open_store)
 	ride_button.pressed.connect(_ride_now)
+	_start_home_bgm()
 	call_deferred("_build_crt_lines")
 	_render_day_start()
 	_build_tutorial()
@@ -183,6 +186,26 @@ func _refresh_stats_row() -> void:
 	if stats_row_refs.is_empty():
 		return
 	PlayerStatsRow.refresh(stats_row_refs)
+
+
+func _start_home_bgm() -> void:
+	if bgm_player != null and is_instance_valid(bgm_player):
+		return
+	bgm_player = AudioStreamPlayer.new()
+	bgm_player.name = "HomeBGMPlayer"
+	bgm_player.bus = "Master"
+	bgm_player.stream = _load_looping_audio_stream(HOME_BGM_PATH)
+	add_child(bgm_player)
+	AudioSettingsManager.register_player(bgm_player, "music")
+	bgm_player.play()
+
+
+func _load_looping_audio_stream(path: String):
+	var stream = load(path)
+	if stream is AudioStreamMP3:
+		stream = stream.duplicate()
+		stream.loop = true
+	return stream
 
 
 func _build_tutorial() -> void:

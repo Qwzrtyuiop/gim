@@ -26,9 +26,13 @@ const DEFAULT_STARTING_GAS_PERCENT := 100.0
 const DEFAULT_MAX_GAS_PERCENT := 100.0
 const GAS_CAN_PERCENT := 10.0
 const GAS_DRAIN_PERCENT_PER_1000_UNITS := 5.0
+const FUEL_EFFICIENCY_UPGRADE_ID := "fuel_efficiency"
+const LEGACY_TIRE_GRIP_UPGRADE_ID := "tire_grip"
+const FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL := 0.07
+const FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL := 0.04
 const LOW_GAS_PERCENT_THRESHOLD := 20.0
 const DEFAULT_GAS_PRICE := 70
-const DAILY_GAS_PRICE_VARIANCE := 10
+const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := 30.0
 const DEFAULT_WEATHER := "clear"
 const WEATHER_CLOUDY := "cloudy"
 const WEATHER_RAIN := "rain"
@@ -104,6 +108,7 @@ var pending_trip_selection: Dictionary = {}
 var pending_story: Dictionary = {}
 var pending_sleep_transition_state: Dictionary = {}
 var pending_gameplay_entry_fade_duration := 0.0
+var pending_result_music: Dictionary = {}
 var current_mock_character_id := ""
 var seen_mock_characters: Dictionary = {}
 var unique_character_progress: Dictionary = {}
@@ -164,6 +169,7 @@ var gas := DEFAULT_STARTING_GAS_PERCENT:
 
 var gas_price := DEFAULT_GAS_PRICE
 var gas_price_delta := 0
+var previous_gas_price := DEFAULT_GAS_PRICE
 var current_weather := DEFAULT_WEATHER
 var weather_forecasts: Dictionary = {}
 var weather_phase_cache: Dictionary = {}
@@ -315,6 +321,7 @@ func begin_stage_sequence() -> void:
 	current_day = 1
 	gas_price = DEFAULT_GAS_PRICE
 	gas_price_delta = 0
+	previous_gas_price = DEFAULT_GAS_PRICE
 	current_weather = DEFAULT_WEATHER
 	weather_forecasts.clear()
 	weather_forecasts[1] = DEFAULT_WEATHER
@@ -325,6 +332,7 @@ func begin_stage_sequence() -> void:
 	clear_pending_story()
 	clear_pending_sleep_transition_state()
 	clear_pending_gameplay_entry_fade()
+	clear_pending_result_music()
 	last_rest_day = 0
 	yosi_bought_today = 0
 	yosi_bought_day = 1
@@ -471,13 +479,28 @@ func get_trip_gas_cost(_stage_descriptor := "") -> float:
 
 
 func get_distance_gas_cost(distance_units: float) -> float:
-	return maxf(0.0, distance_units) / 1000.0 * GAS_DRAIN_PERCENT_PER_1000_UNITS
+	return maxf(0.0, distance_units) / 1000.0 * GAS_DRAIN_PERCENT_PER_1000_UNITS * get_distance_gas_consumption_multiplier()
 
 
 func estimate_stage_gas_usage(stage_type: String) -> float:
 	var parts := _parse_stage_type(stage_type)
 	var difficulty_key := str(parts.get("difficulty", "short"))
 	return get_distance_gas_cost(get_stage_distance_average(difficulty_key))
+
+
+func get_distance_gas_consumption_multiplier() -> float:
+	return maxf(0.45, 1.0 - get_fuel_efficiency_level() * FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL)
+
+
+func get_boost_gas_consumption_multiplier() -> float:
+	return maxf(0.60, 1.0 - get_fuel_efficiency_level() * FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL)
+
+
+func get_fuel_efficiency_level() -> int:
+	return maxi(
+		get_upgrade_level(FUEL_EFFICIENCY_UPGRADE_ID),
+		get_upgrade_level(LEGACY_TIRE_GRIP_UPGRADE_ID)
+	)
 
 
 func get_gas_price() -> int:
@@ -499,9 +522,20 @@ func get_gas_price_change_text() -> String:
 	return "PhP 0.00"
 
 
+func get_gas_price_yesterday_percent_text() -> String:
+	var yesterday_price: float = maxf(1.0, float(previous_gas_price))
+	var raw_percent_change: float = (float(get_gas_price()) - yesterday_price) / yesterday_price * 100.0
+	var percent_change: float = clampf(raw_percent_change, -DAILY_GAS_PRICE_MAX_PERCENT_CHANGE, DAILY_GAS_PRICE_MAX_PERCENT_CHANGE)
+	if percent_change > 0.0:
+		return "+%.1f%%" % percent_change
+	if percent_change < 0.0:
+		return "%.1f%%" % percent_change
+	return "0.0%"
+
+
 func set_gas_price(price: int) -> void:
 	gas_price = max(0, price)
-	gas_price_delta = gas_price - DEFAULT_GAS_PRICE
+	gas_price_delta = gas_price - previous_gas_price
 	save_progress()
 
 
@@ -558,8 +592,9 @@ func weather_text(weather_value: String) -> String:
 
 
 func get_daily_news_text() -> String:
-	return "TODAY'S NEWS\nGas Price:   %s      10%%\nChange:   %s\nToday:   %s\nTomorrow:   %s" % [
+	return "TODAY'S NEWS\nGas Price:   %s      %s\nChange:   %s\nToday:   %s\nTomorrow:   %s" % [
 		get_gas_price_text(),
+		get_gas_price_yesterday_percent_text(),
 		get_gas_price_change_text(),
 		weather_text(get_today_weather_forecast()),
 		weather_text(get_tomorrow_weather_forecast()),
@@ -1118,6 +1153,20 @@ func clear_pending_gameplay_entry_fade() -> void:
 	save_progress()
 
 
+func set_pending_result_music(music_state: Dictionary) -> void:
+	pending_result_music = music_state.duplicate(true)
+
+
+func consume_pending_result_music() -> Dictionary:
+	var music_state := pending_result_music.duplicate(true)
+	pending_result_music.clear()
+	return music_state
+
+
+func clear_pending_result_music() -> void:
+	pending_result_music.clear()
+
+
 func set_sleep_transition_resume_step(resume_step: String) -> void:
 	pending_sleep_transition_state["resume_step"] = resume_step
 	save_progress()
@@ -1321,6 +1370,11 @@ func set_upgrade_level(upgrade_id: String, level: int) -> void:
 
 
 func get_upgrade_level(upgrade_id: String) -> int:
+	if upgrade_id == FUEL_EFFICIENCY_UPGRADE_ID:
+		return maxi(
+			int(upgrades.get(FUEL_EFFICIENCY_UPGRADE_ID, 0)),
+			int(upgrades.get(LEGACY_TIRE_GRIP_UPGRADE_ID, 0))
+		)
 	return int(upgrades.get(upgrade_id, 0))
 
 
@@ -1385,11 +1439,18 @@ func _reset_daily_consumable_counters(day_number: int) -> void:
 
 func _roll_daily_conditions_for_day(day_number: int) -> void:
 	var safe_day: int = maxi(1, day_number)
+	previous_gas_price = gas_price
 	daily_conditions_day = safe_day
-	gas_price_delta = 0
 	if safe_day > 1:
-		gas_price_delta = rng.randi_range(-DAILY_GAS_PRICE_VARIANCE, DAILY_GAS_PRICE_VARIANCE)
-	gas_price = max(0, DEFAULT_GAS_PRICE + gas_price_delta)
+		var percent_delta: float = rng.randf_range(-DAILY_GAS_PRICE_MAX_PERCENT_CHANGE, DAILY_GAS_PRICE_MAX_PERCENT_CHANGE)
+		var previous_price_float: float = maxf(1.0, float(previous_gas_price))
+		var raw_price: int = roundi(previous_price_float * (1.0 + percent_delta / 100.0))
+		var min_price: int = ceili(previous_price_float * (1.0 - DAILY_GAS_PRICE_MAX_PERCENT_CHANGE / 100.0))
+		var max_price: int = floori(previous_price_float * (1.0 + DAILY_GAS_PRICE_MAX_PERCENT_CHANGE / 100.0))
+		gas_price = clampi(raw_price, min_price, maxi(min_price, max_price))
+	else:
+		gas_price = DEFAULT_GAS_PRICE
+	gas_price_delta = gas_price - previous_gas_price
 	_ensure_weather_forecast_for_day(safe_day)
 	_ensure_weather_forecast_for_day(safe_day + 1)
 	current_weather = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
@@ -1489,6 +1550,7 @@ func reset() -> void:
 	gas = DEFAULT_STARTING_GAS_PERCENT
 	gas_price = DEFAULT_GAS_PRICE
 	gas_price_delta = 0
+	previous_gas_price = DEFAULT_GAS_PRICE
 	current_weather = DEFAULT_WEATHER
 	weather_forecasts.clear()
 	weather_forecasts[1] = DEFAULT_WEATHER

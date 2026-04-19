@@ -101,6 +101,7 @@ static func reset_game(owner) -> void:
 	owner.stage_clear_transition_started = false
 	owner.stage_clear_fade_time = 0.0
 	owner.boost_active = false
+	owner.boost_speed_x = 1.0
 	owner.boost_gas_save_timer = 0.0
 	VehicleTrafficController.reset_speeder_timer(owner)
 	if owner.fade_rect:
@@ -132,9 +133,11 @@ static func go_to_profit_screen(owner) -> void:
 		owner.stage_traffic
 	)
 	if not story_payload.is_empty():
+		PlayerState.clear_pending_result_music()
 		owner.get_tree().change_scene_to_file(STORY_SCENE)
 		return
 
+	PlayerState.set_pending_result_music(owner.audio_manager.get_result_music_carry_state())
 	owner.get_tree().change_scene_to_file(STAGE_RESULTS_SCENE)
 
 

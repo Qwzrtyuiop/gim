@@ -44,7 +44,14 @@ static func layout_player(owner, size: Vector2) -> void:
 static func handle_speed(owner, delta: float) -> void:
 	owner.boost_active = GameInput.is_boosting() and PlayerState.boost_gas_is_available()
 	if owner.boost_active:
+		owner.boost_speed_x = owner.player_boost_max_speed_x
 		consume_boost_gas(owner, delta)
+	else:
+		owner.boost_speed_x = move_toward(
+			owner.boost_speed_x,
+			1.0,
+			owner.player_boost_release_decay_x * delta
+		)
 
 	owner.player_speed = PlayerVehicleBehavior.next_speed(
 		owner.player_speed,
@@ -63,13 +70,13 @@ static func handle_speed(owner, delta: float) -> void:
 		owner.player_coast_x,
 		owner.player_max_speed,
 		owner.boost_active,
-		owner.player_boost_max_speed_x,
+		owner.boost_speed_x,
 		owner.player_boost_acceleration_x
 	)
 
 
 static func consume_boost_gas(owner, delta: float) -> void:
-	var gas_to_spend: float = owner.boost_gas_consumption_percent_per_second * delta
+	var gas_to_spend: float = owner.boost_gas_consumption_percent_per_second * PlayerState.get_boost_gas_consumption_multiplier() * delta
 	var gas_spent: float = PlayerState.drain_gas(gas_to_spend, false)
 	if gas_spent < gas_to_spend:
 		owner.boost_active = false

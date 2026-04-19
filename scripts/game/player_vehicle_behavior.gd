@@ -18,12 +18,10 @@ static func next_speed(
 	player_coast_x: float,
 	player_max_speed: float,
 	boosting: bool,
-	boost_max_speed_x: float,
+	boost_speed_x: float,
 	boost_acceleration_x: float
 ) -> float:
-	var effective_max_speed: float = player_max_speed
-	if boosting:
-		effective_max_speed *= boost_max_speed_x
+	var effective_max_speed: float = player_max_speed * maxf(1.0, boost_speed_x)
 	var effective_acceleration_x: float = player_acceleration_x
 	if boosting:
 		effective_acceleration_x *= boost_acceleration_x

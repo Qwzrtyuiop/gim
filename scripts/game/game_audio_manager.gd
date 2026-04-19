@@ -1,18 +1,35 @@
 extends Node
 
-const STAGE_BGM_MORNING_CHILL_PATH := "res://assets/stagebgm/morning_chill.mp3"
-const STAGE_BGM_NIGHT_CHILL_PATH := "res://assets/stagebgm/night_chill.mp3"
-const STAGE_BGM_NORMAL_PATH := "res://assets/stagebgm/normalstage1.mp3"
-const STAGE_BGM_SPEEDER_A_PATH := "res://assets/stagebgm/speeder.mp3"
-const STAGE_BGM_SPEEDER_B_PATH := "res://assets/stagebgm/speeder2.mp3"
+const STAGE_BGM_NORMAL_CHILL_A_PATH := "res://assets/stagebgm/chill_normal_day_noon.mp3"
+const STAGE_BGM_NORMAL_CHILL_B_PATH := "res://assets/stagebgm/normalstage1.mp3"
+const STAGE_BGM_NORMAL_CHILL_C_PATH := "res://assets/stagebgm/normalstage2.mp3"
+const STAGE_BGM_NORMAL_CHILL_D_PATH := "res://assets/stagebgm/normal3.mp3"
+const STAGE_BGM_SPEEDER_BUSY_A_PATH := "res://assets/stagebgm/speederbusy.mp3"
+const STAGE_BGM_SPEEDER_BUSY_B_PATH := "res://assets/stagebgm/speederbusy2.mp3"
+const STAGE_BGM_SPEEDER_BUSY_C_PATH := "res://assets/stagebgm/speederbusy3.mp3"
+const STAGE_BGM_SPEEDER_BUSY_D_PATH := "res://assets/stagebgm/speederbusy4.mp3"
 const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/stagebgm/traffic_jam.mp3"
 const STAGE_BGM_RAIN_LOOP_PATH := "res://assets/stagebgm/rainloop.mp3"
 const CRASH_SFX := preload("res://assets/sfx/crash.mp3")
+
+const STAGE_BGM_NORMAL_CHILL_PATHS := [
+	STAGE_BGM_NORMAL_CHILL_A_PATH,
+	STAGE_BGM_NORMAL_CHILL_B_PATH,
+	STAGE_BGM_NORMAL_CHILL_C_PATH,
+	STAGE_BGM_NORMAL_CHILL_D_PATH,
+]
+const STAGE_BGM_SPEEDER_BUSY_PATHS := [
+	STAGE_BGM_SPEEDER_BUSY_A_PATH,
+	STAGE_BGM_SPEEDER_BUSY_B_PATH,
+	STAGE_BGM_SPEEDER_BUSY_C_PATH,
+	STAGE_BGM_SPEEDER_BUSY_D_PATH,
+]
 
 var speeder_beep_player: AudioStreamPlayer
 var crash_sfx_player: AudioStreamPlayer
 var stage_bgm_player: AudioStreamPlayer
 var rain_loop_bgm_player: AudioStreamPlayer
+var current_stage_bgm_path := ""
 
 
 func setup(parent: Node) -> void:
@@ -53,7 +70,8 @@ func start_stage_bgm(stage_time_of_day: String, stage_traffic: String, rng: Rand
 	if bgm_pool.is_empty():
 		return
 
-	stage_bgm_player.stream = bgm_pool[rng.randi_range(0, bgm_pool.size() - 1)]
+	current_stage_bgm_path = str(bgm_pool[rng.randi_range(0, bgm_pool.size() - 1)])
+	stage_bgm_player.stream = _load_audio_stream(current_stage_bgm_path)
 	stage_bgm_player.play()
 
 
@@ -98,23 +116,36 @@ func play_crash_sfx() -> void:
 	crash_sfx_player.play()
 
 
-func _get_stage_bgm_pool(stage_time_of_day: String, stage_traffic: String) -> Array:
+func get_result_music_carry_state() -> Dictionary:
+	var state: Dictionary = {}
+	var stage_music_is_playing := stage_bgm_player != null and is_instance_valid(stage_bgm_player) and stage_bgm_player.playing
+	if stage_music_is_playing and not current_stage_bgm_path.is_empty():
+		state["stage_path"] = current_stage_bgm_path
+		state["stage_position"] = stage_bgm_player.get_playback_position()
+		state["stage_base_db"] = AudioSettingsManager.get_player_base_db(stage_bgm_player)
+
+	var rain_music_is_playing := rain_loop_bgm_player != null and is_instance_valid(rain_loop_bgm_player) and rain_loop_bgm_player.playing
+	if rain_music_is_playing:
+		state["rain_path"] = STAGE_BGM_RAIN_LOOP_PATH
+		state["rain_position"] = rain_loop_bgm_player.get_playback_position()
+		state["rain_base_db"] = AudioSettingsManager.get_player_base_db(rain_loop_bgm_player)
+
+	return state
+
+
+func _get_stage_bgm_pool(_stage_time_of_day: String, stage_traffic: String) -> Array:
 	match stage_traffic:
 		"speeders":
-			return [_load_audio_stream(STAGE_BGM_SPEEDER_A_PATH), _load_audio_stream(STAGE_BGM_SPEEDER_B_PATH)]
+			return STAGE_BGM_SPEEDER_BUSY_PATHS
 		"traffic-jam":
-			return [_load_audio_stream(STAGE_BGM_TRAFFIC_JAM_PATH)]
+			return [STAGE_BGM_TRAFFIC_JAM_PATH]
 		"busy":
-			return [_load_audio_stream(STAGE_BGM_SPEEDER_A_PATH), _load_audio_stream(STAGE_BGM_SPEEDER_B_PATH)]
+			return STAGE_BGM_SPEEDER_BUSY_PATHS
 		"chill":
-			if stage_time_of_day == "night":
-				return [_load_audio_stream(STAGE_BGM_NIGHT_CHILL_PATH)]
-			return [_load_audio_stream(STAGE_BGM_MORNING_CHILL_PATH), _load_audio_stream(STAGE_BGM_NORMAL_PATH)]
+			return STAGE_BGM_NORMAL_CHILL_PATHS
 		"normal":
-			if stage_time_of_day == "night":
-				return [_load_audio_stream(STAGE_BGM_NIGHT_CHILL_PATH), _load_audio_stream(STAGE_BGM_NORMAL_PATH)]
-			return [_load_audio_stream(STAGE_BGM_NORMAL_PATH), _load_audio_stream(STAGE_BGM_MORNING_CHILL_PATH)]
-	return [_load_audio_stream(STAGE_BGM_NORMAL_PATH)]
+			return STAGE_BGM_NORMAL_CHILL_PATHS
+	return STAGE_BGM_NORMAL_CHILL_PATHS
 
 
 func _load_audio_stream(path: String):

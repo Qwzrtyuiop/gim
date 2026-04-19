@@ -18,10 +18,12 @@ const LAST_ENERGY_WARNING := "Start the next day with critically low energy?\nYo
 var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
 var earnings_summary_label: Label
+var carried_music_players: Array[AudioStreamPlayer] = []
 
 
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/stage_results.tscn")
+	_start_carried_result_music()
 	_create_earnings_summary_label()
 	_create_stats_row()
 	ButtonGlow.attach(self, rest_button)
@@ -214,3 +216,39 @@ func _refresh_stats_row() -> void:
 		return
 
 	PlayerStatsRow.refresh(stats_row_refs)
+
+
+func _start_carried_result_music() -> void:
+	var music_state := PlayerState.consume_pending_result_music()
+	if music_state.is_empty():
+		return
+
+	_play_carried_music(music_state, "stage", "StageResultsBGMPlayer")
+	_play_carried_music(music_state, "rain", "StageResultsRainLoopPlayer")
+
+
+func _play_carried_music(music_state: Dictionary, prefix: String, player_name: String) -> void:
+	var path := str(music_state.get("%s_path" % prefix, "")).strip_edges()
+	if path.is_empty():
+		return
+
+	var stream = _load_looping_audio_stream(path)
+	if stream == null:
+		return
+
+	var player := AudioStreamPlayer.new()
+	player.name = player_name
+	player.bus = "Master"
+	player.stream = stream
+	add_child(player)
+	AudioSettingsManager.register_player(player, "music", float(music_state.get("%s_base_db" % prefix, 0.0)))
+	player.play(maxf(0.0, float(music_state.get("%s_position" % prefix, 0.0))))
+	carried_music_players.append(player)
+
+
+func _load_looping_audio_stream(path: String):
+	var stream = load(path)
+	if stream is AudioStreamMP3:
+		stream = stream.duplicate()
+		stream.loop = true
+	return stream

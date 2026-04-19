@@ -7,12 +7,11 @@ const STORY_SCENE := "res://scenes/story_scene.tscn"
 static func player_upgrade_modifiers() -> Dictionary:
 	var engine_level := PlayerState.get_upgrade_level("engine_tune")
 	var brakes_level := PlayerState.get_upgrade_level("brake_kit")
-	var tires_level := PlayerState.get_upgrade_level("tire_grip")
 	return {
 		"player_acceleration_x": 1.0 + engine_level * 0.2,
 		"player_max_speed": 1.0 + engine_level * 0.2,
 		"player_brake_x": 1.0 + brakes_level * 0.10,
-		"player_lane_lerp_x": 1.0 + tires_level * 0.08,
+		"player_lane_lerp_x": 1.0,
 	}
 
 

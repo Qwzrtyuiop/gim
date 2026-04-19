@@ -43,7 +43,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 		player_state.max_gas = saved_max_gas
 		player_state.gas = saved_gas
 	player_state.gas_price = int(save_data.get("gas_price", player_state.gas_price))
-	player_state.gas_price_delta = int(save_data.get("gas_price_delta", player_state.gas_price - player_state.DEFAULT_GAS_PRICE))
+	player_state.previous_gas_price = int(save_data.get("previous_gas_price", player_state.previous_gas_price))
+	player_state.gas_price_delta = int(save_data.get("gas_price_delta", player_state.gas_price - player_state.previous_gas_price))
 	player_state.current_weather = str(save_data.get("current_weather", player_state.current_weather))
 	player_state.weather_forecasts = Dictionary(save_data.get("weather_forecasts", player_state.weather_forecasts)).duplicate(true)
 	player_state.weather_phase_cache = Dictionary(save_data.get("weather_phase_cache", player_state.weather_phase_cache)).duplicate(true)
@@ -130,6 +131,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"gas": player_state.gas,
 		"gas_price": player_state.gas_price,
 		"gas_price_delta": player_state.gas_price_delta,
+		"previous_gas_price": player_state.previous_gas_price,
 		"current_weather": player_state.current_weather,
 		"weather_forecasts": player_state.weather_forecasts.duplicate(true),
 		"weather_phase_cache": player_state.weather_phase_cache.duplicate(true),

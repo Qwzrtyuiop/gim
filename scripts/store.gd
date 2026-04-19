@@ -39,9 +39,9 @@ const STORE_ITEMS := [
 		"max_level": 5,
 	},
 	{
-		"id": "tire_grip",
-		"name": "Tire Grip",
-		"description": "faster lane switching",
+		"id": "fuel_efficiency",
+		"name": "Fuel Efficiency",
+		"description": "less gas consumption and slightly cheaper boost",
 		"cost": 150,
 		"cost_step": 60,
 		"type": "upgrade",
@@ -167,12 +167,13 @@ func _build_items() -> void:
 		label.fit_content = true
 		label.scroll_active = false
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.custom_minimum_size = Vector2(0.0, 66.0)
+		label.custom_minimum_size = Vector2(0.0, 74.0)
 		label.add_theme_font_override("normal_font", UI_FONT)
 		label.add_theme_font_size_override("normal_font_size", 14)
 		label.add_theme_color_override("default_color", Color(0.24, 0.16, 0.10, 1.0))
 		label.add_theme_color_override("font_outline_color", Color(0.95, 0.92, 0.84, 0.92))
 		label.add_theme_constant_override("outline_size", 1)
+		label.add_theme_constant_override("line_separation", 6)
 		label.text = _item_text(item)
 		row.add_child(label)
 
