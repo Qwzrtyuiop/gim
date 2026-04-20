@@ -2,6 +2,7 @@ extends Control
 
 const STORE_SCENE := "res://scenes/store.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
+const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
@@ -85,6 +86,7 @@ const STORE_ITEMS := [
 @onready var status_label: Label = $StatusLabel
 @onready var item_list: VBoxContainer = $ItemScroll/ItemList
 @onready var back_button: BaseButton = $BackButton
+@onready var back_label: Label = $BackButton/BackLabel
 @onready var ride_button: BaseButton = $RideButton
 @onready var fade_overlay: ColorRect = $FadeOverlay
 
@@ -107,8 +109,8 @@ func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/store.tscn")
 	PlayerState.ensure_daily_conditions_for_current_day()
 	_create_stats_row()
-	_refresh_back_button()
-	back_button.pressed.connect(_back_to_selection)
+	_configure_home_button()
+	back_button.pressed.connect(_go_home)
 	ride_button.pressed.connect(_attempt_ride)
 	ButtonGlow.attach(self, back_button)
 	ButtonGlow.attach(self, ride_button)
@@ -133,11 +135,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_accept"):
 		if back_button.visible and back_button.has_focus():
-			_back_to_selection()
+			_go_home()
 		elif ride_button.has_focus():
 			_attempt_ride()
 	elif event.is_action_pressed("ui_cancel") and back_button.visible:
-		_back_to_selection()
+		_go_home()
 
 
 func _build_items() -> void:
@@ -285,14 +287,9 @@ func _ride() -> void:
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
-func _back_to_selection() -> void:
-	var pending_selection := PlayerState.get_pending_trip_selection()
-	var return_scene := str(pending_selection.get("return_scene", ""))
-	if not PlayerState.has_locked_pending_trip_selection() and return_scene.is_empty():
-		return
-
-	PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
-	get_tree().change_scene_to_file(return_scene if not return_scene.is_empty() else RIDE_SELECTION_SCENE)
+func _go_home() -> void:
+	PlayerState.clear_pending_trip_selection()
+	get_tree().change_scene_to_file(HOME_SCENE)
 
 
 func _apply_button_font(button: Button) -> void:
@@ -409,9 +406,13 @@ func _create_stats_row() -> void:
 	add_child(stats_row)
 
 
-func _refresh_back_button() -> void:
-	var pending_selection := PlayerState.get_pending_trip_selection()
-	back_button.visible = PlayerState.has_locked_pending_trip_selection() or not str(pending_selection.get("return_scene", "")).is_empty()
+func _configure_home_button() -> void:
+	back_button.visible = true
+	if back_label != null:
+		back_label.text = "HOME"
+		back_label.add_theme_color_override("font_color", Color(0.97, 0.92, 0.80, 1.0))
+		back_label.add_theme_color_override("font_outline_color", Color(0.18, 0.10, 0.05, 0.95))
+	back_button.tooltip_text = "Home"
 
 
 func _selection_transition_mode() -> String:
@@ -501,7 +502,7 @@ func _build_tutorial() -> void:
 		"targets": [money_label],
 	})
 	tutorial_steps.append({
-		"text": "RIDE returns to passenger selection. BACK returns to where you came from when available.",
+		"text": "HOME returns to the house screen. RIDE opens passenger selection.",
 		"targets": [ride_button, back_button],
 	})
 

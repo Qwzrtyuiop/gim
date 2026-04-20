@@ -98,11 +98,14 @@ static func reset_game(owner) -> void:
 	owner.game_state = "playing"
 	owner.end_message = ""
 	owner.player_is_stage_clear_exiting = false
+	owner.passenger_rule_violation_count = 0
 	owner.stage_clear_transition_started = false
 	owner.stage_clear_fade_time = 0.0
 	owner.boost_active = false
 	owner.boost_speed_x = 1.0
 	owner.boost_gas_save_timer = 0.0
+	if owner.passenger_dialogue_controller != null:
+		owner.passenger_dialogue_controller.clear()
 	VehicleTrafficController.reset_speeder_timer(owner)
 	if owner.fade_rect:
 		owner.fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
@@ -147,11 +150,13 @@ static func store_stage_result(owner) -> void:
 		owner.stage_difficulty,
 		owner.stage_time_of_day,
 		owner.stage_traffic,
+		owner.stage_special_type,
 		owner.distance,
 		owner.target_distance,
 		owner.fare_php_per_meter,
 		owner.overtime_seconds,
 		owner.overtime_fare_penalty_php_per_second,
 		owner.time_left,
-		owner.time_bonus_php_per_second
+		owner.time_bonus_php_per_second,
+		owner.passenger_rule_violation_count
 	)

@@ -2,6 +2,7 @@ extends RefCounted
 class_name PlayerStateSaveCodec
 
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 
 
@@ -21,6 +22,7 @@ static func load_from_path(player_state, save_path: String) -> bool:
 
 	var needs_migration_save := saved_version < 2
 	player_state._is_loading_save = true
+	player_state._begin_state_batch()
 	player_state.money = int(save_data.get("money", player_state.money))
 	var saved_max_energy := int(save_data.get("max_energy", player_state.max_energy))
 	var saved_energy := int(save_data.get("energy", player_state.energy))
@@ -51,6 +53,9 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.daily_conditions_day = int(save_data.get("daily_conditions_day", 0))
 	player_state.karma = int(save_data.get("karma", player_state.karma))
 	player_state.current_stage_type = str(save_data.get("current_stage_type", player_state.current_stage_type))
+	player_state.current_stage_special_type = player_state.normalize_stage_special_type(
+		str(save_data.get("current_stage_special_type", player_state.current_stage_special_type))
+	)
 	player_state.current_day = int(save_data.get("current_day", player_state.current_day))
 	player_state.stage_round = int(save_data.get("stage_round", player_state.stage_round))
 	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
@@ -61,11 +66,15 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.current_mock_character_id = str(save_data.get("current_mock_character_id", player_state.current_mock_character_id))
 	player_state.seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
 	player_state.unique_character_progress = Dictionary(save_data.get("unique_character_progress", {})).duplicate(true)
+	player_state.consumed_unique_session_dialogue = Dictionary(save_data.get("consumed_unique_session_dialogue", {})).duplicate(true)
 	player_state.seeded_rider_rules.clear()
 	var saved_seeded_rider_rules: Array = save_data.get("seeded_rider_rules", [])
 	for rule_data in saved_seeded_rider_rules:
 		if rule_data is Dictionary:
-			player_state.seeded_rider_rules.append((rule_data as Dictionary).duplicate(true))
+			var normalized_rule := SeededRiderRuntime.normalize_rule(player_state, (rule_data as Dictionary).duplicate(true))
+			if normalized_rule.is_empty():
+				continue
+			player_state.seeded_rider_rules.append(normalized_rule)
 	player_state.consumed_seeded_rider_rules = Dictionary(save_data.get("consumed_seeded_rider_rules", {})).duplicate(true)
 	player_state.last_rest_day = int(save_data.get("last_rest_day", player_state.last_rest_day))
 	player_state.yosi_bought_today = int(save_data.get("yosi_bought_today", player_state.yosi_bought_today))
@@ -111,6 +120,7 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
 	player_state.store_tutorial_shown = bool(save_data.get("store_tutorial_shown", player_state.store_tutorial_shown))
 	player_state.home_tutorial_shown = bool(save_data.get("home_tutorial_shown", player_state.home_tutorial_shown))
+	player_state._end_state_batch(false, true)
 	player_state._is_loading_save = false
 	if needs_story_trigger_save or needs_migration_save:
 		player_state.save_progress()
@@ -138,6 +148,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"daily_conditions_day": player_state.daily_conditions_day,
 		"karma": player_state.karma,
 		"current_stage_type": player_state.current_stage_type,
+		"current_stage_special_type": player_state.current_stage_special_type,
 		"current_day": player_state.current_day,
 		"stage_round": player_state.stage_round,
 		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,
@@ -148,6 +159,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"current_mock_character_id": player_state.current_mock_character_id,
 		"seen_mock_characters": player_state.seen_mock_characters.duplicate(true),
 		"unique_character_progress": player_state.unique_character_progress.duplicate(true),
+		"consumed_unique_session_dialogue": player_state.consumed_unique_session_dialogue.duplicate(true),
 		"seeded_rider_rules": player_state.seeded_rider_rules.duplicate(true),
 		"consumed_seeded_rider_rules": player_state.consumed_seeded_rider_rules.duplicate(true),
 		"last_rest_day": player_state.last_rest_day,

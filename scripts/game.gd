@@ -1,6 +1,16 @@
 extends Node2D
 
-const BACKGROUND_LOOP_TEXTURE := preload("res://assets/background/bg1_loop.png")
+const DEFAULT_BACKGROUND_POOL_TAG := "rural"
+const BACKGROUND_POOL_TAGS_BY_TYPE := {
+	"barangay-streets": DEFAULT_BACKGROUND_POOL_TAG,
+}
+const STAGE_BACKGROUND_POOLS := {
+	"rural": [
+		preload("res://assets/background/bg1_loop.png"),
+		preload("res://assets/background/backgroundfishing.png"),
+		preload("res://assets/background/farmloop.png"),
+	],
+}
 const RAIN_DIAGONAL_TEXTURE := preload("res://assets/weather/rain_diagonal.svg")
 const RAIN_DROPS_TEXTURE := preload("res://assets/weather/rain_drops.svg")
 const RAIN_FLOOR_DROPS_TEXTURE := preload("res://assets/weather/rain_floor_drops.svg")
@@ -10,6 +20,7 @@ const GameFlowController := preload("res://scripts/game/game_flow_controller.gd"
 const GameInput := preload("res://scripts/game/game_input.gd")
 const GameRenderer := preload("res://scripts/game/game_renderer.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
+const PassengerDialogueController := preload("res://scripts/game/passenger_dialogue_controller.gd")
 const PlayerVehicleController := preload("res://scripts/game/player_vehicle_controller.gd")
 const StageTutorialController := preload("res://scripts/game/stage_tutorial_controller.gd")
 const VehicleCollisionController := preload("res://scripts/game/vehicle_collision_controller.gd")
@@ -85,11 +96,15 @@ uniform vec2 glow_radius = vec2(0.72, 0.54);
 uniform vec4 glow_color : source_color = vec4(1.0, 0.85, 0.32, 0.18);
 
 void fragment() {
+	float aspect = SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 0.0001);
 	vec2 delta = SCREEN_UV - glow_center;
-	vec2 normalized = delta / max(glow_radius, vec2(0.0001));
-	float dist = length(normalized);
-	float alpha = max(0.0, 1.0 - dist);
-	alpha = alpha * alpha * 0.85;
+	delta.x *= aspect;
+	float pulse = 1.0 + sin(TIME * 1.8) * 0.06 + sin(TIME * 3.2) * 0.025;
+	float sphere_radius = max(0.0001, min(glow_radius.x, glow_radius.y) * pulse);
+	float dist = length(delta) / sphere_radius;
+	float sphere = pow(max(0.0, 1.0 - dist), 1.7);
+	float halo = pow(max(0.0, 1.0 - dist * 1.55), 3.2);
+	float alpha = (sphere * 0.82 + halo * 0.42) * (0.96 + sin(TIME * 2.1) * 0.04);
 	COLOR = vec4(glow_color.rgb, glow_color.a * alpha);
 }
 "
@@ -328,6 +343,8 @@ var game_hud
 var audio_manager
 var fade_rect: ColorRect
 var stage_tutorial
+var passenger_dialogue_controller
+var passenger_rule_violation_count := 0
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
 var stage_clear_fade_time := 0.0
@@ -335,6 +352,7 @@ var stage_difficulty := "short"
 var stage_time_of_day := "morning"
 var stage_traffic := "chill"
 var stage_weather := "clear"
+var stage_special_type := ""
 var speeder_spawn_timer := 0.0
 var speeder_warning_timer := 0.0
 var speeder_warning_flash_timer := 0.0
@@ -367,21 +385,26 @@ func _ready() -> void:
 	GameStageSetup.apply_stage_profile(self)
 	if use_player_state_stage_sequence:
 		stage_weather = PlayerState.get_stage_weather(stage_time_of_day)
+		stage_special_type = PlayerState.get_current_stage_special_type()
 	GameStageSetup.apply_weather_modifiers(self)
 	GameStageSetup.apply_player_upgrades(self)
+	GameStageSetup.apply_character_modifiers(self)
 	VehicleTrafficController.reset_speeder_timer(self)
 	time_left = time_limit
 	overtime_seconds = 0.0
 	player_speed = player_start_speed
 	headlight_cone_texture = GameEnvironmentController.make_headlight_cone_texture()
 	GameEnvironmentController.create_audio_manager(self)
-	GameEnvironmentController.create_background(self, BACKGROUND_LOOP_TEXTURE)
+	GameEnvironmentController.create_background(self, _pick_stage_background())
 	PlayerVehicleController.create_player(self)
 	GameEnvironmentController.create_time_filter(self)
 	GameEnvironmentController.create_weather_effects(self, RAIN_DIAGONAL_TEXTURE, RAIN_DROPS_TEXTURE, RAIN_FLOOR_DROPS_TEXTURE)
 	GameEnvironmentController.create_noon_glow(self, NOON_GLOW_SHADER_CODE)
 	GameEnvironmentController.create_night_visibility_mask(self, NIGHT_VISIBILITY_SHADER_CODE)
 	GameEnvironmentController.create_ui(self, gameplay_entry_fade_seconds)
+	passenger_rule_violation_count = 0
+	passenger_dialogue_controller = PassengerDialogueController.new()
+	passenger_dialogue_controller.setup(self, game_hud.get_ui_root())
 	stage_tutorial = StageTutorialController.new()
 	audio_manager.start_stage_bgm(stage_time_of_day, stage_traffic, rng)
 	audio_manager.start_rain_loop_bgm(stage_weather)
@@ -397,6 +420,18 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		GameEnvironmentController.layout_scene(self)
 		queue_redraw()
+
+
+func _pick_stage_background() -> Texture2D:
+	var pool_tag := _background_pool_tag()
+	var background_pool: Array = STAGE_BACKGROUND_POOLS.get(pool_tag, STAGE_BACKGROUND_POOLS.get(DEFAULT_BACKGROUND_POOL_TAG, []))
+	if background_pool.is_empty():
+		return null
+	return background_pool[rng.randi_range(0, background_pool.size() - 1)] as Texture2D
+
+
+func _background_pool_tag() -> String:
+	return str(BACKGROUND_POOL_TAGS_BY_TYPE.get(background_type, DEFAULT_BACKGROUND_POOL_TAG))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -462,15 +497,21 @@ func _process(delta: float) -> void:
 		VehicleTrafficController.update_overtake_speed_boosts(self, delta)
 		VehicleTrafficController.update_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta)
+		if passenger_dialogue_controller != null:
+			passenger_dialogue_controller.update(self, delta)
 		var collision_detail: String = VehicleCollisionController.collision_detail(self)
 		if not collision_detail.is_empty():
 			GameFlowController.end_game(self, "CRASH", collision_detail)
 	elif game_state == "YOU MADE IT":
 		VehicleCollisionController.update_stage_clear_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta, true)
+		if passenger_dialogue_controller != null:
+			passenger_dialogue_controller.update(self, delta)
 		GameFlowController.update_stage_clear_transition(self, delta)
 	else:
 		PlayerVehicleController.update_player(self, delta)
+		if passenger_dialogue_controller != null:
+			passenger_dialogue_controller.update(self, delta)
 
 	GameEnvironmentController.update_background(self)
 	GameEnvironmentController.update_weather_effects(self, delta)
