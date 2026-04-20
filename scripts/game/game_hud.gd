@@ -313,3 +313,7 @@ func _make_stat_icon(texture: Texture2D, size_value: float) -> TextureRect:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.custom_minimum_size = Vector2(size_value, size_value)
 	return icon
+
+
+func get_ui_root() -> CanvasLayer:
+	return refs.get("ui") as CanvasLayer

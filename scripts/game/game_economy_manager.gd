@@ -20,13 +20,15 @@ static func store_stage_result(
 	stage_difficulty: String,
 	stage_time_of_day: String,
 	stage_traffic: String,
+	stage_special_type: String,
 	distance: float,
 	target_distance: float,
 	fare_php_per_meter: float,
 	overtime_seconds: float,
 	overtime_fare_penalty_php_per_second: float,
 	time_left: float,
-	time_bonus_php_per_second: float
+	time_bonus_php_per_second: float,
+	passenger_rule_violation_count: int
 ) -> void:
 	var completed_distance: int = floori(minf(distance, target_distance))
 	var base_fare: int = roundi(completed_distance * fare_php_per_meter)
@@ -36,7 +38,20 @@ static func store_stage_result(
 	var earnings_adjustment: Dictionary = PlayerState.apply_stage_earnings_modifiers(raw_fare, raw_bonus, stage_time_of_day, stage_traffic)
 	var fare: int = int(earnings_adjustment.get("fare", raw_fare))
 	var bonus: int = int(earnings_adjustment.get("bonus", raw_bonus))
-	var total: int = fare + bonus
+	var rider_penalty_steps: int = maxi(0, floori(float(passenger_rule_violation_count) / 3.0))
+	var rider_penalty: int = rider_penalty_steps * 10
+	var total: int = maxi(0, fare + bonus - rider_penalty)
+	var detail_lines: Array[String] = [
+		"Distance: %dm" % completed_distance,
+		"Fare: PhP %d" % fare,
+		"Bonus: PhP %d" % bonus,
+	]
+	if passenger_rule_violation_count > 0:
+		if rider_penalty > 0:
+			detail_lines.append("Passenger Penalty: -PhP %d (%d warnings)" % [rider_penalty, passenger_rule_violation_count])
+		else:
+			detail_lines.append("Passenger Warnings: %d/3" % passenger_rule_violation_count)
+	detail_lines.append("Total: PhP %d" % total)
 
 	PlayerState.set_last_stage_result({
 		"day": PlayerState.get_current_day(),
@@ -44,6 +59,7 @@ static func store_stage_result(
 		"difficulty": stage_difficulty,
 		"time_of_day": stage_time_of_day,
 		"traffic": stage_traffic,
+		"stage_special_type": PlayerState.normalize_stage_special_type(stage_special_type),
 		"distance": completed_distance,
 		"base_fare": base_fare,
 		"fare_penalty": fare_penalty,
@@ -51,6 +67,9 @@ static func store_stage_result(
 		"raw_bonus": raw_bonus,
 		"fare": fare,
 		"bonus": bonus,
+		"passenger_rule_violation_count": maxi(0, int(passenger_rule_violation_count)),
+		"passenger_penalty": rider_penalty,
+		"detail_lines": detail_lines,
 		"total": total,
 		"earnings_multiplier": float(earnings_adjustment.get("multiplier", 1.0)),
 		"time_left": time_left,

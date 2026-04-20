@@ -19,6 +19,8 @@ var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
 var earnings_summary_label: Label
 var carried_music_players: Array[AudioStreamPlayer] = []
+var earnings_summary_base_top := -46.0
+var earnings_summary_base_bottom := 18.0
 
 
 func _ready() -> void:
@@ -55,20 +57,21 @@ func _render_results(result: Dictionary) -> void:
 	var stage_name := str(result.get("stage_type", "stage")).to_upper()
 	var day_number := int(result.get("day", PlayerState.get_current_day()))
 	var time_of_day := str(result.get("time_of_day", "morning"))
-	var distance := int(result.get("distance", 0))
-	var fare := int(result.get("fare", 0))
-	var bonus := int(result.get("bonus", 0))
 	var total := int(result.get("total", 0))
 	var is_night_stage := time_of_day == "night"
+	var stage_special_label := PlayerState.get_stage_special_display_name(str(result.get("stage_special_type", "")))
+	var detail_lines: Array[String] = _stringify_detail_lines(result.get("detail_lines", []))
+	if detail_lines.is_empty():
+		detail_lines = _fallback_detail_lines(result)
 
-	results_label.text = "Day %d  %s\nComplete\n\nDistance: %dm\nFare: PhP %d\nBonus: PhP %d\nTotal: PhP %d" % [
-		day_number,
-		stage_name,
-		distance,
-		fare,
-		bonus,
-		total,
-	]
+	var header_line := "Day %d  %s" % [day_number, stage_name]
+	if not stage_special_label.is_empty():
+		header_line += "  [%s]" % stage_special_label
+	var rendered_lines: Array[String] = [header_line, "Complete", ""]
+	for detail_line_variant in detail_lines:
+		rendered_lines.append(str(detail_line_variant))
+	results_label.text = "\n".join(rendered_lines)
+	_layout_dynamic_result_text(detail_lines.size())
 	_render_earnings_summary(total)
 
 	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage()
@@ -157,6 +160,32 @@ func _render_earnings_summary(total: int) -> void:
 		total,
 		goal_percent,
 	]
+
+
+func _fallback_detail_lines(result: Dictionary) -> Array[String]:
+	return [
+		"Distance: %dm" % int(result.get("distance", 0)),
+		"Fare: PhP %d" % int(result.get("fare", 0)),
+		"Bonus: PhP %d" % int(result.get("bonus", 0)),
+		"Total: PhP %d" % int(result.get("total", 0)),
+	]
+
+
+func _stringify_detail_lines(detail_line_variants: Variant) -> Array[String]:
+	var detail_lines: Array[String] = []
+	if not detail_line_variants is Array:
+		return detail_lines
+	for detail_line_variant in detail_line_variants:
+		detail_lines.append(str(detail_line_variant))
+	return detail_lines
+
+
+func _layout_dynamic_result_text(detail_line_count: int) -> void:
+	var extra_lines: int = maxi(0, int(detail_line_count) - 4)
+	var vertical_shift: float = float(extra_lines) * 16.0
+	if earnings_summary_label != null:
+		earnings_summary_label.offset_top = earnings_summary_base_top + vertical_shift
+		earnings_summary_label.offset_bottom = earnings_summary_base_bottom + vertical_shift
 
 
 func _attempt_next_stage() -> void:

@@ -6,6 +6,18 @@ const Day02StationBillPayloadTagalog := preload("res://scripts/story/payloads/da
 const Scene03Day7NightPayloadEnglish := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
 const Scene03Day7NightPayloadTagalog := preload("res://scripts/story/payloads/scene_03_day7_night_tagalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const NUMERIC_TRIGGER_FIELDS := [
+	"energy",
+	"gas",
+	"gas_price",
+	"money",
+	"karma",
+	"week",
+	"character_progress",
+	"days_until_collection",
+	"weekly_goal",
+	"remaining_debt",
+]
 
 const STORY_TRIGGER_DAY_END := "day_end"
 const STORY_TRIGGER_SLEEP_MIDPOINT := "sleep_midpoint"
@@ -40,7 +52,7 @@ static func normalize_story_trigger_phase(phase: String) -> String:
 	return ""
 
 
-static func find_story_trigger_for_phase(story_triggers: Array, consumed_story_triggers: Dictionary, event_values: Dictionary, phase: String, day_number: int, context: Dictionary = {}) -> Dictionary:
+static func find_story_trigger_for_phase(story_triggers: Array, consumed_story_triggers: Dictionary, event_values: Dictionary, phase: String, day_number: int, rng: RandomNumberGenerator = null, context: Dictionary = {}) -> Dictionary:
 	var safe_phase := normalize_story_trigger_phase(str(phase))
 	if safe_phase.is_empty():
 		return {}
@@ -48,7 +60,9 @@ static func find_story_trigger_for_phase(story_triggers: Array, consumed_story_t
 	for trigger_data in story_triggers:
 		var trigger: Dictionary = trigger_data
 		if _story_trigger_matches(trigger, safe_phase, day_number, context, consumed_story_triggers, event_values):
-			return trigger.duplicate(true)
+			var resolved_trigger := _resolve_trigger_payload(trigger, consumed_story_triggers, rng)
+			if not resolved_trigger.is_empty():
+				return resolved_trigger
 
 	return {}
 
@@ -57,7 +71,16 @@ static func get_story_payload_for_trigger(trigger_data: Dictionary) -> Dictionar
 	if trigger_data.is_empty():
 		return {}
 
-	var localized_payload := _build_localized_payload(str(trigger_data.get("payload_id", trigger_data.get("id", ""))))
+	var resolved_payload_variant = trigger_data.get("resolved_payload", null)
+	if resolved_payload_variant is Dictionary:
+		var resolved_payload := resolved_payload_variant as Dictionary
+		var localized_resolved_payload := _build_localized_payload(str(resolved_payload.get("story_id", "")))
+		if not localized_resolved_payload.is_empty():
+			return localized_resolved_payload
+		return resolved_payload.duplicate(true)
+
+	var resolved_payload_id := str(trigger_data.get("resolved_payload_id", "")).strip_edges()
+	var localized_payload := _build_localized_payload(resolved_payload_id if not resolved_payload_id.is_empty() else str(trigger_data.get("payload_id", trigger_data.get("id", ""))))
 	if not localized_payload.is_empty():
 		return localized_payload
 
@@ -87,12 +110,23 @@ static func _build_localized_payload(payload_id: String) -> Dictionary:
 
 
 static func consume_story_trigger(consumed_story_triggers: Dictionary, trigger_data: Dictionary) -> bool:
-	if trigger_data.is_empty() or bool(trigger_data.get("repeatable", false)):
+	if trigger_data.is_empty():
 		return false
+
+	var consumed_any := false
+	var resolved_payload_story_id := _resolved_payload_story_id(trigger_data)
+	if not resolved_payload_story_id.is_empty() and bool(trigger_data.get("consume_resolved_payload_once", true)):
+		var payload_trigger_id := _resolved_payload_trigger_id(resolved_payload_story_id)
+		if not payload_trigger_id.is_empty():
+			consumed_story_triggers[payload_trigger_id] = true
+			consumed_any = true
+
+	if bool(trigger_data.get("repeatable", false)):
+		return consumed_any
 
 	var trigger_id := _story_trigger_id(trigger_data)
 	if trigger_id.is_empty():
-		return false
+		return consumed_any
 
 	consumed_story_triggers[trigger_id] = true
 	return true
@@ -123,7 +157,7 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 		return false
 	if normalize_story_trigger_phase(str(trigger_data.get("phase", ""))) != phase:
 		return false
-	if get_story_payload_for_trigger(trigger_data).is_empty():
+	if not _trigger_has_available_payload(trigger_data, consumed_story_triggers):
 		return false
 
 	var trigger_id := _story_trigger_id(trigger_data)
@@ -147,6 +181,13 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 		if not valid_day:
 			return false
 
+	if not _trigger_matches_numeric_condition(trigger_data, "week", context.get("week", null)):
+		return false
+	var weeks_variant = trigger_data.get("weeks", [])
+	if weeks_variant is Array and not (weeks_variant as Array).is_empty():
+		if not _trigger_matches_context_array(weeks_variant, context.get("week", null)):
+			return false
+
 	if not _trigger_matches_context_value(trigger_data.get("stage_type", null), context.get("stage_type", null)):
 		return false
 	if not _trigger_matches_context_array(trigger_data.get("stage_types", []), context.get("stage_type", null)):
@@ -167,6 +208,16 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 		return false
 	if not _trigger_matches_context_array(trigger_data.get("character_ids", []), context.get("character_id", null)):
 		return false
+	if not _trigger_matches_context_value(trigger_data.get("story_stage_id", null), context.get("story_stage_id", null)):
+		return false
+	if not _trigger_matches_context_array(trigger_data.get("story_stage_ids", []), context.get("story_stage_id", null)):
+		return false
+	for numeric_field_variant in NUMERIC_TRIGGER_FIELDS:
+		var numeric_field := str(numeric_field_variant)
+		if numeric_field == "week":
+			continue
+		if not _trigger_matches_numeric_condition(trigger_data, numeric_field, context.get(numeric_field, null)):
+			return false
 	if not StoryEventHandler.matches_required_events(event_values, trigger_data.get("required_events", [])):
 		return false
 	if not StoryEventHandler.matches_forbidden_events(event_values, trigger_data.get("forbidden_events", [])):
@@ -177,6 +228,118 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 		return false
 
 	return true
+
+
+static func _trigger_matches_numeric_condition(trigger_data: Dictionary, field_name: String, actual_value) -> bool:
+	var exact_key := field_name
+	var min_key := "min_%s" % field_name
+	var max_key := "max_%s" % field_name
+	if not trigger_data.has(exact_key) and not trigger_data.has(min_key) and not trigger_data.has(max_key):
+		return true
+	if actual_value == null:
+		return false
+
+	var actual_number := float(actual_value)
+	if trigger_data.has(exact_key):
+		var expected_number := float(trigger_data.get(exact_key, actual_number))
+		if not is_equal_approx(actual_number, expected_number):
+			return false
+	if trigger_data.has(min_key) and actual_number < float(trigger_data.get(min_key, actual_number)):
+		return false
+	if trigger_data.has(max_key) and actual_number > float(trigger_data.get(max_key, actual_number)):
+		return false
+	return true
+
+
+static func _trigger_has_available_payload(trigger_data: Dictionary, consumed_story_triggers: Dictionary) -> bool:
+	if _trigger_uses_random_payloads(trigger_data):
+		return not _available_random_payload_entries(trigger_data, consumed_story_triggers).is_empty()
+	return not get_story_payload_for_trigger(trigger_data).is_empty()
+
+
+static func _resolve_trigger_payload(trigger_data: Dictionary, consumed_story_triggers: Dictionary, rng: RandomNumberGenerator = null) -> Dictionary:
+	if trigger_data.is_empty():
+		return {}
+
+	var resolved_trigger := trigger_data.duplicate(true)
+	if not _trigger_uses_random_payloads(trigger_data):
+		return resolved_trigger
+
+	var available_payload_entries := _available_random_payload_entries(trigger_data, consumed_story_triggers)
+	if available_payload_entries.is_empty():
+		return {}
+
+	var picker := rng if rng != null else RandomNumberGenerator.new()
+	if rng == null:
+		picker.randomize()
+	var selected_index := picker.randi_range(0, available_payload_entries.size() - 1)
+	var selected_entry: Dictionary = available_payload_entries[selected_index]
+	var resolved_payload_id := str(selected_entry.get("payload_id", "")).strip_edges()
+	if not resolved_payload_id.is_empty():
+		resolved_trigger["resolved_payload_id"] = resolved_payload_id
+	var resolved_payload_variant = selected_entry.get("payload", null)
+	if resolved_payload_variant is Dictionary:
+		resolved_trigger["resolved_payload"] = (resolved_payload_variant as Dictionary).duplicate(true)
+	return resolved_trigger
+
+
+static func _trigger_uses_random_payloads(trigger_data: Dictionary) -> bool:
+	var payload_ids_variant = trigger_data.get("random_payload_ids", [])
+	if payload_ids_variant is Array and not (payload_ids_variant as Array).is_empty():
+		return true
+	var payloads_variant = trigger_data.get("random_payloads", [])
+	return payloads_variant is Array and not (payloads_variant as Array).is_empty()
+
+
+static func _available_random_payload_entries(trigger_data: Dictionary, consumed_story_triggers: Dictionary) -> Array[Dictionary]:
+	var available_payload_entries: Array[Dictionary] = []
+	var payload_ids_variant = trigger_data.get("random_payload_ids", [])
+	if payload_ids_variant is Array:
+		for payload_id_variant in payload_ids_variant:
+			var payload_id := str(payload_id_variant).strip_edges()
+			if payload_id.is_empty():
+				continue
+			if bool(trigger_data.get("consume_resolved_payload_once", true)) and bool(consumed_story_triggers.get(_resolved_payload_trigger_id(payload_id), false)):
+				continue
+			if _build_localized_payload(payload_id).is_empty():
+				continue
+			available_payload_entries.append({
+				"payload_id": payload_id,
+			})
+
+	var payloads_variant = trigger_data.get("random_payloads", [])
+	if payloads_variant is Array:
+		for payload_variant in payloads_variant:
+			if not payload_variant is Dictionary:
+				continue
+			var payload: Dictionary = (payload_variant as Dictionary).duplicate(true)
+			var story_id := str(payload.get("story_id", "")).strip_edges()
+			if story_id.is_empty():
+				continue
+			if bool(trigger_data.get("consume_resolved_payload_once", true)) and bool(consumed_story_triggers.get(_resolved_payload_trigger_id(story_id), false)):
+				continue
+			available_payload_entries.append({
+				"payload": payload,
+			})
+
+	return available_payload_entries
+
+
+static func _resolved_payload_story_id(trigger_data: Dictionary) -> String:
+	var resolved_payload_id := str(trigger_data.get("resolved_payload_id", "")).strip_edges()
+	if not resolved_payload_id.is_empty():
+		return resolved_payload_id
+	var resolved_payload_variant = trigger_data.get("resolved_payload", null)
+	if resolved_payload_variant is Dictionary:
+		return str((resolved_payload_variant as Dictionary).get("story_id", "")).strip_edges()
+	return ""
+
+
+static func _resolved_payload_trigger_id(payload_id: String) -> String:
+	var safe_payload_id := str(payload_id).strip_edges()
+	if safe_payload_id.is_empty():
+		return ""
+	return "__story_payload__:%s" % safe_payload_id
 
 
 static func _trigger_matches_context_value(expected_value, actual_value) -> bool:

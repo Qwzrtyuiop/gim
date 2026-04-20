@@ -92,6 +92,31 @@ static func apply_player_upgrades(owner) -> void:
 	owner.player_wiggle_intensity_x *= float(energy_modifiers["player_wiggle_intensity_x"])
 
 
+static func apply_character_modifiers(owner) -> void:
+	var story_state: Dictionary = PlayerState.get_current_mock_character_story_state({
+		"stage_type": owner.stage_type,
+		"difficulty": owner.stage_difficulty,
+		"time_of_day": owner.stage_time_of_day,
+		"traffic": owner.stage_traffic,
+	})
+	if story_state.is_empty():
+		return
+
+	var modifiers: Dictionary = story_state.get("modifiers", {})
+	if modifiers.is_empty():
+		return
+
+	_apply_numeric_owner_modifier(owner, modifiers, "fare_php_per_meter")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_limit")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_bonus_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "overtime_fare_penalty_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_max_speed")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_acceleration_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_brake_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_lane_lerp_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_coast_x")
+
+
 static func apply_hidden_special_modifiers(owner) -> void:
 	owner.special_mode_hidden_modifiers.clear()
 
@@ -144,3 +169,33 @@ static func apply_hidden_special_modifiers(owner) -> void:
 			owner.speeder_avoid_lookahead *= owner.special_mode_hidden_modifiers["speeder_hunt_x"]
 			owner.main_spawn_min_delay *= owner.rng.randf_range(0.92, 1.10)
 			owner.main_spawn_max_delay *= owner.rng.randf_range(0.92, 1.10)
+
+
+static func _apply_numeric_owner_modifier(owner, modifiers: Dictionary, property_name: String) -> void:
+	if not _owner_has_property(owner, property_name):
+		return
+
+	var resolved_value := float(owner.get(property_name))
+	if modifiers.has(property_name):
+		resolved_value = float(modifiers[property_name])
+	if modifiers.has("%s_multiplier" % property_name):
+		resolved_value *= float(modifiers["%s_multiplier" % property_name])
+	if modifiers.has("%s_delta" % property_name):
+		resolved_value += float(modifiers["%s_delta" % property_name])
+	if modifiers.has("%s_min" % property_name):
+		resolved_value = maxf(resolved_value, float(modifiers["%s_min" % property_name]))
+
+	var cap_key := "%s_cap" % property_name
+	if modifiers.has(cap_key):
+		resolved_value = minf(resolved_value, float(modifiers[cap_key]))
+	elif property_name == "player_max_speed" and modifiers.has("player_max_speed_limit"):
+		resolved_value = minf(resolved_value, float(modifiers["player_max_speed_limit"]))
+
+	owner.set(property_name, resolved_value)
+
+
+static func _owner_has_property(owner, property_name: String) -> bool:
+	for property_data in owner.get_property_list():
+		if str(property_data.get("name", "")) == property_name:
+			return true
+	return false

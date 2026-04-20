@@ -652,6 +652,8 @@ func _run_story_action(action_data: Dictionary) -> void:
 			PlayerState.add_karma(int(action_data.get("amount", 0)))
 		"add_character_progress", "increase_character_progress", "character_progress":
 			_apply_character_progress_action(action_data)
+		"set_character_progress", "character_progress_set":
+			_apply_set_character_progress_action(action_data)
 		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
 			_play_sfx_action(action_data)
 		"stop_sfx", "sfx_stop":
@@ -767,6 +769,12 @@ func _apply_character_progress_action(action_data: Dictionary) -> void:
 	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
 	var amount := int(action_data.get("amount", action_data.get("value", 1)))
 	PlayerState.increment_unique_character_progress(character_id, amount)
+
+
+func _apply_set_character_progress_action(action_data: Dictionary) -> void:
+	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
+	var value := int(action_data.get("value", action_data.get("amount", 0)))
+	PlayerState.set_unique_character_progress(character_id, value)
 
 
 func _apply_set_event_value_action(action_data: Dictionary) -> void:
