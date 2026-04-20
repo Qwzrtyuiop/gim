@@ -48,7 +48,7 @@ static func refresh(stats_refs: Dictionary) -> void:
 
 	money_label.text = "Money: PhP %d" % PlayerState.money
 	energy_label.text = "%d/%d" % [PlayerState.energy, PlayerState.max_energy]
-	gas_label.text = "%d/%d" % [PlayerState.gas, PlayerState.max_gas]
+	gas_label.text = PlayerState.gas_text()
 
 
 static func _make_label(label_config: Dictionary) -> Label:

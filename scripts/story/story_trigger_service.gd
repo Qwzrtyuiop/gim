@@ -1,8 +1,10 @@
 extends RefCounted
 class_name StoryTriggerService
 
-const Day02StationBillPayload := preload("res://scripts/story/payloads/day_02_station_bill.gd")
-const Scene03Day7NightPayload := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
+const Day02StationBillPayloadEnglish := preload("res://scripts/story/payloads/day_02_station_bill.gd")
+const Day02StationBillPayloadTagalog := preload("res://scripts/story/payloads/day_02_station_bill_tagalog.gd")
+const Scene03Day7NightPayloadEnglish := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
+const Scene03Day7NightPayloadTagalog := preload("res://scripts/story/payloads/scene_03_day7_night_tagalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 
 const STORY_TRIGGER_DAY_END := "day_end"
@@ -19,14 +21,14 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 			"min_day": 2,
 			"times": ["morning", "noon"],
 			"forbidden_events": ["day_2_station_bill"],
-			"payload": Day02StationBillPayload.build(),
+			"payload_id": "day_02_station_bill",
 		},
 		{
 			"id": "day_7_night_scene_03",
 			"phase": STORY_TRIGGER_DAY_END,
 			"day": 7,
 			"time_of_day": "night",
-			"payload": Scene03Day7NightPayload.build(),
+			"payload_id": "scene_03_day7_night",
 		},
 	]
 
@@ -55,9 +57,32 @@ static func get_story_payload_for_trigger(trigger_data: Dictionary) -> Dictionar
 	if trigger_data.is_empty():
 		return {}
 
+	var localized_payload := _build_localized_payload(str(trigger_data.get("payload_id", trigger_data.get("id", ""))))
+	if not localized_payload.is_empty():
+		return localized_payload
+
 	var payload_variant = trigger_data.get("payload", {})
 	if payload_variant is Dictionary:
-		return (payload_variant as Dictionary).duplicate(true)
+		var saved_payload := payload_variant as Dictionary
+		localized_payload = _build_localized_payload(str(saved_payload.get("story_id", "")))
+		if not localized_payload.is_empty():
+			return localized_payload
+		return saved_payload.duplicate(true)
+	return {}
+
+
+static func _build_localized_payload(payload_id: String) -> Dictionary:
+	var safe_payload_id := str(payload_id).strip_edges()
+	var use_tagalog := StoryLanguageManager.is_tagalog()
+	match safe_payload_id:
+		"day_02_station_bill", "day_2_station_bill":
+			if use_tagalog:
+				return Day02StationBillPayloadTagalog.build()
+			return Day02StationBillPayloadEnglish.build()
+		"scene_03_day7_night", "day_7_night_scene_03":
+			if use_tagalog:
+				return Scene03Day7NightPayloadTagalog.build()
+			return Scene03Day7NightPayloadEnglish.build()
 	return {}
 
 

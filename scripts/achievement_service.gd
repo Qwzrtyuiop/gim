@@ -47,12 +47,12 @@ const DEFINITIONS := {
 	"maparaan": {
 		"title": "Maparaan",
 		"subtitle": "Resourceful",
-		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.\n\nJohn completed five rides while down to one energy or less and two gas or less.",
+		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.\n\nJohn completed five rides while at 5 energy or less and 20% gas or less.",
 	},
 	"matiyaga": {
 		"title": "Matiyaga",
 		"subtitle": "Persevering",
-		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.\n\nJohn completed five rides while running low on either energy (1 or less) or gas (2 or less).",
+		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.\n\nJohn completed five rides while running low on either energy (5 or less) or gas (20% or less).",
 	},
 	"maingat": {
 		"title": "Maingat",
@@ -62,16 +62,15 @@ const DEFINITIONS := {
 }
 
 const SMOKER_YOSI_GOAL := 10
-const SMOKER_MAX_ENERGY_PENALTY := 1
+const SMOKER_MAX_ENERGY_PENALTY := 2
 const SMOKER_DANGER_YOSI_TOTAL := 50
 const TAMAD_REQUIRED_REST_TIMES := ["morning", "noon", "night"]
-const LOW_ENERGY_THRESHOLD := 1
-const LOW_GAS_THRESHOLD := 2
+const LOW_ENERGY_THRESHOLD := 5
 const LOW_RESOURCE_STREAK_TARGET := 5
 
 
 static func get_yosi_energy_restore(player_state) -> int:
-	return 2 if has_achievement(player_state, "maninigarilyo") else 1
+	return 3 if has_achievement(player_state, "maninigarilyo") else 2
 
 
 static func record_yosi_purchase(player_state, amount := 1) -> int:
@@ -122,11 +121,13 @@ static func record_stage_completion(player_state) -> void:
 	if player_state.clean_stage_streak >= 5:
 		unlock_achievement(player_state, "maingat")
 
-	if player_state.current_trip_low_energy or player_state.current_trip_low_gas:
+	var ended_low_energy: bool = player_state.current_trip_low_energy or player_state.energy <= LOW_ENERGY_THRESHOLD
+	var ended_low_gas: bool = player_state.current_trip_low_gas or player_state.is_low_gas()
+	if ended_low_energy or ended_low_gas:
 		player_state.low_resource_trip_count += 1
 		if player_state.low_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
 			unlock_achievement(player_state, "matiyaga")
-	if player_state.current_trip_low_energy and player_state.current_trip_low_gas:
+	if ended_low_energy and ended_low_gas:
 		player_state.low_both_resource_trip_count += 1
 		if player_state.low_both_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
 			unlock_achievement(player_state, "maparaan")

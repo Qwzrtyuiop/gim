@@ -338,6 +338,9 @@ static func update_npc_following_for_direction(
 	for index in range(1, lane_entities.size()):
 		var front_entity: Dictionary = lane_entities[index - 1]
 		var rear_entity: Dictionary = lane_entities[index]
+		if lane_index == 2 and bool(front_entity.get("is_parked", false)) and not bool(rear_entity.get("is_parked", false)):
+			continue
+
 		var rear_desired_speed := float(rear_entity["desired_world_speed"])
 		var front_speed := float(front_entity["world_speed"])
 		var closing_speed := rear_desired_speed - front_speed
@@ -351,6 +354,7 @@ static func update_npc_following_for_direction(
 
 		if gap <= npc_follow_gap or gap <= predicted_closing_distance:
 			rear_entity["world_speed"] = front_speed
+			rear_entity["desired_world_speed"] = minf(rear_desired_speed, front_speed)
 
 
 static func rect_is_ahead(source_rect: Rect2, other_rect: Rect2, source_moves_with_player: bool) -> bool:

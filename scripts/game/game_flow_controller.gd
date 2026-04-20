@@ -8,10 +8,13 @@ const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_co
 
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
+const GAS_SAVE_INTERVAL := 0.75
 
 
 static func update_progress(owner, delta: float) -> void:
-	owner.distance += owner.player_speed * distance_scale(owner) * delta
+	var distance_delta: float = owner.player_speed * distance_scale(owner) * delta
+	owner.distance += distance_delta
+	_drain_distance_gas(owner, distance_delta, delta)
 	if owner.time_left > 0.0:
 		owner.time_left -= delta
 		if owner.time_left < 0.0:
@@ -28,6 +31,18 @@ static func distance_scale(owner) -> float:
 	return owner.BASE_DISTANCE_SCALE * owner.player_distance_gain_x
 
 
+static func _drain_distance_gas(owner, distance_delta: float, delta: float) -> void:
+	var gas_to_spend: float = PlayerState.get_distance_gas_cost(distance_delta)
+	if gas_to_spend <= 0.0:
+		return
+
+	PlayerState.drain_gas(gas_to_spend, false)
+	owner.boost_gas_save_timer += delta
+	if owner.boost_gas_save_timer >= GAS_SAVE_INTERVAL:
+		owner.boost_gas_save_timer = 0.0
+		PlayerState.flush_deferred_save()
+
+
 static func current_speed_kmh(owner) -> int:
 	return clampi(
 		roundi(owner.player_speed / owner.SPEEDOMETER_REFERENCE_MAX_SPEED * owner.SPEEDOMETER_BASE_MAX_KMH),
@@ -39,6 +54,7 @@ static func current_speed_kmh(owner) -> int:
 static func end_game(owner, title: String, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
+	PlayerState.flush_deferred_save()
 	if title == "CRASH":
 		owner.audio_manager.play_crash_sfx()
 	if title == "CRASH" or title == "TIME OUT":
@@ -84,6 +100,9 @@ static func reset_game(owner) -> void:
 	owner.player_is_stage_clear_exiting = false
 	owner.stage_clear_transition_started = false
 	owner.stage_clear_fade_time = 0.0
+	owner.boost_active = false
+	owner.boost_speed_x = 1.0
+	owner.boost_gas_save_timer = 0.0
 	VehicleTrafficController.reset_speeder_timer(owner)
 	if owner.fade_rect:
 		owner.fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
@@ -114,9 +133,11 @@ static func go_to_profit_screen(owner) -> void:
 		owner.stage_traffic
 	)
 	if not story_payload.is_empty():
+		PlayerState.clear_pending_result_music()
 		owner.get_tree().change_scene_to_file(STORY_SCENE)
 		return
 
+	PlayerState.set_pending_result_music(owner.audio_manager.get_result_music_carry_state())
 	owner.get_tree().change_scene_to_file(STAGE_RESULTS_SCENE)
 
 

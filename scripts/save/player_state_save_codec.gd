@@ -14,17 +14,41 @@ static func load_from_path(player_state, save_path: String) -> bool:
 		return false
 
 	var save_resource := loaded_resource as GameSaveResource
+	var saved_version := int(save_resource.version)
 	var save_data: Dictionary = save_resource.data.duplicate(true)
 	if save_data.is_empty():
 		return false
 
+	var needs_migration_save := saved_version < 2
 	player_state._is_loading_save = true
 	player_state.money = int(save_data.get("money", player_state.money))
-	player_state.max_energy = int(save_data.get("max_energy", player_state.max_energy))
-	player_state.energy = int(save_data.get("energy", player_state.energy))
-	player_state.max_gas = int(save_data.get("max_gas", player_state.max_gas))
-	player_state.gas = int(save_data.get("gas", player_state.gas))
+	var saved_max_energy := int(save_data.get("max_energy", player_state.max_energy))
+	var saved_energy := int(save_data.get("energy", player_state.energy))
+	if saved_version < 2 and saved_max_energy <= 5:
+		player_state.max_energy = maxi(1, player_state.DEFAULT_MAX_ENERGY - maxi(0, 5 - saved_max_energy) * 2)
+		player_state.energy = clampi(
+			roundi(float(saved_energy) / maxf(1.0, float(saved_max_energy)) * float(player_state.max_energy)),
+			0,
+			player_state.max_energy
+		)
+	else:
+		player_state.max_energy = saved_max_energy
+		player_state.energy = saved_energy
+	var saved_max_gas := float(save_data.get("max_gas", player_state.max_gas))
+	var saved_gas := float(save_data.get("gas", player_state.gas))
+	if saved_version < 2 and saved_max_gas <= 10.0:
+		player_state.max_gas = player_state.DEFAULT_MAX_GAS_PERCENT
+		player_state.gas = clampf(saved_gas / maxf(1.0, saved_max_gas) * player_state.max_gas, 0.0, player_state.max_gas)
+	else:
+		player_state.max_gas = saved_max_gas
+		player_state.gas = saved_gas
 	player_state.gas_price = int(save_data.get("gas_price", player_state.gas_price))
+	player_state.previous_gas_price = int(save_data.get("previous_gas_price", player_state.previous_gas_price))
+	player_state.gas_price_delta = int(save_data.get("gas_price_delta", player_state.gas_price - player_state.previous_gas_price))
+	player_state.current_weather = str(save_data.get("current_weather", player_state.current_weather))
+	player_state.weather_forecasts = Dictionary(save_data.get("weather_forecasts", player_state.weather_forecasts)).duplicate(true)
+	player_state.weather_phase_cache = Dictionary(save_data.get("weather_phase_cache", player_state.weather_phase_cache)).duplicate(true)
+	player_state.daily_conditions_day = int(save_data.get("daily_conditions_day", 0))
 	player_state.karma = int(save_data.get("karma", player_state.karma))
 	player_state.current_stage_type = str(save_data.get("current_stage_type", player_state.current_stage_type))
 	player_state.current_day = int(save_data.get("current_day", player_state.current_day))
@@ -85,8 +109,10 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
 	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
+	player_state.store_tutorial_shown = bool(save_data.get("store_tutorial_shown", player_state.store_tutorial_shown))
+	player_state.home_tutorial_shown = bool(save_data.get("home_tutorial_shown", player_state.home_tutorial_shown))
 	player_state._is_loading_save = false
-	if needs_story_trigger_save:
+	if needs_story_trigger_save or needs_migration_save:
 		player_state.save_progress()
 	return true
 
@@ -104,6 +130,12 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"max_gas": player_state.max_gas,
 		"gas": player_state.gas,
 		"gas_price": player_state.gas_price,
+		"gas_price_delta": player_state.gas_price_delta,
+		"previous_gas_price": player_state.previous_gas_price,
+		"current_weather": player_state.current_weather,
+		"weather_forecasts": player_state.weather_forecasts.duplicate(true),
+		"weather_phase_cache": player_state.weather_phase_cache.duplicate(true),
+		"daily_conditions_day": player_state.daily_conditions_day,
 		"karma": player_state.karma,
 		"current_stage_type": player_state.current_stage_type,
 		"current_day": player_state.current_day,
@@ -149,5 +181,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"event_values": player_state.event_values.duplicate(true),
 		"resume_scene_path": player_state.resume_scene_path,
 		"ride_select_tutorial_shown": player_state.ride_select_tutorial_shown,
+		"store_tutorial_shown": player_state.store_tutorial_shown,
+		"home_tutorial_shown": player_state.home_tutorial_shown,
 	}
 	ResourceSaver.save(save_resource, save_path)

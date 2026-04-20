@@ -6,6 +6,8 @@ const PlayerVehicleBehavior := preload("res://scripts/game/player_vehicle_behavi
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
 
+const BOOST_GAS_SAVE_INTERVAL := 0.75
+
 
 static func create_player(owner) -> void:
 	owner.player = Sprite2D.new()
@@ -40,6 +42,17 @@ static func layout_player(owner, size: Vector2) -> void:
 
 
 static func handle_speed(owner, delta: float) -> void:
+	owner.boost_active = GameInput.is_boosting() and PlayerState.boost_gas_is_available()
+	if owner.boost_active:
+		owner.boost_speed_x = owner.player_boost_max_speed_x
+		consume_boost_gas(owner, delta)
+	else:
+		owner.boost_speed_x = move_toward(
+			owner.boost_speed_x,
+			1.0,
+			owner.player_boost_release_decay_x * delta
+		)
+
 	owner.player_speed = PlayerVehicleBehavior.next_speed(
 		owner.player_speed,
 		delta,
@@ -55,8 +68,23 @@ static func handle_speed(owner, delta: float) -> void:
 		owner.player_min_cruise_speed,
 		owner.player_coast_deceleration,
 		owner.player_coast_x,
-		owner.player_max_speed
+		owner.player_max_speed,
+		owner.boost_active,
+		owner.boost_speed_x,
+		owner.player_boost_acceleration_x
 	)
+
+
+static func consume_boost_gas(owner, delta: float) -> void:
+	var gas_to_spend: float = owner.boost_gas_consumption_percent_per_second * PlayerState.get_boost_gas_consumption_multiplier() * delta
+	var gas_spent: float = PlayerState.drain_gas(gas_to_spend, false)
+	if gas_spent < gas_to_spend:
+		owner.boost_active = false
+
+	owner.boost_gas_save_timer += delta
+	if owner.boost_gas_save_timer >= BOOST_GAS_SAVE_INTERVAL:
+		owner.boost_gas_save_timer = 0.0
+		PlayerState.flush_deferred_save()
 
 
 static func update_player(owner, delta: float, move_forward := false) -> void:

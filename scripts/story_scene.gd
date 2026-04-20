@@ -701,7 +701,7 @@ func _play_music_action(action_data: Dictionary) -> void:
 		return
 
 	var loop_enabled := bool(action_data.get("loop", action_data.get("loops", true)))
-	var fade_in_duration := float(action_data.get("fade_in", action_data.get("fade", DEFAULT_MUSIC_FADE_SECONDS)))
+	var fade_in_duration := _music_fade_in_duration(action_data)
 	var fade_out_duration := float(action_data.get("fade_out", action_data.get("out_fade", fade_in_duration)))
 	var target_volume_db := float(action_data.get("volume_db", 0.0))
 	var effective_target_volume_db := AudioSettingsManager.resolve_effective_volume_db("music", target_volume_db)
@@ -728,6 +728,16 @@ func _play_music_action(action_data: Dictionary) -> void:
 		await _fade_audio_player_volume(bgm_player, fade_in_duration, bgm_player.volume_db, effective_target_volume_db)
 	else:
 		AudioSettingsManager.apply_player_volume(bgm_player)
+
+
+func _music_fade_in_duration(action_data: Dictionary) -> float:
+	if action_data.has("fade_in"):
+		return float(action_data["fade_in"])
+	if action_data.has("fade"):
+		return float(action_data["fade"])
+	if action_data.has("fade_out") or action_data.has("out_fade"):
+		return 0.0
+	return DEFAULT_MUSIC_FADE_SECONDS
 
 
 func _stop_music_action(action_data: Dictionary) -> void:

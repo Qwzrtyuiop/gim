@@ -76,7 +76,8 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 		lane_index
 	)
 	VehicleVisuals.apply_shadow(owner, sprite, owner.VEHICLE_HITBOX_INSET)
-	VehicleVisuals.apply_headlight(owner, sprite, owner.VEHICLE_HITBOX_INSET)
+	if not is_parked:
+		VehicleVisuals.apply_headlight(owner, sprite, owner.VEHICLE_HITBOX_INSET)
 	sprite.position = Vector2(
 		VehicleSpawnScheduler.vehicle_spawn_x(owner, size, spawn_side),
 		VehicleGeometry.sprite_y_for_hitbox_bottom(

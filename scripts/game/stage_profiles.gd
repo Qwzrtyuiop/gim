@@ -3,8 +3,8 @@ extends RefCounted
 const FIRST_STAGE_TYPE := "short-morning-chill"
 
 const DEFAULT_STAGE_PROFILE := {
-	"target_distance": 1000.0,
-	"time_limit": 45.0,
+	"target_distance": 525.0,
+	"time_limit": 58.0,
 	"player_x": 220.0,
 	"player_start_speed": 320.0,
 	"player_min_cruise_speed": 180.0,
@@ -48,7 +48,7 @@ const DEFAULT_STAGE_PROFILE := {
 	"stage_clear_min_exit_speed": 180.0,
 	"stage_clear_player_exit_speed": 120.0,
 	"stage_clear_fade_seconds": 0.9,
-	"fare_php_per_meter": 0.08,
+	"fare_php_per_meter": 0.15,
 	"time_bonus_php_per_second": 2.0,
 	"incoming_lane_scale": 0.78,
 	"main_lane_scale": 1.0,
@@ -83,16 +83,16 @@ const DEFAULT_STAGE_PROFILE := {
 const DIFFICULTY_PROFILES := {
 	"short": {},
 	"medium": {
-		"target_distance": 1500.0,
-		"time_limit": 58.0,
+		"target_distance": 875.0,
+		"time_limit": 86.0,
 		"spawn_delay_progress_reduction": 0.15,
-		"fare_php_per_meter": 0.10,
+		"fare_php_per_meter": 0.17,
 	},
 	"long": {
-		"target_distance": 2300.0,
-		"time_limit": 82.0,
+		"target_distance": 1400.0,
+		"time_limit": 128.0,
 		"spawn_delay_progress_reduction": 0.25,
-		"fare_php_per_meter": 0.12,
+		"fare_php_per_meter": 0.20,
 	},
 }
 

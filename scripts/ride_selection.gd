@@ -12,6 +12,25 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const GENERIC_PORTRAIT := preload("res://assets/characters/blankface.png")
 const EMPTY_CARD_CHANCE := 0.28
 const RIDE_SELECT_BGM_PATH := "res://assets/stagebgm/normalstage1.mp3"
+const RISK_DISTANCE_SCORES := {
+	"short": 1,
+	"medium": 2,
+	"long": 3,
+}
+const RISK_TIME_SCORES := {
+	"morning": 1,
+	"noon": 2,
+	"night": 3,
+}
+const RISK_TRAFFIC_SCORES := {
+	"chill": 1,
+	"normal": 2,
+	"traffic-jam": 2,
+	"trafficjam": 2,
+	"speeders": 3,
+	"speeder": 3,
+	"busy": 4,
+}
 
 @onready var subtitle_label: Label = $Panel/Subtitle
 @onready var status_label: Label = $Panel/StatusLabel
@@ -144,7 +163,7 @@ func _set_distance(difficulty: String) -> void:
 	_refresh_distance_buttons()
 	_refresh_character_cards()
 	if _show_store_shortcut():
-		status_label.text = "Out of gas. Visit the store to refuel before Day %d begins." % _display_day()
+		status_label.text = "Not enough gas. Visit the store to refuel before Day %d begins." % _display_day()
 	else:
 		status_label.text = "Choose a passenger for a %s trip." % difficulty.capitalize()
 
@@ -182,12 +201,14 @@ func _refresh_character_cards() -> void:
 			panel.mouse_default_cursor_shape = Control.CURSOR_ARROW
 			continue
 
-		var preview_stage_type := _preview_stage_type(character)
+		var preview_stage_type: String = _preview_stage_type(character)
 		panel.modulate = Color.WHITE
-		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d" % [
+		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d\nGas Est: ~%.1f%%\nRisk: %s" % [
 			str(character["name"]).to_upper(),
 			preview_stage_type,
 			PlayerState.estimate_stage_earnings(preview_stage_type),
+			PlayerState.estimate_stage_gas_usage(preview_stage_type),
+			_risk_label_for_stage_type(preview_stage_type),
 		]
 		if portrait != null:
 			portrait.visible = true
@@ -328,7 +349,7 @@ func _build_first_appearance_rolls(force_first_appearance_unlocks: bool) -> Dict
 
 func _ordered_distances_for_generation() -> Array[String]:
 	var ordered_distances: Array[String] = []
-	if PlayerState.gas <= 4:
+	if PlayerState.gas <= 40.0:
 		ordered_distances.append("short")
 	if not ordered_distances.has(selected_distance):
 		ordered_distances.append(selected_distance)
@@ -460,7 +481,7 @@ func _build_tutorial() -> void:
 	var stats_row := stats_row_refs.get("row") as Control
 	var stats_targets := [stats_row] if stats_row != null else [money_label]
 	tutorial_steps.append({
-		"text": "Money buys upgrades and items. Energy is spent when starting a ride; if it hits 0 you cannot start. Gas is consumed per trip, so refuel when it runs low. Additionally, gas consumed depends on the distance of the trip",
+		"text": "Money buys upgrades and items. Energy is spent when starting a ride; if it hits 0 you cannot start. Gas starts at 100%, drains as you drive, and burns faster while boosting.",
 		"targets": stats_targets,
 	})
 	tutorial_steps.append({
@@ -702,6 +723,35 @@ func _preview_stage_type(character: Dictionary) -> String:
 	)
 
 
+func _risk_label_for_stage_type(stage_type: String) -> String:
+	var score: int = _risk_score_for_stage_type(stage_type)
+	if score <= 5:
+		return "LOW"
+	if score <= 7:
+		return "MODERATE"
+	return "HIGH"
+
+
+func _risk_score_for_stage_type(stage_type: String) -> int:
+	var parts: PackedStringArray = stage_type.split("-")
+	if parts.size() < 3:
+		return 3
+
+	var difficulty: String = str(parts[0]).strip_edges().to_lower()
+	var time_of_day: String = str(parts[1]).strip_edges().to_lower()
+	var traffic: String = ""
+	for index in range(2, parts.size()):
+		if not traffic.is_empty():
+			traffic += "-"
+		traffic += str(parts[index]).strip_edges().to_lower()
+
+	return (
+		int(RISK_DISTANCE_SCORES.get(difficulty, 1))
+		+ int(RISK_TIME_SCORES.get(time_of_day, 1))
+		+ int(RISK_TRAFFIC_SCORES.get(traffic, 2))
+	)
+
+
 func _choose_character(card_index: int) -> void:
 	if card_index < 0 or card_index >= displayed_characters.size():
 		return
@@ -784,7 +834,7 @@ func _display_day() -> int:
 
 
 func _can_open_store_from_selection() -> bool:
-	return _display_day() >= 2 and PlayerState.gas <= 0
+	return _display_day() >= 2 and PlayerState.gas <= 0.0
 
 
 func _show_store_shortcut() -> bool:

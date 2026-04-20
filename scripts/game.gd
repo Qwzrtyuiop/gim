@@ -1,6 +1,9 @@
 extends Node2D
 
 const BACKGROUND_LOOP_TEXTURE := preload("res://assets/background/bg1_loop.png")
+const RAIN_DIAGONAL_TEXTURE := preload("res://assets/weather/rain_diagonal.svg")
+const RAIN_DROPS_TEXTURE := preload("res://assets/weather/rain_drops.svg")
+const RAIN_FLOOR_DROPS_TEXTURE := preload("res://assets/weather/rain_floor_drops.svg")
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
@@ -31,7 +34,8 @@ const VEHICLE_TEXTURES := {
 }
 
 const LANE_NAMES := ["INCOMING", "MAIN", "SHOULDER"]
-const BASE_DISTANCE_SCALE := 0.07
+const BASE_DISTANCE_SCALE := 0.0297619
+const VISUAL_DISTANCE_SCALE := 2.35294
 const PLAYER_HITBOX_INSET := Vector4(0.08, 0.08, 0.08, 0.0)
 const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const NPC_LANE_CHANGE_WARNING_PULSES := 3
@@ -144,8 +148,8 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_enum("barangay-streets") var background_type := "barangay-streets"
 @export var use_stage_profile := true
 @export var use_player_state_stage_sequence := true
-@export_range(1.0, 10000.0, 1.0) var target_distance := 1000.0
-@export_range(1.0, 600.0, 0.5) var time_limit := 45.0
+@export_range(1.0, 10000.0, 1.0) var target_distance := 525.0
+@export_range(1.0, 600.0, 0.5) var time_limit := 58.0
 
 @export_group("Player Movement")
 @export_range(0.0, 600.0, 1.0) var player_x := 220.0
@@ -168,6 +172,12 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_radians := 0.012
 @export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_frequency := 0.018
 @export_range(0.0, 4.0, 0.05) var player_wiggle_intensity_x := 1.0
+
+@export_group("Boost")
+@export_range(1.0, 2.0, 0.01) var player_boost_max_speed_x := 1.2
+@export_range(1.0, 3.0, 0.05) var player_boost_acceleration_x := 1.4
+@export_range(0.05, 3.0, 0.05) var player_boost_release_decay_x := 0.45
+@export_range(0.0, 20.0, 0.1) var boost_gas_consumption_percent_per_second := 1.5
 
 @export_group("Spawn Frequency")
 @export_range(0.15, 60.0, 0.05) var incoming_spawn_min_delay := 18.0
@@ -228,7 +238,7 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 1.0, 0.05) var bottom_lane_lane_change_chance_x := 0.35
 
 @export_group("Stage Rewards")
-@export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.08
+@export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.15
 @export_range(0.0, 100.0, 0.5) var time_bonus_php_per_second := 2.0
 @export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
 
@@ -251,6 +261,22 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export var noon_glow_center := Vector2(0.52, 0.22)
 @export var noon_glow_radius := Vector2(0.72, 0.56)
 
+@export_group("Weather")
+@export var cloudy_filter_color := Color(0.36, 0.39, 0.38, 0.20)
+@export var rain_filter_color := Color(0.16, 0.22, 0.27, 0.28)
+@export var heavy_rain_filter_color := Color(0.10, 0.14, 0.20, 0.38)
+@export_range(-1800.0, 1800.0, 1.0) var rain_scroll_x := -312.0
+@export_range(0.0, 2400.0, 1.0) var rain_scroll_y := 1440.0
+@export_range(0.0, 1.0, 0.01) var rain_lines_alpha := 0.72
+@export_range(0.0, 1.0, 0.01) var heavy_rain_lines_alpha := 0.92
+@export_range(0.0, 1.0, 0.01) var rain_drops_alpha := 0.22
+@export_range(0.0, 1.0, 0.01) var rain_floor_drops_alpha := 0.34
+@export_range(0.02, 2.0, 0.01) var rain_floor_drop_min_delay := 0.12
+@export_range(0.02, 2.0, 0.01) var rain_floor_drop_max_delay := 0.34
+@export_range(0.1, 3.0, 0.05) var rain_floor_drop_lifetime := 0.55
+@export_range(1.0, 6.0, 0.1) var rain_floor_drop_max_scale := 2.4
+@export_range(1, 60, 1) var rain_floor_drop_max_active := 12
+
 @export_group("Night Visibility")
 @export var night_visibility_shade_color := Color(0.0, 0.0, 0.0, 0.86)
 @export var night_visibility_focus_offset := Vector2(170.0, -20.0)
@@ -260,6 +286,11 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 var rng := RandomNumberGenerator.new()
 var background_scroller
 var time_filter_rect: ColorRect
+var weather_filter_rect: ColorRect
+var rain_lines_rect: TextureRect
+var rain_drops_rect: TextureRect
+var rain_floor_drops_rect: Control
+var rain_floor_drop_texture: Texture2D
 var noon_glow_rect: ColorRect
 var noon_glow_material: ShaderMaterial
 var night_visibility_rect: ColorRect
@@ -303,6 +334,7 @@ var stage_clear_fade_time := 0.0
 var stage_difficulty := "short"
 var stage_time_of_day := "morning"
 var stage_traffic := "chill"
+var stage_weather := "clear"
 var speeder_spawn_timer := 0.0
 var speeder_warning_timer := 0.0
 var speeder_warning_flash_timer := 0.0
@@ -318,6 +350,11 @@ var special_mode_hidden_modifiers := {}
 var gameplay_entry_fade_seconds := 0.0
 var rolled_target_distance := 0.0
 var rolled_target_stage_type := ""
+var boost_active := false
+var boost_speed_x := 1.0
+var boost_gas_save_timer := 0.0
+var weather_effect_time := 0.0
+var rain_floor_drop_spawn_timer := 0.0
 
 
 func _ready() -> void:
@@ -328,6 +365,9 @@ func _ready() -> void:
 	if use_player_state_stage_sequence:
 		stage_type = PlayerState.get_current_stage_type()
 	GameStageSetup.apply_stage_profile(self)
+	if use_player_state_stage_sequence:
+		stage_weather = PlayerState.get_stage_weather(stage_time_of_day)
+	GameStageSetup.apply_weather_modifiers(self)
 	GameStageSetup.apply_player_upgrades(self)
 	VehicleTrafficController.reset_speeder_timer(self)
 	time_left = time_limit
@@ -338,11 +378,13 @@ func _ready() -> void:
 	GameEnvironmentController.create_background(self, BACKGROUND_LOOP_TEXTURE)
 	PlayerVehicleController.create_player(self)
 	GameEnvironmentController.create_time_filter(self)
+	GameEnvironmentController.create_weather_effects(self, RAIN_DIAGONAL_TEXTURE, RAIN_DROPS_TEXTURE, RAIN_FLOOR_DROPS_TEXTURE)
 	GameEnvironmentController.create_noon_glow(self, NOON_GLOW_SHADER_CODE)
 	GameEnvironmentController.create_night_visibility_mask(self, NIGHT_VISIBILITY_SHADER_CODE)
 	GameEnvironmentController.create_ui(self, gameplay_entry_fade_seconds)
 	stage_tutorial = StageTutorialController.new()
 	audio_manager.start_stage_bgm(stage_time_of_day, stage_traffic, rng)
+	audio_manager.start_rain_loop_bgm(stage_weather)
 	GameEnvironmentController.layout_scene(self)
 	GameEnvironmentController.begin_gameplay_entry_fade(self)
 	StageTutorialController.schedule(self)
@@ -390,10 +432,13 @@ func _process(delta: float) -> void:
 			func(lane_index: int, size: Vector2) -> float:
 				return VehicleGeometry.lane_y(self, lane_index, size)
 		)
+		GameEnvironmentController.update_background(self)
+		GameEnvironmentController.update_weather_effects(self, delta)
 		GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 		return
 	if stage_tutorial != null and stage_tutorial.input_lock_active:
 		GameEnvironmentController.update_background(self)
+		GameEnvironmentController.update_weather_effects(self, delta)
 		GameEnvironmentController.update_night_visibility_mask(self)
 		GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 		queue_redraw()
@@ -428,10 +473,11 @@ func _process(delta: float) -> void:
 		PlayerVehicleController.update_player(self, delta)
 
 	GameEnvironmentController.update_background(self)
+	GameEnvironmentController.update_weather_effects(self, delta)
 	GameEnvironmentController.update_night_visibility_mask(self)
 	GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 	queue_redraw()
 
 
 func _draw() -> void:
-	GameRenderer.draw(self, distance)
+	GameRenderer.draw(self, distance * VISUAL_DISTANCE_SCALE)

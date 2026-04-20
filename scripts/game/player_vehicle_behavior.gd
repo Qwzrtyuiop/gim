@@ -16,11 +16,18 @@ static func next_speed(
 	player_min_cruise_speed: float,
 	player_coast_deceleration: float,
 	player_coast_x: float,
-	player_max_speed: float
+	player_max_speed: float,
+	boosting: bool,
+	boost_speed_x: float,
+	boost_acceleration_x: float
 ) -> float:
+	var effective_max_speed: float = player_max_speed * maxf(1.0, boost_speed_x)
+	var effective_acceleration_x: float = player_acceleration_x
+	if boosting:
+		effective_acceleration_x *= boost_acceleration_x
 	var speed := current_speed
 	if accelerating and not braking:
-		speed += player_acceleration * player_acceleration_x * lane_acceleration_multiplier(
+		speed += player_acceleration * effective_acceleration_x * lane_acceleration_multiplier(
 			background_type,
 			player_lane,
 			bottom_lane_player_acceleration_x
@@ -30,7 +37,7 @@ static func next_speed(
 	else:
 		speed = move_toward(speed, player_min_cruise_speed, player_coast_deceleration * player_coast_x * delta)
 
-	return clampf(speed, 0.0, player_max_speed)
+	return clampf(speed, 0.0, effective_max_speed)
 
 
 static func lane_acceleration_multiplier(background_type: String, player_lane: int, bottom_lane_player_acceleration_x: float) -> float:
