@@ -104,7 +104,6 @@ const TIME_PROFILES := {
 		"incoming_vehicle_max_speed": 650.0,
 	},
 	"night": {
-		"player_max_speed": 600.0,
 		"incoming_vehicle_min_speed": 420.0,
 		"incoming_vehicle_max_speed": 690.0,
 		"time_bonus_php_per_second": 2.5,

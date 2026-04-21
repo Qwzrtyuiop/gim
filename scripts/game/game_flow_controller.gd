@@ -68,10 +68,49 @@ static func end_game(owner, title: String, detail: String) -> void:
 	if owner.speeder_warning_label:
 		owner.speeder_warning_label.visible = false
 	owner.speeder_warning_active = false
+	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	if owner.game_state == "YOU MADE IT":
 		owner.player_is_stage_clear_exiting = true
 		store_stage_result(owner)
 		VehicleCollisionController.remove_vehicles_behind_player(owner)
+
+
+static func handle_player_hit(owner, detail: String) -> void:
+	if owner.game_state != "playing" or owner.player_hit_invincible_timer > 0.0:
+		return
+
+	owner.audio_manager.play_crash_sfx()
+	owner.player_speed = 0.0
+	owner.boost_active = false
+	owner.boost_speed_x = 1.0
+	owner.player_hit_recovery_timer = owner.crash_recovery_seconds
+	owner.player_hit_invincible_timer = maxf(owner.crash_recovery_seconds, owner.crash_invincible_seconds)
+	owner.player_hit_flicker_timer = owner.crash_flicker_interval
+	owner.player_hit_flicker_visible = false
+
+	var energy_loss := mini(PlayerState.energy, owner.crash_energy_loss)
+	if energy_loss > 0:
+		PlayerState.spend_energy(energy_loss)
+		PlayerState.save_progress()
+
+	if PlayerState.energy > 0:
+		return
+
+	PlayerState.flush_deferred_save()
+	PlayerState.record_stage_failure()
+	GameEconomyManager.store_failed_stage_result(
+		owner.stage_type,
+		owner.stage_difficulty,
+		owner.stage_time_of_day,
+		owner.stage_traffic,
+		owner.stage_special_type,
+		owner.special_stage_id,
+		owner.distance,
+		owner.target_distance,
+		detail
+	)
+	PlayerState.set_pending_result_music(owner.audio_manager.get_result_music_carry_state())
+	owner.get_tree().change_scene_to_file(STAGE_RESULTS_SCENE)
 
 
 static func try_retry_stage(owner) -> void:
@@ -104,11 +143,17 @@ static func reset_game(owner) -> void:
 	owner.boost_active = false
 	owner.boost_speed_x = 1.0
 	owner.boost_gas_save_timer = 0.0
+	owner.player_hit_recovery_timer = 0.0
+	owner.player_hit_invincible_timer = 0.0
+	owner.player_hit_flicker_timer = 0.0
+	owner.player_hit_flicker_visible = true
 	if owner.passenger_dialogue_controller != null:
 		owner.passenger_dialogue_controller.clear()
 	VehicleTrafficController.reset_speeder_timer(owner)
 	if owner.fade_rect:
 		owner.fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
+	if owner.player:
+		owner.player.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	GameEnvironmentController.layout_scene(owner)
 
 
@@ -151,6 +196,7 @@ static func store_stage_result(owner) -> void:
 		owner.stage_time_of_day,
 		owner.stage_traffic,
 		owner.stage_special_type,
+		owner.special_stage_id,
 		owner.distance,
 		owner.target_distance,
 		owner.fare_php_per_meter,

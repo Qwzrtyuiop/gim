@@ -452,6 +452,7 @@ func _lock_character_for_selection(picked_character: Dictionary, active_distance
 		selected_traffic = PlayerState.get_random_stage_traffic_type()
 	locked_character["stage_traffic"] = selected_traffic
 	locked_character["stage_special_type"] = _roll_stage_special_type(active_distance, selected_traffic)
+	locked_character["special_stage_id"] = ""
 	locked_character["is_first_appearance"] = not was_seen_before_roll
 	return locked_character
 
@@ -536,6 +537,8 @@ func _card_special_badge_text(stage_special_type: String) -> String:
 			return "RUSH"
 		PlayerState.STAGE_SPECIAL_TYPE_CAREFUL:
 			return "CAREFUL"
+		PlayerState.STAGE_SPECIAL_TYPE_SPECIAL:
+			return "SPECIAL"
 	return ""
 
 
@@ -917,6 +920,7 @@ func _choose_character(card_index: int) -> void:
 
 	PlayerState.set_current_mock_character(str(character.get("id", "")))
 	PlayerState.set_current_stage_special_type(str(character.get("stage_special_type", "")))
+	PlayerState.set_current_special_stage_id(str(character.get("special_stage_id", "")))
 	var should_show_day_start_transition := PlayerState.will_advance_day(transition_mode) and PlayerState.get_transition_display_day(transition_mode) <= 1
 	PlayerState.advance_to_next_stage(
 		transition_mode,

@@ -58,6 +58,7 @@ func _render_results(result: Dictionary) -> void:
 	var day_number := int(result.get("day", PlayerState.get_current_day()))
 	var time_of_day := str(result.get("time_of_day", "morning"))
 	var total := int(result.get("total", 0))
+	var completed := bool(result.get("completed", true))
 	var is_night_stage := time_of_day == "night"
 	var has_pending_night_skip := time_of_day == "noon" and PlayerState.has_pending_night_phase_skip()
 	var stage_special_label := PlayerState.get_stage_special_display_name(str(result.get("stage_special_type", "")))
@@ -68,7 +69,7 @@ func _render_results(result: Dictionary) -> void:
 	var header_line := "Day %d  %s" % [day_number, stage_name]
 	if not stage_special_label.is_empty():
 		header_line += "  [%s]" % stage_special_label
-	var rendered_lines: Array[String] = [header_line, "Complete", ""]
+	var rendered_lines: Array[String] = [header_line, "Complete" if completed else "Failed", ""]
 	for detail_line_variant in detail_lines:
 		rendered_lines.append(str(detail_line_variant))
 	results_label.text = "\n".join(rendered_lines)
@@ -151,6 +152,10 @@ func _refresh_status(note := "") -> void:
 
 func _render_earnings_summary(total: int) -> void:
 	if earnings_summary_label == null:
+		return
+	var result: Dictionary = PlayerState.get_last_stage_result()
+	if not bool(result.get("completed", true)):
+		earnings_summary_label.text = "No payout for this trip.\nRecover and try another route."
 		return
 
 	var weekly_goal := PlayerState.get_current_weekly_goal()

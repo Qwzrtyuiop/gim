@@ -56,6 +56,11 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.current_stage_special_type = player_state.normalize_stage_special_type(
 		str(save_data.get("current_stage_special_type", player_state.current_stage_special_type))
 	)
+	player_state.current_special_stage_id = player_state.normalize_special_stage_id(
+		str(save_data.get("current_special_stage_id", player_state.current_special_stage_id))
+	)
+	if player_state.current_stage_special_type != player_state.STAGE_SPECIAL_TYPE_SPECIAL:
+		player_state.current_special_stage_id = ""
 	player_state.current_day = int(save_data.get("current_day", player_state.current_day))
 	player_state.stage_round = int(save_data.get("stage_round", player_state.stage_round))
 	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
@@ -151,6 +156,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"karma": player_state.karma,
 		"current_stage_type": player_state.current_stage_type,
 		"current_stage_special_type": player_state.current_stage_special_type,
+		"current_special_stage_id": player_state.current_special_stage_id,
 		"current_day": player_state.current_day,
 		"stage_round": player_state.stage_round,
 		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,

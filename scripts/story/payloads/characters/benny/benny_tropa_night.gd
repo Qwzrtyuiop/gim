@@ -140,6 +140,20 @@ static func build() -> Dictionary:
 			{
 				"background": BACKGROUND_BAR,
 				"background_fade": 0.28,
+				"actions": [
+					{
+						"type": "play_music",
+						"path": StoryConstants.MUSIC_BAR,
+						"loop": true,
+						"fade_in": 0.24,
+						"volume_db": -9.0,
+					},
+					{
+						"type": "play_sfx",
+						"path": StoryConstants.MUSIC_BAR_SFX,
+						"volume_db": -5.0,
+					},
+				],
 				"text": "Inside, the first few minutes felt awkward.",
 			},
 			{
@@ -163,6 +177,9 @@ static func build() -> Dictionary:
 			{
 				"speaker": "John Toda",
 				"text": "More or less.",
+			},
+			{
+				"text": "...",
 			},
 			{
 				"text": "Nobody pushes it",

@@ -5,6 +5,9 @@ const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_co
 
 
 static func collision_detail(owner) -> String:
+	if owner.player_hit_invincible_timer > 0.0:
+		return ""
+
 	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
 	for entity in owner.active_entities:
 		if VehicleTrafficController.entity_collision_disabled(entity):
@@ -22,7 +25,7 @@ static func collision_detail(owner) -> String:
 			if VehicleTrafficController.lane_change_fault_is_active(entity):
 				VehicleTrafficController.deflect_lane_change_fault(owner, entity)
 				continue
-			return "Collision in the %s lane. Space/R to retry." % owner.LANE_NAMES[entity["lane"]]
+			return "Collision in the %s lane." % owner.LANE_NAMES[entity["lane"]]
 	return ""
 
 

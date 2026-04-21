@@ -3,6 +3,13 @@ extends RefCounted
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
 
+# Custom special stages can be registered here later.
+# Each blueprint is keyed by special_stage_id and may provide:
+# - display_name: String
+# - modifiers: Dictionary of numeric owner modifiers, reusing _apply_numeric_owner_modifier keys
+# - metadata: Dictionary for bespoke stage scripts to inspect at runtime
+const SPECIAL_STAGE_BLUEPRINTS := {}
+
 
 static func apply_stage_profile(owner) -> void:
 	if not owner.use_stage_profile:
@@ -115,6 +122,42 @@ static func apply_character_modifiers(owner) -> void:
 	_apply_numeric_owner_modifier(owner, modifiers, "player_brake_x")
 	_apply_numeric_owner_modifier(owner, modifiers, "player_lane_lerp_x")
 	_apply_numeric_owner_modifier(owner, modifiers, "player_coast_x")
+
+
+static func apply_special_stage_blueprint(owner) -> void:
+	owner.special_stage_blueprint = {}
+	if PlayerState.normalize_stage_special_type(owner.stage_special_type) != PlayerState.STAGE_SPECIAL_TYPE_SPECIAL:
+		return
+
+	var special_stage_id: String = PlayerState.normalize_special_stage_id(owner.special_stage_id)
+	if special_stage_id.is_empty():
+		return
+
+	var blueprint: Dictionary = special_stage_blueprint(special_stage_id)
+	if blueprint.is_empty():
+		return
+
+	owner.special_stage_blueprint = blueprint.duplicate(true)
+	var modifiers: Dictionary = blueprint.get("modifiers", {})
+	if modifiers.is_empty():
+		return
+
+	_apply_numeric_owner_modifier(owner, modifiers, "fare_php_per_meter")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_limit")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_bonus_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "overtime_fare_penalty_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_max_speed")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_acceleration_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_brake_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_lane_lerp_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_coast_x")
+
+
+static func special_stage_blueprint(special_stage_id: String) -> Dictionary:
+	var safe_special_stage_id: String = PlayerState.normalize_special_stage_id(special_stage_id)
+	if safe_special_stage_id.is_empty():
+		return {}
+	return Dictionary(SPECIAL_STAGE_BLUEPRINTS.get(safe_special_stage_id, {})).duplicate(true)
 
 
 static func apply_hidden_special_modifiers(owner) -> void:

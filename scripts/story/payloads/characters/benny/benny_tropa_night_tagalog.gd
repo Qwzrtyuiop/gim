@@ -129,6 +129,20 @@ static func build() -> Dictionary:
 			{
 				"background": StoryConstants.BACKGROUND_BAR,
 				"background_fade": 0.28,
+				"actions": [
+					{
+						"type": "play_music",
+						"path": StoryConstants.MUSIC_BAR,
+						"loop": true,
+						"fade_in": 0.24,
+						"volume_db": -9.0,
+					},
+					{
+						"type": "play_sfx",
+						"path": StoryConstants.MUSIC_BAR_SFX,
+						"volume_db": -5.0,
+					},
+				],
 				"text": "Sa loob, nagkwentuhan kami tungkol sa buhay.",
 			},
 			{
@@ -157,11 +171,15 @@ static func build() -> Dictionary:
 			},
 			{
 				"speaker": "Arvin",
-				"text": "Trabaho lang?",
+				"text": "Yun lang?",
 			},
 			{
 				"speaker": "John Toda",
 				"text": "Medyo.",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "...",
 			},
 			{
 				"text": "Di na sila nagtanong muli.",

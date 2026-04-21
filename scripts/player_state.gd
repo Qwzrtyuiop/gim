@@ -28,7 +28,12 @@ const STAGE_TRAFFIC_TYPES := ["chill", "normal", "traffic-jam", "busy", "speeder
 const STAGE_SPECIAL_TYPE_NONE := ""
 const STAGE_SPECIAL_TYPE_URGENT := "urgent"
 const STAGE_SPECIAL_TYPE_CAREFUL := "careful"
-const STAGE_SPECIAL_TYPES := [STAGE_SPECIAL_TYPE_URGENT, STAGE_SPECIAL_TYPE_CAREFUL]
+const STAGE_SPECIAL_TYPE_SPECIAL := "special"
+const STAGE_SPECIAL_TYPES := [
+	STAGE_SPECIAL_TYPE_URGENT,
+	STAGE_SPECIAL_TYPE_CAREFUL,
+	STAGE_SPECIAL_TYPE_SPECIAL,
+]
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const TOTAL_DEBT_GOAL := 50000
 const WEEKLY_DEBT_GOALS := [1000]
@@ -116,6 +121,7 @@ var max_energy := DEFAULT_MAX_ENERGY
 var max_gas := DEFAULT_MAX_GAS_PERCENT
 var current_stage_type := FIRST_STAGE_TYPE
 var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
+var current_special_stage_id := ""
 var current_day := 1
 var stage_round := 0
 var pending_stage_energy_cost := false
@@ -376,13 +382,33 @@ func normalize_stage_special_type(stage_special_type: String) -> String:
 	return safe_special_type if STAGE_SPECIAL_TYPES.has(safe_special_type) else STAGE_SPECIAL_TYPE_NONE
 
 
+func normalize_special_stage_id(special_stage_id: String) -> String:
+	return str(special_stage_id).strip_edges().to_lower()
+
+
 func set_current_stage_special_type(stage_special_type: String) -> void:
 	current_stage_special_type = normalize_stage_special_type(stage_special_type)
+	if current_stage_special_type != STAGE_SPECIAL_TYPE_SPECIAL:
+		current_special_stage_id = ""
 	save_progress()
 
 
 func get_current_stage_special_type() -> String:
 	return normalize_stage_special_type(current_stage_special_type)
+
+
+func set_current_special_stage_id(special_stage_id: String) -> void:
+	if get_current_stage_special_type() != STAGE_SPECIAL_TYPE_SPECIAL:
+		current_special_stage_id = ""
+	else:
+		current_special_stage_id = normalize_special_stage_id(special_stage_id)
+	save_progress()
+
+
+func get_current_special_stage_id() -> String:
+	if get_current_stage_special_type() != STAGE_SPECIAL_TYPE_SPECIAL:
+		return ""
+	return normalize_special_stage_id(current_special_stage_id)
 
 
 func get_stage_special_display_name(stage_special_type: String) -> String:
@@ -391,6 +417,8 @@ func get_stage_special_display_name(stage_special_type: String) -> String:
 			return "URGENT"
 		STAGE_SPECIAL_TYPE_CAREFUL:
 			return "CAREFUL"
+		STAGE_SPECIAL_TYPE_SPECIAL:
+			return "SPECIAL"
 	return ""
 
 
@@ -835,6 +863,7 @@ func prepare_day_start(target_day: int) -> void:
 	current_day = safe_target_day
 	current_stage_type = build_stage_type("short", "morning", "chill")
 	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
+	current_special_stage_id = ""
 	pending_stage_energy_cost = false
 	_reset_daily_consumable_counters(current_day)
 	_roll_daily_conditions_for_day(current_day)
@@ -851,6 +880,7 @@ func set_current_stage_time(day_time: String) -> void:
 		str(stage_parts.get("traffic", "chill"))
 	)
 	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
+	current_special_stage_id = ""
 	save_progress()
 
 
@@ -1770,6 +1800,7 @@ func _apply_new_run_defaults() -> void:
 	stage_round = 0
 	current_stage_type = FIRST_STAGE_TYPE
 	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
+	current_special_stage_id = ""
 	current_day = 1
 	_reset_weather_state()
 	_reset_pending_runtime_state()
