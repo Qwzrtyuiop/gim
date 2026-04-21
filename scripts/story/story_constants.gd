@@ -1,6 +1,7 @@
 extends RefCounted
 
 const BACKGROUND_INHOUSE := "res://assets/story/backgrounds/inhouse.png"
+const BACKGROUND_BAR := "res://assets/story/backgrounds/bar.jpeg"
 const BACKGROUND_GARAGE_NORMAL := "res://assets/story/backgrounds/garagenormal.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/station.png"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/city.png"
@@ -9,6 +10,8 @@ const BACKGROUND_STORYDOOR_ZOOM := "res://assets/story/backgrounds/storydoorzoom
 const BACKGROUND_STORE := "res://assets/story/backgrounds/store.png"
 
 const MUSIC_CITY_AMBIENCE := "res://assets/story/music/city_ambience.mp3"
+const MUSIC_BAR := "res://assets/story/music/bar.mp3"
+const MUSIC_BAR_SFX := "res://assets/story/music/barsfx.mp3"
 const MUSIC_DRUM := "res://assets/story/music/drum.mp3"
 const MUSIC_ALARM_SFX := "res://assets/story/music/alarm sfx.mp3"
 const MUSIC_RUNNING_SFX := "res://assets/story/music/running.mp3"

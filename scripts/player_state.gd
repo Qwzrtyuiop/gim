@@ -1,27 +1,61 @@
 extends Node
 
+# Central run-state authority.
+# If a feature needs to survive scene changes or be saved, it usually belongs here.
+
+# Shared services
 const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
+const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryTriggerRuntime := preload("res://scripts/story/story_trigger_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 
+# Signals
 signal money_changed(amount: int)
 signal energy_changed(amount: int)
-signal gas_changed(amount: int)
+signal gas_changed(amount: float)
 signal karma_changed(amount: int)
 signal upgrade_changed(upgrade_id: String, level: int)
 signal achievement_unlocked(achievement_id: String)
 
+# Run configuration
 const FIRST_STAGE_TYPE := "short-morning-chill"
 const STAGE_DIFFICULTIES := ["short", "medium", "long"]
 const STAGE_TIMES := ["morning", "noon", "night"]
 const STAGE_TRAFFIC_TYPES := ["chill", "normal", "traffic-jam", "busy", "speeders"]
+const STAGE_SPECIAL_TYPE_NONE := ""
+const STAGE_SPECIAL_TYPE_URGENT := "urgent"
+const STAGE_SPECIAL_TYPE_CAREFUL := "careful"
+const STAGE_SPECIAL_TYPE_SPECIAL := "special"
+const STAGE_SPECIAL_TYPES := [
+	STAGE_SPECIAL_TYPE_URGENT,
+	STAGE_SPECIAL_TYPE_CAREFUL,
+	STAGE_SPECIAL_TYPE_SPECIAL,
+]
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const TOTAL_DEBT_GOAL := 50000
 const WEEKLY_DEBT_GOALS := [1000]
-const DEFAULT_STARTING_GAS := 10
+const DEFAULT_STARTING_ENERGY := 10
+const DEFAULT_MAX_ENERGY := 10
+const DEFAULT_STARTING_GAS_PERCENT := 100.0
+const DEFAULT_MAX_GAS_PERCENT := 100.0
+const GAS_CAN_PERCENT := 10.0
+const GAS_DRAIN_PERCENT_PER_1000_UNITS := 5.0
+const FUEL_EFFICIENCY_UPGRADE_ID := "fuel_efficiency"
+const LEGACY_TIRE_GRIP_UPGRADE_ID := "tire_grip"
+const FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL := 0.07
+const FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL := 0.04
+const LOW_GAS_PERCENT_THRESHOLD := 20.0
 const DEFAULT_GAS_PRICE := 70
+const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := 30.0
+const DEFAULT_WEATHER := "clear"
+const WEATHER_CLOUDY := "cloudy"
+const WEATHER_RAIN := "rain"
+const WEATHER_HEAVY_RAIN := "heavy rain"
+const WEATHER_TYPES := [DEFAULT_WEATHER, WEATHER_CLOUDY, WEATHER_RAIN, WEATHER_HEAVY_RAIN]
+const WEATHER_SYSTEM_START_DAY := 2
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const TRANSITION_RIDE := "ride"
 const TRANSITION_CURRENT_STAGE := "current_stage"
@@ -32,44 +66,39 @@ const STORY_TRIGGER_DAY_END := "day_end"
 const STORY_TRIGGER_SLEEP_MIDPOINT := "sleep_midpoint"
 const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
-const END_OF_DAY_ENERGY_BONUS := 1
-const NIGHT_SLEEP_ENERGY_BONUS := 1
+const END_OF_DAY_ENERGY_BONUS := 2
+const NIGHT_SLEEP_ENERGY_BONUS := 3
 const ESTIMATED_BONUS_TIME_RATIO := 0.35
-const TRIP_GAS_COSTS := {
-	"short": 1,
-	"medium": 2,
-	"long": 3,
-}
 const STAGE_DISTANCE_RANGES := {
-	"short": Vector2(800.0, 1200.0),
-	"medium": Vector2(1200.0, 1800.0),
-	"long": Vector2(1800.0, 2800.0),
+	"short": Vector2(400.0, 650.0),
+	"medium": Vector2(700.0, 1050.0),
+	"long": Vector2(1150.0, 1650.0),
 }
 const SAVE_PATH := "user://progress_save.tres"
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const REST_ENERGY_BONUSES := {
 	TRANSITION_RIDE: 0,
-	TRANSITION_REST_TO_NIGHT: 1,
-	TRANSITION_REST_TO_NEXT_DAY: 2,
+	TRANSITION_REST_TO_NIGHT: 2,
+	TRANSITION_REST_TO_NEXT_DAY: 3,
 	TRANSITION_SLEEP_TO_NEXT_DAY: 0,
 }
 const ESTIMATED_STAGE_PROFILES := {
 	"short": {
-		"target_distance": 1000.0,
-		"time_limit": 45.0,
-		"fare_php_per_meter": 0.08,
+		"target_distance": 525.0,
+		"time_limit": 58.0,
+		"fare_php_per_meter": 0.15,
 		"time_bonus_php_per_second": 2.0,
 	},
 	"medium": {
-		"target_distance": 1500.0,
-		"time_limit": 58.0,
-		"fare_php_per_meter": 0.10,
+		"target_distance": 875.0,
+		"time_limit": 86.0,
+		"fare_php_per_meter": 0.17,
 		"time_bonus_php_per_second": 2.0,
 	},
 	"long": {
-		"target_distance": 2300.0,
-		"time_limit": 82.0,
-		"fare_php_per_meter": 0.12,
+		"target_distance": 1400.0,
+		"time_limit": 128.0,
+		"fare_php_per_meter": 0.20,
 		"time_bonus_php_per_second": 2.0,
 	},
 }
@@ -85,10 +114,14 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 	"busy": 1.24,
 	"speeders": 1.34,
 }
+
+# Persistent run state
 var last_stage_result: Dictionary = {}
-var max_energy := 5
-var max_gas := DEFAULT_STARTING_GAS
+var max_energy := DEFAULT_MAX_ENERGY
+var max_gas := DEFAULT_MAX_GAS_PERCENT
 var current_stage_type := FIRST_STAGE_TYPE
+var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
+var current_special_stage_id := ""
 var current_day := 1
 var stage_round := 0
 var pending_stage_energy_cost := false
@@ -96,9 +129,13 @@ var pending_trip_selection: Dictionary = {}
 var pending_story: Dictionary = {}
 var pending_sleep_transition_state: Dictionary = {}
 var pending_gameplay_entry_fade_duration := 0.0
+var pending_result_music: Dictionary = {}
+var pending_skip_night_phase := false
 var current_mock_character_id := ""
 var seen_mock_characters: Dictionary = {}
 var unique_character_progress: Dictionary = {}
+var locked_unique_character_stories: Dictionary = {}
+var consumed_unique_session_dialogue: Dictionary = {}
 var seeded_rider_rules: Array[Dictionary] = []
 var consumed_seeded_rider_rules: Dictionary = {}
 var last_rest_day := 0
@@ -130,7 +167,14 @@ var last_seen_story_id := ""
 var event_values: Dictionary = {}
 var resume_scene_path := ""
 var ride_select_tutorial_shown := false
+var store_tutorial_shown := false
+var home_tutorial_shown := false
+
+# Save-flow guards
 var _is_loading_save := false
+var _suppress_auto_save := false
+var _has_deferred_save := false
+var _state_batch_depth := 0
 
 var money := 0:
 	set(value):
@@ -138,19 +182,25 @@ var money := 0:
 		money_changed.emit(money)
 		save_progress()
 
-var energy := 3:
+var energy := DEFAULT_STARTING_ENERGY:
 	set(value):
 		energy = clampi(value, 0, max_energy)
 		energy_changed.emit(energy)
 		save_progress()
 
-var gas := DEFAULT_STARTING_GAS:
+var gas := DEFAULT_STARTING_GAS_PERCENT:
 	set(value):
-		gas = clampi(value, 0, max_gas)
+		gas = clampf(value, 0.0, max_gas)
 		gas_changed.emit(gas)
 		save_progress()
 
 var gas_price := DEFAULT_GAS_PRICE
+var gas_price_delta := 0
+var previous_gas_price := DEFAULT_GAS_PRICE
+var current_weather := DEFAULT_WEATHER
+var weather_forecasts: Dictionary = {}
+var weather_phase_cache: Dictionary = {}
+var daily_conditions_day := 1
 
 var karma := 0:
 	set(value):
@@ -171,10 +221,41 @@ func _load_progress() -> void:
 	PlayerStateSaveCodec.load_from_path(self, SAVE_PATH)
 
 
+# Save flow
 func save_progress() -> void:
+	if _is_loading_save:
+		return
+	if _suppress_auto_save:
+		_has_deferred_save = true
+		return
 	PlayerStateSaveCodec.save_to_path(self, SAVE_PATH, SAVE_VERSION)
 
 
+func flush_deferred_save() -> void:
+	if not _has_deferred_save:
+		return
+	_has_deferred_save = false
+	save_progress()
+
+
+func _begin_state_batch() -> void:
+	_state_batch_depth += 1
+	_suppress_auto_save = true
+
+
+func _end_state_batch(save_after := true, discard_deferred := false) -> void:
+	_state_batch_depth = maxi(0, _state_batch_depth - 1)
+	if _state_batch_depth > 0:
+		return
+	_suppress_auto_save = false
+	if discard_deferred:
+		_has_deferred_save = false
+		return
+	if save_after and _has_deferred_save:
+		flush_deferred_save()
+
+
+# Story event and resume state
 func set_last_seen_story_section(story_id: String, section_index: int) -> void:
 	var safe_story_id := str(story_id).strip_edges()
 	if safe_story_id.is_empty():
@@ -247,6 +328,7 @@ func get_resume_scene() -> String:
 	return resume_scene_path
 
 
+# Tutorial state
 func has_ride_select_tutorial_shown() -> bool:
 	return ride_select_tutorial_shown
 
@@ -258,44 +340,86 @@ func mark_ride_select_tutorial_shown() -> void:
 	save_progress()
 
 
-func begin_stage_sequence() -> void:
-	stage_round = 0
-	current_stage_type = FIRST_STAGE_TYPE
-	current_day = 1
-	pending_stage_energy_cost = false
-	clear_pending_trip_selection()
-	clear_pending_story()
-	clear_pending_sleep_transition_state()
-	clear_pending_gameplay_entry_fade()
-	last_rest_day = 0
-	yosi_bought_today = 0
-	yosi_bought_day = 1
-	yosi_bought_total = 0
-	rests_taken_today = 0
-	rests_taken_day = 1
-	tamad_rest_day = 1
-	tamad_rest_times_today.clear()
-	rides_completed_today = 0
-	rides_completed_day = 1
-	non_gas_store_purchases_this_week = 0
-	clean_stage_streak = 0
-	current_trip_low_energy = false
-	current_trip_low_gas = false
-	low_resource_trip_count = 0
-	low_both_resource_trip_count = 0
-	debt_goal_index = 0
-	last_debt_collection_day = 0
-	remaining_debt = TOTAL_DEBT_GOAL
-	run_failed = false
-	run_fail_reason = ""
-	_reset_story_triggers()
+func has_store_tutorial_shown() -> bool:
+	return store_tutorial_shown
+
+
+func mark_store_tutorial_shown() -> void:
+	if store_tutorial_shown:
+		return
+	store_tutorial_shown = true
 	save_progress()
+
+
+func has_home_tutorial_shown() -> bool:
+	return home_tutorial_shown
+
+
+func mark_home_tutorial_shown() -> void:
+	if home_tutorial_shown:
+		return
+	home_tutorial_shown = true
+	save_progress()
+
+
+# Run setup and progression
+func begin_stage_sequence() -> void:
+	_begin_state_batch()
+	_apply_new_run_defaults()
+	last_stage_result.clear()
+	save_progress()
+	_end_state_batch()
 
 
 func get_current_stage_type() -> String:
 	if current_stage_type.is_empty():
 		current_stage_type = FIRST_STAGE_TYPE
 	return current_stage_type
+
+
+func normalize_stage_special_type(stage_special_type: String) -> String:
+	var safe_special_type: String = str(stage_special_type).strip_edges().to_lower()
+	return safe_special_type if STAGE_SPECIAL_TYPES.has(safe_special_type) else STAGE_SPECIAL_TYPE_NONE
+
+
+func normalize_special_stage_id(special_stage_id: String) -> String:
+	return str(special_stage_id).strip_edges().to_lower()
+
+
+func set_current_stage_special_type(stage_special_type: String) -> void:
+	current_stage_special_type = normalize_stage_special_type(stage_special_type)
+	if current_stage_special_type != STAGE_SPECIAL_TYPE_SPECIAL:
+		current_special_stage_id = ""
+	save_progress()
+
+
+func get_current_stage_special_type() -> String:
+	return normalize_stage_special_type(current_stage_special_type)
+
+
+func set_current_special_stage_id(special_stage_id: String) -> void:
+	if get_current_stage_special_type() != STAGE_SPECIAL_TYPE_SPECIAL:
+		current_special_stage_id = ""
+	else:
+		current_special_stage_id = normalize_special_stage_id(special_stage_id)
+	save_progress()
+
+
+func get_current_special_stage_id() -> String:
+	if get_current_stage_special_type() != STAGE_SPECIAL_TYPE_SPECIAL:
+		return ""
+	return normalize_special_stage_id(current_special_stage_id)
+
+
+func get_stage_special_display_name(stage_special_type: String) -> String:
+	match normalize_stage_special_type(stage_special_type):
+		STAGE_SPECIAL_TYPE_URGENT:
+			return "URGENT"
+		STAGE_SPECIAL_TYPE_CAREFUL:
+			return "CAREFUL"
+		STAGE_SPECIAL_TYPE_SPECIAL:
+			return "SPECIAL"
+	return ""
 
 
 func get_current_day() -> int:
@@ -324,6 +448,11 @@ func get_days_until_debt_collection(day_number := -1) -> int:
 	var effective_day: int = int(day_number) if int(day_number) > 0 else get_current_day()
 	var cycle_day: int = ((effective_day - 1) % DEBT_COLLECTION_INTERVAL_DAYS) + 1
 	return DEBT_COLLECTION_INTERVAL_DAYS - cycle_day + 1
+
+
+func get_week_number(day_number := -1) -> int:
+	var effective_day: int = int(day_number) if int(day_number) > 0 else get_current_day()
+	return maxi(1, int(floor(float(maxi(1, effective_day) - 1) / float(DEBT_COLLECTION_INTERVAL_DAYS))) + 1)
 
 
 func get_stage_distance_range(difficulty: String) -> Vector2:
@@ -377,6 +506,8 @@ func get_next_stage_time(transition_mode: String = TRANSITION_RIDE) -> String:
 
 	if safe_transition_mode == TRANSITION_CURRENT_STAGE:
 		return current_time
+	if _should_skip_night_phase_transition(safe_transition_mode, current_time):
+		return "morning"
 	if safe_transition_mode == TRANSITION_REST_TO_NIGHT and current_time == "morning":
 		return "night"
 	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY and current_time == "noon":
@@ -408,30 +539,222 @@ func get_transition_display_day(transition_mode: String = TRANSITION_RIDE) -> in
 	return max(1, display_day)
 
 
-func get_trip_gas_cost(stage_descriptor := "") -> int:
-	var difficulty_key := _difficulty_from_stage_descriptor(str(stage_descriptor))
-	return int(TRIP_GAS_COSTS.get(difficulty_key, TRIP_GAS_COSTS["short"]))
+# Economy and resource helpers
+func get_trip_gas_cost(_stage_descriptor := "") -> float:
+	return 0.0
+
+
+func get_distance_gas_cost(distance_units: float) -> float:
+	return maxf(0.0, distance_units) / 1000.0 * GAS_DRAIN_PERCENT_PER_1000_UNITS * get_distance_gas_consumption_multiplier()
+
+
+func estimate_stage_gas_usage(stage_type: String) -> float:
+	var parts := _parse_stage_type(stage_type)
+	var difficulty_key := str(parts.get("difficulty", "short"))
+	return get_distance_gas_cost(get_stage_distance_average(difficulty_key))
+
+
+func get_distance_gas_consumption_multiplier() -> float:
+	return maxf(0.45, 1.0 - get_fuel_efficiency_level() * FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL)
+
+
+func get_boost_gas_consumption_multiplier() -> float:
+	return maxf(0.60, 1.0 - get_fuel_efficiency_level() * FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL)
+
+
+func get_fuel_efficiency_level() -> int:
+	return maxi(
+		get_upgrade_level(FUEL_EFFICIENCY_UPGRADE_ID),
+		get_upgrade_level(LEGACY_TIRE_GRIP_UPGRADE_ID)
+	)
 
 
 func get_gas_price() -> int:
 	return max(0, gas_price)
 
 
+func get_gas_price_text() -> String:
+	return "PhP %d.00" % get_gas_price()
+
+
+func get_gas_price_change_text() -> String:
+	var absolute_delta: int = gas_price_delta
+	if absolute_delta < 0:
+		absolute_delta *= -1
+	if gas_price_delta > 0:
+		return "+PhP %d.00" % absolute_delta
+	if gas_price_delta < 0:
+		return "-PhP %d.00" % absolute_delta
+	return "PhP 0.00"
+
+
+func get_gas_price_yesterday_percent_text() -> String:
+	var yesterday_price: float = maxf(1.0, float(previous_gas_price))
+	var raw_percent_change: float = (float(get_gas_price()) - yesterday_price) / yesterday_price * 100.0
+	var percent_change: float = clampf(raw_percent_change, -DAILY_GAS_PRICE_MAX_PERCENT_CHANGE, DAILY_GAS_PRICE_MAX_PERCENT_CHANGE)
+	if percent_change > 0.0:
+		return "+%.1f%%" % percent_change
+	if percent_change < 0.0:
+		return "%.1f%%" % percent_change
+	return "0.0%"
+
+
 func set_gas_price(price: int) -> void:
 	gas_price = max(0, price)
+	gas_price_delta = gas_price - previous_gas_price
 	save_progress()
 
 
-func add_gas(amount: int) -> void:
+func get_current_weather() -> String:
+	return get_stage_weather(get_current_time_of_day())
+
+
+func get_current_weather_text() -> String:
+	return weather_text(get_current_weather())
+
+
+func get_today_weather_forecast() -> String:
+	return get_weather_forecast_for_day(get_current_day())
+
+
+func get_tomorrow_weather_forecast() -> String:
+	return get_weather_forecast_for_day(get_current_day() + 1)
+
+
+func get_weather_forecast_for_day(day_number: int) -> String:
+	var safe_day: int = maxi(1, day_number)
+	_ensure_weather_forecast_for_day(safe_day)
+	return _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+
+
+func get_stage_weather(day_time := "") -> String:
+	var safe_day: int = get_current_day()
+	if safe_day < WEATHER_SYSTEM_START_DAY:
+		return DEFAULT_WEATHER
+
+	_ensure_weather_forecast_for_day(safe_day)
+	var safe_time: String = str(day_time).strip_edges().to_lower()
+	if not STAGE_TIMES.has(safe_time):
+		safe_time = get_current_time_of_day()
+	var phase_key: String = _weather_phase_key(safe_day, safe_time)
+	if not weather_phase_cache.has(phase_key):
+		weather_phase_cache[phase_key] = _roll_weather_for_phase(get_weather_forecast_for_day(safe_day), safe_time)
+		save_progress()
+
+	current_weather = _normalize_weather(str(weather_phase_cache.get(phase_key, DEFAULT_WEATHER)))
+	return current_weather
+
+
+func weather_text(weather_value: String) -> String:
+	var safe_weather: String = _normalize_weather(weather_value)
+	match safe_weather:
+		WEATHER_CLOUDY:
+			return "Cloudy"
+		WEATHER_RAIN:
+			return "Rain"
+		WEATHER_HEAVY_RAIN:
+			return "Heavy Rain"
+	return "Clear"
+
+
+func get_daily_news_text() -> String:
+	return "TODAY'S NEWS\nGas Price:   %s      %s\nChange:   %s\nToday:   %s\nTomorrow:   %s" % [
+		get_gas_price_text(),
+		get_gas_price_yesterday_percent_text(),
+		get_gas_price_change_text(),
+		weather_text(get_today_weather_forecast()),
+		weather_text(get_tomorrow_weather_forecast()),
+	]
+
+
+func ensure_daily_conditions_for_current_day() -> void:
+	var safe_day: int = get_current_day()
+	var needs_save: bool = false
+	if daily_conditions_day != safe_day:
+		_roll_daily_conditions_for_day(safe_day)
+		needs_save = true
+	if _ensure_weather_forecast_for_day(safe_day):
+		needs_save = true
+	if _ensure_weather_forecast_for_day(safe_day + 1):
+		needs_save = true
+	if needs_save:
+		save_progress()
+
+
+func add_gas(amount: float) -> void:
 	gas += amount
 
 
-func spend_gas(amount: int) -> bool:
-	if amount < 0 or gas < amount:
+func spend_gas(amount: float, save_immediately := true) -> bool:
+	if amount < 0.0 or gas + 0.001 < amount:
 		return false
 
-	gas -= amount
+	_set_gas_with_save_mode(gas - amount, save_immediately)
 	return true
+
+
+func drain_gas(amount: float, save_immediately := true) -> float:
+	var consumed_amount: float = minf(maxf(0.0, amount), gas)
+	if consumed_amount <= 0.0:
+		return 0.0
+
+	_set_gas_with_save_mode(gas - consumed_amount, save_immediately)
+	return consumed_amount
+
+
+func _set_gas_with_save_mode(value: float, save_immediately: bool) -> void:
+	if save_immediately:
+		gas = value
+		return
+
+	_suppress_auto_save = true
+	gas = value
+	_suppress_auto_save = false
+	_has_deferred_save = true
+
+
+func gas_text() -> String:
+	return "%.1f%%" % gas
+
+
+func gas_capacity_text() -> String:
+	return "%.1f%%" % max_gas
+
+
+func gas_ratio() -> float:
+	return clampf(gas / maxf(1.0, max_gas), 0.0, 1.0)
+
+
+func is_low_gas() -> bool:
+	return gas <= LOW_GAS_PERCENT_THRESHOLD
+
+
+func get_energy_vehicle_modifiers() -> Dictionary:
+	var high_energy_level: int = maxi(0, energy - 7)
+	if high_energy_level > 0:
+		return {
+			"player_acceleration_x": 1.0 + high_energy_level * 0.05,
+			"player_max_speed": 1.0 + high_energy_level * 0.035,
+			"player_brake_x": 1.0 + high_energy_level * 0.04,
+			"player_lane_lerp_x": 1.0 + high_energy_level * 0.04,
+			"player_coast_x": 1.0,
+			"player_wiggle_intensity_x": 0.92,
+		}
+
+	var fatigue_level: int = maxi(0, 6 - energy)
+	var fatigue_ratio: float = float(fatigue_level) / 6.0
+	return {
+		"player_acceleration_x": 1.0 - fatigue_ratio * 0.45,
+		"player_max_speed": 1.0 - fatigue_ratio * 0.30,
+		"player_brake_x": 1.0 - fatigue_ratio * 0.35,
+		"player_lane_lerp_x": 1.0 - fatigue_ratio * 0.40,
+		"player_coast_x": 1.0 + fatigue_ratio * 0.35,
+		"player_wiggle_intensity_x": 1.0 + fatigue_ratio * 0.45,
+	}
+
+
+func boost_gas_is_available() -> bool:
+	return gas > 0.05
 
 
 func apply_night_rest_bonus() -> int:
@@ -448,8 +771,7 @@ func get_stage_start_error(stage_descriptor := "") -> String:
 	if energy <= 0:
 		return "Not enough energy to start this trip."
 
-	var trip_gas_cost := get_trip_gas_cost(stage_descriptor)
-	if gas < trip_gas_cost:
+	if gas <= 0.0:
 		return "Not enough gas for this trip."
 
 	return ""
@@ -462,12 +784,9 @@ func prepare_stage_start(stage_descriptor := "") -> bool:
 	if not get_stage_start_error(stage_descriptor).is_empty():
 		return false
 
-	var trip_gas_cost := get_trip_gas_cost(stage_descriptor)
-
 	spend_energy(1)
-	spend_gas(trip_gas_cost)
 	current_trip_low_energy = energy <= AchievementService.LOW_ENERGY_THRESHOLD
-	current_trip_low_gas = gas <= AchievementService.LOW_GAS_THRESHOLD
+	current_trip_low_gas = is_low_gas()
 	pending_stage_energy_cost = true
 	save_progress()
 	return true
@@ -480,6 +799,8 @@ func confirm_stage_started() -> void:
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
 	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	if _should_skip_night_phase_transition(safe_transition_mode, get_current_time_of_day()):
+		return true
 	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
 		return true
 	return safe_transition_mode == TRANSITION_RIDE and get_current_time_of_day() == "night"
@@ -505,8 +826,10 @@ func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) ->
 	return applied_bonus
 
 
+# Stage flow and transitions
 func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_difficulty := "", forced_traffic := "") -> String:
 	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var current_time_before_advance := get_current_time_of_day()
 	var next_time := get_next_stage_time(safe_transition_mode)
 	var current_day_before_advance := get_current_day()
 	var next_day := current_day_before_advance
@@ -523,8 +846,11 @@ func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_d
 	current_stage_type = next_stage
 	if current_day != current_day_before_advance:
 		_reset_daily_consumable_counters(current_day)
+		_roll_daily_conditions_for_day(current_day)
 	if will_advance_day(safe_transition_mode):
 		_resolve_debt_collection_for_day(current_day)
+	if pending_skip_night_phase and current_time_before_advance != "night" and next_time == "morning" and current_day > current_day_before_advance:
+		pending_skip_night_phase = false
 	save_progress()
 	return current_stage_type
 
@@ -536,8 +862,11 @@ func prepare_day_start(target_day: int) -> void:
 
 	current_day = safe_target_day
 	current_stage_type = build_stage_type("short", "morning", "chill")
+	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
+	current_special_stage_id = ""
 	pending_stage_energy_cost = false
 	_reset_daily_consumable_counters(current_day)
+	_roll_daily_conditions_for_day(current_day)
 	_resolve_debt_collection_for_day(current_day)
 	save_progress()
 
@@ -550,6 +879,8 @@ func set_current_stage_time(day_time: String) -> void:
 		safe_time,
 		str(stage_parts.get("traffic", "chill"))
 	)
+	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
+	current_special_stage_id = ""
 	save_progress()
 
 
@@ -621,6 +952,15 @@ func add_energy(amount: int) -> void:
 	energy += amount
 
 
+func add_max_energy(amount: int) -> void:
+	var safe_amount: int = int(amount)
+	if safe_amount == 0:
+		return
+	max_energy = maxi(1, max_energy + safe_amount)
+	energy = mini(energy, max_energy)
+	save_progress()
+
+
 func spend_energy(amount: int) -> bool:
 	if amount < 0 or energy < amount:
 		return false
@@ -662,14 +1002,24 @@ func get_run_fail_reason() -> String:
 	return run_fail_reason
 
 
+# Pending scene and transition state
 func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE, allow_back := true) -> void:
-	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
-	locked_characters = locked_characters.duplicate(true)
-	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
-	var locked_distance := str(pending_trip_selection.get("selected_distance", ""))
+	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var should_preserve_locked_selection: bool = (
+		safe_transition_mode == TRANSITION_RIDE
+		or safe_transition_mode == TRANSITION_CURRENT_STAGE
+	)
+	var locked_characters: Array = []
+	var locked_character_pools: Dictionary = {}
+	var locked_distance := ""
+	if should_preserve_locked_selection:
+		locked_characters = pending_trip_selection.get("locked_characters", [])
+		locked_characters = locked_characters.duplicate(true)
+		locked_character_pools = Dictionary(pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
+		locked_distance = str(pending_trip_selection.get("selected_distance", ""))
 	pending_trip_selection = {
 		"return_scene": return_scene,
-		"transition_mode": normalize_transition_mode(str(transition_mode)),
+		"transition_mode": safe_transition_mode,
 		"allow_back": bool(allow_back),
 	}
 	if not locked_character_pools.is_empty():
@@ -734,11 +1084,12 @@ func clear_pending_trip_selection() -> void:
 	save_progress()
 
 
+# Seeded rider runtime
 func add_seeded_rider_rule(rule_data: Dictionary) -> void:
 	if rule_data.is_empty():
 		return
 
-	var normalized_rule := _normalize_seeded_rider_rule(rule_data)
+	var normalized_rule := SeededRiderRuntime.normalize_rule(self, rule_data)
 	if normalized_rule.is_empty():
 		return
 
@@ -764,8 +1115,7 @@ func seed_rider_for_stage(character_id: String, day: int, time_of_day := "", dis
 
 
 func clear_seeded_rider_rules() -> void:
-	seeded_rider_rules.clear()
-	consumed_seeded_rider_rules.clear()
+	_reset_seeded_rider_state()
 	save_progress()
 
 
@@ -774,85 +1124,16 @@ func get_seeded_rider_rules() -> Array:
 
 
 func consume_seeded_rider_rules(rule_ids: Array) -> void:
-	var consumed_any := false
-	for rule_id_variant in rule_ids:
-		var rule_id := str(rule_id_variant).strip_edges()
-		if rule_id.is_empty():
-			continue
-		if bool(consumed_seeded_rider_rules.get(rule_id, false)):
-			continue
-		consumed_seeded_rider_rules[rule_id] = true
-		consumed_any = true
+	var consumed_any := SeededRiderRuntime.consume_rules(consumed_seeded_rider_rules, rule_ids)
 	if consumed_any:
 		save_progress()
 
 
 func get_seeded_rider_pool_setup(selection_context: Dictionary) -> Dictionary:
-	var context := selection_context.duplicate(true)
-	var distance_slots := {
-		"short": [],
-		"medium": [],
-		"long": [],
-	}
-	var consumed_character_ids: Dictionary = {}
-	var used_rule_ids: Array[String] = []
-
-	for rule_data in seeded_rider_rules:
-		var rule: Dictionary = rule_data
-		if not _seeded_rider_rule_matches(rule, context):
-			continue
-
-		var rule_id := _seeded_rider_rule_id(rule)
-		if not bool(rule.get("repeatable", false)) and not rule_id.is_empty() and bool(consumed_seeded_rider_rules.get(rule_id, false)):
-			continue
-
-		var character_id := str(rule.get("character_id", rule.get("passenger_id", ""))).strip_edges().to_lower()
-		if character_id.is_empty() or consumed_character_ids.has(character_id):
-			continue
-
-		var character := get_character_by_id(character_id)
-		if character.is_empty():
-			continue
-
-		var target_distances := _get_seeded_rule_target_distances(rule, character)
-		if target_distances.is_empty():
-			continue
-
-		var assigned := false
-		for distance_variant in target_distances:
-			var distance := str(distance_variant)
-			if not STAGE_DIFFICULTIES.has(distance):
-				continue
-
-			var slot_index := _resolve_seeded_rider_slot_index(rule, distance_slots[distance])
-			if slot_index < 0:
-				continue
-
-			var assignment := {
-				"character": character.duplicate(true),
-				"slot": slot_index,
-				"forced_traffic": str(rule.get("forced_traffic", rule.get("traffic", ""))).strip_edges(),
-				"forced_distance": distance,
-				"rule_id": rule_id,
-			}
-			var existing_assignments: Array = distance_slots[distance]
-			existing_assignments.append(assignment)
-			distance_slots[distance] = existing_assignments
-			consumed_character_ids[character_id] = true
-			if not rule_id.is_empty():
-				used_rule_ids.append(rule_id)
-			assigned = true
-			break
-
-		if assigned:
-			continue
-
-	return {
-		"distance_slots": distance_slots,
-		"rule_ids": used_rule_ids,
-	}
+	return SeededRiderRuntime.get_pool_setup(self, selection_context)
 
 
+# Pending story state
 func set_pending_story(story_payload: Dictionary) -> void:
 	pending_story = story_payload.duplicate(true)
 	save_progress()
@@ -898,6 +1179,36 @@ func clear_pending_gameplay_entry_fade() -> void:
 	save_progress()
 
 
+func set_pending_result_music(music_state: Dictionary) -> void:
+	pending_result_music = music_state.duplicate(true)
+
+
+func has_pending_night_phase_skip() -> bool:
+	return pending_skip_night_phase
+
+
+func set_pending_night_phase_skip(enabled: bool) -> void:
+	pending_skip_night_phase = bool(enabled)
+	save_progress()
+
+
+func clear_pending_night_phase_skip() -> void:
+	if not pending_skip_night_phase:
+		return
+	pending_skip_night_phase = false
+	save_progress()
+
+
+func consume_pending_result_music() -> Dictionary:
+	var music_state := pending_result_music.duplicate(true)
+	pending_result_music.clear()
+	return music_state
+
+
+func clear_pending_result_music() -> void:
+	pending_result_music.clear()
+
+
 func set_sleep_transition_resume_step(resume_step: String) -> void:
 	pending_sleep_transition_state["resume_step"] = resume_step
 	save_progress()
@@ -907,6 +1218,7 @@ func get_sleep_transition_resume_step() -> String:
 	return str(pending_sleep_transition_state.get("resume_step", ""))
 
 
+# Story trigger state
 func add_story_trigger(trigger_data: Dictionary) -> void:
 	if trigger_data.is_empty():
 		return
@@ -930,19 +1242,7 @@ func normalize_story_trigger_phase(phase: String) -> String:
 
 
 func find_story_trigger_for_phase(phase: String, day_number := -1, context: Dictionary = {}) -> Dictionary:
-	var safe_phase := normalize_story_trigger_phase(str(phase))
-	if safe_phase.is_empty():
-		return {}
-
-	var effective_day := int(day_number) if int(day_number) > 0 else get_current_day()
-	return StoryTriggerService.find_story_trigger_for_phase(
-		story_triggers,
-		consumed_story_triggers,
-		event_values,
-		safe_phase,
-		effective_day,
-		context
-	)
+	return StoryTriggerRuntime.find_story_trigger_for_phase(self, phase, day_number, context)
 
 
 func has_story_trigger_for_phase(phase: String, day_number := -1, context: Dictionary = {}) -> bool:
@@ -959,6 +1259,7 @@ func consume_story_trigger(trigger_data: Dictionary) -> void:
 	save_progress()
 
 
+# Character catalog and stage previews
 func get_mock_characters() -> Array:
 	return StoryCatalog.get_mock_characters(self)
 
@@ -973,6 +1274,30 @@ func get_generic_passengers() -> Array:
 
 func get_unique_passengers() -> Array:
 	return StoryCatalog.get_unique_passengers(self)
+
+
+func get_unique_character_story_state(character_id: String, context: Dictionary = {}) -> Dictionary:
+	return StoryCatalog.get_unique_character_story_state(self, character_id, context)
+
+
+func get_current_mock_character_story_state(context: Dictionary = {}) -> Dictionary:
+	return get_unique_character_story_state(current_mock_character_id, context)
+
+
+func get_character_stage_modifiers(character_id: String, context: Dictionary = {}) -> Dictionary:
+	return StoryCatalog.get_character_stage_modifiers(self, character_id, context)
+
+
+func get_current_mock_character_stage_modifiers(context: Dictionary = {}) -> Dictionary:
+	return get_character_stage_modifiers(current_mock_character_id, context)
+
+
+func get_character_session_dialogue(character_id: String, context: Dictionary = {}) -> Dictionary:
+	return StoryCatalog.get_character_session_dialogue(self, character_id, context)
+
+
+func get_current_mock_character_session_dialogue(context: Dictionary = {}) -> Dictionary:
+	return get_character_session_dialogue(current_mock_character_id, context)
 
 
 func get_random_stage_traffic_type() -> String:
@@ -1006,10 +1331,23 @@ func apply_stage_earnings_modifiers(fare: int, bonus: int, day_time: String, tra
 	}
 
 
-func estimate_stage_earnings(stage_type: String) -> int:
-	var parts := _parse_stage_type(stage_type)
+func estimate_stage_earnings(stage_type: String, character_id := "") -> int:
+	var parts: Dictionary = _parse_stage_type(stage_type)
 	var difficulty_key := str(parts.get("difficulty", "short"))
-	var difficulty_profile: Dictionary = ESTIMATED_STAGE_PROFILES[difficulty_key] if ESTIMATED_STAGE_PROFILES.has(difficulty_key) else ESTIMATED_STAGE_PROFILES["short"]
+	var difficulty_profile: Dictionary = ESTIMATED_STAGE_PROFILES[difficulty_key].duplicate(true) if ESTIMATED_STAGE_PROFILES.has(difficulty_key) else ESTIMATED_STAGE_PROFILES["short"].duplicate(true)
+	var modifier_context := {
+		"stage_type": stage_type,
+		"difficulty": difficulty_key,
+		"time_of_day": str(parts.get("time", "morning")),
+		"traffic": str(parts.get("traffic", "chill")),
+	}
+	var effective_character_id: String = str(character_id).strip_edges().to_lower()
+	if effective_character_id.is_empty():
+		effective_character_id = current_mock_character_id
+	_apply_estimated_stage_profile_modifiers(
+		difficulty_profile,
+		get_character_stage_modifiers(effective_character_id, modifier_context)
+	)
 	var estimated_distance := get_stage_distance_average(difficulty_key)
 	var base_fare := estimated_distance * float(difficulty_profile["fare_php_per_meter"])
 	var estimated_bonus_seconds := float(difficulty_profile["time_limit"]) * ESTIMATED_BONUS_TIME_RATIO
@@ -1018,6 +1356,7 @@ func estimate_stage_earnings(stage_type: String) -> int:
 	return roundi((base_fare + base_bonus) * multiplier)
 
 
+# Achievements and failure state
 func _should_collect_debt_for_day(day_number: int) -> bool:
 	return day_number > 1 and ((day_number - 1) % DEBT_COLLECTION_INTERVAL_DAYS) == 0
 
@@ -1053,9 +1392,8 @@ func _resolve_debt_collection_for_day(day_number: int) -> bool:
 
 
 func set_current_mock_character(character_id: String) -> void:
-	current_mock_character_id = character_id
-	if is_unique_character(character_id):
-		increment_unique_character_progress(character_id)
+	var safe_character_id := str(character_id).strip_edges().to_lower()
+	current_mock_character_id = safe_character_id
 	save_progress()
 
 
@@ -1079,18 +1417,90 @@ func get_unique_character_progress(character_id: String) -> int:
 	return int(unique_character_progress.get(safe_id, 0))
 
 
+func is_unique_character_story_locked(character_id: String) -> bool:
+	var safe_id := str(character_id).strip_edges().to_lower()
+	if safe_id.is_empty() or not is_unique_character(safe_id):
+		return false
+	return bool(locked_unique_character_stories.get(safe_id, false))
+
+
+func set_unique_character_story_locked(character_id: String, locked := true) -> bool:
+	var safe_id := str(character_id).strip_edges().to_lower()
+	if safe_id.is_empty() or not is_unique_character(safe_id):
+		return false
+	var should_lock: bool = bool(locked)
+	if should_lock:
+		locked_unique_character_stories[safe_id] = true
+	else:
+		locked_unique_character_stories.erase(safe_id)
+	save_progress()
+	return should_lock
+
+
+func set_unique_character_progress(character_id: String, progress: int) -> int:
+	var safe_id := str(character_id).strip_edges().to_lower()
+	if safe_id.is_empty() or not is_unique_character(safe_id):
+		return get_unique_character_progress(safe_id)
+	unique_character_progress[safe_id] = maxi(0, int(progress))
+	save_progress()
+	return int(unique_character_progress[safe_id])
+
+
 func increment_unique_character_progress(character_id: String, amount := 1) -> int:
 	var safe_id := str(character_id).strip_edges().to_lower()
 	var safe_amount: int = maxi(0, int(amount))
 	if safe_id.is_empty() or safe_amount <= 0 or not is_unique_character(safe_id):
+		return get_unique_character_progress(safe_id)
+	if is_unique_character_story_locked(safe_id):
 		return get_unique_character_progress(safe_id)
 	unique_character_progress[safe_id] = get_unique_character_progress(safe_id) + safe_amount
 	save_progress()
 	return int(unique_character_progress[safe_id])
 
 
+func has_consumed_unique_session_dialogue(entry_id: String) -> bool:
+	var safe_entry_id: String = str(entry_id).strip_edges()
+	if safe_entry_id.is_empty():
+		return false
+	return bool(consumed_unique_session_dialogue.get(safe_entry_id, false))
+
+
+func consume_unique_session_dialogue(entry_id: String) -> void:
+	var safe_entry_id: String = str(entry_id).strip_edges()
+	if safe_entry_id.is_empty() or has_consumed_unique_session_dialogue(safe_entry_id):
+		return
+	consumed_unique_session_dialogue[safe_entry_id] = true
+	save_progress()
+
+
 func is_unique_character(character_id: String) -> bool:
 	return StoryCatalog.is_unique_character(character_id)
+
+
+func _apply_estimated_stage_profile_modifiers(profile: Dictionary, modifiers: Dictionary) -> void:
+	if profile.is_empty() or modifiers.is_empty():
+		return
+	_apply_numeric_profile_modifier(profile, modifiers, "fare_php_per_meter")
+	_apply_numeric_profile_modifier(profile, modifiers, "time_limit")
+	_apply_numeric_profile_modifier(profile, modifiers, "time_bonus_php_per_second")
+
+
+func _apply_numeric_profile_modifier(profile: Dictionary, modifiers: Dictionary, key: String) -> void:
+	if not profile.has(key):
+		return
+
+	var resolved_value := float(profile.get(key, 0.0))
+	if modifiers.has(key):
+		resolved_value = float(modifiers[key])
+	if modifiers.has("%s_multiplier" % key):
+		resolved_value *= float(modifiers["%s_multiplier" % key])
+	if modifiers.has("%s_delta" % key):
+		resolved_value += float(modifiers["%s_delta" % key])
+	if modifiers.has("%s_min" % key):
+		resolved_value = maxf(resolved_value, float(modifiers["%s_min" % key]))
+	if modifiers.has("%s_cap" % key):
+		resolved_value = minf(resolved_value, float(modifiers["%s_cap" % key]))
+	profile[key] = resolved_value
 
 
 func set_upgrade_level(upgrade_id: String, level: int) -> void:
@@ -1101,6 +1511,11 @@ func set_upgrade_level(upgrade_id: String, level: int) -> void:
 
 
 func get_upgrade_level(upgrade_id: String) -> int:
+	if upgrade_id == FUEL_EFFICIENCY_UPGRADE_ID:
+		return maxi(
+			int(upgrades.get(FUEL_EFFICIENCY_UPGRADE_ID, 0)),
+			int(upgrades.get(LEGACY_TIRE_GRIP_UPGRADE_ID, 0))
+		)
 	return int(upgrades.get(upgrade_id, 0))
 
 
@@ -1125,6 +1540,8 @@ func record_store_purchase(item_type: String) -> void:
 
 
 func record_stage_completion() -> void:
+	if is_unique_character(current_mock_character_id):
+		increment_unique_character_progress(current_mock_character_id)
 	AchievementService.record_stage_completion(self)
 
 
@@ -1159,30 +1576,174 @@ func _apply_achievement_effects(achievement_id: String) -> void:
 	AchievementService.apply_achievement_effects(self, achievement_id)
 
 
+# Weather and daily condition state
 func _reset_daily_consumable_counters(day_number: int) -> void:
 	AchievementService.reset_daily_consumable_counters(self, day_number)
 
 
+func _roll_daily_conditions_for_day(day_number: int) -> void:
+	var safe_day: int = maxi(1, day_number)
+	previous_gas_price = gas_price
+	daily_conditions_day = safe_day
+	if safe_day > 1:
+		var percent_delta: float = rng.randf_range(-DAILY_GAS_PRICE_MAX_PERCENT_CHANGE, DAILY_GAS_PRICE_MAX_PERCENT_CHANGE)
+		var previous_price_float: float = maxf(1.0, float(previous_gas_price))
+		var raw_price: int = roundi(previous_price_float * (1.0 + percent_delta / 100.0))
+		var min_price: int = ceili(previous_price_float * (1.0 - DAILY_GAS_PRICE_MAX_PERCENT_CHANGE / 100.0))
+		var max_price: int = floori(previous_price_float * (1.0 + DAILY_GAS_PRICE_MAX_PERCENT_CHANGE / 100.0))
+		gas_price = clampi(raw_price, min_price, maxi(min_price, max_price))
+	else:
+		gas_price = DEFAULT_GAS_PRICE
+	gas_price_delta = gas_price - previous_gas_price
+	_ensure_weather_forecast_for_day(safe_day)
+	_ensure_weather_forecast_for_day(safe_day + 1)
+	current_weather = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+
+
+func _ensure_weather_forecast_for_day(day_number: int) -> bool:
+	var safe_day: int = maxi(1, day_number)
+	if weather_forecasts.has(safe_day):
+		weather_forecasts[safe_day] = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+		return false
+
+	if safe_day < WEATHER_SYSTEM_START_DAY:
+		weather_forecasts[safe_day] = DEFAULT_WEATHER
+	else:
+		weather_forecasts[safe_day] = _roll_weather_forecast()
+	return true
+
+
+func _roll_weather_forecast() -> String:
+	var roll: int = rng.randi_range(1, 100)
+	if roll <= 45:
+		return DEFAULT_WEATHER
+	if roll <= 70:
+		return WEATHER_CLOUDY
+	if roll <= 93:
+		return WEATHER_RAIN
+	return WEATHER_HEAVY_RAIN
+
+
+func _roll_weather_for_phase(day_forecast: String, day_time: String) -> String:
+	var safe_forecast: String = _normalize_weather(day_forecast)
+	var safe_time: String = day_time
+	if not STAGE_TIMES.has(safe_time):
+		safe_time = "morning"
+	if safe_time == "night":
+		return _roll_night_weather_for_forecast(safe_forecast)
+
+	var roll: int = rng.randi_range(1, 100)
+	match safe_forecast:
+		WEATHER_CLOUDY:
+			if roll <= 70:
+				return WEATHER_CLOUDY
+			return DEFAULT_WEATHER
+		WEATHER_RAIN:
+			if roll <= 68:
+				return WEATHER_RAIN
+			return WEATHER_CLOUDY
+		WEATHER_HEAVY_RAIN:
+			if roll <= 52:
+				return WEATHER_HEAVY_RAIN
+			if roll <= 87:
+				return WEATHER_RAIN
+			return WEATHER_CLOUDY
+	if roll <= 82:
+		return DEFAULT_WEATHER
+	return WEATHER_CLOUDY
+
+
+func _roll_night_weather_for_forecast(day_forecast: String) -> String:
+	var safe_forecast: String = _normalize_weather(day_forecast)
+	var roll: int = rng.randi_range(1, 100)
+	match safe_forecast:
+		WEATHER_CLOUDY:
+			if roll <= 18:
+				return WEATHER_RAIN
+			return DEFAULT_WEATHER
+		WEATHER_RAIN:
+			if roll <= 82:
+				return WEATHER_RAIN
+			return WEATHER_HEAVY_RAIN
+		WEATHER_HEAVY_RAIN:
+			if roll <= 62:
+				return WEATHER_HEAVY_RAIN
+			return WEATHER_RAIN
+	return DEFAULT_WEATHER
+
+
+func _weather_phase_key(day_number: int, day_time: String) -> String:
+	return "%d:%s" % [maxi(1, day_number), day_time]
+
+
+func _normalize_weather(weather_value: String) -> String:
+	var safe_weather: String = str(weather_value).strip_edges().to_lower()
+	if safe_weather == "heavy-rain" or safe_weather == "heavy_rain":
+		safe_weather = WEATHER_HEAVY_RAIN
+	if WEATHER_TYPES.has(safe_weather):
+		return safe_weather
+	return DEFAULT_WEATHER
+
+
+# Reset helpers
 func reset() -> void:
 	_is_loading_save = true
-	money = 0
-	energy = 3
-	max_energy = 5
-	max_gas = DEFAULT_STARTING_GAS
-	gas = DEFAULT_STARTING_GAS
-	gas_price = DEFAULT_GAS_PRICE
-	karma = 0
-	begin_stage_sequence()
+	_begin_state_batch()
+	_reset_resource_state()
+	_apply_new_run_defaults()
 	last_stage_result.clear()
-	clear_pending_trip_selection()
-	clear_pending_story()
-	clear_pending_sleep_transition_state()
-	clear_pending_gameplay_entry_fade()
-	current_mock_character_id = ""
-	seen_mock_characters.clear()
-	unique_character_progress.clear()
-	seeded_rider_rules.clear()
-	consumed_seeded_rider_rules.clear()
+	_reset_character_progress_state()
+	_reset_seeded_rider_state()
+	upgrades.clear()
+	achievements.clear()
+	_reset_story_progress_state()
+	resume_scene_path = ""
+	_reset_tutorial_state()
+	_end_state_batch(false, true)
+	_is_loading_save = false
+	_delete_save_file()
+
+
+func _normalize_tamad_rest_time(time_of_day: String) -> String:
+	return AchievementService.normalize_tamad_rest_time(time_of_day)
+
+
+func _reset_story_triggers() -> void:
+	story_triggers = StoryTriggerService.build_default_story_triggers()
+	consumed_story_triggers.clear()
+
+
+func _reset_resource_state() -> void:
+	money = 0
+	max_energy = DEFAULT_MAX_ENERGY
+	energy = DEFAULT_STARTING_ENERGY
+	max_gas = DEFAULT_MAX_GAS_PERCENT
+	gas = DEFAULT_STARTING_GAS_PERCENT
+	karma = 0
+
+
+func _reset_weather_state() -> void:
+	gas_price = DEFAULT_GAS_PRICE
+	gas_price_delta = 0
+	previous_gas_price = DEFAULT_GAS_PRICE
+	current_weather = DEFAULT_WEATHER
+	weather_forecasts.clear()
+	weather_forecasts[1] = DEFAULT_WEATHER
+	weather_phase_cache.clear()
+	daily_conditions_day = 1
+
+
+func _reset_pending_runtime_state() -> void:
+	pending_stage_energy_cost = false
+	pending_trip_selection.clear()
+	pending_story.clear()
+	pending_sleep_transition_state.clear()
+	pending_gameplay_entry_fade_duration = 0.0
+	pending_result_music.clear()
+	pending_skip_night_phase = false
+
+
+func _reset_daily_run_state() -> void:
 	last_rest_day = 0
 	yosi_bought_today = 0
 	yosi_bought_day = 1
@@ -1199,225 +1760,70 @@ func reset() -> void:
 	current_trip_low_gas = false
 	low_resource_trip_count = 0
 	low_both_resource_trip_count = 0
+
+
+func _reset_debt_and_failure_state() -> void:
 	debt_goal_index = 0
 	last_debt_collection_day = 0
 	remaining_debt = TOTAL_DEBT_GOAL
 	run_failed = false
 	run_fail_reason = ""
-	upgrades.clear()
-	achievements.clear()
+
+
+func _reset_character_progress_state() -> void:
+	current_mock_character_id = ""
+	seen_mock_characters.clear()
+	unique_character_progress.clear()
+	locked_unique_character_stories.clear()
+	consumed_unique_session_dialogue.clear()
+
+
+func _reset_seeded_rider_state() -> void:
+	seeded_rider_rules.clear()
+	consumed_seeded_rider_rules.clear()
+
+
+func _reset_story_progress_state() -> void:
 	last_seen_story_sections.clear()
 	last_seen_story_id = ""
 	event_values.clear()
-	resume_scene_path = ""
-	ride_select_tutorial_shown = false
 	_reset_story_triggers()
-	_is_loading_save = false
-	_delete_save_file()
 
 
-func _normalize_seeded_rider_rule(rule_data: Dictionary) -> Dictionary:
-	var explicit_rule_id := str(rule_data.get("id", "")).strip_edges()
-	var character_id := str(rule_data.get("character_id", rule_data.get("passenger_id", ""))).strip_edges().to_lower()
-	if character_id.is_empty():
-		return {}
-	if get_character_by_id(character_id).is_empty():
-		return {}
-
-	var normalized_rule: Dictionary = rule_data.duplicate(true)
-	normalized_rule["character_id"] = character_id
-	normalized_rule.erase("passenger_id")
-	if explicit_rule_id.is_empty():
-		normalized_rule.erase("id")
-	else:
-		normalized_rule["id"] = explicit_rule_id
-	normalized_rule["id"] = _seeded_rider_rule_id(normalized_rule)
-	if normalized_rule.has("distance"):
-		normalized_rule["distance"] = _normalize_seeded_distance(str(normalized_rule.get("distance", "")))
-	if normalized_rule.has("distances") and normalized_rule.get("distances", null) is Array:
-		var normalized_distances: Array[String] = []
-		for distance_variant in normalized_rule.get("distances", []):
-			var normalized_distance := _normalize_seeded_distance(str(distance_variant))
-			if normalized_distance.is_empty() or normalized_distances.has(normalized_distance):
-				continue
-			normalized_distances.append(normalized_distance)
-		normalized_rule["distances"] = normalized_distances
-	if normalized_rule.has("time_of_day"):
-		normalized_rule["time_of_day"] = _normalize_seeded_time(str(normalized_rule.get("time_of_day", "")))
-	if normalized_rule.has("times") and normalized_rule.get("times", null) is Array:
-		var normalized_times: Array[String] = []
-		for time_variant in normalized_rule.get("times", []):
-			var normalized_time := _normalize_seeded_time(str(time_variant))
-			if normalized_time.is_empty() or normalized_times.has(normalized_time):
-				continue
-			normalized_times.append(normalized_time)
-		normalized_rule["times"] = normalized_times
-	if normalized_rule.has("current_time_of_day"):
-		normalized_rule["current_time_of_day"] = _normalize_seeded_time(str(normalized_rule.get("current_time_of_day", "")))
-	if normalized_rule.has("current_times") and normalized_rule.get("current_times", null) is Array:
-		var normalized_current_times: Array[String] = []
-		for time_variant in normalized_rule.get("current_times", []):
-			var normalized_current_time := _normalize_seeded_time(str(time_variant))
-			if normalized_current_time.is_empty() or normalized_current_times.has(normalized_current_time):
-				continue
-			normalized_current_times.append(normalized_current_time)
-		normalized_rule["current_times"] = normalized_current_times
-	if normalized_rule.has("forced_traffic"):
-		normalized_rule["forced_traffic"] = _normalize_seeded_traffic(str(normalized_rule.get("forced_traffic", "")))
-	if normalized_rule.has("traffic"):
-		normalized_rule["traffic"] = _normalize_seeded_traffic(str(normalized_rule.get("traffic", "")))
-	return normalized_rule
+func _reset_tutorial_state() -> void:
+	ride_select_tutorial_shown = false
+	store_tutorial_shown = false
+	home_tutorial_shown = false
 
 
-func _normalize_tamad_rest_time(time_of_day: String) -> String:
-	return AchievementService.normalize_tamad_rest_time(time_of_day)
+func _apply_new_run_defaults() -> void:
+	stage_round = 0
+	current_stage_type = FIRST_STAGE_TYPE
+	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
+	current_special_stage_id = ""
+	current_day = 1
+	_reset_weather_state()
+	_reset_pending_runtime_state()
+	_reset_daily_run_state()
+	_reset_debt_and_failure_state()
+	_reset_story_triggers()
 
 
-func _seeded_rider_rule_matches(rule_data: Dictionary, selection_context: Dictionary) -> bool:
-	if rule_data.is_empty():
+func _should_skip_night_phase_transition(transition_mode: String, current_time: String) -> bool:
+	if not pending_skip_night_phase:
 		return false
-
-	var upcoming_day := int(selection_context.get("day", get_transition_display_day()))
-	var current_day_value := int(selection_context.get("current_day", get_current_day()))
-	if rule_data.has("day") and int(rule_data.get("day", 0)) != upcoming_day:
+	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var safe_current_time := str(current_time).strip_edges().to_lower()
+	if safe_current_time == "night":
 		return false
-	if rule_data.has("min_day") and upcoming_day < int(rule_data.get("min_day", upcoming_day)):
+	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY or safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY:
 		return false
-	if rule_data.has("max_day") and upcoming_day > int(rule_data.get("max_day", upcoming_day)):
-		return false
-	if not _trigger_matches_context_array(rule_data.get("days", []), upcoming_day):
-		return false
-
-	if rule_data.has("current_day") and int(rule_data.get("current_day", 0)) != current_day_value:
-		return false
-	if not _trigger_matches_context_array(rule_data.get("current_days", []), current_day_value):
-		return false
-
-	if not _trigger_matches_context_value(rule_data.get("time_of_day", null), selection_context.get("time_of_day", null)):
-		return false
-	if not _trigger_matches_context_array(rule_data.get("times", []), selection_context.get("time_of_day", null)):
-		return false
-	if not _trigger_matches_context_value(rule_data.get("current_time_of_day", null), selection_context.get("current_time_of_day", null)):
-		return false
-	if not _trigger_matches_context_array(rule_data.get("current_times", []), selection_context.get("current_time_of_day", null)):
-		return false
-	if not _trigger_matches_context_value(rule_data.get("current_stage_type", null), selection_context.get("current_stage_type", null)):
-		return false
-	if not _trigger_matches_context_array(rule_data.get("current_stage_types", []), selection_context.get("current_stage_type", null)):
-		return false
-
-	return true
-
-
-func _get_seeded_rule_target_distances(rule_data: Dictionary, character: Dictionary) -> Array[String]:
-	var target_distances: Array[String] = []
-	if rule_data.has("distance"):
-		var normalized_distance := _normalize_seeded_distance(str(rule_data.get("distance", "")))
-		if not normalized_distance.is_empty():
-			target_distances.append(normalized_distance)
-	elif rule_data.has("distances") and rule_data.get("distances", null) is Array:
-		for distance_variant in rule_data.get("distances", []):
-			var normalized_distance := _normalize_seeded_distance(str(distance_variant))
-			if normalized_distance.is_empty() or target_distances.has(normalized_distance):
-				continue
-			target_distances.append(normalized_distance)
-	else:
-		for distance_variant in character.get("eligible_distances", []):
-			var normalized_distance := _normalize_seeded_distance(str(distance_variant))
-			if normalized_distance.is_empty() or target_distances.has(normalized_distance):
-				continue
-			target_distances.append(normalized_distance)
-
-	if target_distances.is_empty():
-		var fallback_distance := _normalize_seeded_distance(str(character.get("first_distance", "")))
-		if not fallback_distance.is_empty():
-			target_distances.append(fallback_distance)
-
-	var filtered_distances: Array[String] = []
-	for distance_variant in target_distances:
-		var distance := str(distance_variant)
-		var eligible_distances: Array = character.get("eligible_distances", [])
-		if eligible_distances.is_empty() or eligible_distances.has(distance):
-			filtered_distances.append(distance)
-	return filtered_distances
-
-
-func _resolve_seeded_rider_slot_index(rule_data: Dictionary, current_assignments: Array) -> int:
-	var used_slots: Dictionary = {}
-	for assignment_variant in current_assignments:
-		if not assignment_variant is Dictionary:
-			continue
-		var assignment: Dictionary = assignment_variant
-		used_slots[int(assignment.get("slot", -1))] = true
-
-	if rule_data.has("slot"):
-		var requested_slot := clampi(int(rule_data.get("slot", 0)), 0, 2)
-		return -1 if used_slots.has(requested_slot) else requested_slot
-
-	for slot_index in range(3):
-		if not used_slots.has(slot_index):
-			return slot_index
-	return -1
-
-
-func _seeded_rider_rule_id(rule_data: Dictionary) -> String:
-	var explicit_id := str(rule_data.get("id", "")).strip_edges()
-	if not explicit_id.is_empty():
-		return explicit_id
-	return "seeded:%s:%s:%s:%s" % [
-		str(rule_data.get("character_id", "")).strip_edges().to_lower(),
-		str(rule_data.get("day", "")).strip_edges(),
-		str(rule_data.get("time_of_day", "")).strip_edges().to_lower(),
-		str(rule_data.get("distance", "")).strip_edges().to_lower(),
-	]
-
-
-func _normalize_seeded_distance(distance: String) -> String:
-	var safe_distance := str(distance).strip_edges().to_lower()
-	if safe_distance == "easy":
-		safe_distance = "short"
-	return safe_distance if STAGE_DIFFICULTIES.has(safe_distance) else ""
-
-
-func _normalize_seeded_time(time_of_day: String) -> String:
-	var safe_time := str(time_of_day).strip_edges().to_lower()
-	return safe_time if STAGE_TIMES.has(safe_time) else ""
-
-
-func _normalize_seeded_traffic(traffic_type: String) -> String:
-	var safe_traffic := str(traffic_type).strip_edges().to_lower()
-	return safe_traffic if STAGE_TRAFFIC_TYPES.has(safe_traffic) else ""
-
-
-func _reset_story_triggers() -> void:
-	story_triggers = StoryTriggerService.build_default_story_triggers()
-	consumed_story_triggers.clear()
-	save_progress()
+	if safe_current_time == "noon":
+		return safe_transition_mode == TRANSITION_RIDE
+	return safe_current_time == "morning" and safe_transition_mode == TRANSITION_REST_TO_NIGHT
 
 
 func _delete_save_file() -> void:
 	if not FileAccess.file_exists(SAVE_PATH):
 		return
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
-
-
-func _trigger_matches_context_value(expected_value, actual_value) -> bool:
-	if expected_value == null:
-		return true
-	var expected_text := str(expected_value).strip_edges()
-	if expected_text.is_empty():
-		return true
-	return expected_text == str(actual_value).strip_edges()
-
-
-func _trigger_matches_context_array(expected_values, actual_value) -> bool:
-	if not expected_values is Array:
-		return true
-	var expected_array := expected_values as Array
-	if expected_array.is_empty():
-		return true
-	var actual_text := str(actual_value).strip_edges()
-	for value in expected_array:
-		if str(value).strip_edges() == actual_text:
-			return true
-	return false

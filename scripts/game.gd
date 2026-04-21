@@ -1,12 +1,29 @@
 extends Node2D
 
-const BACKGROUND_LOOP_TEXTURE := preload("res://assets/background/bg1_loop.png")
+# Gameplay scene coordinator.
+# This file wires the stage together, while most driving logic lives in scripts/game/*.gd helpers.
+
+const DEFAULT_BACKGROUND_POOL_TAG := "rural"
+const BACKGROUND_POOL_TAGS_BY_TYPE := {
+	"barangay-streets": DEFAULT_BACKGROUND_POOL_TAG,
+}
+const STAGE_BACKGROUND_POOLS := {
+	"rural": [
+		preload("res://assets/background/bg1_loop.png"),
+		preload("res://assets/background/backgroundfishing.png"),
+		preload("res://assets/background/farmloop.png"),
+	],
+}
+const RAIN_DIAGONAL_TEXTURE := preload("res://assets/weather/rain_diagonal.svg")
+const RAIN_DROPS_TEXTURE := preload("res://assets/weather/rain_drops.svg")
+const RAIN_FLOOR_DROPS_TEXTURE := preload("res://assets/weather/rain_floor_drops.svg")
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const GameRenderer := preload("res://scripts/game/game_renderer.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
+const PassengerDialogueController := preload("res://scripts/game/passenger_dialogue_controller.gd")
 const PlayerVehicleController := preload("res://scripts/game/player_vehicle_controller.gd")
 const StageTutorialController := preload("res://scripts/game/stage_tutorial_controller.gd")
 const VehicleCollisionController := preload("res://scripts/game/vehicle_collision_controller.gd")
@@ -31,7 +48,8 @@ const VEHICLE_TEXTURES := {
 }
 
 const LANE_NAMES := ["INCOMING", "MAIN", "SHOULDER"]
-const BASE_DISTANCE_SCALE := 0.07
+const BASE_DISTANCE_SCALE := 0.0297619
+const VISUAL_DISTANCE_SCALE := 2.35294
 const PLAYER_HITBOX_INSET := Vector4(0.08, 0.08, 0.08, 0.0)
 const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const NPC_LANE_CHANGE_WARNING_PULSES := 3
@@ -81,11 +99,15 @@ uniform vec2 glow_radius = vec2(0.72, 0.54);
 uniform vec4 glow_color : source_color = vec4(1.0, 0.85, 0.32, 0.18);
 
 void fragment() {
+	float aspect = SCREEN_PIXEL_SIZE.y / max(SCREEN_PIXEL_SIZE.x, 0.0001);
 	vec2 delta = SCREEN_UV - glow_center;
-	vec2 normalized = delta / max(glow_radius, vec2(0.0001));
-	float dist = length(normalized);
-	float alpha = max(0.0, 1.0 - dist);
-	alpha = alpha * alpha * 0.85;
+	delta.x *= aspect;
+	float pulse = 1.0 + sin(TIME * 1.8) * 0.06 + sin(TIME * 3.2) * 0.025;
+	float sphere_radius = max(0.0001, min(glow_radius.x, glow_radius.y) * pulse);
+	float dist = length(delta) / sphere_radius;
+	float sphere = pow(max(0.0, 1.0 - dist), 1.7);
+	float halo = pow(max(0.0, 1.0 - dist * 1.55), 3.2);
+	float alpha = (sphere * 0.82 + halo * 0.42) * (0.96 + sin(TIME * 2.1) * 0.04);
 	COLOR = vec4(glow_color.rgb, glow_color.a * alpha);
 }
 "
@@ -144,8 +166,8 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_enum("barangay-streets") var background_type := "barangay-streets"
 @export var use_stage_profile := true
 @export var use_player_state_stage_sequence := true
-@export_range(1.0, 10000.0, 1.0) var target_distance := 1000.0
-@export_range(1.0, 600.0, 0.5) var time_limit := 45.0
+@export_range(1.0, 10000.0, 1.0) var target_distance := 525.0
+@export_range(1.0, 600.0, 0.5) var time_limit := 58.0
 
 @export_group("Player Movement")
 @export_range(0.0, 600.0, 1.0) var player_x := 220.0
@@ -168,6 +190,12 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_radians := 0.012
 @export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_frequency := 0.018
 @export_range(0.0, 4.0, 0.05) var player_wiggle_intensity_x := 1.0
+
+@export_group("Boost")
+@export_range(1.0, 2.0, 0.01) var player_boost_max_speed_x := 1.2
+@export_range(1.0, 3.0, 0.05) var player_boost_acceleration_x := 1.4
+@export_range(0.05, 3.0, 0.05) var player_boost_release_decay_x := 0.45
+@export_range(0.0, 20.0, 0.1) var boost_gas_consumption_percent_per_second := 0.75
 
 @export_group("Spawn Frequency")
 @export_range(0.15, 60.0, 0.05) var incoming_spawn_min_delay := 18.0
@@ -228,9 +256,16 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 1.0, 0.05) var bottom_lane_lane_change_chance_x := 0.35
 
 @export_group("Stage Rewards")
-@export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.08
+@export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.15
 @export_range(0.0, 100.0, 0.5) var time_bonus_php_per_second := 2.0
 @export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
+
+@export_group("Crash Recovery")
+@export_range(0, 10, 1) var crash_energy_loss := 1
+@export_range(0.0, 3.0, 0.05) var crash_recovery_seconds := 0.45
+@export_range(0.0, 5.0, 0.05) var crash_invincible_seconds := 1.6
+@export_range(0.02, 0.5, 0.01) var crash_flicker_interval := 0.08
+@export_range(0.1, 1.0, 0.05) var crash_flicker_alpha := 0.35
 
 @export_group("Perspective")
 @export_range(0.2, 2.0, 0.01) var incoming_lane_scale := 0.78
@@ -251,6 +286,22 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export var noon_glow_center := Vector2(0.52, 0.22)
 @export var noon_glow_radius := Vector2(0.72, 0.56)
 
+@export_group("Weather")
+@export var cloudy_filter_color := Color(0.36, 0.39, 0.38, 0.20)
+@export var rain_filter_color := Color(0.16, 0.22, 0.27, 0.28)
+@export var heavy_rain_filter_color := Color(0.10, 0.14, 0.20, 0.38)
+@export_range(-1800.0, 1800.0, 1.0) var rain_scroll_x := -312.0
+@export_range(0.0, 2400.0, 1.0) var rain_scroll_y := 1440.0
+@export_range(0.0, 1.0, 0.01) var rain_lines_alpha := 0.72
+@export_range(0.0, 1.0, 0.01) var heavy_rain_lines_alpha := 0.92
+@export_range(0.0, 1.0, 0.01) var rain_drops_alpha := 0.22
+@export_range(0.0, 1.0, 0.01) var rain_floor_drops_alpha := 0.34
+@export_range(0.02, 2.0, 0.01) var rain_floor_drop_min_delay := 0.12
+@export_range(0.02, 2.0, 0.01) var rain_floor_drop_max_delay := 0.34
+@export_range(0.1, 3.0, 0.05) var rain_floor_drop_lifetime := 0.55
+@export_range(1.0, 6.0, 0.1) var rain_floor_drop_max_scale := 2.4
+@export_range(1, 60, 1) var rain_floor_drop_max_active := 12
+
 @export_group("Night Visibility")
 @export var night_visibility_shade_color := Color(0.0, 0.0, 0.0, 0.86)
 @export var night_visibility_focus_offset := Vector2(170.0, -20.0)
@@ -260,6 +311,11 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 var rng := RandomNumberGenerator.new()
 var background_scroller
 var time_filter_rect: ColorRect
+var weather_filter_rect: ColorRect
+var rain_lines_rect: TextureRect
+var rain_drops_rect: TextureRect
+var rain_floor_drops_rect: Control
+var rain_floor_drop_texture: Texture2D
 var noon_glow_rect: ColorRect
 var noon_glow_material: ShaderMaterial
 var night_visibility_rect: ColorRect
@@ -297,12 +353,18 @@ var game_hud
 var audio_manager
 var fade_rect: ColorRect
 var stage_tutorial
+var passenger_dialogue_controller
+var passenger_rule_violation_count := 0
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
 var stage_clear_fade_time := 0.0
 var stage_difficulty := "short"
 var stage_time_of_day := "morning"
 var stage_traffic := "chill"
+var stage_weather := "clear"
+var stage_special_type := ""
+var special_stage_id := ""
+var special_stage_blueprint: Dictionary = {}
 var speeder_spawn_timer := 0.0
 var speeder_warning_timer := 0.0
 var speeder_warning_flash_timer := 0.0
@@ -318,6 +380,15 @@ var special_mode_hidden_modifiers := {}
 var gameplay_entry_fade_seconds := 0.0
 var rolled_target_distance := 0.0
 var rolled_target_stage_type := ""
+var boost_active := false
+var boost_speed_x := 1.0
+var boost_gas_save_timer := 0.0
+var weather_effect_time := 0.0
+var rain_floor_drop_spawn_timer := 0.0
+var player_hit_recovery_timer := 0.0
+var player_hit_invincible_timer := 0.0
+var player_hit_flicker_timer := 0.0
+var player_hit_flicker_visible := true
 
 
 func _ready() -> void:
@@ -328,21 +399,33 @@ func _ready() -> void:
 	if use_player_state_stage_sequence:
 		stage_type = PlayerState.get_current_stage_type()
 	GameStageSetup.apply_stage_profile(self)
+	if use_player_state_stage_sequence:
+		stage_weather = PlayerState.get_stage_weather(stage_time_of_day)
+		stage_special_type = PlayerState.get_current_stage_special_type()
+		special_stage_id = PlayerState.get_current_special_stage_id()
+	GameStageSetup.apply_weather_modifiers(self)
 	GameStageSetup.apply_player_upgrades(self)
+	GameStageSetup.apply_character_modifiers(self)
+	GameStageSetup.apply_special_stage_blueprint(self)
 	VehicleTrafficController.reset_speeder_timer(self)
 	time_left = time_limit
 	overtime_seconds = 0.0
 	player_speed = player_start_speed
 	headlight_cone_texture = GameEnvironmentController.make_headlight_cone_texture()
 	GameEnvironmentController.create_audio_manager(self)
-	GameEnvironmentController.create_background(self, BACKGROUND_LOOP_TEXTURE)
+	GameEnvironmentController.create_background(self, _pick_stage_background())
 	PlayerVehicleController.create_player(self)
 	GameEnvironmentController.create_time_filter(self)
+	GameEnvironmentController.create_weather_effects(self, RAIN_DIAGONAL_TEXTURE, RAIN_DROPS_TEXTURE, RAIN_FLOOR_DROPS_TEXTURE)
 	GameEnvironmentController.create_noon_glow(self, NOON_GLOW_SHADER_CODE)
 	GameEnvironmentController.create_night_visibility_mask(self, NIGHT_VISIBILITY_SHADER_CODE)
 	GameEnvironmentController.create_ui(self, gameplay_entry_fade_seconds)
+	passenger_rule_violation_count = 0
+	passenger_dialogue_controller = PassengerDialogueController.new()
+	passenger_dialogue_controller.setup(self, game_hud.get_ui_root())
 	stage_tutorial = StageTutorialController.new()
 	audio_manager.start_stage_bgm(stage_time_of_day, stage_traffic, rng)
+	audio_manager.start_rain_loop_bgm(stage_weather)
 	GameEnvironmentController.layout_scene(self)
 	GameEnvironmentController.begin_gameplay_entry_fade(self)
 	StageTutorialController.schedule(self)
@@ -357,9 +440,25 @@ func _notification(what: int) -> void:
 		queue_redraw()
 
 
+func _pick_stage_background() -> Texture2D:
+	var pool_tag := _background_pool_tag()
+	var background_pool: Array = STAGE_BACKGROUND_POOLS.get(pool_tag, STAGE_BACKGROUND_POOLS.get(DEFAULT_BACKGROUND_POOL_TAG, []))
+	if background_pool.is_empty():
+		return null
+	return background_pool[rng.randi_range(0, background_pool.size() - 1)] as Texture2D
+
+
+func _background_pool_tag() -> String:
+	return str(BACKGROUND_POOL_TAGS_BY_TYPE.get(background_type, DEFAULT_BACKGROUND_POOL_TAG))
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if GameInput.is_any_press(event) and game_state == "GAME OVER":
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+		return
+
+	if game_state == "playing" and GameInput.is_stage_complete_debug_shortcut(event):
+		GameFlowController.end_game(self, "YOU MADE IT", "Debug stage complete.")
 		return
 
 	if stage_tutorial != null and stage_tutorial.input_lock_active:
@@ -390,17 +489,26 @@ func _process(delta: float) -> void:
 			func(lane_index: int, size: Vector2) -> float:
 				return VehicleGeometry.lane_y(self, lane_index, size)
 		)
+		GameEnvironmentController.update_background(self)
+		GameEnvironmentController.update_weather_effects(self, delta)
 		GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 		return
 	if stage_tutorial != null and stage_tutorial.input_lock_active:
 		GameEnvironmentController.update_background(self)
+		GameEnvironmentController.update_weather_effects(self, delta)
 		GameEnvironmentController.update_night_visibility_mask(self)
 		GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 		queue_redraw()
 		return
 
 	if game_state == "playing":
-		PlayerVehicleController.handle_speed(self, delta)
+		_update_player_hit_state(delta)
+		if player_hit_recovery_timer > 0.0:
+			player_speed = 0.0
+			boost_active = false
+			boost_speed_x = 1.0
+		else:
+			PlayerVehicleController.handle_speed(self, delta)
 		GameFlowController.update_progress(self, delta)
 		VehicleTrafficController.prune_invalid_entities(self)
 		VehicleSpawnScheduler.update_spawns(self, delta)
@@ -417,21 +525,55 @@ func _process(delta: float) -> void:
 		VehicleTrafficController.update_overtake_speed_boosts(self, delta)
 		VehicleTrafficController.update_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta)
+		if passenger_dialogue_controller != null:
+			passenger_dialogue_controller.update(self, delta)
 		var collision_detail: String = VehicleCollisionController.collision_detail(self)
 		if not collision_detail.is_empty():
-			GameFlowController.end_game(self, "CRASH", collision_detail)
+			GameFlowController.handle_player_hit(self, collision_detail)
 	elif game_state == "YOU MADE IT":
 		VehicleCollisionController.update_stage_clear_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta, true)
+		if passenger_dialogue_controller != null:
+			passenger_dialogue_controller.update(self, delta)
 		GameFlowController.update_stage_clear_transition(self, delta)
 	else:
 		PlayerVehicleController.update_player(self, delta)
+		if passenger_dialogue_controller != null:
+			passenger_dialogue_controller.update(self, delta)
 
+	_apply_player_hit_visuals()
 	GameEnvironmentController.update_background(self)
+	GameEnvironmentController.update_weather_effects(self, delta)
 	GameEnvironmentController.update_night_visibility_mask(self)
 	GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 	queue_redraw()
 
 
 func _draw() -> void:
-	GameRenderer.draw(self, distance)
+	GameRenderer.draw(self, distance * VISUAL_DISTANCE_SCALE)
+
+
+func _update_player_hit_state(delta: float) -> void:
+	player_hit_recovery_timer = maxf(0.0, player_hit_recovery_timer - delta)
+	if player_hit_invincible_timer <= 0.0:
+		player_hit_flicker_timer = 0.0
+		player_hit_flicker_visible = true
+		return
+
+	player_hit_invincible_timer = maxf(0.0, player_hit_invincible_timer - delta)
+	player_hit_flicker_timer -= delta
+	if player_hit_flicker_timer <= 0.0:
+		player_hit_flicker_timer = crash_flicker_interval
+		player_hit_flicker_visible = not player_hit_flicker_visible
+
+
+func _apply_player_hit_visuals() -> void:
+	if player == null:
+		return
+
+	if game_state != "playing" or player_hit_invincible_timer <= 0.0:
+		player.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		return
+
+	var flicker_alpha := 1.0 if player_hit_flicker_visible else crash_flicker_alpha
+	player.modulate = Color(1.0, 1.0, 1.0, flicker_alpha)

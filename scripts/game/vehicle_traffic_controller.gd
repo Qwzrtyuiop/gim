@@ -360,6 +360,10 @@ static func update_busy_vehicle_ai(owner, delta: float) -> void:
 			continue
 
 		entity["lane_change_cooldown"] = maxf(0.0, float(entity.get("lane_change_cooldown", 0.0)) - delta)
+		if float(entity["lane_change_cooldown"]) > 0.0:
+			apply_forward_collision_detection(owner, entity)
+			continue
+
 		var lane_index := int(entity["lane"])
 
 		if not vehicle_needs_lane_change(owner, entity, lane_index):
@@ -391,6 +395,7 @@ static func update_vehicle_overtake_ai(owner, delta: float) -> void:
 		var lane_index := int(entity["lane"])
 		entity["lane_change_cooldown"] = maxf(0.0, float(entity.get("lane_change_cooldown", 0.0)) - delta)
 		if float(entity["lane_change_cooldown"]) > 0.0:
+			apply_forward_collision_detection(owner, entity)
 			continue
 
 		if lane_index == 0:
@@ -400,21 +405,21 @@ static func update_vehicle_overtake_ai(owner, delta: float) -> void:
 		if not vehicle_needs_lane_change(owner, entity, lane_index):
 			continue
 
-		if lane_index == 1 and try_warn_overtake_lane_change(owner, entity, 0):
-			continue
-
 		var overtake_chance: float = owner.npc_overtake_chance_per_second
 		if lane_index == 2:
 			overtake_chance *= owner.bottom_lane_lane_change_chance_x
 
 		if owner.rng.randf() > overtake_chance * delta:
+			slow_vehicle_for_front_car(owner, entity, lane_index)
 			continue
 
+		var started_overtake := false
 		for target_lane in VehicleBehaviors.overtake_lane_order(lane_index):
-			if target_lane == 0:
-				continue
 			if try_warn_overtake_lane_change(owner, entity, target_lane):
+				started_overtake = true
 				break
+		if not started_overtake:
+			slow_vehicle_for_front_car(owner, entity, lane_index)
 
 
 static func vehicle_needs_lane_change(owner, vehicle: Dictionary, lane_index: int) -> bool:
@@ -740,7 +745,15 @@ static func apply_bottom_lane_speed_cap(owner) -> void:
 static func apply_forward_collision_detection(owner, entity: Dictionary) -> void:
 	if float(entity.get("world_speed", 0.0)) <= 0.0:
 		return
+	if bool(entity.get("top_lane_evasive_offset_active", false)):
+		maintain_top_lane_evasive_speed(owner, entity)
+		return
 	slow_vehicle_for_front_car(owner, entity, int(entity.get("lane", -1)))
+
+
+static func maintain_top_lane_evasive_speed(owner, entity: Dictionary) -> void:
+	if entity.get("kind", "traffic") == "traffic" and entity.has("overtake_return_lane"):
+		maintain_top_lane_overtake_boost(owner, entity)
 
 
 static func slow_vehicle_for_front_car(owner, entity: Dictionary, lane_index: int) -> void:
@@ -754,7 +767,7 @@ static func slow_vehicle_for_front_car(owner, entity: Dictionary, lane_index: in
 		Callable(VehicleGeometry, "collision_rect").bind(owner)
 	)
 	if front_speed >= 0.0:
-		entity["world_speed"] = minf(float(entity.get("world_speed", front_speed)), front_speed)
+		limit_entity_speed(entity, front_speed)
 
 
 static func speeder_needs_lane_change(owner, speeder: Dictionary, lane_index: int) -> bool:
@@ -1032,7 +1045,7 @@ static func slow_speeder_near_player(owner, entity: Dictionary) -> void:
 	var speeder_is_behind_player := speeder_rect.get_center().x < player_rect.get_center().x
 	var center_gap := absf(speeder_rect.get_center().x - player_rect.get_center().x)
 	if speeder_is_behind_player and center_gap < owner.SPEEDER_PLAYER_LANE_CHANGE_BUFFER:
-		entity["world_speed"] = minf(float(entity.get("world_speed", owner.speeder_vehicle_max_speed)), owner.player_speed)
+		limit_entity_speed(entity, owner.player_speed)
 
 
 static func find_entity_by_sprite(owner, sprite) -> Dictionary:
@@ -1059,6 +1072,16 @@ static func entity_collision_disabled(entity: Dictionary) -> bool:
 	return bool(entity.get("top_lane_evasive_offset_active", false))
 
 
+static func bottom_lane_traffic_can_pass_parked(moving_entity: Dictionary, parked_entity: Dictionary) -> bool:
+	return (
+		str(moving_entity.get("kind", "traffic")) == "traffic"
+		and not bool(moving_entity.get("is_parked", false))
+		and int(moving_entity.get("lane", -1)) == 2
+		and bool(parked_entity.get("is_parked", false))
+		and int(parked_entity.get("lane", -1)) == 2
+	)
+
+
 static func active_collision_entities(owner, include_entity: Dictionary = {}) -> Array:
 	var entities: Array = []
 	for entity in owner.active_entities:
@@ -1066,6 +1089,8 @@ static func active_collision_entities(owner, include_entity: Dictionary = {}) ->
 			continue
 		if not include_entity.is_empty() and same_entity_sprite(entity, include_entity):
 			entities.append(entity)
+			continue
+		if not include_entity.is_empty() and bottom_lane_traffic_can_pass_parked(include_entity, entity):
 			continue
 		if entity_collision_disabled(entity):
 			continue
@@ -1217,8 +1242,12 @@ static func slow_rear_pressure_vehicle(owner, entity: Dictionary) -> void:
 		return
 
 	var pressure_speed := maxf(0.0, owner.player_speed - 60.0)
-	entity["world_speed"] = minf(float(entity.get("world_speed", pressure_speed)), pressure_speed)
-	entity["desired_world_speed"] = minf(float(entity.get("desired_world_speed", pressure_speed)), pressure_speed)
+	limit_entity_speed(entity, pressure_speed)
+
+
+static func limit_entity_speed(entity: Dictionary, speed: float) -> void:
+	entity["world_speed"] = minf(float(entity.get("world_speed", speed)), speed)
+	entity["desired_world_speed"] = minf(float(entity.get("desired_world_speed", speed)), speed)
 
 
 static func update_npc_following(owner) -> void:
@@ -1375,6 +1404,9 @@ static func resolve_direction_overlaps(owner, lane_index: int, moves_with_player
 	for index in range(1, lane_entities.size()):
 		var front_entity: Dictionary = lane_entities[index - 1]
 		var rear_entity: Dictionary = lane_entities[index]
+		if bottom_lane_traffic_can_pass_parked(rear_entity, front_entity) or bottom_lane_traffic_can_pass_parked(front_entity, rear_entity):
+			continue
+
 		var front_rect: Rect2 = VehicleGeometry.collision_rect(front_entity["sprite"], owner.VEHICLE_HITBOX_INSET, owner)
 		var rear_rect: Rect2 = VehicleGeometry.collision_rect(rear_entity["sprite"], owner.VEHICLE_HITBOX_INSET, owner)
 
@@ -1383,13 +1415,13 @@ static func resolve_direction_overlaps(owner, lane_index: int, moves_with_player
 			var desired_rear_right: float = front_rect.position.x - NPC_OVERLAP_SEPARATION_GAP
 			if rear_right > desired_rear_right:
 				rear_entity["sprite"].position.x += desired_rear_right - rear_right
-				rear_entity["world_speed"] = minf(float(rear_entity.get("world_speed", 0.0)), float(front_entity.get("world_speed", 0.0)))
+				limit_entity_speed(rear_entity, float(front_entity.get("world_speed", 0.0)))
 		else:
 			var front_right: float = front_rect.position.x + front_rect.size.x
 			var desired_rear_left: float = front_right + NPC_OVERLAP_SEPARATION_GAP
 			if rear_rect.position.x < desired_rear_left:
 				rear_entity["sprite"].position.x += desired_rear_left - rear_rect.position.x
-				rear_entity["world_speed"] = minf(float(rear_entity.get("world_speed", 0.0)), float(front_entity.get("world_speed", 0.0)))
+				limit_entity_speed(rear_entity, float(front_entity.get("world_speed", 0.0)))
 
 
 static func resolve_opposing_direction_overlaps(owner, lane_index: int) -> void:

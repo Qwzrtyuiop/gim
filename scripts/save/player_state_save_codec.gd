@@ -2,6 +2,7 @@ extends RefCounted
 class_name PlayerStateSaveCodec
 
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 
 
@@ -14,19 +15,52 @@ static func load_from_path(player_state, save_path: String) -> bool:
 		return false
 
 	var save_resource := loaded_resource as GameSaveResource
+	var saved_version := int(save_resource.version)
 	var save_data: Dictionary = save_resource.data.duplicate(true)
 	if save_data.is_empty():
 		return false
 
+	var needs_migration_save := saved_version < 2
 	player_state._is_loading_save = true
+	player_state._begin_state_batch()
 	player_state.money = int(save_data.get("money", player_state.money))
-	player_state.max_energy = int(save_data.get("max_energy", player_state.max_energy))
-	player_state.energy = int(save_data.get("energy", player_state.energy))
-	player_state.max_gas = int(save_data.get("max_gas", player_state.max_gas))
-	player_state.gas = int(save_data.get("gas", player_state.gas))
+	var saved_max_energy := int(save_data.get("max_energy", player_state.max_energy))
+	var saved_energy := int(save_data.get("energy", player_state.energy))
+	if saved_version < 2 and saved_max_energy <= 5:
+		player_state.max_energy = maxi(1, player_state.DEFAULT_MAX_ENERGY - maxi(0, 5 - saved_max_energy) * 2)
+		player_state.energy = clampi(
+			roundi(float(saved_energy) / maxf(1.0, float(saved_max_energy)) * float(player_state.max_energy)),
+			0,
+			player_state.max_energy
+		)
+	else:
+		player_state.max_energy = saved_max_energy
+		player_state.energy = saved_energy
+	var saved_max_gas := float(save_data.get("max_gas", player_state.max_gas))
+	var saved_gas := float(save_data.get("gas", player_state.gas))
+	if saved_version < 2 and saved_max_gas <= 10.0:
+		player_state.max_gas = player_state.DEFAULT_MAX_GAS_PERCENT
+		player_state.gas = clampf(saved_gas / maxf(1.0, saved_max_gas) * player_state.max_gas, 0.0, player_state.max_gas)
+	else:
+		player_state.max_gas = saved_max_gas
+		player_state.gas = saved_gas
 	player_state.gas_price = int(save_data.get("gas_price", player_state.gas_price))
+	player_state.previous_gas_price = int(save_data.get("previous_gas_price", player_state.previous_gas_price))
+	player_state.gas_price_delta = int(save_data.get("gas_price_delta", player_state.gas_price - player_state.previous_gas_price))
+	player_state.current_weather = str(save_data.get("current_weather", player_state.current_weather))
+	player_state.weather_forecasts = Dictionary(save_data.get("weather_forecasts", player_state.weather_forecasts)).duplicate(true)
+	player_state.weather_phase_cache = Dictionary(save_data.get("weather_phase_cache", player_state.weather_phase_cache)).duplicate(true)
+	player_state.daily_conditions_day = int(save_data.get("daily_conditions_day", 0))
 	player_state.karma = int(save_data.get("karma", player_state.karma))
 	player_state.current_stage_type = str(save_data.get("current_stage_type", player_state.current_stage_type))
+	player_state.current_stage_special_type = player_state.normalize_stage_special_type(
+		str(save_data.get("current_stage_special_type", player_state.current_stage_special_type))
+	)
+	player_state.current_special_stage_id = player_state.normalize_special_stage_id(
+		str(save_data.get("current_special_stage_id", player_state.current_special_stage_id))
+	)
+	if player_state.current_stage_special_type != player_state.STAGE_SPECIAL_TYPE_SPECIAL:
+		player_state.current_special_stage_id = ""
 	player_state.current_day = int(save_data.get("current_day", player_state.current_day))
 	player_state.stage_round = int(save_data.get("stage_round", player_state.stage_round))
 	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
@@ -34,14 +68,20 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
 	player_state.pending_sleep_transition_state = Dictionary(save_data.get("pending_sleep_transition_state", {})).duplicate(true)
 	player_state.pending_gameplay_entry_fade_duration = float(save_data.get("pending_gameplay_entry_fade_duration", player_state.pending_gameplay_entry_fade_duration))
+	player_state.pending_skip_night_phase = bool(save_data.get("pending_skip_night_phase", player_state.pending_skip_night_phase))
 	player_state.current_mock_character_id = str(save_data.get("current_mock_character_id", player_state.current_mock_character_id))
 	player_state.seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
 	player_state.unique_character_progress = Dictionary(save_data.get("unique_character_progress", {})).duplicate(true)
+	player_state.locked_unique_character_stories = Dictionary(save_data.get("locked_unique_character_stories", {})).duplicate(true)
+	player_state.consumed_unique_session_dialogue = Dictionary(save_data.get("consumed_unique_session_dialogue", {})).duplicate(true)
 	player_state.seeded_rider_rules.clear()
 	var saved_seeded_rider_rules: Array = save_data.get("seeded_rider_rules", [])
 	for rule_data in saved_seeded_rider_rules:
 		if rule_data is Dictionary:
-			player_state.seeded_rider_rules.append((rule_data as Dictionary).duplicate(true))
+			var normalized_rule := SeededRiderRuntime.normalize_rule(player_state, (rule_data as Dictionary).duplicate(true))
+			if normalized_rule.is_empty():
+				continue
+			player_state.seeded_rider_rules.append(normalized_rule)
 	player_state.consumed_seeded_rider_rules = Dictionary(save_data.get("consumed_seeded_rider_rules", {})).duplicate(true)
 	player_state.last_rest_day = int(save_data.get("last_rest_day", player_state.last_rest_day))
 	player_state.yosi_bought_today = int(save_data.get("yosi_bought_today", player_state.yosi_bought_today))
@@ -85,8 +125,11 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
 	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
+	player_state.store_tutorial_shown = bool(save_data.get("store_tutorial_shown", player_state.store_tutorial_shown))
+	player_state.home_tutorial_shown = bool(save_data.get("home_tutorial_shown", player_state.home_tutorial_shown))
+	player_state._end_state_batch(false, true)
 	player_state._is_loading_save = false
-	if needs_story_trigger_save:
+	if needs_story_trigger_save or needs_migration_save:
 		player_state.save_progress()
 	return true
 
@@ -104,8 +147,16 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"max_gas": player_state.max_gas,
 		"gas": player_state.gas,
 		"gas_price": player_state.gas_price,
+		"gas_price_delta": player_state.gas_price_delta,
+		"previous_gas_price": player_state.previous_gas_price,
+		"current_weather": player_state.current_weather,
+		"weather_forecasts": player_state.weather_forecasts.duplicate(true),
+		"weather_phase_cache": player_state.weather_phase_cache.duplicate(true),
+		"daily_conditions_day": player_state.daily_conditions_day,
 		"karma": player_state.karma,
 		"current_stage_type": player_state.current_stage_type,
+		"current_stage_special_type": player_state.current_stage_special_type,
+		"current_special_stage_id": player_state.current_special_stage_id,
 		"current_day": player_state.current_day,
 		"stage_round": player_state.stage_round,
 		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,
@@ -113,9 +164,12 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"pending_story": player_state.pending_story.duplicate(true),
 		"pending_sleep_transition_state": player_state.pending_sleep_transition_state.duplicate(true),
 		"pending_gameplay_entry_fade_duration": player_state.pending_gameplay_entry_fade_duration,
+		"pending_skip_night_phase": player_state.pending_skip_night_phase,
 		"current_mock_character_id": player_state.current_mock_character_id,
 		"seen_mock_characters": player_state.seen_mock_characters.duplicate(true),
 		"unique_character_progress": player_state.unique_character_progress.duplicate(true),
+		"locked_unique_character_stories": player_state.locked_unique_character_stories.duplicate(true),
+		"consumed_unique_session_dialogue": player_state.consumed_unique_session_dialogue.duplicate(true),
 		"seeded_rider_rules": player_state.seeded_rider_rules.duplicate(true),
 		"consumed_seeded_rider_rules": player_state.consumed_seeded_rider_rules.duplicate(true),
 		"last_rest_day": player_state.last_rest_day,
@@ -149,5 +203,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"event_values": player_state.event_values.duplicate(true),
 		"resume_scene_path": player_state.resume_scene_path,
 		"ride_select_tutorial_shown": player_state.ride_select_tutorial_shown,
+		"store_tutorial_shown": player_state.store_tutorial_shown,
+		"home_tutorial_shown": player_state.home_tutorial_shown,
 	}
 	ResourceSaver.save(save_resource, save_path)

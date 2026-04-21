@@ -12,7 +12,8 @@ const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
-const Scene01IntroPayload := preload("res://scripts/story/payloads/scene_01_intro.gd")
+const Scene01IntroPayloadEnglish := preload("res://scripts/story/payloads/intro/scene_01_intro.gd")
+const Scene01IntroPayloadTagalog := preload("res://scripts/story/payloads/intro/scene_01_intro_tagalog.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const GENERIC_BUTTON_TEXTURE := preload("res://assets/ui/button_generic.png")
 const MAIN_MENU_BGM_PATH := "res://assets/story/music/peace.mp3"
@@ -29,7 +30,7 @@ const ROAD_ACTOR_Z_STEP := 10
 const INCOMING_LANE_SCALE := 0.78
 const MAIN_LANE_SCALE := 1.0
 const RESET_HOLD_SECONDS := 1.4
-const LAST_ENERGY_WARNING := "Start the day with your last energy?\nIf this trip goes bad, the run ends."
+const LAST_ENERGY_WARNING := "Start the day with critically low energy?\nYour vehicle will handle worse until John recovers."
 const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
@@ -54,6 +55,8 @@ var is_start_transitioning := false
 var audio_panel_refs: Dictionary = {}
 var audio_toggle_button: TextureButton
 var audio_toggle_label: Label
+var language_toggle_button: TextureButton
+var language_toggle_label: Label
 var bgm_player: AudioStreamPlayer
 
 
@@ -73,6 +76,7 @@ func _ready() -> void:
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu_trace_lines.visible = false
 	_build_audio_panel()
+	_build_language_button()
 	_create_dialogs()
 	_spawn_menu_traffic()
 	_start_main_menu_bgm()
@@ -120,7 +124,7 @@ func _start_game() -> void:
 		return
 
 	PlayerState.begin_stage_sequence()
-	if PlayerState.energy == 1:
+	if PlayerState.energy <= 2:
 		start_confirm_dialog.popup_centered()
 		return
 
@@ -136,7 +140,10 @@ func _confirm_start_game() -> void:
 	is_start_transitioning = true
 	start_button.disabled = true
 	quit_button.disabled = true
-	PlayerState.set_pending_story(Scene01IntroPayload.build(
+	achievements_button.disabled = true
+	audio_toggle_button.disabled = true
+	language_toggle_button.disabled = true
+	PlayerState.set_pending_story(_build_intro_story_payload(
 		HOUSE_DAY_START_SCENE,
 		PlayerState.get_current_stage_type()
 	))
@@ -148,6 +155,8 @@ func _continue_saved_game() -> void:
 	start_button.disabled = true
 	quit_button.disabled = true
 	achievements_button.disabled = true
+	audio_toggle_button.disabled = true
+	language_toggle_button.disabled = true
 	_fade_to_scene(_saved_resume_scene())
 
 
@@ -165,7 +174,7 @@ func _open_achievements_library() -> void:
 
 func _create_dialogs() -> void:
 	start_confirm_dialog = ConfirmationDialog.new()
-	start_confirm_dialog.title = "Last Energy"
+	start_confirm_dialog.title = "Low Energy"
 	start_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
 	start_confirm_dialog.get_ok_button().text = "START"
 	start_confirm_dialog.get_cancel_button().text = "BACK"
@@ -227,12 +236,60 @@ func _build_audio_panel() -> void:
 	audio_toggle_button.pressed.connect(_toggle_audio_panel)
 
 
+func _build_language_button() -> void:
+	language_toggle_button = TextureButton.new()
+	language_toggle_button.z_index = 10
+	language_toggle_button.texture_normal = GENERIC_BUTTON_TEXTURE
+	language_toggle_button.texture_pressed = GENERIC_BUTTON_TEXTURE
+	language_toggle_button.texture_hover = GENERIC_BUTTON_TEXTURE
+	language_toggle_button.texture_focused = GENERIC_BUTTON_TEXTURE
+	language_toggle_button.ignore_texture_size = true
+	language_toggle_button.stretch_mode = TextureButton.STRETCH_SCALE
+	language_toggle_button.position = Vector2(26.0, 602.0)
+	language_toggle_button.size = Vector2(300.0, 48.0)
+	language_toggle_button.tooltip_text = "Toggle Story Language"
+	add_child(language_toggle_button)
+
+	language_toggle_label = Label.new()
+	language_toggle_label.anchor_right = 1.0
+	language_toggle_label.anchor_bottom = 1.0
+	language_toggle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	language_toggle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	language_toggle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	language_toggle_label.add_theme_font_override("font", UI_FONT)
+	language_toggle_label.add_theme_font_size_override("font_size", 14)
+	language_toggle_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
+	language_toggle_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	language_toggle_label.add_theme_constant_override("outline_size", 1)
+	language_toggle_button.add_child(language_toggle_label)
+	ButtonGlow.attach(self, language_toggle_button)
+	language_toggle_button.pressed.connect(_toggle_story_language)
+	_refresh_language_toggle_label()
+
+
 func _toggle_audio_panel() -> void:
 	var audio_panel := audio_panel_refs.get("panel") as Panel
 	if audio_panel == null:
 		return
 	audio_panel.visible = not audio_panel.visible
 	audio_toggle_label.text = "AUDIO  -" if audio_panel.visible else "AUDIO"
+
+
+func _toggle_story_language() -> void:
+	StoryLanguageManager.toggle_language()
+	_refresh_language_toggle_label()
+
+
+func _refresh_language_toggle_label() -> void:
+	if language_toggle_label == null:
+		return
+	language_toggle_label.text = "LANG: %s" % StoryLanguageManager.get_language_label()
+
+
+func _build_intro_story_payload(next_scene: String, stage_descriptor: String) -> Dictionary:
+	if StoryLanguageManager.is_tagalog():
+		return Scene01IntroPayloadTagalog.build(next_scene, stage_descriptor)
+	return Scene01IntroPayloadEnglish.build(next_scene, stage_descriptor)
 
 
 func _start_main_menu_bgm() -> void:

@@ -3,6 +3,13 @@ extends RefCounted
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
 
+# Custom special stages can be registered here later.
+# Each blueprint is keyed by special_stage_id and may provide:
+# - display_name: String
+# - modifiers: Dictionary of numeric owner modifiers, reusing _apply_numeric_owner_modifier keys
+# - metadata: Dictionary for bespoke stage scripts to inspect at runtime
+const SPECIAL_STAGE_BLUEPRINTS := {}
+
 
 static func apply_stage_profile(owner) -> void:
 	if not owner.use_stage_profile:
@@ -64,12 +71,93 @@ static func apply_target_distance_roll(owner) -> void:
 	owner.target_distance = owner.rolled_target_distance
 
 
+static func apply_weather_modifiers(owner) -> void:
+	match owner.stage_weather:
+		"rain":
+			owner.player_brake_deceleration *= 0.85
+			owner.player_brake_x *= 0.85
+			owner.player_coast_deceleration *= 0.86
+		"heavy rain":
+			owner.player_brake_deceleration *= 0.72
+			owner.player_brake_x *= 0.75
+			owner.player_coast_deceleration *= 0.72
+
+
 static func apply_player_upgrades(owner) -> void:
 	var modifiers: Dictionary = GameEconomyManager.player_upgrade_modifiers()
 	owner.player_acceleration_x *= float(modifiers["player_acceleration_x"])
 	owner.player_max_speed *= float(modifiers["player_max_speed"])
 	owner.player_brake_x *= float(modifiers["player_brake_x"])
 	owner.player_lane_lerp_x *= float(modifiers["player_lane_lerp_x"])
+
+	var energy_modifiers: Dictionary = PlayerState.get_energy_vehicle_modifiers()
+	owner.player_acceleration_x *= float(energy_modifiers["player_acceleration_x"])
+	owner.player_max_speed *= float(energy_modifiers["player_max_speed"])
+	owner.player_brake_x *= float(energy_modifiers["player_brake_x"])
+	owner.player_lane_lerp_x *= float(energy_modifiers["player_lane_lerp_x"])
+	owner.player_coast_x *= float(energy_modifiers["player_coast_x"])
+	owner.player_wiggle_intensity_x *= float(energy_modifiers["player_wiggle_intensity_x"])
+
+
+static func apply_character_modifiers(owner) -> void:
+	var story_state: Dictionary = PlayerState.get_current_mock_character_story_state({
+		"stage_type": owner.stage_type,
+		"difficulty": owner.stage_difficulty,
+		"time_of_day": owner.stage_time_of_day,
+		"traffic": owner.stage_traffic,
+	})
+	if story_state.is_empty():
+		return
+
+	var modifiers: Dictionary = story_state.get("modifiers", {})
+	if modifiers.is_empty():
+		return
+
+	_apply_numeric_owner_modifier(owner, modifiers, "fare_php_per_meter")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_limit")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_bonus_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "overtime_fare_penalty_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_max_speed")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_acceleration_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_brake_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_lane_lerp_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_coast_x")
+
+
+static func apply_special_stage_blueprint(owner) -> void:
+	owner.special_stage_blueprint = {}
+	if PlayerState.normalize_stage_special_type(owner.stage_special_type) != PlayerState.STAGE_SPECIAL_TYPE_SPECIAL:
+		return
+
+	var special_stage_id: String = PlayerState.normalize_special_stage_id(owner.special_stage_id)
+	if special_stage_id.is_empty():
+		return
+
+	var blueprint: Dictionary = special_stage_blueprint(special_stage_id)
+	if blueprint.is_empty():
+		return
+
+	owner.special_stage_blueprint = blueprint.duplicate(true)
+	var modifiers: Dictionary = blueprint.get("modifiers", {})
+	if modifiers.is_empty():
+		return
+
+	_apply_numeric_owner_modifier(owner, modifiers, "fare_php_per_meter")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_limit")
+	_apply_numeric_owner_modifier(owner, modifiers, "time_bonus_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "overtime_fare_penalty_php_per_second")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_max_speed")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_acceleration_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_brake_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_lane_lerp_x")
+	_apply_numeric_owner_modifier(owner, modifiers, "player_coast_x")
+
+
+static func special_stage_blueprint(special_stage_id: String) -> Dictionary:
+	var safe_special_stage_id: String = PlayerState.normalize_special_stage_id(special_stage_id)
+	if safe_special_stage_id.is_empty():
+		return {}
+	return Dictionary(SPECIAL_STAGE_BLUEPRINTS.get(safe_special_stage_id, {})).duplicate(true)
 
 
 static func apply_hidden_special_modifiers(owner) -> void:
@@ -124,3 +212,33 @@ static func apply_hidden_special_modifiers(owner) -> void:
 			owner.speeder_avoid_lookahead *= owner.special_mode_hidden_modifiers["speeder_hunt_x"]
 			owner.main_spawn_min_delay *= owner.rng.randf_range(0.92, 1.10)
 			owner.main_spawn_max_delay *= owner.rng.randf_range(0.92, 1.10)
+
+
+static func _apply_numeric_owner_modifier(owner, modifiers: Dictionary, property_name: String) -> void:
+	if not _owner_has_property(owner, property_name):
+		return
+
+	var resolved_value := float(owner.get(property_name))
+	if modifiers.has(property_name):
+		resolved_value = float(modifiers[property_name])
+	if modifiers.has("%s_multiplier" % property_name):
+		resolved_value *= float(modifiers["%s_multiplier" % property_name])
+	if modifiers.has("%s_delta" % property_name):
+		resolved_value += float(modifiers["%s_delta" % property_name])
+	if modifiers.has("%s_min" % property_name):
+		resolved_value = maxf(resolved_value, float(modifiers["%s_min" % property_name]))
+
+	var cap_key := "%s_cap" % property_name
+	if modifiers.has(cap_key):
+		resolved_value = minf(resolved_value, float(modifiers[cap_key]))
+	elif property_name == "player_max_speed" and modifiers.has("player_max_speed_limit"):
+		resolved_value = minf(resolved_value, float(modifiers["player_max_speed_limit"]))
+
+	owner.set(property_name, resolved_value)
+
+
+static func _owner_has_property(owner, property_name: String) -> bool:
+	for property_data in owner.get_property_list():
+		if str(property_data.get("name", "")) == property_name:
+			return true
+	return false
