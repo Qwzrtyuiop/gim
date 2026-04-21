@@ -28,7 +28,6 @@ static func build() -> Dictionary:
 
 	var drink_choice_index: int = composition.size()
 	composition.append({
-		"speaker": "Benny",
 		"text": "Warning: Agreeing will skip the night phase.\n\nSo, what do you say?",
 		"choices": [],
 	})

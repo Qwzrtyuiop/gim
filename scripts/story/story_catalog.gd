@@ -70,6 +70,7 @@ const UNIQUE_SESSION_DIALOGUE_OVERRIDES := {
 	"benny": {
 		"special_1": [
 			{"english": "It's been a long time since I've seen you around here. What happened to your city job?", "tagalog": "Long time no see pre, Kala ko ba doon ka nagtratrabaho sa siyudad?"},
+			{"english": "Remember me? We used to hang out a lot during high school.", "tagalog": "Naaalala mo pa ako? Tayo yung laging magkakasama nung high school."},
 		],
 		"special_2": [
 			{"english": "Construction starts early. If I'm late, the foreman will chew me out.", "tagalog": "Maaga nanaman ang pasok. Sana di ako masigawan ni porman."},

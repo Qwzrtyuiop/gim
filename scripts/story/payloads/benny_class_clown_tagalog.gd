@@ -9,7 +9,7 @@ static func build() -> Dictionary:
 			"background": StoryConstants.BACKGROUND_STATION,
 			"background_fade": 0.28,
 			"pause_before": 0.14,
-			"text": "Maingay ang terminal. Halo-halo ang makina, yabag, at usapan ng mga pagod na tao.",
+			"text": "Bumaba si Benny mula sa aking tricycle at nagsimula siyang maglakad papunta sa kanyang trabaho.",
 			"camera": {
 				"zoom": 1.0,
 				"focus": "center",
@@ -17,19 +17,45 @@ static func build() -> Dictionary:
 			},
 		},
 		{
-			"speaker": "Benny",
-			"text": "Oy, John. Libre ka ba mamaya? Tara inom tayo mamayang gabi.",
+			"text": "Pinaandar ko ang makina ng aking tricycle.",
+		},
+		{
+			"speaker":"John Toda",
+			"text": "Mahaba-haba pa ang araw na to.",
+		},
+		{
+			"text": "...",
+			"actions": 
+				[
+					{
+						"type": "play_sfx",
+						"path": StoryConstants.MUSIC_RUNNING_SFX,
+						"volume_db": -4.0,
+					},
+				]
+		},
+		{
+			"text": "Tumakbo pabalik si Benny.",
 		},
 		{
 			"speaker": "Benny",
-			"text": "Sasama rin sina Arvin at Dylan. Nakakausap ko pa rin 'yang dalawang loko na 'yan.",
+			"text": "Oy, John. May gagawin ka ba mamaya? Tara labas mamayang gabi.",
+		},
+		{
+			"text": "Ha?",
+		},
+		{
+			"speaker": "Benny",
+			"text": "Tawagin ko din sina Arvin at Dylan. Naaalala mo pa sila diba?",
+		},
+		{
+			"text": "...",
 		},
 	]
 
 	var drink_choice_index: int = composition.size()
 	composition.append({
-		"speaker": "Benny",
-		"text": "Babala: Kapag pumayag ka, malalaktawan ang night phase.\n\nAno, game ka ba?",
+		"text": "Warning: Agreeing will skip the night phase.\n\nSo, what do you say?",
 		"choices": [],
 	})
 
@@ -53,7 +79,7 @@ static func build() -> Dictionary:
 	var agree_question_index: int = composition.size()
 	composition.append({
 		"speaker": "Benny",
-		"text": "Oo nga pala. Hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nHindi kita inasahang papalit sa trabaho ng tatay mo. Hindi ka mukhang gano'n.",
+		"text": "Oo nga pala. Hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nBa't ka nag-trirtricycle driver ngayon?",
 		"choices": [],
 	})
 
@@ -73,15 +99,14 @@ static func build() -> Dictionary:
 	var dont_go_question_index: int = composition.size()
 	composition.append({
 		"speaker": "Benny",
-		"text": "Sige. Pero... hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nHindi kita inasahang papalit sa trabaho ng tatay mo. Hindi ka mukhang gano'n.",
-		"choices": [],
+		"text": "Sige. Pero... hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nBa't ka nag-trirtricycle driver ngayon?",
 	})
 
 	var truth_index: int = composition.size()
 	composition.append_array([
 		{
 			"speaker": "John Toda",
-			"text": "Natanggal ako sa trabaho sa siyudad.",
+			"text": "Ayun, nawalan ako ng trabaho.",
 			"actions": [
 				{
 					"type": "set_event_value",
@@ -92,17 +117,25 @@ static func build() -> Dictionary:
 		},
 		{
 			"speaker": "John Toda",
-			"text": "Pag-uwi ko, wala na si Tatay. Pero nandoon pa rin ang traysikel.",
+			"text": "Tapos pag-uwi ko, wala na si Tatay.",
 			"required_achievements": ["tapat"],
 		},
 		{
 			"speaker": "John Toda",
-			"text": "Doon nagsimula lahat.",
+			"text": "Yung tricycle nalang ang naiwan.",
+			"required_achievements": ["tapat"],
+		},
+		{
+			"speaker": "John Toda",
+			"text": "Doon ako nagsimula",
 			"required_achievements": ["tapat"],
 		},
 		{
 			"speaker": "Benny",
 			"text": "Grabe. Pasensya na, John.",
+		},
+		{
+			"text": "Tinapik ni Benny ang aking balikat",
 		},
 		{
 			"speaker": "Benny",
@@ -173,7 +206,7 @@ static func build() -> Dictionary:
 			"next_index": agree_index,
 		},
 		{
-			"text": "Huwag na",
+			"text": "Huwag",
 			"next_index": dont_go_index,
 		},
 	]

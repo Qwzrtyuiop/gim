@@ -36,7 +36,7 @@ func _ready() -> void:
 	ride_button.pressed.connect(_attempt_next_stage)
 	_create_dialogs()
 
-	var result := PlayerState.get_last_stage_result()
+	var result: Dictionary = PlayerState.get_last_stage_result()
 	PlayerState.claim_last_stage_total()
 	_render_results(result)
 
@@ -230,13 +230,16 @@ func _create_earnings_summary_label() -> void:
 
 
 func _create_stats_row() -> void:
-	stats_row_refs = PlayerStatsRow.create({
+	stats_row_refs.clear()
+	stats_row_refs.merge(PlayerStatsRow.create({
 		"font": UI_FONT,
 		"font_size": 11,
 		"font_color": Color(0.27, 0.18, 0.10, 1.0),
 		"outline_color": Color(0.95, 0.90, 0.78, 0.92),
-	})
-	var stats_row := stats_row_refs["row"] as HBoxContainer
+	}), true)
+	var stats_row := stats_row_refs.get("row") as HBoxContainer
+	if stats_row == null:
+		return
 	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stats_row.position = Vector2(330.0, 410.0)
 	stats_row.size = Vector2(620.0, 24.0)
@@ -251,7 +254,7 @@ func _refresh_stats_row() -> void:
 
 
 func _start_carried_result_music() -> void:
-	var music_state := PlayerState.consume_pending_result_music()
+	var music_state: Dictionary = PlayerState.consume_pending_result_music()
 	if music_state.is_empty():
 		return
 

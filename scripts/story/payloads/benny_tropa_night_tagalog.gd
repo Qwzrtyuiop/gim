@@ -20,10 +20,63 @@ static func build() -> Dictionary:
 				"background": StoryConstants.BACKGROUND_INHOUSE,
 				"background_fade": 0.28,
 				"pause_before": 0.16,
-				"text": "Sa bahay, tinitingnan ni John ang oras sa kanyang phone.",
+				"text": "Bago ako umalis, binuksan ko ang aking pitaka.",
 			},
 			{
-				"text": "Pinulot niya ang susi ng traysikel at umalis.",
+				"speaker": "John Toda",
+				"text": "Kakasya pa ba to?",
+			},
+			{
+				"text": "Binilang ko ang aking pera.",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "...",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "May utang pa ako na babayaran. Wala na akong oras magwalwal.",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "Pero...",
+			},
+			{
+				"text": "Si Benny, Arvin, at Dylan.",
+			},
+			{
+				"text": "Matagal ko na silang hindi nakita",
+			},
+			{
+				"text": "Mas mabuti nalang siguro na makausap ko sila bago mahuli ang lahat",
+			},
+			{
+				"text": "...",
+				"actions": [
+					{
+						"type": "set_background",
+						"background": StoryConstants.BACKGROUND_STORYDOOR,
+					},
+					{
+						"type": "wait",
+						"duration": 0.5,
+					},
+					{
+						"type": "fade_to_black",
+						"duration": 0.15,
+					},
+					{
+						"type": "set_background",
+						"background": StoryConstants.BACKGROUND_INHOUSE,
+					},
+					{
+						"type": "fade_from_black",
+						"duration": 0.15,
+					},
+				],
+			},
+			{
+				"text": "Binuksan ko ang pintuan at ako'y lumabas.",
 			},
 			{
 				"background": StoryConstants.BACKGROUND_CITY,

@@ -1,5 +1,8 @@
 extends Control
 
+# Ride selection bridges hub flow and gameplay.
+# It previews the next stage, locks the chosen rider, then commits the stage into PlayerState.
+
 const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
 const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
@@ -9,6 +12,8 @@ const STORE_SCENE := "res://scenes/store.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const RIDE_SELECT_DAY_BACKGROUND := preload("res://assets/bg/rideselectbg.png")
+const RIDE_SELECT_NIGHT_BACKGROUND := preload("res://assets/story/backgrounds/station_night.jpeg")
 const GENERIC_PORTRAIT := preload("res://assets/characters/blankface.png")
 const UNIQUE_CHARACTER_PORTRAITS := {
 	"alma": preload("res://assets/characters/Alma.png"),
@@ -47,6 +52,7 @@ const RISK_TRAFFIC_SCORES := {
 @onready var subtitle_label: Label = $Panel/Subtitle
 @onready var status_label: Label = $Panel/StatusLabel
 @onready var money_label: Label = $Panel/MoneyLabel
+@onready var background: TextureRect = $Background
 @onready var back_button: BaseButton = $Panel/BackButton
 @onready var back_label: Label = $Panel/BackButton/BackLabel
 @onready var short_button: BaseButton = $Panel/ShortButton
@@ -92,6 +98,7 @@ func _ready() -> void:
 	if _is_forced_first_day_ride():
 		selected_distance = "short"
 	back_button.visible = _allow_back()
+	_refresh_background()
 	_create_stats_row()
 
 	back_button.pressed.connect(_handle_back_button_pressed)
@@ -159,6 +166,11 @@ func _refresh_header() -> void:
 	var display_day := PlayerState.get_transition_display_day(_transition_mode())
 	_refresh_stats_row()
 	money_label.text = PlayerState.get_debt_status_text(display_day)
+
+
+func _refresh_background() -> void:
+	var next_time := PlayerState.get_next_stage_time(_transition_mode())
+	background.texture = RIDE_SELECT_NIGHT_BACKGROUND if next_time == "night" else RIDE_SELECT_DAY_BACKGROUND
 
 
 func _refresh_subtitle() -> void:

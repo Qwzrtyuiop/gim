@@ -1,5 +1,8 @@
 extends Control
 
+# Generic story runtime.
+# Payload files provide data only; this scene interprets lines, actions, choices, and scene returns.
+
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")

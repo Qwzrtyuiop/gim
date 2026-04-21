@@ -1,5 +1,8 @@
 extends Node2D
 
+# Gameplay scene coordinator.
+# This file wires the stage together, while most driving logic lives in scripts/game/*.gd helpers.
+
 const DEFAULT_BACKGROUND_POOL_TAG := "rural"
 const BACKGROUND_POOL_TAGS_BY_TYPE := {
 	"barangay-streets": DEFAULT_BACKGROUND_POOL_TAG,
@@ -437,6 +440,10 @@ func _background_pool_tag() -> String:
 func _unhandled_input(event: InputEvent) -> void:
 	if GameInput.is_any_press(event) and game_state == "GAME OVER":
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+		return
+
+	if game_state == "playing" and GameInput.is_stage_complete_debug_shortcut(event):
+		GameFlowController.end_game(self, "YOU MADE IT", "Debug stage complete.")
 		return
 
 	if stage_tutorial != null and stage_tutorial.input_lock_active:

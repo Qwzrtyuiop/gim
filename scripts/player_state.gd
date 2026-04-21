@@ -1,5 +1,8 @@
 extends Node
 
+# Central run-state authority.
+# If a feature needs to survive scene changes or be saved, it usually belongs here.
+
 # Shared services
 const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")

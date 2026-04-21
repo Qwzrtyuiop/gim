@@ -1,6 +1,9 @@
 extends RefCounted
 class_name StoryTriggerService
 
+# Story trigger registry and payload resolver.
+# Add new payloads and default trigger rules here when you want them to enter the main game flow.
+
 const Day02StationBillPayloadEnglish := preload("res://scripts/story/payloads/day_02_station_bill.gd")
 const Day02StationBillPayloadTagalog := preload("res://scripts/story/payloads/day_02_station_bill_tagalog.gd")
 const BennyClassClownPayloadEnglish := preload("res://scripts/story/payloads/benny_class_clown.gd")
