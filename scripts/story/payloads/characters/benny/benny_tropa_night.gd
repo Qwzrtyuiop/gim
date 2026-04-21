@@ -21,50 +21,195 @@ static func build() -> Dictionary:
 				"background": StoryConstants.BACKGROUND_INHOUSE,
 				"background_fade": 0.28,
 				"pause_before": 0.16,
-				"text": "At home, John checks the time on his phone.",
+				"text": "I check the time on my phone before heading out.",
 			},
 			{
-				"text": "He picks up his tricycle keys and heads out.",
+				"speaker": "John Toda",
+				"text": "Oh, right.",
+			},
+			{
+				"text": "I pull my wallet out of my pocket.",
+			},
+			{
+				"text": "I count the bills. A hundred, two hundred, three...",
+			},
+			{
+				"text": "...",
+			},
+			{
+				"speaker":"John Toda",
+				"text": "Still got loans to pay but still going out huh.",
+			},
+			{
+				"speaker":"John Toda",
+				"text": "But...",
+			},
+			{
+				"speaker":"John Toda",
+				"text": "Benny, Arvin, and Dylan.",
+			},
+			{
+				"speaker":"John Toda",
+				"text": "It's been a long time since I last saw those three.",
+			},
+			{
+				"speaker":"John Toda",
+				"text": "Better now than too late.",
+			},
+			{
+				"text": "...",
+				"actions": [
+					{
+						"type": "set_background",
+						"background": StoryConstants.BACKGROUND_STORYDOOR,
+					},
+					{
+						"type": "wait",
+						"duration": 0.5,
+					},
+					{
+						"type": "fade_to_black",
+						"duration": 0.15,
+					},
+					{
+						"type": "set_background",
+						"background": StoryConstants.BACKGROUND_INHOUSE,
+					},
+					{
+						"type": "fade_from_black",
+						"duration": 0.15,
+					},
+				],
+			},
+			{
+				"text": "I pick up my tricycle keys and head out.",
 			},
 			{
 				"background": StoryConstants.BACKGROUND_CITY,
 				"background_fade": 0.28,
-				"text": "At the agreed spot in the city, Benny is already there waiting for him.",
+				"text": "As I arrive, Benny is already standing at the entrance, waiting.",
 			},
 			{
-				"text": "The bar turns out to be the same one John used to go to.",
+				"text": "Turns out, the bar that he mentioned is the same one I used to go to.",
+			},
+			{
+				"speaker":"John Toda",
+				"text": "Small world.",
 			},
 			{
 				"speaker": "Benny",
-				"text": "You made it.",
+				"text": "Glad you made it.",
 			},
 			{
-				"text": "The two of them wait outside for a bit under the city lights.",
+				"speaker": "Benny",
+				"text": "Almost thought you'd bail out.",
 			},
 			{
-				"text": "Then Arvin and Dylan arrive, loud and familiar as ever.",
+				"speaker": "John Toda",
+				"text": "Thought about it.",
 			},
 			{
-				"text": "All four of them head inside together.",
+				"speaker": "Benny",
+				"text": "That sounds like you alright.",
+			},
+			{
+				"text": "We wait outside for a bit. The dimming sun, eventually replaced by bright city lights.",
+			},
+			{
+				"text": "Arvin and Dylan arrive together.",
+			},
+			{
+				"speaker": "Arvin",
+				"text": "No way! He's still alive!?",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "That's fifty pesos for me.",
+			},
+			{
+				"text": "Upon seeing us, they wave and run toward us.",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "I can't believe that's how you guys greet me.",
+			},
+		
+			{
+				"text": "We head inside together.",
 			},
 			{
 				"background": BACKGROUND_BAR,
 				"background_fade": 0.28,
-				"text": "Inside, they talk about how life has been treating them.",
+				"text": "Inside, the first few minutes felt awkward.",
+			},
+			{
+				"text": "Too many years. Too much catching up packed into small talk.",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "So… what have you been up to these past few years?",
+			},
+			{
+				"text": "...",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "Working.",
+			},
+			{
+				"speaker": "Arvin",
+				"text": "Just working?",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "More or less.",
+			},
+			{
+				"text": "Nobody pushes it",
+			},
+			{
+				"text": "Awkward silence fills the room.",
+			},
+			{
+				"text": "until",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "Oh c'mon don't be like that, just look at Ben Ten here. He looks like he has ten strands of hair left.",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "Do you want him to lose more?.",
+			},
+			{
+				"text": "And just like that, everyone laughed.",
+			},
+			{
+				"text": "Soon enough they start talking about their life. How it's been for them.",
 			},
 			{
 				"text": "Work, old mistakes, money, and all the years in between.",
 			},
 			{
-				"text": "Before long, they are laughing about school again like no time passed at all.",
+				"text": "And then we were back. Laughing like we used to.",
 			},
 			{
-				"speaker": "John Toda",
-				"text": "Even after all those years...",
+				"text": "Like we were still in school.",
 			},
 			{
-				"speaker": "John Toda",
-				"text": "My friends will always be my friends.",
+				"text": "Like no time passed at all.",
+			},
+			{
+				"text": "....",
+			},
+			{
+				"text": "Later, when we finally step outside, my face hurts a little from smiling.",
+			},
+			{
+				"text": "In those few hours, it almost felt like nothing changed",
+			},
+			{
+				"text": "But it did.",
 			},
 			{
 				"text": "Achievement unlocked: Tropa",

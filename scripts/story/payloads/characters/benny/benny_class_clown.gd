@@ -9,7 +9,7 @@ static func build() -> Dictionary:
 			"background": StoryConstants.BACKGROUND_STATION,
 			"background_fade": 0.28,
 			"pause_before": 0.14,
-			"text": "The station hums with engines, footsteps, and tired voices.",
+			"text": "The station hums with engines, footsteps, and the occasional clinking of bottles.",
 			"camera": {
 				"zoom": 1.0,
 				"focus": "center",
@@ -17,25 +17,58 @@ static func build() -> Dictionary:
 			},
 		},
 		{
+			"text": "Benny gets off the tricycle and heads to work.",
+		},
+		{
+			"text": "I rev the engine of my ride.",
+		},
+		{
+			"speaker":"John Toda",
+			"text": "Today's gonna be another long day.",
+		},
+		{
+			"text": "...",
+			"actions": 
+				[
+					{
+						"type": "play_sfx",
+						"path": StoryConstants.MUSIC_RUNNING_SFX,
+						"volume_db": -4.0,
+					},
+				]
+		},
+		{
+			"text": "Benny runs toward me before I could leave.",
+		},
+		{
+			"text": "Did he forget something?",
+		},
+		{
 			"speaker": "Benny",
 			"text": "Hey, John. You free for a drink later tonight?",
 		},
 		{
+			"text": "Huh!?",
+		},
+		{
 			"speaker": "Benny",
-			"text": "Arvin and Dylan are coming too. I still talk to those idiots somehow.",
+			"text": "I'll call Arvin and Dylan too. It's been a while since we've seen you after all.",
+		},
+		{
+			"text": "...",
 		},
 	]
 
 	var drink_choice_index: int = composition.size()
 	composition.append({
-		"text": "Warning: Agreeing will skip the night phase.\n\nSo, what do you say?",
+		"text": "Warning: Agreeing will skip the night phase.",
 		"choices": [],
 	})
 
 	var agree_index: int = composition.size()
 	composition.append({
 		"speaker": "John Toda",
-		"text": "Maybe. It's been a while.",
+		"text": "I'll try. I guess.",
 		"actions": [
 			{
 				"type": "set_event_value",
@@ -52,7 +85,7 @@ static func build() -> Dictionary:
 	var agree_question_index: int = composition.size()
 	composition.append({
 		"speaker": "Benny",
-		"text": "Right. Weren't you working in the city? What happened?\nI never expected you to take over your father's job. You don't seem like the type to.",
+		"text": "One more thing. Weren't you working in the city? What happened?\nI never expected you to take over your father's job. Doesn't seem like your thing.",
 		"choices": [],
 	})
 
@@ -72,7 +105,7 @@ static func build() -> Dictionary:
 	var dont_go_question_index: int = composition.size()
 	composition.append({
 		"speaker": "Benny",
-		"text": "Fair enough. Still... weren't you working in the city? What happened?\nI never expected you to take over your father's job. You don't seem like the type to.",
+		"text": "Fair enough. Still... weren't you working in the city? What happened?\nI never expected you to take over your father's job. Doesn't seem like your thing.",
 		"choices": [],
 	})
 
@@ -80,7 +113,7 @@ static func build() -> Dictionary:
 	composition.append_array([
 		{
 			"speaker": "John Toda",
-			"text": "I lost the job in the city.",
+			"text": "I lost the job.",
 			"actions": [
 				{
 					"type": "set_event_value",
@@ -90,8 +123,16 @@ static func build() -> Dictionary:
 			],
 		},
 		{
+			"text": "...",
+		},
+		{
 			"speaker": "John Toda",
-			"text": "When I came home, my father was gone. The tricycle was still there.",
+			"text": "And when I came home, my father was gone.",
+			"required_achievements": ["tapat"],
+		},
+		{
+			"speaker": "John Toda",
+			"text": "But the tricycle was still there. So I thought why not?",
 			"required_achievements": ["tapat"],
 		},
 		{
@@ -100,8 +141,14 @@ static func build() -> Dictionary:
 			"required_achievements": ["tapat"],
 		},
 		{
+			"text": "Benny pauses for a while.",
+		},
+		{
 			"speaker": "Benny",
 			"text": "Damn. Sorry, John.",
+		},
+		{
+			"text": "He pats my shoulder a few times.",
 		},
 		{
 			"speaker": "Benny",

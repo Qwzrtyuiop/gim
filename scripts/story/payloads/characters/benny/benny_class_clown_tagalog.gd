@@ -9,7 +9,7 @@ static func build() -> Dictionary:
 			"background": StoryConstants.BACKGROUND_STATION,
 			"background_fade": 0.28,
 			"pause_before": 0.14,
-			"text": "Bumaba si Benny mula sa aking tricycle at nagsimula siyang maglakad papunta sa kanyang trabaho.",
+			"text": "Bumaba si Benny mula sa tricycle at nagsimula siyang maglakad papunta sa kanyang trabaho.",
 			"camera": {
 				"zoom": 1.0,
 				"focus": "center",
@@ -55,7 +55,7 @@ static func build() -> Dictionary:
 
 	var drink_choice_index: int = composition.size()
 	composition.append({
-		"text": "Warning: Agreeing will skip the night phase.\n\nSo, what do you say?",
+		"text": "Warning: Agreeing will skip the night phase.",
 		"choices": [],
 	})
 

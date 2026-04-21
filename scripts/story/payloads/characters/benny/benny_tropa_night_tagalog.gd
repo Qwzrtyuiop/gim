@@ -81,42 +81,137 @@ static func build() -> Dictionary:
 			{
 				"background": StoryConstants.BACKGROUND_CITY,
 				"background_fade": 0.28,
-				"text": "Sa napagkasunduang lugar sa siyudad, nauna nang naghihintay si Benny para sa kanya.",
+				"text": "Naghihintay na si Benny sa may pintuan nang makarating ako.",
 			},
 			{
-				"text": "Nagkataon pa na iyon din ang parehong bar na dati ring pinupuntahan ni John.",
+				"text": "Nagkataon din na dati akong suki sa bar na aming pinuntahan.",
 			},
 			{
 				"speaker": "Benny",
-				"text": "Ayos, nakapunta ka.",
+				"text": "Yun! Sabi ko na pupunta ka eh.",
 			},
 			{
-				"text": "Sandali silang naghintay sa labas sa ilalim ng ilaw ng siyudad.",
+				"speaker": "Benny",
+				"text": "Buti di nagbago isip mo.",
 			},
 			{
-				"text": "Pagkatapos, dumating sina Arvin at Dylan, maingay at pamilyar pa rin gaya ng dati.",
+				"speaker": "John Toda",
+				"text": "Muntik na nga.",
 			},
 			{
-				"text": "Sabay-sabay silang pumasok sa loob.",
+				"speaker": "Benny",
+				"text": "Sabi ko nga.",
+			},
+			{
+				"text": "Ilang saglit pa ang aming hinintay sa labas, at ang sinag ng araw ay unti-unting napalitan ng ilaw ng siyudad.",
+			},
+			{
+				"text": "Sabay na dumating sina Arvin at Dylan.",
+			},
+			{
+				"speaker": "Arvin",
+				"text": "Aba, buhay ka pa pala.",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "Uy si idol! Nagbabalik.",
+			},
+			{
+				"text": "Napatakbo sila na parang mga batang nang makita nila ako.",
+			},
+			{
+				"speaker": "John Toda",
+				"text": "Di parin nga nagbago ang mga bonjing.",
+			},
+			{
+				"text": "Sabay-sabay kaming pumasok sa loob.",
 			},
 			{
 				"background": StoryConstants.BACKGROUND_BAR,
 				"background_fade": 0.28,
-				"text": "Sa loob, nagkwentuhan sila tungkol sa buhay nila.",
+				"text": "Sa loob, nagkwentuhan kami tungkol sa buhay.",
 			},
 			{
-				"text": "Trabaho, mga dating pagkakamali, pera, at lahat ng taon sa pagitan noon at ngayon.",
+				"text": "dapat.",
 			},
 			{
-				"text": "Maya-maya, nagtatawanan na sila tungkol sa mga kalokohan nila noong school days.",
+				"text": "Nanatiling tahimik ang aming lamesa na para bang hindi namin alam ang sasabihin sa isa't isa.",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "Nga pala John.",
+			},
+			{
+				"text": "Si Dylan ang unang nagsalita.",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "Anong ginawa mo sa siyudad ng ilang taon?",
+			},
+			{
+				"text": "...",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Kahit lumipas ang lahat ng taon na iyon...",
+				"text": "Trabaho.",
+			},
+			{
+				"speaker": "Arvin",
+				"text": "Trabaho lang?",
 			},
 			{
 				"speaker": "John Toda",
-				"text": "Kaibigan ko pa rin sila. At mananatili silang kaibigan ko.",
+				"text": "Medyo.",
+			},
+			{
+				"text": "Di na sila nagtanong muli.",
+			},
+			{
+				"text": "Nanahimik nanaman ang aming lamesa.",
+			},
+			{
+				"text": "hanggang.",
+			},
+			{
+				"speaker": "Dylan",
+				"text": "Bat kayo ganyan. Magkakalbo nanaman si Ben sa ginagawa niyo.",
+			},
+			{
+				"speaker": "Ben",
+				"text": "Gag-.",
+			},
+			{
+				"text": "At parang ganun lang, nagsitawanan kaming lahat.",
+			},
+			{
+				"text": "Di nagtagal, at nagsimula silang magkwento tungkol sakanilang buhay.",
+			},
+			{
+				"text": "Sa trabaho, mga dating pagkakamali, pera, at lahat ng mga pangyayari sa pagitan ng noon at ngayon.",
+			},
+			{
+				"text": "Hindi nagtagal at kami'y nagtatawanan na para bang mga bata.",
+			},
+			{
+				"text": "Na parang nasa eskwelahan pa kami.",
+			},
+			{
+				"text": "At hindi gumalaw ang oras para saamin.",
+			},
+			{
+				"text": "...",
+			},
+			{
+				"text": "Mayamaya, nang kami'y papaalis na, pinisil ko ang aking pisngi",
+			},
+			{
+				"text": "Medyo nangawit sa kakatawa.",
+			},
+			{
+				"text": "Sa ilang oras na lumipas, parang nagbalik kami sa nakaraan.",
+			},
+			{
+				"text": "Ngunit ang nakaraan ay hindi na maibabalik.",
 			},
 			{
 				"text": "Achievement unlocked: Tropa",
