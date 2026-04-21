@@ -192,6 +192,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "short",
 		"first_appearance_chance": 0.85,
 		"eligible_distances": ["short", "medium"],
+		"eligible_times": ["morning", "night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "First Bargain"},
@@ -206,7 +207,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "medium",
 		"first_appearance_chance": 0.70,
 		# debug- normal values medium long
-		"eligible_distances": ["short"],
+		"eligible_distances": ["medium","long"],
 		"eligible_times": ["morning", "noon"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
@@ -221,7 +222,8 @@ const MOCK_CHARACTERS := [
 		"blurb": "Clinic aide who is quietly very observant.",
 		"first_distance": "short",
 		"first_appearance_chance": 0.55,
-		"eligible_distances": ["short", "medium", "long"],
+		"eligible_distances": ["medium", "long"],
+		"eligible_times": ["morning", "noon", "night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "Sharp Eyes"},
@@ -235,7 +237,8 @@ const MOCK_CHARACTERS := [
 		"blurb": "Night shift mechanic carrying a secret.",
 		"first_distance": "long",
 		"first_appearance_chance": 0.65,
-		"eligible_distances": ["medium", "long"],
+		"eligible_distances": ["short","medium", "long"],
+		"eligible_times": ["night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "After Hours"},
@@ -249,7 +252,8 @@ const MOCK_CHARACTERS := [
 		"blurb": "Teacher who knew your father well.",
 		"first_distance": "short",
 		"first_appearance_chance": 0.45,
-		"eligible_distances": ["short", "long"],
+		"eligible_distances": ["short","long"],
+		"eligible_times": ["morning", "noon"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "A Familiar Name"},
@@ -263,7 +267,8 @@ const MOCK_CHARACTERS := [
 			"blurb": "Red light district worker who reads people fast.",
 			"first_distance": "medium",
 			"first_appearance_chance": 0.80,
-			"eligible_distances": ["short", "medium"],
+			"eligible_distances": ["short", "medium","long"],
+			"eligible_times": ["night"],
 			"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 			"story_stage_overrides": {
 				"introduction": {"title": "Salon Chatter"},
@@ -278,6 +283,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "long",
 		"first_appearance_chance": 0.40,
 		"eligible_distances": ["long"],
+		"eligible_times": ["morning", "noon","night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "All Smiles"},
@@ -292,6 +298,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "medium",
 		"first_appearance_chance": 0.60,
 		"eligible_distances": ["medium", "long"],
+		"eligible_times": ["morning", "night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "Notebook Ready"},
@@ -306,6 +313,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "long",
 		"first_appearance_chance": 0.35,
 		"eligible_distances": ["short", "medium", "long"],
+		"eligible_times": ["morning", "noon"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "Late Paperwork"},
@@ -320,6 +328,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "short",
 		"first_appearance_chance": 0.75,
 		"eligible_distances": ["short", "medium"],
+		"eligible_times": ["night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "A Quiet Ride"},
