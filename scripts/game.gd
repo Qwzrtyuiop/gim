@@ -195,7 +195,7 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(1.0, 2.0, 0.01) var player_boost_max_speed_x := 1.2
 @export_range(1.0, 3.0, 0.05) var player_boost_acceleration_x := 1.4
 @export_range(0.05, 3.0, 0.05) var player_boost_release_decay_x := 0.45
-@export_range(0.0, 20.0, 0.1) var boost_gas_consumption_percent_per_second := 1.5
+@export_range(0.0, 20.0, 0.1) var boost_gas_consumption_percent_per_second := 0.75
 
 @export_group("Spawn Frequency")
 @export_range(0.15, 60.0, 0.05) var incoming_spawn_min_delay := 18.0
@@ -259,6 +259,13 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 10.0, 0.01) var fare_php_per_meter := 0.15
 @export_range(0.0, 100.0, 0.5) var time_bonus_php_per_second := 2.0
 @export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
+
+@export_group("Crash Recovery")
+@export_range(0, 10, 1) var crash_energy_loss := 1
+@export_range(0.0, 3.0, 0.05) var crash_recovery_seconds := 0.45
+@export_range(0.0, 5.0, 0.05) var crash_invincible_seconds := 1.6
+@export_range(0.02, 0.5, 0.01) var crash_flicker_interval := 0.08
+@export_range(0.1, 1.0, 0.05) var crash_flicker_alpha := 0.35
 
 @export_group("Perspective")
 @export_range(0.2, 2.0, 0.01) var incoming_lane_scale := 0.78
@@ -356,6 +363,8 @@ var stage_time_of_day := "morning"
 var stage_traffic := "chill"
 var stage_weather := "clear"
 var stage_special_type := ""
+var special_stage_id := ""
+var special_stage_blueprint: Dictionary = {}
 var speeder_spawn_timer := 0.0
 var speeder_warning_timer := 0.0
 var speeder_warning_flash_timer := 0.0
@@ -376,6 +385,10 @@ var boost_speed_x := 1.0
 var boost_gas_save_timer := 0.0
 var weather_effect_time := 0.0
 var rain_floor_drop_spawn_timer := 0.0
+var player_hit_recovery_timer := 0.0
+var player_hit_invincible_timer := 0.0
+var player_hit_flicker_timer := 0.0
+var player_hit_flicker_visible := true
 
 
 func _ready() -> void:
@@ -389,9 +402,11 @@ func _ready() -> void:
 	if use_player_state_stage_sequence:
 		stage_weather = PlayerState.get_stage_weather(stage_time_of_day)
 		stage_special_type = PlayerState.get_current_stage_special_type()
+		special_stage_id = PlayerState.get_current_special_stage_id()
 	GameStageSetup.apply_weather_modifiers(self)
 	GameStageSetup.apply_player_upgrades(self)
 	GameStageSetup.apply_character_modifiers(self)
+	GameStageSetup.apply_special_stage_blueprint(self)
 	VehicleTrafficController.reset_speeder_timer(self)
 	time_left = time_limit
 	overtime_seconds = 0.0
@@ -487,7 +502,13 @@ func _process(delta: float) -> void:
 		return
 
 	if game_state == "playing":
-		PlayerVehicleController.handle_speed(self, delta)
+		_update_player_hit_state(delta)
+		if player_hit_recovery_timer > 0.0:
+			player_speed = 0.0
+			boost_active = false
+			boost_speed_x = 1.0
+		else:
+			PlayerVehicleController.handle_speed(self, delta)
 		GameFlowController.update_progress(self, delta)
 		VehicleTrafficController.prune_invalid_entities(self)
 		VehicleSpawnScheduler.update_spawns(self, delta)
@@ -508,7 +529,7 @@ func _process(delta: float) -> void:
 			passenger_dialogue_controller.update(self, delta)
 		var collision_detail: String = VehicleCollisionController.collision_detail(self)
 		if not collision_detail.is_empty():
-			GameFlowController.end_game(self, "CRASH", collision_detail)
+			GameFlowController.handle_player_hit(self, collision_detail)
 	elif game_state == "YOU MADE IT":
 		VehicleCollisionController.update_stage_clear_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta, true)
@@ -520,6 +541,7 @@ func _process(delta: float) -> void:
 		if passenger_dialogue_controller != null:
 			passenger_dialogue_controller.update(self, delta)
 
+	_apply_player_hit_visuals()
 	GameEnvironmentController.update_background(self)
 	GameEnvironmentController.update_weather_effects(self, delta)
 	GameEnvironmentController.update_night_visibility_mask(self)
@@ -529,3 +551,29 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	GameRenderer.draw(self, distance * VISUAL_DISTANCE_SCALE)
+
+
+func _update_player_hit_state(delta: float) -> void:
+	player_hit_recovery_timer = maxf(0.0, player_hit_recovery_timer - delta)
+	if player_hit_invincible_timer <= 0.0:
+		player_hit_flicker_timer = 0.0
+		player_hit_flicker_visible = true
+		return
+
+	player_hit_invincible_timer = maxf(0.0, player_hit_invincible_timer - delta)
+	player_hit_flicker_timer -= delta
+	if player_hit_flicker_timer <= 0.0:
+		player_hit_flicker_timer = crash_flicker_interval
+		player_hit_flicker_visible = not player_hit_flicker_visible
+
+
+func _apply_player_hit_visuals() -> void:
+	if player == null:
+		return
+
+	if game_state != "playing" or player_hit_invincible_timer <= 0.0:
+		player.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		return
+
+	var flicker_alpha := 1.0 if player_hit_flicker_visible else crash_flicker_alpha
+	player.modulate = Color(1.0, 1.0, 1.0, flicker_alpha)

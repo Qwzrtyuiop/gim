@@ -132,5 +132,7 @@ static func update_player(owner, delta: float, move_forward := false) -> void:
 static func change_lane(owner, direction: int) -> void:
 	if owner.game_state != "playing":
 		return
+	if owner.player_hit_recovery_timer > 0.0:
+		return
 	owner.player_lane = PlayerVehicleBehavior.changed_lane(owner.player_lane, direction)
 	owner.player.z_index = VehicleGeometry.z_for_lane(owner, owner.player_lane, 1)

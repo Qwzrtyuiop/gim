@@ -21,6 +21,7 @@ static func store_stage_result(
 	stage_time_of_day: String,
 	stage_traffic: String,
 	stage_special_type: String,
+	special_stage_id: String,
 	distance: float,
 	target_distance: float,
 	fare_php_per_meter: float,
@@ -60,6 +61,7 @@ static func store_stage_result(
 		"time_of_day": stage_time_of_day,
 		"traffic": stage_traffic,
 		"stage_special_type": PlayerState.normalize_stage_special_type(stage_special_type),
+		"special_stage_id": PlayerState.normalize_special_stage_id(special_stage_id),
 		"distance": completed_distance,
 		"base_fare": base_fare,
 		"fare_penalty": fare_penalty,
@@ -74,8 +76,54 @@ static func store_stage_result(
 		"earnings_multiplier": float(earnings_adjustment.get("multiplier", 1.0)),
 		"time_left": time_left,
 		"overtime": overtime_seconds,
+		"completed": true,
 	})
 	PlayerState.record_stage_completion()
+
+
+static func store_failed_stage_result(
+	stage_type: String,
+	stage_difficulty: String,
+	stage_time_of_day: String,
+	stage_traffic: String,
+	stage_special_type: String,
+	special_stage_id: String,
+	distance: float,
+	target_distance: float,
+	failure_reason: String
+) -> void:
+	var completed_distance: int = floori(minf(distance, target_distance))
+	var detail_lines: Array[String] = [
+		"Progress: %dm / %dm" % [completed_distance, int(target_distance)],
+		"Reason: %s" % failure_reason,
+		"Total: PhP 0",
+	]
+
+	PlayerState.set_last_stage_result({
+		"day": PlayerState.get_current_day(),
+		"stage_type": stage_type,
+		"difficulty": stage_difficulty,
+		"time_of_day": stage_time_of_day,
+		"traffic": stage_traffic,
+		"stage_special_type": PlayerState.normalize_stage_special_type(stage_special_type),
+		"special_stage_id": PlayerState.normalize_special_stage_id(special_stage_id),
+		"distance": completed_distance,
+		"base_fare": 0,
+		"fare_penalty": 0,
+		"raw_fare": 0,
+		"raw_bonus": 0,
+		"fare": 0,
+		"bonus": 0,
+		"passenger_rule_violation_count": 0,
+		"passenger_penalty": 0,
+		"detail_lines": detail_lines,
+		"total": 0,
+		"earnings_multiplier": 1.0,
+		"time_left": 0.0,
+		"overtime": 0.0,
+		"completed": false,
+		"failure_reason": failure_reason,
+	})
 
 
 static func stage_complete_story_payload(stage_type: String, stage_difficulty: String, stage_time_of_day: String, stage_traffic: String) -> Dictionary:
