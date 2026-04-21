@@ -170,7 +170,7 @@ static func build() -> Dictionary:
 				"text": "Nanahimik nanaman ang aming lamesa.",
 			},
 			{
-				"text": "hanggang.",
+				"text": "hanggang...",
 			},
 			{
 				"speaker": "Dylan",
