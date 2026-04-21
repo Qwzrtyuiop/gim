@@ -55,6 +55,8 @@ func _ready() -> void:
 
 	_create_stats_row()
 	PlayerState.ensure_daily_conditions_for_current_day()
+	if PlayerState.get_current_day() >= 2 and int(PlayerState.stage_round) > 0 and not PlayerState.has_home_tutorial_shown():
+		PlayerState.mark_home_tutorial_shown()
 	ButtonGlow.attach(self, rest_button)
 	ButtonGlow.attach(self, store_button)
 	ButtonGlow.attach(self, ride_button)
@@ -431,6 +433,7 @@ func _transition_home_rest(next_time: String) -> void:
 	PlayerState.record_rest()
 	PlayerState.add_energy(2)
 	PlayerState.set_current_stage_time(next_time)
+	PlayerState.clear_pending_trip_selection()
 	_render_day_start()
 	await _fade_overlay_to(0.0, HOME_REST_FADE_SECONDS)
 	_set_buttons_disabled(false)

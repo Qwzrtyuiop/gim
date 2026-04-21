@@ -4,6 +4,8 @@ class_name AchievementService
 const ORDER := [
 	"mapagsamantala",
 	"tapat",
+	"sinungaling",
+	"tropa",
 	"maninigarilyo",
 	"tamad",
 	"matipid",
@@ -23,6 +25,16 @@ const DEFINITIONS := {
 		"title": "Tapat",
 		"subtitle": "Honesty",
 		"description": "Tapat is the Filipino virtue of staying honest even when hardship makes the wrong choice feel easier.\n\nJohn gave the money back, even when he badly needed it himself.",
+	},
+	"sinungaling": {
+		"title": "Sinungaling",
+		"subtitle": "Liar",
+		"description": "Sometimes a lie is less about fooling someone else and more about hiding from what you became.\n\nJohn smiled, made something up, and let Benny believe it.",
+	},
+	"tropa": {
+		"title": "Tropa",
+		"subtitle": "Crew",
+		"description": "Years can change work, debt, and where life leaves you, but some friendships still feel like they were only waiting for you to return.\n\nFor one night, John got to be with his people again.",
 	},
 	"maninigarilyo": {
 		"title": "Maninigarilyo",

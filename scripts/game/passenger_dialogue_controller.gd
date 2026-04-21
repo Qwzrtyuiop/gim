@@ -209,6 +209,14 @@ func _resolve_line_data(owner, category: String) -> Dictionary:
 		return {}
 
 	var localized_key: String = "tagalog" if StoryLanguageManager.is_tagalog() else "english"
+	if _has_ordered_session_entries(entries as Array):
+		for entry in entries:
+			var candidate_text: String = _localized_dialogue_text(entry, localized_key)
+			if candidate_text.is_empty():
+				continue
+			return _build_line_data(entry, candidate_text)
+		return {}
+
 	var shuffled_entries: Array = (entries as Array).duplicate(true)
 	for index in range(shuffled_entries.size() - 1, 0, -1):
 		var swap_index: int = owner.rng.randi_range(0, index)
@@ -300,3 +308,10 @@ func _build_line_data(entry: Variant, text: String) -> Dictionary:
 		"entry_id": "",
 		"once": false,
 	}
+
+
+func _has_ordered_session_entries(entries: Array) -> bool:
+	for entry in entries:
+		if entry is Dictionary and bool((entry as Dictionary).get("_session_dialogue_ordered", false)):
+			return true
+	return false

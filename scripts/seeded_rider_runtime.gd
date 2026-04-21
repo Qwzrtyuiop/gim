@@ -94,6 +94,8 @@ static func get_pool_setup(player_state, selection_context: Dictionary) -> Dicti
 		var character: Dictionary = player_state.get_character_by_id(character_id)
 		if character.is_empty():
 			continue
+		if not supports_character_time(player_state, character, str(context.get("time_of_day", ""))):
+			continue
 
 		var target_distances: Array[String] = get_target_distances(player_state, rule, character)
 		if target_distances.is_empty():
@@ -196,6 +198,20 @@ static func get_target_distances(player_state, rule_data: Dictionary, character:
 		if eligible_distances.is_empty() or eligible_distances.has(distance):
 			filtered_distances.append(distance)
 	return filtered_distances
+
+
+static func supports_character_time(player_state, character: Dictionary, time_of_day: String) -> bool:
+	var safe_time: String = normalize_time(player_state, time_of_day)
+	var eligible_times_variant: Variant = character.get("eligible_times", [])
+	if not eligible_times_variant is Array or (eligible_times_variant as Array).is_empty():
+		return true
+	if safe_time.is_empty():
+		return false
+	for time_variant in eligible_times_variant:
+		var eligible_time: String = normalize_time(player_state, str(time_variant))
+		if not eligible_time.is_empty() and eligible_time == safe_time:
+			return true
+	return false
 
 
 static func resolve_slot_index(rule_data: Dictionary, current_assignments: Array) -> int:

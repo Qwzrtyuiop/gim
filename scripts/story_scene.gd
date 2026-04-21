@@ -136,11 +136,15 @@ func _restore_story_music_state(resume_index: int) -> void:
 	var capped_index := clampi(resume_index, 0, story_lines.size())
 	for line_index in range(capped_index):
 		var line_data: Dictionary = story_lines[line_index]
+		if not _matches_story_conditions(line_data):
+			continue
 		var raw_actions: Array = line_data.get("actions", line_data.get("triggers", []))
 		for action_data_variant in raw_actions:
 			if not action_data_variant is Dictionary:
 				continue
 			var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
+			if not _matches_story_conditions(action_data):
+				continue
 			var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
 			match action_type:
 				"play_music", "music_play":
@@ -182,14 +186,15 @@ func _build_payload_music_action() -> Dictionary:
 
 
 func _show_line(index: int) -> void:
-	if story_lines.is_empty() or index < 0 or index >= story_lines.size():
+	var resolved_index: int = _resolve_visible_story_index(index)
+	if story_lines.is_empty() or resolved_index < 0 or resolved_index >= story_lines.size():
 		_finish_story()
 		return
 
 	is_input_locked = true
-	current_line_index = index
-	PlayerState.set_last_seen_story_section(story_id, index)
-	var line := story_lines[index]
+	current_line_index = resolved_index
+	PlayerState.set_last_seen_story_section(story_id, resolved_index)
+	var line := story_lines[resolved_index]
 	continue_label.visible = false
 	await _pause_for_seconds(float(line.get("pause_before", 0.0)))
 	await _apply_line_visuals(line)
@@ -238,8 +243,12 @@ func _apply_line_text(line: Dictionary) -> void:
 func _run_line_actions(line: Dictionary) -> void:
 	var raw_actions: Array = line.get("actions", line.get("triggers", []))
 	for action_data_variant in raw_actions:
-		if action_data_variant is Dictionary:
-			await _run_story_action((action_data_variant as Dictionary).duplicate(true))
+		if not action_data_variant is Dictionary:
+			continue
+		var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
+		if not _matches_story_conditions(action_data):
+			continue
+		await _run_story_action(action_data)
 
 
 func _render_choices(line: Dictionary) -> void:
@@ -258,6 +267,8 @@ func _render_choices(line: Dictionary) -> void:
 			continue
 
 		var choice_data: Dictionary = (choice_data_variant as Dictionary).duplicate(true)
+		if not _matches_story_conditions(choice_data):
+			continue
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(420.0, 54.0)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -277,6 +288,9 @@ func _render_choices(line: Dictionary) -> void:
 		if is_instance_valid(button) and not button.disabled:
 			button.grab_focus()
 			break
+	if choice_buttons.is_empty():
+		choice_container.visible = false
+		continue_label.visible = true
 
 
 func _run_choice_actions(choice_data: Dictionary) -> void:
@@ -292,8 +306,12 @@ func _run_choice_actions(choice_data: Dictionary) -> void:
 
 	var raw_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
 	for action_data_variant in raw_actions:
-		if action_data_variant is Dictionary:
-			await _run_story_action((action_data_variant as Dictionary).duplicate(true))
+		if not action_data_variant is Dictionary:
+			continue
+		var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
+		if not _matches_story_conditions(action_data):
+			continue
+		await _run_story_action(action_data)
 
 
 func _build_choice_response_line(choice_data: Dictionary, explicit_next_scene: String, next_index: int) -> Dictionary:
@@ -477,6 +495,92 @@ func _current_line() -> Dictionary:
 	return story_lines[current_line_index]
 
 
+func _resolve_visible_story_index(index: int) -> int:
+	var candidate_index: int = index
+	var safety_limit: int = story_lines.size() + 1
+	while candidate_index >= 0 and candidate_index < story_lines.size() and safety_limit > 0:
+		var line: Dictionary = story_lines[candidate_index]
+		if _matches_story_conditions(line):
+			return candidate_index
+		candidate_index = _next_story_index_from_line(line, candidate_index)
+		safety_limit -= 1
+	return -1
+
+
+func _next_story_index_from_line(line: Dictionary, fallback_index: int) -> int:
+	var next_index: int = int(line.get("next_index", fallback_index + 1))
+	if next_index == fallback_index:
+		return fallback_index + 1
+	return next_index
+
+
+func _matches_story_conditions(data: Dictionary) -> bool:
+	if data.is_empty():
+		return true
+
+	var condition_source: Dictionary = data
+	var nested_conditions: Variant = data.get("conditions", null)
+	if nested_conditions is Dictionary:
+		condition_source = (nested_conditions as Dictionary).duplicate(true)
+		for key_variant in data.keys():
+			var key: String = str(key_variant)
+			if key == "conditions":
+				continue
+			if key.begins_with("required_") or key.begins_with("forbidden_"):
+				condition_source[key] = data[key_variant]
+
+	var event_values: Dictionary = PlayerState.get_event_values()
+	if not _matches_required_achievements(condition_source):
+		return false
+	if not _matches_forbidden_achievements(condition_source):
+		return false
+	if not StoryEventHandler.matches_required_events(event_values, _condition_array(condition_source, "required_events", "required_event")):
+		return false
+	if not StoryEventHandler.matches_forbidden_events(event_values, _condition_array(condition_source, "forbidden_events", "forbidden_event")):
+		return false
+	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "required_event_values", "required_event_value"), true):
+		return false
+	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "forbidden_event_values", "forbidden_event_value"), false):
+		return false
+	return true
+
+
+func _matches_required_achievements(condition_source: Dictionary) -> bool:
+	for achievement_id_variant in _condition_array(condition_source, "required_achievements", "required_achievement"):
+		if not PlayerState.has_achievement(str(achievement_id_variant)):
+			return false
+	return true
+
+
+func _matches_forbidden_achievements(condition_source: Dictionary) -> bool:
+	for achievement_id_variant in _condition_array(condition_source, "forbidden_achievements", "forbidden_achievement"):
+		if PlayerState.has_achievement(str(achievement_id_variant)):
+			return false
+	return true
+
+
+func _condition_array(condition_source: Dictionary, plural_key: String, singular_key: String) -> Array:
+	var values: Array = []
+	var plural_variant: Variant = condition_source.get(plural_key, [])
+	if plural_variant is Array:
+		values.append_array(plural_variant as Array)
+	var singular_variant: Variant = condition_source.get(singular_key, null)
+	if singular_variant != null:
+		values.append(singular_variant)
+	return values
+
+
+func _condition_dictionary(condition_source: Dictionary, plural_key: String, singular_key: String) -> Dictionary:
+	var values: Dictionary = {}
+	var plural_variant: Variant = condition_source.get(plural_key, {})
+	if plural_variant is Dictionary:
+		values.merge((plural_variant as Dictionary).duplicate(true), true)
+	var singular_variant: Variant = condition_source.get(singular_key, null)
+	if singular_variant is Dictionary:
+		values.merge((singular_variant as Dictionary).duplicate(true), true)
+	return values
+
+
 func _preview_story_payload() -> Dictionary:
 	return {
 		"chapter_title": "Story Scene",
@@ -648,12 +752,22 @@ func _run_story_action(action_data: Dictionary) -> void:
 			PlayerState.clear_event_values()
 		"add_money", "gain_money":
 			PlayerState.add_money(int(action_data.get("amount", 0)))
+		"add_energy", "gain_energy":
+			PlayerState.add_energy(int(action_data.get("amount", 0)))
+		"add_max_energy", "gain_max_energy":
+			PlayerState.add_max_energy(int(action_data.get("amount", 0)))
 		"add_karma", "change_karma":
 			PlayerState.add_karma(int(action_data.get("amount", 0)))
 		"add_character_progress", "increase_character_progress", "character_progress":
 			_apply_character_progress_action(action_data)
 		"set_character_progress", "character_progress_set":
 			_apply_set_character_progress_action(action_data)
+		"set_character_story_lock", "character_story_lock":
+			_apply_character_story_lock_action(action_data)
+		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
+			PlayerState.set_pending_night_phase_skip(bool(action_data.get("enabled", action_data.get("value", true))))
+		"clear_pending_night_skip":
+			PlayerState.clear_pending_night_phase_skip()
 		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
 			_play_sfx_action(action_data)
 		"stop_sfx", "sfx_stop":
@@ -775,6 +889,14 @@ func _apply_set_character_progress_action(action_data: Dictionary) -> void:
 	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
 	var value := int(action_data.get("value", action_data.get("amount", 0)))
 	PlayerState.set_unique_character_progress(character_id, value)
+
+
+func _apply_character_story_lock_action(action_data: Dictionary) -> void:
+	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
+	PlayerState.set_unique_character_story_locked(
+		character_id,
+		bool(action_data.get("locked", action_data.get("value", true)))
+	)
 
 
 func _apply_set_event_value_action(action_data: Dictionary) -> void:

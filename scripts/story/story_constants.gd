@@ -1,6 +1,7 @@
 extends RefCounted
 
 const BACKGROUND_INHOUSE := "res://assets/story/backgrounds/inhouse.png"
+const BACKGROUND_BAR := "res://assets/story/backgrounds/bar.jpeg"
 const BACKGROUND_GARAGE_NORMAL := "res://assets/story/backgrounds/garagenormal.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/station.png"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/city.png"

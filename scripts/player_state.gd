@@ -121,9 +121,11 @@ var pending_story: Dictionary = {}
 var pending_sleep_transition_state: Dictionary = {}
 var pending_gameplay_entry_fade_duration := 0.0
 var pending_result_music: Dictionary = {}
+var pending_skip_night_phase := false
 var current_mock_character_id := ""
 var seen_mock_characters: Dictionary = {}
 var unique_character_progress: Dictionary = {}
+var locked_unique_character_stories: Dictionary = {}
 var consumed_unique_session_dialogue: Dictionary = {}
 var seeded_rider_rules: Array[Dictionary] = []
 var consumed_seeded_rider_rules: Dictionary = {}
@@ -473,6 +475,8 @@ func get_next_stage_time(transition_mode: String = TRANSITION_RIDE) -> String:
 
 	if safe_transition_mode == TRANSITION_CURRENT_STAGE:
 		return current_time
+	if _should_skip_night_phase_transition(safe_transition_mode, current_time):
+		return "morning"
 	if safe_transition_mode == TRANSITION_REST_TO_NIGHT and current_time == "morning":
 		return "night"
 	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY and current_time == "noon":
@@ -764,6 +768,8 @@ func confirm_stage_started() -> void:
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
 	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	if _should_skip_night_phase_transition(safe_transition_mode, get_current_time_of_day()):
+		return true
 	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
 		return true
 	return safe_transition_mode == TRANSITION_RIDE and get_current_time_of_day() == "night"
@@ -792,6 +798,7 @@ func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) ->
 # Stage flow and transitions
 func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_difficulty := "", forced_traffic := "") -> String:
 	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var current_time_before_advance := get_current_time_of_day()
 	var next_time := get_next_stage_time(safe_transition_mode)
 	var current_day_before_advance := get_current_day()
 	var next_day := current_day_before_advance
@@ -811,6 +818,8 @@ func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_d
 		_roll_daily_conditions_for_day(current_day)
 	if will_advance_day(safe_transition_mode):
 		_resolve_debt_collection_for_day(current_day)
+	if pending_skip_night_phase and current_time_before_advance != "night" and next_time == "morning" and current_day > current_day_before_advance:
+		pending_skip_night_phase = false
 	save_progress()
 	return current_stage_type
 
@@ -910,6 +919,15 @@ func add_energy(amount: int) -> void:
 	energy += amount
 
 
+func add_max_energy(amount: int) -> void:
+	var safe_amount: int = int(amount)
+	if safe_amount == 0:
+		return
+	max_energy = maxi(1, max_energy + safe_amount)
+	energy = mini(energy, max_energy)
+	save_progress()
+
+
 func spend_energy(amount: int) -> bool:
 	if amount < 0 or energy < amount:
 		return false
@@ -953,13 +971,22 @@ func get_run_fail_reason() -> String:
 
 # Pending scene and transition state
 func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE, allow_back := true) -> void:
-	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
-	locked_characters = locked_characters.duplicate(true)
-	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
-	var locked_distance := str(pending_trip_selection.get("selected_distance", ""))
+	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var should_preserve_locked_selection: bool = (
+		safe_transition_mode == TRANSITION_RIDE
+		or safe_transition_mode == TRANSITION_CURRENT_STAGE
+	)
+	var locked_characters: Array = []
+	var locked_character_pools: Dictionary = {}
+	var locked_distance := ""
+	if should_preserve_locked_selection:
+		locked_characters = pending_trip_selection.get("locked_characters", [])
+		locked_characters = locked_characters.duplicate(true)
+		locked_character_pools = Dictionary(pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
+		locked_distance = str(pending_trip_selection.get("selected_distance", ""))
 	pending_trip_selection = {
 		"return_scene": return_scene,
-		"transition_mode": normalize_transition_mode(str(transition_mode)),
+		"transition_mode": safe_transition_mode,
 		"allow_back": bool(allow_back),
 	}
 	if not locked_character_pools.is_empty():
@@ -1121,6 +1148,22 @@ func clear_pending_gameplay_entry_fade() -> void:
 
 func set_pending_result_music(music_state: Dictionary) -> void:
 	pending_result_music = music_state.duplicate(true)
+
+
+func has_pending_night_phase_skip() -> bool:
+	return pending_skip_night_phase
+
+
+func set_pending_night_phase_skip(enabled: bool) -> void:
+	pending_skip_night_phase = bool(enabled)
+	save_progress()
+
+
+func clear_pending_night_phase_skip() -> void:
+	if not pending_skip_night_phase:
+		return
+	pending_skip_night_phase = false
+	save_progress()
 
 
 func consume_pending_result_music() -> Dictionary:
@@ -1341,6 +1384,26 @@ func get_unique_character_progress(character_id: String) -> int:
 	return int(unique_character_progress.get(safe_id, 0))
 
 
+func is_unique_character_story_locked(character_id: String) -> bool:
+	var safe_id := str(character_id).strip_edges().to_lower()
+	if safe_id.is_empty() or not is_unique_character(safe_id):
+		return false
+	return bool(locked_unique_character_stories.get(safe_id, false))
+
+
+func set_unique_character_story_locked(character_id: String, locked := true) -> bool:
+	var safe_id := str(character_id).strip_edges().to_lower()
+	if safe_id.is_empty() or not is_unique_character(safe_id):
+		return false
+	var should_lock: bool = bool(locked)
+	if should_lock:
+		locked_unique_character_stories[safe_id] = true
+	else:
+		locked_unique_character_stories.erase(safe_id)
+	save_progress()
+	return should_lock
+
+
 func set_unique_character_progress(character_id: String, progress: int) -> int:
 	var safe_id := str(character_id).strip_edges().to_lower()
 	if safe_id.is_empty() or not is_unique_character(safe_id):
@@ -1354,6 +1417,8 @@ func increment_unique_character_progress(character_id: String, amount := 1) -> i
 	var safe_id := str(character_id).strip_edges().to_lower()
 	var safe_amount: int = maxi(0, int(amount))
 	if safe_id.is_empty() or safe_amount <= 0 or not is_unique_character(safe_id):
+		return get_unique_character_progress(safe_id)
+	if is_unique_character_story_locked(safe_id):
 		return get_unique_character_progress(safe_id)
 	unique_character_progress[safe_id] = get_unique_character_progress(safe_id) + safe_amount
 	save_progress()
@@ -1642,6 +1707,7 @@ func _reset_pending_runtime_state() -> void:
 	pending_sleep_transition_state.clear()
 	pending_gameplay_entry_fade_duration = 0.0
 	pending_result_music.clear()
+	pending_skip_night_phase = false
 
 
 func _reset_daily_run_state() -> void:
@@ -1675,6 +1741,7 @@ func _reset_character_progress_state() -> void:
 	current_mock_character_id = ""
 	seen_mock_characters.clear()
 	unique_character_progress.clear()
+	locked_unique_character_stories.clear()
 	consumed_unique_session_dialogue.clear()
 
 
@@ -1706,6 +1773,20 @@ func _apply_new_run_defaults() -> void:
 	_reset_daily_run_state()
 	_reset_debt_and_failure_state()
 	_reset_story_triggers()
+
+
+func _should_skip_night_phase_transition(transition_mode: String, current_time: String) -> bool:
+	if not pending_skip_night_phase:
+		return false
+	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
+	var safe_current_time := str(current_time).strip_edges().to_lower()
+	if safe_current_time == "night":
+		return false
+	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY or safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY:
+		return false
+	if safe_current_time == "noon":
+		return safe_transition_mode == TRANSITION_RIDE
+	return safe_current_time == "morning" and safe_transition_mode == TRANSITION_REST_TO_NIGHT
 
 
 func _delete_save_file() -> void:

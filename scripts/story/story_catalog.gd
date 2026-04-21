@@ -6,6 +6,8 @@ const DEFAULT_UNIQUE_STORY_STAGES := [
 	{
 		"id": "introduction",
 		"title": "Introduction",
+		"arc_id": "arc1",
+		"arc_title": "Arc 1",
 		"progress_required": 0,
 		"modifiers": {},
 		"modifier_rules": [],
@@ -13,6 +15,8 @@ const DEFAULT_UNIQUE_STORY_STAGES := [
 	{
 		"id": "familiar",
 		"title": "Familiar Face",
+		"arc_id": "arc1",
+		"arc_title": "Arc 1",
 		"progress_required": 2,
 		"modifiers": {},
 		"modifier_rules": [],
@@ -20,6 +24,8 @@ const DEFAULT_UNIQUE_STORY_STAGES := [
 	{
 		"id": "turning_point",
 		"title": "Turning Point",
+		"arc_id": "arc1",
+		"arc_title": "Arc 1",
 		"progress_required": 5,
 		"modifiers": {},
 		"modifier_rules": [],
@@ -63,6 +69,9 @@ const UNIQUE_SESSION_DIALOGUE_OVERRIDES := {
 	},
 	"benny": {
 		"special_1": [
+			{"english": "It's been a long time since I've seen you around here. What happened to your city job?", "tagalog": "Long time no see pre, Kala ko ba doon ka nagtratrabaho sa siyudad?"},
+		],
+		"special_2": [
 			{"english": "Construction starts early. If I'm late, the foreman will chew me out.", "tagalog": "Maaga nanaman ang pasok. Sana di ako masigawan ni porman."},
 			{"english": "Funny, no? We used to cut class. Now we're the ones getting chased by time.", "tagalog": "Dati pa cutting cutting pa tayo, ngayon tayo na ang hinahabol ng oras.."},
 		],
@@ -111,7 +120,7 @@ const UNIQUE_SESSION_DIALOGUE_OVERRIDES := {
 	},
 	"jessa": {
 		"special_1": [
-			{"english": "If anyone asks, you didn't see me.", "tagalog": "Kapag may nagtanong tungkol saakin, hindi mo ako nakita."},
+			{"english": "If anyone asks, you didn't see me.", "tagalog": "Kapag may naghanap saakin, hindi mo ako nakita."},
 			{"english": "I just need a little more time before I go back.", "tagalog": "Kaya ko pa to..."},
 		],
 	},
@@ -186,7 +195,7 @@ const MOCK_CHARACTERS := [
 		"story_stage_overrides": {
 			"introduction": {"title": "First Bargain"},
 			"familiar": {"title": "Regular Customer"},
-			"turning_point": {"title": "Alma's Favor"},
+			"turning_point": {"title": "A Bartender's Life"},
 		},
 	},
 	{
@@ -195,7 +204,9 @@ const MOCK_CHARACTERS := [
 		"blurb": "Former classmate working construction.",
 		"first_distance": "medium",
 		"first_appearance_chance": 0.70,
-		"eligible_distances": ["medium", "long"],
+		# debug- normal values medium long
+		"eligible_distances": ["short"],
+		"eligible_times": ["morning", "noon"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "Old Jokester"},
@@ -369,7 +380,7 @@ static func get_unique_character_story_state(player_state, character_id: String,
 	if character_data.is_empty():
 		return {}
 
-	var story_stages: Array = _resolve_story_stages(character_data)
+	var story_stages: Array = _resolve_story_stages(player_state, character_data, context)
 	if story_stages.is_empty():
 		return {}
 
@@ -387,9 +398,13 @@ static func get_unique_character_story_state(player_state, character_id: String,
 		"stage_data": current_stage.duplicate(true),
 		"stage_id": str(current_stage.get("id", "")),
 		"stage_title": str(current_stage.get("title", "")),
+		"arc_id": str(current_stage.get("arc_id", "")),
+		"arc_title": str(current_stage.get("arc_title", "")),
 		"stage_progress_required": int(current_stage.get("progress_required", 0)),
 		"next_stage_id": str(next_stage.get("id", "")),
 		"next_stage_title": str(next_stage.get("title", "")),
+		"next_arc_id": str(next_stage.get("arc_id", "")),
+		"next_arc_title": str(next_stage.get("arc_title", "")),
 		"next_stage_progress_required": int(next_stage.get("progress_required", progress)),
 		"story_stages": story_stages.duplicate(true),
 		"modifiers": resolved_modifiers,
@@ -434,10 +449,14 @@ static func _character_with_progress(player_state, character_data: Dictionary) -
 	if not story_state.is_empty():
 		character_copy["story_stage_id"] = str(story_state.get("stage_id", ""))
 		character_copy["story_stage_title"] = str(story_state.get("stage_title", ""))
+		character_copy["story_arc_id"] = str(story_state.get("arc_id", ""))
+		character_copy["story_arc_title"] = str(story_state.get("arc_title", ""))
 		character_copy["story_stage_index"] = int(story_state.get("stage_index", 0))
 		character_copy["story_stage_count"] = int(story_state.get("stage_count", 0))
 		character_copy["next_story_stage_id"] = str(story_state.get("next_stage_id", ""))
 		character_copy["next_story_stage_title"] = str(story_state.get("next_stage_title", ""))
+		character_copy["next_story_arc_id"] = str(story_state.get("next_arc_id", ""))
+		character_copy["next_story_arc_title"] = str(story_state.get("next_arc_title", ""))
 		character_copy["next_story_stage_progress_required"] = int(story_state.get("next_stage_progress_required", 0))
 	return character_copy
 
@@ -453,7 +472,7 @@ static func _get_unique_character_base_data(character_id: String) -> Dictionary:
 	return {}
 
 
-static func _resolve_story_stages(character_data: Dictionary) -> Array:
+static func _resolve_story_stages(player_state, character_data: Dictionary, context: Dictionary = {}) -> Array:
 	var raw_stages: Variant = character_data.get("story_stages", [])
 	var story_stages: Array = []
 	if raw_stages is Array and not (raw_stages as Array).is_empty():
@@ -476,7 +495,19 @@ static func _resolve_story_stages(character_data: Dictionary) -> Array:
 	story_stages.sort_custom(func(a, b):
 		return int(a.get("progress_required", 0)) < int(b.get("progress_required", 0))
 	)
-	return story_stages
+
+	var effective_week: int = _resolve_story_stage_week(player_state, context)
+	var available_story_stages: Array = []
+	for stage_data in story_stages:
+		if not stage_data is Dictionary:
+			continue
+		var stage_dict: Dictionary = stage_data
+		if not _story_stage_available_for_week(stage_dict, effective_week):
+			continue
+		available_story_stages.append(stage_dict)
+	if available_story_stages.is_empty():
+		return story_stages
+	return available_story_stages
 
 
 static func _resolve_story_stage_index(story_stages: Array, progress: int) -> int:
@@ -489,6 +520,29 @@ static func _resolve_story_stage_index(story_stages: Array, progress: int) -> in
 		if progress >= required_progress:
 			resolved_index = index
 	return resolved_index
+
+
+static func _resolve_story_stage_week(player_state, context: Dictionary) -> int:
+	if context.has("week"):
+		return maxi(1, int(context.get("week", 1)))
+	if context.has("day"):
+		return maxi(1, player_state.get_week_number(int(context.get("day", player_state.get_current_day()))))
+	return maxi(1, player_state.get_week_number())
+
+
+static func _story_stage_available_for_week(stage_data: Dictionary, week_number: int) -> bool:
+	var effective_week: int = maxi(1, int(week_number))
+	if stage_data.has("min_week") and effective_week < int(stage_data.get("min_week", effective_week)):
+		return false
+	if stage_data.has("max_week") and effective_week > int(stage_data.get("max_week", effective_week)):
+		return false
+	var weeks_variant: Variant = stage_data.get("weeks", [])
+	if weeks_variant is Array and not (weeks_variant as Array).is_empty():
+		for allowed_week in weeks_variant:
+			if int(allowed_week) == effective_week:
+				return true
+		return false
+	return true
 
 
 static func _resolve_story_stage_modifiers(stage_data: Dictionary, context: Dictionary) -> Dictionary:
@@ -651,9 +705,11 @@ static func _decorate_progress_scoped_dialogue_entry(player_state, character_id:
 		var entry_dict: Dictionary = (entry as Dictionary).duplicate(true)
 		entry_dict["_session_dialogue_id"] = entry_id
 		entry_dict["_session_dialogue_once"] = true
+		entry_dict["_session_dialogue_ordered"] = true
 		return entry_dict
 	return {
 		"english": str(entry),
 		"_session_dialogue_id": entry_id,
 		"_session_dialogue_once": true,
+		"_session_dialogue_ordered": true,
 	}

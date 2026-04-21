@@ -59,6 +59,7 @@ func _render_results(result: Dictionary) -> void:
 	var time_of_day := str(result.get("time_of_day", "morning"))
 	var total := int(result.get("total", 0))
 	var is_night_stage := time_of_day == "night"
+	var has_pending_night_skip := time_of_day == "noon" and PlayerState.has_pending_night_phase_skip()
 	var stage_special_label := PlayerState.get_stage_special_display_name(str(result.get("stage_special_type", "")))
 	var detail_lines: Array[String] = _stringify_detail_lines(result.get("detail_lines", []))
 	if detail_lines.is_empty():
@@ -74,10 +75,10 @@ func _render_results(result: Dictionary) -> void:
 	_layout_dynamic_result_text(detail_lines.size())
 	_render_earnings_summary(total)
 
-	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage()
+	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage() or has_pending_night_skip
 	rest_button.visible = allow_rest
-	store_button.visible = not is_night_stage
-	ride_button.visible = not is_night_stage
+	store_button.visible = not is_night_stage and not has_pending_night_skip
+	ride_button.visible = not is_night_stage and not has_pending_night_skip
 	if allow_rest:
 		rest_button.grab_focus()
 	elif store_button.visible:
@@ -92,7 +93,7 @@ func _render_results(result: Dictionary) -> void:
 		if time_of_day == "morning":
 			rest_note = "Rest: recover +2 energy, then return home for night."
 		elif time_of_day == "noon":
-			rest_note = "Rest: sleep, recover +5 energy, then choose a morning trip."
+			rest_note = "Tonight is spoken for. Head out with Benny, then sleep and start the next day in the morning." if has_pending_night_skip else "Rest: sleep, recover +5 energy, then choose a morning trip."
 	elif time_of_day == "morning" or time_of_day == "noon":
 		rest_note = "Rest already used for Day %d." % PlayerState.get_current_day()
 
@@ -106,11 +107,13 @@ func _rest_then_next_stage() -> void:
 		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return
 
-	if not PlayerState.can_rest_after_stage():
+	var has_pending_night_skip := current_time == "noon" and PlayerState.has_pending_night_phase_skip()
+	if not PlayerState.can_rest_after_stage() and not has_pending_night_skip:
 		return
 
 	if current_time == "noon":
-		PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NEXT_DAY)
+		if not has_pending_night_skip:
+			PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NEXT_DAY)
 		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return
 

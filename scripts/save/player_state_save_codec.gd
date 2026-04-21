@@ -63,9 +63,11 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
 	player_state.pending_sleep_transition_state = Dictionary(save_data.get("pending_sleep_transition_state", {})).duplicate(true)
 	player_state.pending_gameplay_entry_fade_duration = float(save_data.get("pending_gameplay_entry_fade_duration", player_state.pending_gameplay_entry_fade_duration))
+	player_state.pending_skip_night_phase = bool(save_data.get("pending_skip_night_phase", player_state.pending_skip_night_phase))
 	player_state.current_mock_character_id = str(save_data.get("current_mock_character_id", player_state.current_mock_character_id))
 	player_state.seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
 	player_state.unique_character_progress = Dictionary(save_data.get("unique_character_progress", {})).duplicate(true)
+	player_state.locked_unique_character_stories = Dictionary(save_data.get("locked_unique_character_stories", {})).duplicate(true)
 	player_state.consumed_unique_session_dialogue = Dictionary(save_data.get("consumed_unique_session_dialogue", {})).duplicate(true)
 	player_state.seeded_rider_rules.clear()
 	var saved_seeded_rider_rules: Array = save_data.get("seeded_rider_rules", [])
@@ -156,9 +158,11 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"pending_story": player_state.pending_story.duplicate(true),
 		"pending_sleep_transition_state": player_state.pending_sleep_transition_state.duplicate(true),
 		"pending_gameplay_entry_fade_duration": player_state.pending_gameplay_entry_fade_duration,
+		"pending_skip_night_phase": player_state.pending_skip_night_phase,
 		"current_mock_character_id": player_state.current_mock_character_id,
 		"seen_mock_characters": player_state.seen_mock_characters.duplicate(true),
 		"unique_character_progress": player_state.unique_character_progress.duplicate(true),
+		"locked_unique_character_stories": player_state.locked_unique_character_stories.duplicate(true),
 		"consumed_unique_session_dialogue": player_state.consumed_unique_session_dialogue.duplicate(true),
 		"seeded_rider_rules": player_state.seeded_rider_rules.duplicate(true),
 		"consumed_seeded_rider_rules": player_state.consumed_seeded_rider_rules.duplicate(true),

@@ -56,4 +56,6 @@ static func build_context(player_state, effective_day: int, context: Dictionary 
 		if not story_state.is_empty():
 			merged_context["story_stage_id"] = str(story_state.get("stage_id", ""))
 			merged_context["story_stage_title"] = str(story_state.get("stage_title", ""))
+			merged_context["story_arc_id"] = str(story_state.get("arc_id", ""))
+			merged_context["story_arc_title"] = str(story_state.get("arc_title", ""))
 	return merged_context

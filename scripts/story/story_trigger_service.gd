@@ -3,6 +3,10 @@ class_name StoryTriggerService
 
 const Day02StationBillPayloadEnglish := preload("res://scripts/story/payloads/day_02_station_bill.gd")
 const Day02StationBillPayloadTagalog := preload("res://scripts/story/payloads/day_02_station_bill_tagalog.gd")
+const BennyClassClownPayloadEnglish := preload("res://scripts/story/payloads/benny_class_clown.gd")
+const BennyClassClownPayloadTagalog := preload("res://scripts/story/payloads/benny_class_clown_tagalog.gd")
+const BennyTropaNightPayloadEnglish := preload("res://scripts/story/payloads/benny_tropa_night.gd")
+const BennyTropaNightPayloadTagalog := preload("res://scripts/story/payloads/benny_tropa_night_tagalog.gd")
 const Scene03Day7NightPayloadEnglish := preload("res://scripts/story/payloads/scene_03_day7_night.gd")
 const Scene03Day7NightPayloadTagalog := preload("res://scripts/story/payloads/scene_03_day7_night_tagalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
@@ -36,11 +40,31 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 			"payload_id": "day_02_station_bill",
 		},
 		{
+			"id": "benny_class_clown",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "benny",
+			"min_character_progress": 2,
+			"required_events": ["day_2_station_bill"],
+			"forbidden_events": ["benny_class_clown_seen"],
+			"payload_id": "benny_class_clown",
+		},
+		{
 			"id": "day_7_night_scene_03",
 			"phase": STORY_TRIGGER_DAY_END,
 			"day": 7,
 			"time_of_day": "night",
 			"payload_id": "scene_03_day7_night",
+		},
+		{
+			"id": "benny_tropa_night",
+			"phase": STORY_TRIGGER_DAY_END,
+			"times": ["noon"],
+			"required_events": ["benny_class_clown_seen"],
+			"required_event_values": {
+				"benny_class_clown_drink_choice": "agree",
+			},
+			"forbidden_events": ["benny_tropa_seen"],
+			"payload_id": "benny_tropa_night",
 		},
 	]
 
@@ -57,12 +81,22 @@ static func find_story_trigger_for_phase(story_triggers: Array, consumed_story_t
 	if safe_phase.is_empty():
 		return {}
 
+	var matching_triggers: Array[Dictionary] = []
 	for trigger_data in story_triggers:
 		var trigger: Dictionary = trigger_data
 		if _story_trigger_matches(trigger, safe_phase, day_number, context, consumed_story_triggers, event_values):
-			var resolved_trigger := _resolve_trigger_payload(trigger, consumed_story_triggers, rng)
-			if not resolved_trigger.is_empty():
-				return resolved_trigger
+			matching_triggers.append(trigger.duplicate(true))
+
+	if matching_triggers.is_empty():
+		return {}
+
+	var selected_trigger: Dictionary = _select_matching_trigger(matching_triggers)
+	if selected_trigger.is_empty():
+		return {}
+
+	var resolved_trigger := _resolve_trigger_payload(selected_trigger, consumed_story_triggers, rng)
+	if not resolved_trigger.is_empty():
+		return resolved_trigger
 
 	return {}
 
@@ -102,6 +136,14 @@ static func _build_localized_payload(payload_id: String) -> Dictionary:
 			if use_tagalog:
 				return Day02StationBillPayloadTagalog.build()
 			return Day02StationBillPayloadEnglish.build()
+		"benny_class_clown":
+			if use_tagalog:
+				return BennyClassClownPayloadTagalog.build()
+			return BennyClassClownPayloadEnglish.build()
+		"benny_tropa_night":
+			if use_tagalog:
+				return BennyTropaNightPayloadTagalog.build()
+			return BennyTropaNightPayloadEnglish.build()
 		"scene_03_day7_night", "day_7_night_scene_03":
 			if use_tagalog:
 				return Scene03Day7NightPayloadTagalog.build()
@@ -162,6 +204,8 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 
 	var trigger_id := _story_trigger_id(trigger_data)
 	if not bool(trigger_data.get("repeatable", false)) and not trigger_id.is_empty() and bool(consumed_story_triggers.get(trigger_id, false)):
+		return false
+	if _is_character_story_trigger(trigger_data) and not _character_story_gate_satisfied(trigger_data, event_values):
 		return false
 
 	if trigger_data.has("day") and int(trigger_data.get("day", 0)) != day_number:
@@ -228,6 +272,53 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 		return false
 
 	return true
+
+
+static func _select_matching_trigger(matching_triggers: Array[Dictionary]) -> Dictionary:
+	if matching_triggers.is_empty():
+		return {}
+
+	var first_match: Dictionary = matching_triggers[0]
+	if not _is_character_story_trigger(first_match):
+		return first_match
+
+	var selected_trigger: Dictionary = first_match
+	var selected_order: float = _character_story_trigger_order(first_match)
+	for trigger_data in matching_triggers:
+		if not _is_character_story_trigger(trigger_data):
+			continue
+		var trigger_order: float = _character_story_trigger_order(trigger_data)
+		if trigger_order < selected_order:
+			selected_trigger = trigger_data
+			selected_order = trigger_order
+	return selected_trigger
+
+
+static func _is_character_story_trigger(trigger_data: Dictionary) -> bool:
+	if bool(trigger_data.get("character_story", false)):
+		return true
+	if trigger_data.has("character_id"):
+		return not str(trigger_data.get("character_id", "")).strip_edges().is_empty()
+	var character_ids_variant = trigger_data.get("character_ids", [])
+	return character_ids_variant is Array and not (character_ids_variant as Array).is_empty()
+
+
+static func _character_story_gate_satisfied(trigger_data: Dictionary, event_values: Dictionary) -> bool:
+	if bool(trigger_data.get("bypass_character_story_gate", false)):
+		return true
+	return StoryEventHandler.has_event_value(event_values, "day_2_station_bill")
+
+
+static func _character_story_trigger_order(trigger_data: Dictionary) -> float:
+	if trigger_data.has("story_order"):
+		return float(trigger_data.get("story_order", 0))
+	if trigger_data.has("character_story_order"):
+		return float(trigger_data.get("character_story_order", 0))
+	if trigger_data.has("character_progress"):
+		return float(trigger_data.get("character_progress", 0))
+	if trigger_data.has("min_character_progress"):
+		return float(trigger_data.get("min_character_progress", 0))
+	return 1000000.0
 
 
 static func _trigger_matches_numeric_condition(trigger_data: Dictionary, field_name: String, actual_value) -> bool:

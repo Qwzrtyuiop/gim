@@ -346,11 +346,11 @@ func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_
 
 		var is_seen := PlayerState.has_seen_mock_character(character_id)
 		if is_seen:
-			if _supports_distance_in_selection(character, distance, false):
+			if _supports_selection_availability(character, distance, false):
 				seen_candidates.append(character)
 			continue
 
-		if not _supports_distance_in_selection(character, distance, true):
+		if not _supports_selection_availability(character, distance, true):
 			continue
 		if not force_first_appearance_unlocks and not bool(first_appearance_rolls.get(character_id, false)):
 			continue
@@ -406,12 +406,26 @@ func _count_non_empty_cards(card_results: Array) -> int:
 	return count
 
 
+func _supports_selection_availability(character: Dictionary, distance: String, is_first_appearance: bool) -> bool:
+	if not _supports_time_in_selection(character):
+		return false
+	return _supports_distance_in_selection(character, distance, is_first_appearance)
+
+
 func _supports_distance_in_selection(character: Dictionary, distance: String, is_first_appearance: bool) -> bool:
 	if is_first_appearance:
 		return str(character.get("first_distance", "")) == distance
 
 	var eligible_distances: Array = character.get("eligible_distances", [])
 	return eligible_distances.has(distance)
+
+
+func _supports_time_in_selection(character: Dictionary) -> bool:
+	var next_time_of_day: String = PlayerState.get_next_stage_time(_transition_mode())
+	var eligible_times: Array = character.get("eligible_times", [])
+	if eligible_times.is_empty():
+		return true
+	return eligible_times.has(next_time_of_day)
 
 
 func _lock_character_for_selection(picked_character: Dictionary, active_distance: String, forced_traffic: String = "") -> Dictionary:
@@ -934,6 +948,7 @@ func _transition_mode() -> String:
 func _is_forced_first_day_ride() -> bool:
 	return (
 		PlayerState.get_current_day() == 1
+		and PlayerState.get_current_time_of_day() == "morning"
 		and int(PlayerState.stage_round) <= 0
 		and _transition_mode() == PlayerState.TRANSITION_CURRENT_STAGE
 	)

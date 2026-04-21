@@ -116,6 +116,7 @@ func _finish_transition() -> void:
 		if PlayerState.is_run_failed():
 			get_tree().change_scene_to_file(GAME_OVER_SCENE)
 			return
+		PlayerState.clear_pending_trip_selection()
 		get_tree().change_scene_to_file(HOUSE_DAY_START_SCENE)
 		return
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
