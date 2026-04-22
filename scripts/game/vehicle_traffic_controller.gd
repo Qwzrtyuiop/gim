@@ -799,7 +799,6 @@ static func lane_is_safe_for_entity(owner, moving_entity: Dictionary, target_lan
 static func target_lane_is_safe_for_entity(owner, moving_entity: Dictionary, target_lane: int, safe_gap: float) -> bool:
 	return (
 		lane_is_safe_for_entity(owner, moving_entity, target_lane, safe_gap)
-		and target_lane_hitboxes_clear(owner, moving_entity, target_lane)
 		and top_lane_overtake_is_safe(owner, moving_entity, target_lane)
 		and player_lane_is_safe_for_entity(owner, moving_entity, target_lane)
 	)
@@ -966,8 +965,6 @@ static func speeder_target_lane_is_safe(owner, entity: Dictionary, target_lane: 
 static func speeder_lane_is_safe_for_entity(owner, entity: Dictionary, target_lane: int) -> bool:
 	if not lane_is_safe_for_entity(owner, entity, target_lane, speeder_lane_change_safe_gap(owner, target_lane)):
 		return false
-	if not target_lane_hitboxes_clear(owner, entity, target_lane):
-		return false
 	if not top_lane_overtake_is_safe(owner, entity, target_lane):
 		return false
 
@@ -1006,19 +1003,15 @@ static func lane_change_allowed(entity: Dictionary, target_lane: int) -> bool:
 
 static func projected_entity_collision_rect(owner, entity: Dictionary, lane_index: int) -> Rect2:
 	var sprite: Sprite2D = entity["sprite"]
-	var original_position := sprite.position
-	var original_scale := sprite.scale
-	sprite.scale = target_scale_for_entity(owner, entity, lane_index)
-	sprite.position.y = VehicleGeometry.sprite_y_for_hitbox_bottom(
-		sprite,
+	var target_scale := target_scale_for_entity(owner, entity, lane_index)
+	var local_rect: Rect2 = VehicleGeometry.local_hitbox_rect(sprite, owner.VEHICLE_HITBOX_INSET, owner)
+	var target_y := VehicleGeometry.sprite_y_for_hitbox_bottom_with_scale(
+		local_rect,
 		VehicleGeometry.entity_lane_y(owner, lane_index, owner.get_viewport_rect().size, bool(entity.get("is_parked", false))),
-		owner.VEHICLE_HITBOX_INSET,
-		owner
+		target_scale
 	)
-	var projected_rect: Rect2 = VehicleGeometry.collision_rect(sprite, owner.VEHICLE_HITBOX_INSET, owner)
-	sprite.position = original_position
-	sprite.scale = original_scale
-	return projected_rect
+	var projected_global_position := sprite.global_position + Vector2(0.0, target_y - sprite.position.y)
+	return VehicleGeometry.collision_rect_for_transform(sprite, projected_global_position, target_scale, local_rect)
 
 
 static func speeder_has_player_lane_change_clearance(owner, entity: Dictionary, target_lane: int) -> bool:

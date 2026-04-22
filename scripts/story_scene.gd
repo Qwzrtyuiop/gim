@@ -6,6 +6,7 @@ extends Control
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
@@ -726,91 +727,7 @@ func _play_outro_fade() -> void:
 
 
 func _run_story_action(action_data: Dictionary) -> void:
-	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
-	match action_type:
-		"pause", "wait":
-			await _pause_for_seconds(float(action_data.get("duration", action_data.get("time", 0.0))))
-		"fade_to_black", "screen_fade_out":
-			await _fade_background_overlay(1.0, float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS)))
-		"fade_from_black", "screen_fade_in":
-			await _fade_background_overlay(0.0, float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS)))
-		"fade_screen":
-			await _fade_background_overlay(
-				clampf(float(action_data.get("alpha", action_data.get("target_alpha", background_fade_overlay.color.a))), 0.0, 1.0),
-				float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS))
-			)
-		"play_music", "music_play":
-			await _play_music_action(action_data)
-		"stop_music", "music_stop":
-			await _stop_music_action(action_data)
-		"unlock_achievement", "achievement_unlock":
-			PlayerState.unlock_achievement(str(action_data.get("id", action_data.get("achievement_id", ""))))
-		"set_event_value", "story_event", "event_value":
-			_apply_set_event_value_action(action_data)
-		"set_event_values", "story_events", "event_values":
-			_apply_set_event_values_action(action_data)
-		"clear_event_value", "erase_event_value":
-			PlayerState.clear_event_value(str(action_data.get("id", action_data.get("event_id", action_data.get("key", "")))))
-		"clear_event_values", "erase_event_values":
-			PlayerState.clear_event_values()
-		"add_money", "gain_money":
-			PlayerState.add_money(int(action_data.get("amount", 0)))
-		"add_energy", "gain_energy":
-			PlayerState.add_energy(int(action_data.get("amount", 0)))
-		"add_max_energy", "gain_max_energy":
-			PlayerState.add_max_energy(int(action_data.get("amount", 0)))
-		"add_karma", "change_karma":
-			PlayerState.add_karma(int(action_data.get("amount", 0)))
-		"add_character_progress", "increase_character_progress", "character_progress":
-			_apply_character_progress_action(action_data)
-		"set_character_progress", "character_progress_set":
-			_apply_set_character_progress_action(action_data)
-		"set_character_story_lock", "character_story_lock":
-			_apply_character_story_lock_action(action_data)
-		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
-			PlayerState.set_pending_night_phase_skip(bool(action_data.get("enabled", action_data.get("value", true))))
-		"clear_pending_night_skip":
-			PlayerState.clear_pending_night_phase_skip()
-		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
-			_play_sfx_action(action_data)
-		"stop_sfx", "sfx_stop":
-			sfx_player.stop()
-		"set_portrait", "change_portrait":
-			_apply_portrait_action(action_data)
-		"clear_portrait":
-			_clear_portrait_action(action_data)
-		"portrait_switch", "focus_portrait":
-			_apply_portrait_focus_from_side(str(action_data.get("side", action_data.get("focus", "none"))))
-		"set_dialogue", "dialogue":
-			_set_dialogue_content(
-				str(action_data.get("speaker", speaker_label.text)),
-				str(action_data.get("text", body_label.text)),
-				str(action_data.get("continue_hint", continue_label.text if not continue_label.text.is_empty() else DEFAULT_CONTINUE_HINT)),
-				bool(action_data.get("visible", true))
-			)
-		"background_camera", "bg_camera", "camera":
-			_apply_background_camera_action(action_data)
-		"zoom_background", "bg_zoom":
-			_apply_background_camera_action({
-				"zoom": action_data.get("zoom", action_data.get("value", action_data.get("amount", background_zoom))),
-				"duration": action_data.get("duration", DEFAULT_BG_CAMERA_DURATION),
-			})
-		"pan_background", "bg_pan":
-			_apply_background_camera_action({
-				"pan": action_data.get("pan", action_data.get("value", action_data.get("offset", action_data.get("focus", null)))),
-				"duration": action_data.get("duration", DEFAULT_BG_CAMERA_DURATION),
-			})
-		"reset_background_camera", "bg_reset":
-			_set_background_camera(1.0, Vector2.ZERO, float(action_data.get("duration", DEFAULT_BG_CAMERA_DURATION)))
-		"hide_dialogue":
-			dialogue_panel.visible = false
-		"show_dialogue":
-			dialogue_panel.visible = true
-		"set_background":
-			current_background_ref = action_data.get("texture", action_data.get("background", action_data.get("path", null)))
-			_set_background_texture(current_background_ref, not bool(action_data.get("preserve_camera", false)))
-			if _has_background_camera_data(action_data):
-				_apply_background_camera_action(action_data)
+	await StoryActionRunner.run(self, action_data)
 
 
 func _play_music_action(action_data: Dictionary) -> void:

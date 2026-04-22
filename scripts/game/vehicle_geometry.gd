@@ -20,21 +20,29 @@ const VEHICLE_REFERENCE_PATHS := {
 
 static func collision_rect(sprite: Sprite2D, inset: Vector4, owner) -> Rect2:
 	var local_rect: Rect2 = local_hitbox_rect(sprite, inset, owner)
+	return collision_rect_for_transform(sprite, sprite.global_position, sprite.scale, local_rect)
+
+
+static func collision_rect_for_transform(sprite: Sprite2D, global_position: Vector2, scale: Vector2, local_rect: Rect2) -> Rect2:
 	var scaled_position := Vector2(
-		local_rect.position.x * sprite.scale.x,
-		local_rect.position.y * sprite.scale.y
+		local_rect.position.x * scale.x,
+		local_rect.position.y * scale.y
 	)
 	var scaled_size := Vector2(
-		local_rect.size.x * absf(sprite.scale.x),
-		local_rect.size.y * absf(sprite.scale.y)
+		local_rect.size.x * absf(scale.x),
+		local_rect.size.y * absf(scale.y)
 	)
-	return Rect2(sprite.global_position + scaled_position, scaled_size)
+	return Rect2(global_position + scaled_position, scaled_size)
 
 
 static func sprite_y_for_hitbox_bottom(sprite: Sprite2D, guide_y: float, inset: Vector4, owner) -> float:
 	var local_rect: Rect2 = local_hitbox_rect(sprite, inset, owner)
+	return sprite_y_for_hitbox_bottom_with_scale(local_rect, guide_y, sprite.scale)
+
+
+static func sprite_y_for_hitbox_bottom_with_scale(local_rect: Rect2, guide_y: float, scale: Vector2) -> float:
 	var local_bottom := local_rect.position.y + local_rect.size.y
-	return guide_y - local_bottom * sprite.scale.y
+	return guide_y - local_bottom * scale.y
 
 
 static func local_hitbox_rect(sprite: Sprite2D, inset: Vector4, owner) -> Rect2:

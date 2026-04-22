@@ -11,6 +11,7 @@ const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
+const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const RIDE_SELECT_DAY_BACKGROUND := preload("res://assets/bg/rideselectbg.png")
 const RIDE_SELECT_NIGHT_BACKGROUND := preload("res://assets/story/backgrounds/station_night.jpeg")
@@ -670,97 +671,19 @@ func _show_tutorial_step(step_index: int) -> void:
 
 
 func _layout_tutorial_for_targets(targets: Array) -> void:
-	var rect := _union_global_rect(targets)
-	var label_size := Vector2(620.0, 88.0)
-	if tutorial_text_label != null:
-		var text_len := tutorial_text_label.text.length()
-		if text_len > 180:
-			label_size.y = 170.0
-		elif text_len > 120:
-			label_size.y = 140.0
-	if rect.size == Vector2.ZERO:
-		tutorial_highlight.visible = false
-		if tutorial_text_panel != null:
-			tutorial_text_panel.size = label_size
-		var fallback_pos := Vector2(
-			(get_viewport_rect().size.x - label_size.x) * 0.5,
-			120.0
-		)
-		if tutorial_text_panel != null:
-			tutorial_text_panel.global_position = fallback_pos
-		return
-
-	var padding := 14.0
-	rect.position -= Vector2(padding, padding)
-	rect.size += Vector2(padding * 2.0, padding * 2.0)
-	tutorial_highlight.visible = true
-	tutorial_highlight.global_position = rect.position
-	tutorial_highlight.size = rect.size
-
-	var label_pos := rect.position + Vector2((rect.size.x - label_size.x) * 0.5, rect.size.y + 16.0)
-	if label_pos.y + label_size.y > get_viewport_rect().size.y - 12.0:
-		label_pos.y = rect.position.y - label_size.y - 16.0
-	label_pos.y = maxf(label_pos.y, 12.0)
-	label_pos.x = clampf(label_pos.x, 20.0, get_viewport_rect().size.x - label_size.x - 20.0)
-	if tutorial_text_panel != null:
-		tutorial_text_panel.size = label_size
-		tutorial_text_panel.global_position = label_pos
+	TutorialOverlayHelper.layout_for_targets(self, tutorial_highlight, tutorial_text_panel, tutorial_text_label, targets, false)
 
 
 func _union_global_rect(targets: Array) -> Rect2:
-	var has_rect := false
-	var rect := Rect2()
-	for target in targets:
-		var control := target as Control
-		if control == null:
-			continue
-		var target_rect := control.get_global_rect()
-		if not has_rect:
-			rect = target_rect
-			has_rect = true
-		else:
-			rect = rect.merge(target_rect)
-	return rect
+	return TutorialOverlayHelper.union_global_rect(targets, false)
 
 
 func _set_tutorial_active(is_active: bool) -> void:
 	tutorial_active = is_active
-	if tutorial_overlay != null:
-		tutorial_overlay.visible = is_active
-		if is_active:
-			tutorial_overlay.grab_focus()
-	if tutorial_text_panel != null:
-		tutorial_text_panel.visible = is_active
-	if tutorial_text_label != null:
-		tutorial_text_label.visible = is_active
-
 	var buttons := [back_button, short_button, medium_button, long_button]
-	if is_active:
-		tutorial_disabled_buttons.clear()
-		for button in buttons:
-			if button == null:
-				continue
-			tutorial_disabled_buttons[button] = button.disabled
-			button.disabled = true
-
-		tutorial_card_filters.clear()
-		for panel in [card_a, card_b, card_c]:
-			if panel == null:
-				continue
-			tutorial_card_filters[panel] = panel.mouse_filter
-			panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	else:
-		for button in tutorial_disabled_buttons.keys():
-			if button == null:
-				continue
-			button.disabled = bool(tutorial_disabled_buttons.get(button, false))
-		tutorial_disabled_buttons.clear()
-
-		for panel in tutorial_card_filters.keys():
-			if panel == null:
-				continue
-			panel.mouse_filter = int(tutorial_card_filters.get(panel, panel.mouse_filter))
-		tutorial_card_filters.clear()
+	TutorialOverlayHelper.set_overlay_visible(is_active, tutorial_overlay, tutorial_text_panel, tutorial_text_label)
+	TutorialOverlayHelper.set_buttons_disabled(is_active, buttons, tutorial_disabled_buttons)
+	TutorialOverlayHelper.set_mouse_filter(is_active, [card_a, card_b, card_c], tutorial_card_filters, Control.MOUSE_FILTER_IGNORE)
 
 
 func _end_tutorial() -> void:
@@ -768,16 +691,7 @@ func _end_tutorial() -> void:
 
 
 func _make_tutorial_label() -> Label:
-	var label := Label.new()
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_override("font", UI_FONT)
-	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88, 1.0))
-	label.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.04, 0.95))
-	label.add_theme_constant_override("outline_size", 2)
-	return label
+	return TutorialOverlayHelper.make_label(UI_FONT)
 
 
 func _start_ride_select_bgm() -> void:
@@ -794,13 +708,7 @@ func _start_ride_select_bgm() -> void:
 
 
 func _is_any_press(event: InputEvent) -> bool:
-	if event is InputEventKey and event.pressed and not event.echo:
-		return true
-	if event is InputEventMouseButton and event.pressed:
-		return true
-	if event is InputEventJoypadButton and event.pressed:
-		return true
-	return false
+	return TutorialOverlayHelper.is_any_press(event)
 
 
 func _create_portrait_images() -> void:
@@ -904,14 +812,11 @@ func _choose_character(card_index: int) -> void:
 		return
 
 	var transition_mode := _transition_mode()
-	var applied_bonus := PlayerState.apply_transition_energy_bonus(transition_mode)
 	var stage_distance := "short" if _is_forced_first_day_ride() else selected_distance
 	var stage_traffic := "chill" if _is_forced_first_day_ride() else str(character.get("stage_traffic", ""))
 
-	if not PlayerState.prepare_stage_start(stage_distance):
-		if applied_bonus > 0:
-			PlayerState.add_energy(-applied_bonus)
-		var start_error := PlayerState.get_stage_start_error(stage_distance)
+	if not PlayerState.prepare_stage_start_after_transition(stage_distance, transition_mode):
+		var start_error := PlayerState.get_stage_start_error_after_transition(stage_distance, transition_mode)
 		if _show_store_shortcut() and start_error == "Not enough gas for this trip.":
 			status_label.text = "Not enough gas for this trip. Visit the store to refuel."
 		else:

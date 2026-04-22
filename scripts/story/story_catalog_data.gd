@@ -205,7 +205,6 @@ const MOCK_CHARACTERS := [
 		"blurb": "Former classmate working construction.",
 		"first_distance": "medium",
 		"first_appearance_chance": 0.70,
-		# debug- normal values medium long
 		"eligible_distances": ["medium","long"],
 		"eligible_times": ["morning", "noon"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,

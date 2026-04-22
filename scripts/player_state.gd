@@ -6,6 +6,8 @@ extends Node
 # Shared services
 const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
+const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
+const PlayerStageFlow := preload("res://scripts/state/player_stage_flow.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
@@ -236,6 +238,10 @@ func flush_deferred_save() -> void:
 		return
 	_has_deferred_save = false
 	save_progress()
+
+
+func _mark_deferred_save() -> void:
+	_has_deferred_save = true
 
 
 func _begin_state_batch() -> void:
@@ -494,33 +500,11 @@ func get_current_time_of_day() -> String:
 
 
 func normalize_transition_mode(transition_mode: String) -> String:
-	match transition_mode:
-		TRANSITION_CURRENT_STAGE, TRANSITION_REST_TO_NIGHT, TRANSITION_REST_TO_NEXT_DAY, TRANSITION_SLEEP_TO_NEXT_DAY:
-			return transition_mode
-	return TRANSITION_RIDE
+	return PlayerStageFlow.normalize_transition_mode(self, transition_mode)
 
 
 func get_next_stage_time(transition_mode: String = TRANSITION_RIDE) -> String:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	var current_time := get_current_time_of_day()
-
-	if safe_transition_mode == TRANSITION_CURRENT_STAGE:
-		return current_time
-	if _should_skip_night_phase_transition(safe_transition_mode, current_time):
-		return "morning"
-	if safe_transition_mode == TRANSITION_REST_TO_NIGHT and current_time == "morning":
-		return "night"
-	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY and current_time == "noon":
-		return "morning"
-	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		return "morning"
-
-	match current_time:
-		"morning":
-			return "noon"
-		"noon":
-			return "night"
-	return "morning"
+	return PlayerStageFlow.next_stage_time(self, transition_mode)
 
 
 func can_rest_after_stage() -> bool:
@@ -707,10 +691,11 @@ func _set_gas_with_save_mode(value: float, save_immediately: bool) -> void:
 		gas = value
 		return
 
+	var was_suppressing_auto_save := _suppress_auto_save
 	_suppress_auto_save = true
 	gas = value
-	_suppress_auto_save = false
-	_has_deferred_save = true
+	_suppress_auto_save = was_suppressing_auto_save
+	_mark_deferred_save()
 
 
 func gas_text() -> String:
@@ -722,35 +707,15 @@ func gas_capacity_text() -> String:
 
 
 func gas_ratio() -> float:
-	return clampf(gas / maxf(1.0, max_gas), 0.0, 1.0)
+	return PlayerResourceState.gas_ratio(self)
 
 
 func is_low_gas() -> bool:
-	return gas <= LOW_GAS_PERCENT_THRESHOLD
+	return PlayerResourceState.is_low_gas(self)
 
 
 func get_energy_vehicle_modifiers() -> Dictionary:
-	var high_energy_level: int = maxi(0, energy - 7)
-	if high_energy_level > 0:
-		return {
-			"player_acceleration_x": 1.0 + high_energy_level * 0.05,
-			"player_max_speed": 1.0 + high_energy_level * 0.035,
-			"player_brake_x": 1.0 + high_energy_level * 0.04,
-			"player_lane_lerp_x": 1.0 + high_energy_level * 0.04,
-			"player_coast_x": 1.0,
-			"player_wiggle_intensity_x": 0.92,
-		}
-
-	var fatigue_level: int = maxi(0, 6 - energy)
-	var fatigue_ratio: float = float(fatigue_level) / 6.0
-	return {
-		"player_acceleration_x": 1.0 - fatigue_ratio * 0.45,
-		"player_max_speed": 1.0 - fatigue_ratio * 0.30,
-		"player_brake_x": 1.0 - fatigue_ratio * 0.35,
-		"player_lane_lerp_x": 1.0 - fatigue_ratio * 0.40,
-		"player_coast_x": 1.0 + fatigue_ratio * 0.35,
-		"player_wiggle_intensity_x": 1.0 + fatigue_ratio * 0.45,
-	}
+	return PlayerResourceState.energy_vehicle_modifiers(self)
 
 
 func boost_gas_is_available() -> bool:
@@ -766,15 +731,11 @@ func apply_night_rest_bonus() -> int:
 
 
 func get_stage_start_error(stage_descriptor := "") -> String:
-	if pending_stage_energy_cost:
-		return ""
-	if energy <= 0:
-		return "Not enough energy to start this trip."
+	return PlayerResourceState.stage_start_error(self, stage_descriptor)
 
-	if gas <= 0.0:
-		return "Not enough gas for this trip."
 
-	return ""
+func get_stage_start_error_after_transition(stage_descriptor := "", transition_mode: String = TRANSITION_RIDE) -> String:
+	return PlayerResourceState.stage_start_error_after_transition(self, stage_descriptor, transition_mode)
 
 
 func prepare_stage_start(stage_descriptor := "") -> bool:
@@ -792,28 +753,28 @@ func prepare_stage_start(stage_descriptor := "") -> bool:
 	return true
 
 
+func prepare_stage_start_after_transition(stage_descriptor := "", transition_mode: String = TRANSITION_RIDE) -> bool:
+	if pending_stage_energy_cost:
+		return true
+
+	if not get_stage_start_error_after_transition(stage_descriptor, transition_mode).is_empty():
+		return false
+
+	apply_transition_energy_bonus(transition_mode)
+	return prepare_stage_start(stage_descriptor)
+
+
 func confirm_stage_started() -> void:
 	pending_stage_energy_cost = false
 	save_progress()
 
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	if _should_skip_night_phase_transition(safe_transition_mode, get_current_time_of_day()):
-		return true
-	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		return true
-	return safe_transition_mode == TRANSITION_RIDE and get_current_time_of_day() == "night"
+	return PlayerStageFlow.will_advance_day(self, transition_mode)
 
 
 func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		return 0
-	var energy_bonus := int(REST_ENERGY_BONUSES.get(safe_transition_mode, 0))
-	if will_advance_day(safe_transition_mode):
-		energy_bonus += END_OF_DAY_ENERGY_BONUS
-	return energy_bonus
+	return PlayerStageFlow.transition_energy_bonus(self, transition_mode)
 
 
 func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
