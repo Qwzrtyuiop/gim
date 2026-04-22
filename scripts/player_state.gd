@@ -111,8 +111,8 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 	"chill": 0.92,
 	"normal": 1.0,
 	"traffic-jam": 1.12,
-	"busy": 1.24,
-	"speeders": 1.34,
+	"busy": 1.55,
+	"speeders": 1.24,
 }
 
 # Persistent run state
