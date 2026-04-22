@@ -126,15 +126,12 @@ func _build_ui() -> void:
 
 	return_button = _make_texture_button("RETURN", Vector2(110.0, 92.0))
 	return_button.pressed.connect(hide_pause_menu)
-	menu_panel.add_child(return_button)
 
 	achievements_button = _make_texture_button("ACHIEVEMENTS", Vector2(110.0, 166.0), 14)
 	achievements_button.pressed.connect(_show_library)
-	menu_panel.add_child(achievements_button)
 
 	exit_button = _make_texture_button("EXIT", Vector2(110.0, 240.0))
 	exit_button.pressed.connect(_exit_to_main_menu)
-	menu_panel.add_child(exit_button)
 
 	audio_panel_refs = AudioSettingsPanel.create(
 		self,

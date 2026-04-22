@@ -20,67 +20,7 @@ const BUY_BUTTON_HOVER_BG := Color(0.80, 0.60, 0.28, 0.98)
 const BUY_BUTTON_PRESSED_BG := Color(0.36, 0.53, 0.30, 0.98)
 const BUY_BUTTON_DISABLED_BG := Color(0.42, 0.37, 0.32, 0.86)
 const BUY_BUTTON_BORDER := Color(0.20, 0.12, 0.07, 0.96)
-const STORE_ITEMS := [
-	{
-		"id": "engine_tune",
-		"name": "Engine Tune",
-		"description": "increase top speed and acceleration",
-		"cost": 250,
-		"cost_step": 70,
-		"type": "upgrade",
-		"max_level": 5,
-	},
-	{
-		"id": "brake_kit",
-		"name": "Brake Kit",
-		"description": "improve braking power",
-		"cost": 200,
-		"cost_step": 55,
-		"type": "upgrade",
-		"max_level": 5,
-	},
-	{
-		"id": "fuel_efficiency",
-		"name": "Fuel Efficiency",
-		"description": "less gas consumption and slightly cheaper boost",
-		"cost": 150,
-		"cost_step": 60,
-		"type": "upgrade",
-		"max_level": 5,
-	},
-	{
-		"id": "yosi",
-		"name": "Warlboro Blue",
-		"description": "Restore energy. May cause negative effects",
-		"cost": 25,
-		"type": "energy",
-		"energy": 2,
-	},
-	
-	{
-		"id": "energy_snack",
-		"name": "Energy Bar",
-		"description": "Restore 2 energy",
-		"cost": 50,
-		"type": "energy",
-		"energy": 2,
-	},
-	{
-		"id": "full_meal",
-		"name": "Budget Meal",
-		"description": "Restore 5 energy",
-		"cost": 120,
-		"type": "energy",
-		"energy": 5,
-	},
-	{
-		"id": "gas_can",
-		"name": "Gas Can",
-		"description": "Add 10% gas",
-		"type": "gas",
-		"gas": 10.0,
-	},
-]
+const StoreItemCatalog := preload("res://scripts/store/store_item_catalog.gd")
 
 @onready var money_label: Label = $MoneyLabel
 @onready var status_label: Label = $StatusLabel
@@ -145,7 +85,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _build_items() -> void:
 	store_item_rows.clear()
 	store_buy_buttons.clear()
-	for item in STORE_ITEMS:
+	for item in StoreItemCatalog.ITEMS:
 		var row_frame := PanelContainer.new()
 		row_frame.custom_minimum_size = Vector2(0.0, 108.0)
 		row_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
