@@ -28,26 +28,10 @@ static func normalize_rule(player_state, rule_data: Dictionary) -> Dictionary:
 				continue
 			normalized_distances.append(normalized_distance)
 		normalized_rule["distances"] = normalized_distances
-	if normalized_rule.has("time_of_day"):
-		normalized_rule["time_of_day"] = normalize_time(player_state, str(normalized_rule.get("time_of_day", "")))
-	if normalized_rule.has("times") and normalized_rule.get("times", null) is Array:
-		var normalized_times: Array[String] = []
-		for time_variant in normalized_rule.get("times", []):
-			var normalized_time: String = normalize_time(player_state, str(time_variant))
-			if normalized_time.is_empty() or normalized_times.has(normalized_time):
-				continue
-			normalized_times.append(normalized_time)
-		normalized_rule["times"] = normalized_times
-	if normalized_rule.has("current_time_of_day"):
-		normalized_rule["current_time_of_day"] = normalize_time(player_state, str(normalized_rule.get("current_time_of_day", "")))
-	if normalized_rule.has("current_times") and normalized_rule.get("current_times", null) is Array:
-		var normalized_current_times: Array[String] = []
-		for time_variant in normalized_rule.get("current_times", []):
-			var normalized_current_time: String = normalize_time(player_state, str(time_variant))
-			if normalized_current_time.is_empty() or normalized_current_times.has(normalized_current_time):
-				continue
-			normalized_current_times.append(normalized_current_time)
-		normalized_rule["current_times"] = normalized_current_times
+	_normalize_time_field_aliases(player_state, normalized_rule, "time_of_day", ["phase_of_day", "phase"])
+	_normalize_time_array_aliases(player_state, normalized_rule, "times", ["phases"])
+	_normalize_time_field_aliases(player_state, normalized_rule, "current_time_of_day", ["current_phase"])
+	_normalize_time_array_aliases(player_state, normalized_rule, "current_times", ["current_phases"])
 	if normalized_rule.has("forced_traffic"):
 		normalized_rule["forced_traffic"] = normalize_traffic(player_state, str(normalized_rule.get("forced_traffic", "")))
 	if normalized_rule.has("traffic"):
@@ -69,7 +53,7 @@ static func consume_rules(consumed_seeded_rider_rules: Dictionary, rule_ids: Arr
 
 
 static func get_pool_setup(player_state, selection_context: Dictionary) -> Dictionary:
-	var context: Dictionary = selection_context.duplicate(true)
+	var context: Dictionary = normalize_selection_context(player_state, selection_context)
 	var distance_slots: Dictionary = {
 		"short": [],
 		"medium": [],
@@ -129,6 +113,13 @@ static func get_pool_setup(player_state, selection_context: Dictionary) -> Dicti
 		"distance_slots": distance_slots,
 		"rule_ids": used_rule_ids,
 	}
+
+
+static func normalize_selection_context(player_state, selection_context: Dictionary) -> Dictionary:
+	var context: Dictionary = selection_context.duplicate(true)
+	_normalize_time_field_aliases(player_state, context, "time_of_day", ["phase_of_day", "phase"])
+	_normalize_time_field_aliases(player_state, context, "current_time_of_day", ["current_phase"])
+	return context
 
 
 static func matches_rule(player_state, rule_data: Dictionary, selection_context: Dictionary) -> bool:
@@ -254,6 +245,50 @@ static func normalize_distance(player_state, distance: String) -> String:
 static func normalize_time(player_state, time_of_day: String) -> String:
 	var safe_time := str(time_of_day).strip_edges().to_lower()
 	return safe_time if player_state.STAGE_TIMES.has(safe_time) else ""
+
+
+static func _normalize_time_field_aliases(player_state, data: Dictionary, canonical_key: String, alias_keys: Array[String]) -> void:
+	var raw_value = data.get(canonical_key, null)
+	for alias_key in alias_keys:
+		if raw_value == null and data.has(alias_key):
+			raw_value = data.get(alias_key)
+		data.erase(alias_key)
+
+	if raw_value == null:
+		return
+
+	var normalized_time := normalize_time(player_state, str(raw_value))
+	if normalized_time.is_empty():
+		data.erase(canonical_key)
+		return
+	data[canonical_key] = normalized_time
+
+
+static func _normalize_time_array_aliases(player_state, data: Dictionary, canonical_key: String, alias_keys: Array[String]) -> void:
+	var raw_values: Array = []
+	var canonical_values = data.get(canonical_key, [])
+	if canonical_values is Array:
+		raw_values.append_array(canonical_values)
+	for alias_key in alias_keys:
+		var alias_values = data.get(alias_key, [])
+		if alias_values is Array:
+			raw_values.append_array(alias_values)
+		data.erase(alias_key)
+
+	if raw_values.is_empty():
+		return
+
+	var normalized_times: Array[String] = []
+	for raw_value in raw_values:
+		var normalized_time := normalize_time(player_state, str(raw_value))
+		if normalized_time.is_empty() or normalized_times.has(normalized_time):
+			continue
+		normalized_times.append(normalized_time)
+
+	if normalized_times.is_empty():
+		data.erase(canonical_key)
+		return
+	data[canonical_key] = normalized_times
 
 
 static func normalize_traffic(player_state, traffic_type: String) -> String:

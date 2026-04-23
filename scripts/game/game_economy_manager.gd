@@ -78,6 +78,7 @@ static func store_stage_result(
 		"overtime": overtime_seconds,
 		"completed": true,
 	})
+	PlayerState.advance_phase_after_stage_result(stage_time_of_day)
 	PlayerState.record_stage_completion()
 
 
@@ -124,6 +125,7 @@ static func store_failed_stage_result(
 		"completed": false,
 		"failure_reason": failure_reason,
 	})
+	PlayerState.advance_phase_after_stage_result(stage_time_of_day)
 
 
 static func stage_complete_story_payload(stage_type: String, stage_difficulty: String, stage_time_of_day: String, stage_traffic: String) -> Dictionary:

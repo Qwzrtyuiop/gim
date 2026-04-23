@@ -32,6 +32,23 @@ const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
 
 
+static func normalize_trigger(player_state, trigger_data: Dictionary) -> Dictionary:
+	if trigger_data.is_empty():
+		return {}
+
+	var normalized_trigger: Dictionary = trigger_data.duplicate(true)
+	var normalized_phase := normalize_story_trigger_phase(str(normalized_trigger.get("phase", "")))
+	if normalized_phase.is_empty():
+		return {}
+	normalized_trigger["phase"] = normalized_phase
+
+	_normalize_trigger_time_field(player_state, normalized_trigger, "time_of_day", ["phase_of_day"])
+	_normalize_trigger_time_field(player_state, normalized_trigger, "current_time_of_day", ["current_phase"])
+	_normalize_trigger_time_array(player_state, normalized_trigger, "times", ["phases"])
+	_normalize_trigger_time_array(player_state, normalized_trigger, "current_times", ["current_phases"])
+	return normalized_trigger
+
+
 static func build_default_story_triggers() -> Array[Dictionary]:
 	return [
 		{
@@ -188,6 +205,56 @@ static func ensure_required_story_triggers(story_triggers: Array) -> bool:
 	return changed
 
 
+static func _normalize_trigger_time_field(player_state, trigger_data: Dictionary, canonical_key: String, alias_keys: Array[String]) -> void:
+	var raw_value = trigger_data.get(canonical_key, null)
+	for alias_key in alias_keys:
+		if raw_value == null and trigger_data.has(alias_key):
+			raw_value = trigger_data.get(alias_key)
+		trigger_data.erase(alias_key)
+
+	if raw_value == null:
+		return
+
+	var normalized_value := _normalize_time_value(player_state, raw_value)
+	if normalized_value.is_empty():
+		trigger_data.erase(canonical_key)
+		return
+
+	trigger_data[canonical_key] = normalized_value
+
+
+static func _normalize_trigger_time_array(player_state, trigger_data: Dictionary, canonical_key: String, alias_keys: Array[String]) -> void:
+	var raw_values: Array = []
+	var canonical_values = trigger_data.get(canonical_key, [])
+	if canonical_values is Array:
+		raw_values.append_array(canonical_values)
+	for alias_key in alias_keys:
+		var alias_values = trigger_data.get(alias_key, [])
+		if alias_values is Array:
+			raw_values.append_array(alias_values)
+		trigger_data.erase(alias_key)
+	if raw_values.is_empty():
+		return
+
+	var normalized_values: Array[String] = []
+	for raw_value in raw_values:
+		var normalized_value := _normalize_time_value(player_state, raw_value)
+		if normalized_value.is_empty() or normalized_values.has(normalized_value):
+			continue
+		normalized_values.append(normalized_value)
+
+	if normalized_values.is_empty():
+		trigger_data.erase(canonical_key)
+		return
+
+	trigger_data[canonical_key] = normalized_values
+
+
+static func _normalize_time_value(player_state, time_value) -> String:
+	var safe_time := str(time_value).strip_edges().to_lower()
+	return safe_time if player_state.STAGE_TIMES.has(safe_time) else ""
+
+
 static func _has_trigger_with_id(story_triggers: Array, trigger_id: String) -> bool:
 	for trigger_data in story_triggers:
 		if not trigger_data is Dictionary:
@@ -242,6 +309,10 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 	if not _trigger_matches_context_value(trigger_data.get("time_of_day", null), context.get("time_of_day", null)):
 		return false
 	if not _trigger_matches_context_array(trigger_data.get("times", []), context.get("time_of_day", null)):
+		return false
+	if not _trigger_matches_context_value(trigger_data.get("current_time_of_day", null), context.get("current_time_of_day", null)):
+		return false
+	if not _trigger_matches_context_array(trigger_data.get("current_times", []), context.get("current_time_of_day", null)):
 		return false
 	if not _trigger_matches_context_value(trigger_data.get("difficulty", null), context.get("difficulty", null)):
 		return false

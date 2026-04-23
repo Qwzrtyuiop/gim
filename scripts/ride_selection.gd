@@ -544,11 +544,15 @@ func _card_special_badge_text(stage_special_type: String) -> String:
 
 
 func _build_seed_selection_context() -> Dictionary:
+	var next_time_of_day := PlayerState.get_next_stage_time(_transition_mode())
+	var current_time_of_day := PlayerState.get_current_time_of_day()
 	return {
 		"day": PlayerState.get_transition_display_day(_transition_mode()),
-		"time_of_day": PlayerState.get_next_stage_time(_transition_mode()),
+		"time_of_day": next_time_of_day,
+		"phase_of_day": next_time_of_day,
 		"current_day": PlayerState.get_current_day(),
-		"current_time_of_day": PlayerState.get_current_time_of_day(),
+		"current_time_of_day": current_time_of_day,
+		"current_phase": current_time_of_day,
 		"current_stage_type": PlayerState.get_current_stage_type(),
 	}
 

@@ -30,6 +30,10 @@ static func run(owner, action_data: Dictionary) -> void:
 			PlayerState.clear_event_value(str(action_data.get("id", action_data.get("event_id", action_data.get("key", "")))))
 		"clear_event_values", "erase_event_values":
 			PlayerState.clear_event_values()
+		"add_story_trigger", "insert_story_trigger", "queue_story_trigger":
+			_add_story_trigger_from_action(action_data)
+		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
+			_add_seeded_rider_from_action(action_data)
 		"add_money", "gain_money":
 			PlayerState.add_money(int(action_data.get("amount", 0)))
 		"add_energy", "gain_energy":
@@ -88,3 +92,32 @@ static func run(owner, action_data: Dictionary) -> void:
 			owner._set_background_texture(owner.current_background_ref, not bool(action_data.get("preserve_camera", false)))
 			if owner._has_background_camera_data(action_data):
 				owner._apply_background_camera_action(action_data)
+
+
+static func _add_story_trigger_from_action(action_data: Dictionary) -> void:
+	var trigger_data: Dictionary = _extract_payload_dictionary(action_data, ["trigger", "trigger_data", "data"])
+	if trigger_data.is_empty():
+		trigger_data = action_data.duplicate(true)
+		_strip_action_keys(trigger_data)
+	PlayerState.add_story_trigger(trigger_data)
+
+
+static func _add_seeded_rider_from_action(action_data: Dictionary) -> void:
+	var rule_data: Dictionary = _extract_payload_dictionary(action_data, ["rule", "rider_rule", "seed", "data"])
+	if rule_data.is_empty():
+		rule_data = action_data.duplicate(true)
+		_strip_action_keys(rule_data)
+	PlayerState.add_seeded_rider_rule(rule_data)
+
+
+static func _extract_payload_dictionary(action_data: Dictionary, keys: Array[String]) -> Dictionary:
+	for key in keys:
+		var value = action_data.get(key, null)
+		if value is Dictionary:
+			return (value as Dictionary).duplicate(true)
+	return {}
+
+
+static func _strip_action_keys(data: Dictionary) -> void:
+	data.erase("type")
+	data.erase("action")

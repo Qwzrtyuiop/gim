@@ -7,7 +7,7 @@ const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const LAST_ENERGY_WARNING := "Start the next day with critically low energy?\nYour vehicle will handle worse until John recovers."
+const LAST_ENERGY_WARNING := "Start this trip with critically low energy?\nYour vehicle will handle worse until John recovers."
 
 @onready var results_label: Label = $ResultsLabel
 @onready var status_label: Label = $StatusLabel
@@ -76,7 +76,7 @@ func _render_results(result: Dictionary) -> void:
 	_layout_dynamic_result_text(detail_lines.size())
 	_render_earnings_summary(total)
 
-	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage() or has_pending_night_skip
+	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage_result(time_of_day, day_number) or has_pending_night_skip
 	rest_button.visible = allow_rest
 	store_button.visible = not is_night_stage and not has_pending_night_skip
 	ride_button.visible = not is_night_stage and not has_pending_night_skip
@@ -102,17 +102,19 @@ func _render_results(result: Dictionary) -> void:
 
 
 func _rest_then_next_stage() -> void:
-	var current_time := PlayerState.get_current_time_of_day()
-	if current_time == "night":
+	var result: Dictionary = PlayerState.get_last_stage_result()
+	var result_time := str(result.get("time_of_day", PlayerState.get_current_time_of_day())).strip_edges().to_lower()
+	var result_day := int(result.get("day", PlayerState.get_current_day()))
+	if result_time == "night":
 		PlayerState.apply_night_rest_bonus()
 		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return
 
-	var has_pending_night_skip := current_time == "noon" and PlayerState.has_pending_night_phase_skip()
-	if not PlayerState.can_rest_after_stage() and not has_pending_night_skip:
+	var has_pending_night_skip := result_time == "noon" and PlayerState.has_pending_night_phase_skip()
+	if not PlayerState.can_rest_after_stage_result(result_time, result_day) and not has_pending_night_skip:
 		return
 
-	if current_time == "noon":
+	if result_time == "noon":
 		if not has_pending_night_skip:
 			PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NEXT_DAY)
 		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
@@ -124,7 +126,7 @@ func _rest_then_next_stage() -> void:
 
 
 func _next_stage() -> void:
-	_begin_trip_selection(PlayerState.TRANSITION_RIDE)
+	_begin_trip_selection(PlayerState.TRANSITION_CURRENT_STAGE)
 
 
 func _begin_trip_selection(transition_mode: String) -> void:
@@ -139,7 +141,7 @@ func _begin_sleep_transition(transition_mode: String) -> void:
 
 func _open_store() -> void:
 	if not PlayerState.has_locked_pending_trip_selection():
-		PlayerState.clear_pending_trip_selection()
+		PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 	get_tree().change_scene_to_file(STORE_SCENE)
 
 

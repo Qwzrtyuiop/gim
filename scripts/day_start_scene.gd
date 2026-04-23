@@ -147,14 +147,14 @@ func _build_crt_lines() -> void:
 func _ride_now() -> void:
 	if is_transitioning:
 		return
-	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
+	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _open_store() -> void:
 	if is_transitioning:
 		return
-	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
+	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(STORE_SCENE)
 
 

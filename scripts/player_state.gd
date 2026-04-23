@@ -6,8 +6,8 @@ extends Node
 # Shared services
 const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
+const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
-const PlayerStageFlow := preload("res://scripts/state/player_stage_flow.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
@@ -77,7 +77,7 @@ const STAGE_DISTANCE_RANGES := {
 	"long": Vector2(1150.0, 1650.0),
 }
 const SAVE_PATH := "user://progress_save.tres"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const REST_ENERGY_BONUSES := {
 	TRANSITION_RIDE: 0,
 	TRANSITION_REST_TO_NIGHT: 2,
@@ -125,6 +125,7 @@ var current_stage_type := FIRST_STAGE_TYPE
 var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
 var current_special_stage_id := ""
 var current_day := 1
+var current_phase := "morning"
 var stage_round := 0
 var pending_stage_energy_cost := false
 var pending_trip_selection: Dictionary = {}
@@ -380,6 +381,7 @@ func begin_stage_sequence() -> void:
 func get_current_stage_type() -> String:
 	if current_stage_type.is_empty():
 		current_stage_type = FIRST_STAGE_TYPE
+	current_stage_type = PlayerDayPhaseTracker.stage_type_for_phase(self, current_stage_type, get_current_time_of_day())
 	return current_stage_type
 
 
@@ -429,7 +431,7 @@ func get_stage_special_display_name(stage_special_type: String) -> String:
 
 
 func get_current_day() -> int:
-	return max(1, current_day)
+	return PlayerDayPhaseTracker.get_current_day(self)
 
 
 func get_current_debt_goal() -> int:
@@ -496,15 +498,18 @@ func get_debt_due_text(day_number := -1) -> String:
 
 
 func get_current_time_of_day() -> String:
-	return _parse_stage_type(get_current_stage_type())["time"]
+	return PlayerDayPhaseTracker.get_current_phase(self)
 
 
 func normalize_transition_mode(transition_mode: String) -> String:
-	return PlayerStageFlow.normalize_transition_mode(self, transition_mode)
+	match transition_mode:
+		TRANSITION_CURRENT_STAGE, TRANSITION_REST_TO_NIGHT, TRANSITION_REST_TO_NEXT_DAY, TRANSITION_SLEEP_TO_NEXT_DAY:
+			return transition_mode
+	return TRANSITION_RIDE
 
 
 func get_next_stage_time(transition_mode: String = TRANSITION_RIDE) -> String:
-	return PlayerStageFlow.next_stage_time(self, transition_mode)
+	return PlayerDayPhaseTracker.next_phase(self, transition_mode)
 
 
 func can_rest_after_stage() -> bool:
@@ -512,15 +517,24 @@ func can_rest_after_stage() -> bool:
 	return (current_time == "morning" or current_time == "noon") and last_rest_day != get_current_day()
 
 
+func can_rest_after_stage_result(stage_time_of_day: String, stage_day := -1) -> bool:
+	var safe_time := str(stage_time_of_day).strip_edges().to_lower()
+	if not STAGE_TIMES.has(safe_time):
+		return false
+	var safe_day: int = int(stage_day) if int(stage_day) > 0 else get_current_day()
+	return (safe_time == "morning" or safe_time == "noon") and last_rest_day != safe_day
+
+
 func has_rested_today() -> bool:
 	return last_rest_day == get_current_day()
 
 
 func get_transition_display_day(transition_mode: String = TRANSITION_RIDE) -> int:
-	var display_day := get_current_day()
-	if will_advance_day(transition_mode):
-		display_day += 1
-	return max(1, display_day)
+	return PlayerDayPhaseTracker.transition_display_day(self, transition_mode)
+
+
+func get_home_ride_transition_mode() -> String:
+	return PlayerDayPhaseTracker.home_ride_transition_mode(self)
 
 
 # Economy and resource helpers
@@ -770,11 +784,11 @@ func confirm_stage_started() -> void:
 
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
-	return PlayerStageFlow.will_advance_day(self, transition_mode)
+	return PlayerDayPhaseTracker.will_advance_day(self, transition_mode)
 
 
 func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
-	return PlayerStageFlow.transition_energy_bonus(self, transition_mode)
+	return PlayerDayPhaseTracker.transition_energy_bonus(self, transition_mode)
 
 
 func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
@@ -804,6 +818,7 @@ func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_d
 	var next_stage := _random_stage_type_for_time(next_time, selected_difficulty, forced_traffic)
 	stage_round += 1
 	current_day = next_day
+	current_phase = next_time
 	current_stage_type = next_stage
 	if current_day != current_day_before_advance:
 		_reset_daily_consumable_counters(current_day)
@@ -816,12 +831,20 @@ func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_d
 	return current_stage_type
 
 
+func advance_phase_after_stage_result(stage_time_of_day: String) -> bool:
+	var advanced := PlayerDayPhaseTracker.advance_after_stage_result(self, stage_time_of_day)
+	if advanced:
+		save_progress()
+	return advanced
+
+
 func prepare_day_start(target_day: int) -> void:
 	var safe_target_day: int = maxi(1, target_day)
 	if get_current_day() == safe_target_day and get_current_time_of_day() == "morning":
 		return
 
 	current_day = safe_target_day
+	current_phase = "morning"
 	current_stage_type = build_stage_type("short", "morning", "chill")
 	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
 	current_special_stage_id = ""
@@ -835,6 +858,7 @@ func prepare_day_start(target_day: int) -> void:
 func set_current_stage_time(day_time: String) -> void:
 	var safe_time := day_time if STAGE_TIMES.has(day_time) else "morning"
 	var stage_parts := _parse_stage_type(get_current_stage_type())
+	current_phase = safe_time
 	current_stage_type = build_stage_type(
 		str(stage_parts.get("difficulty", "short")),
 		safe_time,
@@ -1184,7 +1208,11 @@ func add_story_trigger(trigger_data: Dictionary) -> void:
 	if trigger_data.is_empty():
 		return
 
-	story_triggers.append(trigger_data.duplicate(true))
+	var normalized_trigger := StoryTriggerService.normalize_trigger(self, trigger_data)
+	if normalized_trigger.is_empty():
+		return
+
+	story_triggers.append(normalized_trigger)
 	save_progress()
 
 
@@ -1763,6 +1791,7 @@ func _apply_new_run_defaults() -> void:
 	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
 	current_special_stage_id = ""
 	current_day = 1
+	current_phase = "morning"
 	_reset_weather_state()
 	_reset_pending_runtime_state()
 	_reset_daily_run_state()
