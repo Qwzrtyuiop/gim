@@ -8,6 +8,7 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -65,17 +66,21 @@ var background_motion_tween: Tween
 var bgm_fade_tween: Tween
 var debt_overlay_tween: Tween
 var is_input_locked := false
+var shown_gallery_images: Dictionary = {}
 
 
 func _ready() -> void:
-	PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
 	_apply_theme()
 	_load_story_payload()
+	if not _is_replay_mode():
+		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
 	_refresh_background_transform()
 	await _play_intro_fade()
-	var resume_index := PlayerState.get_last_seen_story_section(story_id)
-	if resume_index < 0 or resume_index >= story_lines.size():
-		resume_index = 0
+	var resume_index: int = 0
+	if not _is_replay_mode():
+		resume_index = PlayerState.get_last_seen_story_section(story_id)
+		if resume_index < 0 or resume_index >= story_lines.size():
+			resume_index = 0
 	await _restore_story_music_state(resume_index)
 	await _show_line(resume_index)
 
@@ -106,6 +111,7 @@ func _load_story_payload() -> void:
 	else:
 		story_payload = pending_story
 
+	shown_gallery_images.clear()
 	story_lines.clear()
 	var raw_lines: Array = []
 	if story_payload.has("composition"):
@@ -127,6 +133,9 @@ func _load_story_payload() -> void:
 	current_background_ref = story_payload.get("background", null)
 	current_left_portrait_ref = story_payload.get("left_portrait", null)
 	current_right_portrait_ref = story_payload.get("right_portrait", null)
+	_remember_gallery_image(current_background_ref)
+	_remember_gallery_image(current_left_portrait_ref)
+	_remember_gallery_image(current_right_portrait_ref)
 
 
 func _restore_story_music_state(resume_index: int) -> void:
@@ -197,7 +206,8 @@ func _show_line(index: int) -> void:
 
 	is_input_locked = true
 	current_line_index = resolved_index
-	PlayerState.set_last_seen_story_section(story_id, resolved_index)
+	if not _is_replay_mode():
+		PlayerState.set_last_seen_story_section(story_id, resolved_index)
 	var line := story_lines[resolved_index]
 	continue_label.visible = false
 	await _pause_for_seconds(float(line.get("pause_before", 0.0)))
@@ -298,6 +308,17 @@ func _render_choices(line: Dictionary) -> void:
 
 
 func _run_choice_actions(choice_data: Dictionary) -> void:
+	if _is_replay_mode():
+		var replay_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
+		for replay_action_variant in replay_actions:
+			if not replay_action_variant is Dictionary:
+				continue
+			var replay_action: Dictionary = (replay_action_variant as Dictionary).duplicate(true)
+			if not _matches_story_conditions(replay_action):
+				continue
+			await _run_story_action(replay_action)
+		return
+
 	if choice_data.has("event_values"):
 		PlayerState.set_event_values(choice_data.get("event_values", {}))
 	elif choice_data.has("event_id") or choice_data.has("event_value") or choice_data.has("key"):
@@ -405,10 +426,13 @@ func _finish_story() -> void:
 	if target_scene.is_empty():
 		target_scene = FALLBACK_SCENE
 
-	if bool(story_payload.get("prepare_stage_start", false)):
+	if not _is_replay_mode() and bool(story_payload.get("prepare_stage_start", false)):
 		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
 		if not PlayerState.prepare_stage_start(stage_descriptor):
 			target_scene = return_scene_path if not return_scene_path.is_empty() else FALLBACK_SCENE
+
+	if not _is_replay_mode():
+		StoryGalleryUnlocker.unlock_gallery_images(PlayerState, _shown_gallery_image_paths())
 
 	await _play_outro_fade()
 	PlayerState.clear_pending_story()
@@ -436,6 +460,8 @@ func _set_portrait(frame: Panel, portrait_rect: TextureRect, texture_ref) -> voi
 	var portrait_texture := _resolve_texture(texture_ref)
 	frame.visible = portrait_texture != null
 	portrait_rect.texture = portrait_texture
+	if portrait_texture != null:
+		_remember_gallery_image(texture_ref)
 	if frame.visible:
 		frame.modulate = INACTIVE_PORTRAIT_MODULATE
 
@@ -444,10 +470,29 @@ func _set_background_texture(texture_ref, reset_camera := false) -> void:
 	var resolved_texture := _resolve_texture(texture_ref)
 	background.texture = resolved_texture
 	background.visible = resolved_texture != null
+	if resolved_texture != null:
+		_remember_gallery_image(texture_ref)
 	if reset_camera:
 		background_zoom = 1.0
 		background_pan = Vector2.ZERO
 	_refresh_background_transform()
+
+
+func _remember_gallery_image(texture_ref) -> void:
+	var image_path: String = StoryGalleryUnlocker.normalize_image_path(texture_ref)
+	if image_path.is_empty():
+		return
+	shown_gallery_images[image_path] = true
+
+
+func _shown_gallery_image_paths() -> Array:
+	var image_paths: Array = []
+	for image_path_variant in shown_gallery_images.keys():
+		var image_path: String = str(image_path_variant)
+		if image_path.is_empty():
+			continue
+		image_paths.append(image_path)
+	return image_paths
 
 
 func _resolve_texture(texture_ref) -> Texture2D:
@@ -727,7 +772,51 @@ func _play_outro_fade() -> void:
 
 
 func _run_story_action(action_data: Dictionary) -> void:
+	if _is_replay_mode() and _is_persistent_story_action(action_data):
+		return
 	await StoryActionRunner.run(self, action_data)
+
+
+func _is_replay_mode() -> bool:
+	return bool(story_payload.get("replay", story_payload.get("memory_replay", false)))
+
+
+func _is_persistent_story_action(action_data: Dictionary) -> bool:
+	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
+	match action_type:
+		"unlock_achievement", "achievement_unlock":
+			return true
+		"set_event_value", "story_event", "event_value":
+			return true
+		"set_event_values", "story_events", "event_values":
+			return true
+		"clear_event_value", "erase_event_value":
+			return true
+		"clear_event_values", "erase_event_values":
+			return true
+		"add_story_trigger", "insert_story_trigger", "queue_story_trigger":
+			return true
+		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
+			return true
+		"add_money", "gain_money":
+			return true
+		"add_energy", "gain_energy":
+			return true
+		"add_max_energy", "gain_max_energy":
+			return true
+		"add_karma", "change_karma":
+			return true
+		"add_character_progress", "increase_character_progress", "character_progress":
+			return true
+		"set_character_progress", "character_progress_set":
+			return true
+		"set_character_story_lock", "character_story_lock":
+			return true
+		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
+			return true
+		"clear_pending_night_skip":
+			return true
+	return false
 
 
 func _play_music_action(action_data: Dictionary) -> void:

@@ -155,7 +155,7 @@ static func build() -> Dictionary:
 	composition.append_array([
 		{
 			"speaker": "John Toda",
-			"text": "Hindi ko na kinaya ang siyudad. Parang masyadong masikip para sa akin.",
+			"text": "Hindi ko na kinaya ang siyudad. Masyadong maingay. Magulo.",
 			"actions": [
 				{
 					"type": "set_event_value",

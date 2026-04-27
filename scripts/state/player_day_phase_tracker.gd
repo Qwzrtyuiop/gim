@@ -1,5 +1,4 @@
 extends RefCounted
-class_name PlayerDayPhaseTracker
 
 const DEFAULT_PHASE := "morning"
 
@@ -19,7 +18,7 @@ static func phase_from_stage_type(player_state, stage_type: String) -> String:
 
 
 static func get_current_phase(player_state) -> String:
-	var safe_phase := normalize_phase(player_state, str(player_state.current_phase))
+	var safe_phase: String = normalize_phase(player_state, str(player_state.current_phase))
 	if player_state.current_phase != safe_phase:
 		player_state.current_phase = safe_phase
 	return safe_phase
@@ -107,11 +106,11 @@ static func home_ride_transition_mode(player_state) -> String:
 
 
 static func advance_after_stage_result(player_state, completed_phase: String) -> bool:
-	var safe_completed_phase := normalize_phase(player_state, completed_phase)
+	var safe_completed_phase: String = normalize_phase(player_state, completed_phase)
 	if get_current_phase(player_state) != safe_completed_phase:
 		return false
 
-	var next_phase := ""
+	var next_phase: String = ""
 	match safe_completed_phase:
 		"morning":
 			next_phase = "noon"

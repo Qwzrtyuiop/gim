@@ -1,0 +1,305 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/gallery_library.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/background/bg1_loop.png" id="2_bg"]
+[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="3_font"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_title"]
+font = ExtResource("3_font")
+font_size = 22
+font_color = Color(0.98, 0.95, 0.82, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
+font = ExtResource("3_font")
+font_size = 11
+font_color = Color(0.95, 0.91, 0.78, 1)
+outline_size = 2
+outline_color = Color(0, 0, 0, 0.95)
+
+[sub_resource type="LabelSettings" id="LabelSettings_body"]
+font = ExtResource("3_font")
+font_size = 12
+font_color = Color(0.98, 0.95, 0.88, 1)
+outline_size = 1
+outline_color = Color(0, 0, 0, 0.95)
+
+[node name="GalleryLibrary" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="."]
+z_index = -20
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Shade" type="ColorRect" parent="."]
+z_index = -10
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.04, 0.04, 0.05, 0.62)
+
+[node name="TitleLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -420.0
+offset_top = 34.0
+offset_right = 420.0
+offset_bottom = 76.0
+grow_horizontal = 2
+text = "SCENE GALLERY"
+label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -480.0
+offset_top = 82.0
+offset_right = 480.0
+offset_bottom = 120.0
+grow_horizontal = 2
+text = "Unlocked images and memories"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -600.0
+offset_top = -248.0
+offset_right = 600.0
+offset_bottom = 294.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TabBar" type="HBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 28.0
+offset_top = 22.0
+offset_right = -28.0
+offset_bottom = 72.0
+grow_horizontal = 2
+theme_override_constants/separation = 12
+
+[node name="GalleryTabButton" type="Button" parent="Panel/TabBar"]
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "GALLERY"
+
+[node name="MemoryTabButton" type="Button" parent="Panel/TabBar"]
+custom_minimum_size = Vector2(220, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "MEMORY"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 94.0
+offset_right = -28.0
+offset_bottom = -86.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ListContainer" type="VBoxContainer" parent="Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="EmptyLabel" type="Label" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = 150.0
+offset_right = -48.0
+offset_bottom = -120.0
+grow_horizontal = 2
+grow_vertical = 2
+label_settings = SubResource("LabelSettings_body")
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="PreviewPanel" type="Panel" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 448.0
+offset_top = 94.0
+offset_right = -28.0
+offset_bottom = -86.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PreviewTexture" type="TextureRect" parent="Panel/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 42.0
+offset_top = 24.0
+offset_right = -42.0
+offset_bottom = 206.0
+grow_horizontal = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TitleLabel" type="Label" parent="Panel/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 24.0
+offset_top = 218.0
+offset_right = -24.0
+offset_bottom = 250.0
+grow_horizontal = 2
+label_settings = SubResource("LabelSettings_title")
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="Panel/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 44.0
+offset_top = 256.0
+offset_right = -44.0
+offset_bottom = 296.0
+grow_horizontal = 2
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="BodyLabel" type="Label" parent="Panel/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = -62.0
+offset_right = -28.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 0
+label_settings = SubResource("LabelSettings_body")
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
+[node name="ReplayButton" type="Button" parent="Panel/PreviewPanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -138.0
+offset_top = -64.0
+offset_right = 138.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "REPLAY"
+
+[node name="BackButton" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -120.0
+offset_top = -66.0
+offset_right = 120.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "BACK"
+
+[node name="ImageOverlay" type="ColorRect" parent="."]
+visible = false
+z_index = 120
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.78)
+
+[node name="ImagePanel" type="Panel" parent="ImageOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -540.0
+offset_top = -300.0
+offset_right = 540.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ExpandedImage" type="TextureRect" parent="ImageOverlay/ImagePanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -82.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CloseButton" type="Button" parent="ImageOverlay/ImagePanel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -110.0
+offset_top = -60.0
+offset_right = 110.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "CLOSE"

@@ -6,12 +6,14 @@ const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
 const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
+const GALLERY_LIBRARY_SCENE := "res://scenes/gallery_library.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
+const StoryMemoryCatalog := preload("res://scripts/story/story_memory_catalog.gd")
 const Scene01IntroPayloadEnglish := preload("res://scripts/story/payloads/intro/scene_01_intro.gd")
 const Scene01IntroPayloadTagalog := preload("res://scripts/story/payloads/intro/scene_01_intro_tagalog.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -35,19 +37,24 @@ const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
 @onready var quit_button: BaseButton = $Menu/QuitButton
-@onready var achievements_button: BaseButton = $Menu/AchievementsButton
-@onready var achievements_label: Label = $Menu/AchievementsButton/AchievementsLabel
+@onready var gallery_button: BaseButton = $Menu/GalleryButton
+@onready var gallery_label: Label = $Menu/GalleryButton/GalleryLabel
+@onready var achievements_button: BaseButton = $AchievementsButton
+@onready var achievements_label: Label = $AchievementsButton/AchievementsLabel
 @onready var background: TextureRect = $Background
 @onready var traffic_layer: Node2D = $TrafficLayer
 @onready var menu_trace_lines: Node2D = $MenuTraceLines
 @onready var hint_label: Label = $Hint
 @onready var fade_overlay: ColorRect = $FadeOverlay
+@onready var debug_unlock_all_button: BaseButton = $DebugUnlockAllButton
+@onready var debug_unlock_all_label: Label = $DebugUnlockAllButton/DebugUnlockAllLabel
 
 var rng := RandomNumberGenerator.new()
 var menu_vehicles: Array = []
 var texture_hitbox_cache := {}
 var reset_hold_time := 0.0
 var reset_message_time := 0.0
+var debug_unlock_message_time := 0.0
 var blocked_start_message_time := 0.0
 var reset_hold_completed := false
 var start_confirm_dialog: ConfirmationDialog
@@ -63,16 +70,25 @@ var bgm_player: AudioStreamPlayer
 func _ready() -> void:
 	rng.randomize()
 	start_button.grab_focus()
+	gallery_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	achievements_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	debug_unlock_all_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	start_button.pressed.connect(_start_game)
 	quit_button.pressed.connect(_quit_game)
+	gallery_button.pressed.connect(_open_gallery_library)
 	achievements_button.pressed.connect(_open_achievements_library)
+	debug_unlock_all_button.pressed.connect(_debug_unlock_all)
 	_apply_button_font(start_button)
 	_apply_button_font(quit_button)
+	_apply_button_font(gallery_button)
 	_apply_button_font(achievements_button)
+	_apply_button_font(debug_unlock_all_button)
 	ButtonGlow.attach(self, start_button)
 	ButtonGlow.attach(self, quit_button)
+	ButtonGlow.attach(self, gallery_button)
 	ButtonGlow.attach(self, achievements_button)
+	ButtonGlow.attach(self, debug_unlock_all_button)
+	debug_unlock_all_button.visible = OS.is_debug_build()
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	menu_trace_lines.visible = false
 	_build_audio_panel()
@@ -102,7 +118,9 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
-		if achievements_button.has_focus():
+		if gallery_button.has_focus():
+			_open_gallery_library()
+		elif achievements_button.has_focus():
 			_open_achievements_library()
 		elif quit_button.has_focus():
 			_quit_game()
@@ -140,7 +158,9 @@ func _confirm_start_game() -> void:
 	is_start_transitioning = true
 	start_button.disabled = true
 	quit_button.disabled = true
+	gallery_button.disabled = true
 	achievements_button.disabled = true
+	debug_unlock_all_button.disabled = true
 	audio_toggle_button.disabled = true
 	language_toggle_button.disabled = true
 	PlayerState.set_pending_story(_build_intro_story_payload(
@@ -154,7 +174,9 @@ func _continue_saved_game() -> void:
 	is_start_transitioning = true
 	start_button.disabled = true
 	quit_button.disabled = true
+	gallery_button.disabled = true
 	achievements_button.disabled = true
+	debug_unlock_all_button.disabled = true
 	audio_toggle_button.disabled = true
 	language_toggle_button.disabled = true
 	_fade_to_scene(_saved_resume_scene())
@@ -170,6 +192,20 @@ func _open_achievements_library() -> void:
 	if is_start_transitioning:
 		return
 	get_tree().change_scene_to_file(ACHIEVEMENTS_LIBRARY_SCENE)
+
+
+func _open_gallery_library() -> void:
+	if is_start_transitioning:
+		return
+	get_tree().change_scene_to_file(GALLERY_LIBRARY_SCENE)
+
+
+func _debug_unlock_all() -> void:
+	if is_start_transitioning:
+		return
+	StoryMemoryCatalog.unlock_all(PlayerState)
+	debug_unlock_message_time = 1.8
+	hint_label.text = "Gallery and memories unlocked"
 
 
 func _create_dialogs() -> void:
@@ -353,6 +389,9 @@ func _update_reset_progress(delta: float) -> void:
 		if reset_message_time > 0.0:
 			reset_message_time -= delta
 			hint_label.text = "Progress reset"
+		elif debug_unlock_message_time > 0.0:
+			debug_unlock_message_time -= delta
+			hint_label.text = "Gallery and memories unlocked"
 		elif blocked_start_message_time > 0.0:
 			blocked_start_message_time -= delta
 			hint_label.text = _default_hint_text() if PlayerState.is_run_failed() else "No energy left. Hold R to reset progress"
@@ -363,7 +402,7 @@ func _update_reset_progress(delta: float) -> void:
 func _default_hint_text() -> String:
 	if PlayerState.is_run_failed():
 		return "%s" % PlayerState.get_run_fail_reason()
-	return "ENTER start     ESC quit     HOLD R reset progress"
+	return "ENTER select     ESC quit     HOLD R reset progress"
 
 
 func _spawn_menu_traffic() -> void:

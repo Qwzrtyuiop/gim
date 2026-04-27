@@ -21,7 +21,7 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	if save_data.is_empty():
 		return false
 
-	var needs_migration_save := saved_version < 3
+	var needs_migration_save := saved_version < 4
 	player_state._is_loading_save = true
 	player_state._begin_state_batch()
 	player_state.money = int(save_data.get("money", player_state.money))
@@ -132,6 +132,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
+	player_state.unlocked_gallery_images = Dictionary(save_data.get("unlocked_gallery_images", {})).duplicate(true)
+	player_state.gallery_image_unlocks_initialized = bool(save_data.get("gallery_image_unlocks_initialized", saved_version >= 4))
 	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
 	player_state.store_tutorial_shown = bool(save_data.get("store_tutorial_shown", player_state.store_tutorial_shown))
@@ -211,6 +213,8 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"last_seen_story_sections": player_state.last_seen_story_sections.duplicate(true),
 		"last_seen_story_id": player_state.last_seen_story_id,
 		"event_values": player_state.event_values.duplicate(true),
+		"unlocked_gallery_images": player_state.unlocked_gallery_images.duplicate(true),
+		"gallery_image_unlocks_initialized": player_state.gallery_image_unlocks_initialized,
 		"resume_scene_path": player_state.resume_scene_path,
 		"ride_select_tutorial_shown": player_state.ride_select_tutorial_shown,
 		"store_tutorial_shown": player_state.store_tutorial_shown,

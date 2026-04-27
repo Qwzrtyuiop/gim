@@ -2,6 +2,7 @@ extends RefCounted
 
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
 const BACKGROUND_BAR := "res://assets/story/backgrounds/bar.jpeg"
+const TROPA_CG := "res://assets/specialCG/tropaCg.png"
 
 
 static func build() -> Dictionary:
@@ -201,9 +202,11 @@ static func build() -> Dictionary:
 			{
 				"text": "And just like that, everyone laughed.",
 			},
-			{
-				"text": "Soon enough they start talking about their life. How it's been for them.",
-			},
+				{
+					"background": TROPA_CG,
+					"background_fade": 0.45,
+					"text": "Soon enough they start talking about their life. How it's been for them.",
+				},
 			{
 				"text": "Work, old mistakes, money, and all the years in between.",
 			},
