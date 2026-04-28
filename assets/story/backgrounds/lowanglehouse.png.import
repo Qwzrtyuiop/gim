@@ -2,12 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cxko3v2qsboev"
-valid=false
+uid="uid://rqdxx2e4s8tm"
+path="res://.godot/imported/lowanglehouse.png-4ebe3b0ba302d5e2f39b439875ce914f.ctex"
+metadata={
+"vram_texture": false
+}
 
 [deps]
 
-source_file="res://assets/story/backgrounds/lowanglehouse_2.jpeg"
+source_file="res://assets/story/backgrounds/lowanglehouse.png"
+dest_files=["res://.godot/imported/lowanglehouse.png-4ebe3b0ba302d5e2f39b439875ce914f.ctex"]
 
 [params]
 
