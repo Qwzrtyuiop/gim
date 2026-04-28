@@ -146,7 +146,7 @@ static func build() -> Dictionary:
 			"required_achievements": ["mapagsamantala"],
 		},
 		{
-			"background": StoryConstants.BACKGROUND_STORYDOOR,
+			"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
 			"background_fade": 0.22,
 			"text": "I put the payment in his hand.",
 			"actions": [
@@ -239,10 +239,10 @@ static func build() -> Dictionary:
 	var not_enough_index: int = composition.size()
 	composition.append_array([
 		{
-			"text": "I count them again anyway, because panic is stupid like that.",
+			"text": "I count them again anyway as if the amount would increase.",
 		},
 		{
-			"background": StoryConstants.BACKGROUND_STORYDOOR,
+			"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
 			"background_fade": 0.22,
 			"speaker": "John Toda",
 			"text": "This is what I have right now. I can get the rest tomorrow.",
@@ -277,7 +277,7 @@ static func build() -> Dictionary:
 		{
 			"background": StoryConstants.BACKGROUND_LOWANGLE_HOUSE,
 			"background_fade": 0.18,
-			"text": "The floor hits my shoulder before I understand I have fallen.",
+			"text": "The floor hits back in a raw thud.",
 		},
 	])
 	var not_enough_end_index: int = composition.size() - 1
@@ -285,7 +285,7 @@ static func build() -> Dictionary:
 	var paid_departure_index: int = composition.size()
 	composition.append_array([
 		{
-			"background": StoryConstants.BACKGROUND_STORYDOOR,
+			"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
 			"background_fade": 0.2,
 			"text": "He tosses the wallet back against my chest.",
 		},

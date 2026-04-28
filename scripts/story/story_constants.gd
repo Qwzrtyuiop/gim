@@ -8,7 +8,7 @@ const BACKGROUND_STATION := "res://assets/story/backgrounds/station.png"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/city.png"
 const BACKGROUND_STORYDOOR := "res://assets/story/backgrounds/storydoor.png"
 const BACKGROUND_STORYDOOR_ZOOM := "res://assets/story/backgrounds/storydoorzoom.png"
-const BACKGROUND_LOWANGLE_HOUSE := "res://assets/story/backgrounds/lowanglehouse_2.jpeg"
+const BACKGROUND_LOWANGLE_HOUSE := "res://assets/story/backgrounds/lowanglehouse.png"
 const BACKGROUND_STORE := "res://assets/story/backgrounds/store.png"
 
 const MUSIC_CITY_AMBIENCE := "res://assets/story/music/city_ambience.mp3"
