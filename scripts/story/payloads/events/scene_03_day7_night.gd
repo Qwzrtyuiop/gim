@@ -13,7 +13,7 @@ static func build() -> Dictionary:
 			"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
 			"background_fade": 0.28,
 			"pause_before": 0.18,
-			"text": "The television keeps talking even after I stop listening.",
+			"text": "The television plays on the background.",
 			"camera": {
 				"zoom": 1.0,
 				"focus": "center",
@@ -27,7 +27,7 @@ static func build() -> Dictionary:
 			],
 		},
 		{
-			"text": "Blue light crawls over the walls. Outside, the road has gone quiet enough to hear the house breathe.",
+			"text": "I open my phone and check the time.",
 		},
 		{
 			"text": "Then someone knocks.",
@@ -56,8 +56,6 @@ static func build() -> Dictionary:
 		},
 		{
 			"text": "The door opens before I can think of a better answer.",
-			"background": StoryConstants.BACKGROUND_STORYDOOR,
-			"background_fade": 0.22,
 			"actions": [
 				{
 					"type": "play_sfx",
