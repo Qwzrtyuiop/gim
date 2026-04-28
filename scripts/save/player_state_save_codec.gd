@@ -2,6 +2,7 @@ extends RefCounted
 class_name PlayerStateSaveCodec
 
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 
@@ -20,7 +21,7 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	if save_data.is_empty():
 		return false
 
-	var needs_migration_save := saved_version < 2
+	var needs_migration_save := saved_version < 4
 	player_state._is_loading_save = true
 	player_state._begin_state_batch()
 	player_state.money = int(save_data.get("money", player_state.money))
@@ -62,6 +63,11 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	if player_state.current_stage_special_type != player_state.STAGE_SPECIAL_TYPE_SPECIAL:
 		player_state.current_special_stage_id = ""
 	player_state.current_day = int(save_data.get("current_day", player_state.current_day))
+	var saved_current_phase: String = str(save_data.get("current_phase", "")).strip_edges().to_lower()
+	if saved_current_phase.is_empty():
+		saved_current_phase = PlayerDayPhaseTracker.phase_from_stage_type(player_state, player_state.current_stage_type)
+	player_state.current_phase = PlayerDayPhaseTracker.normalize_phase(player_state, saved_current_phase)
+	PlayerDayPhaseTracker.sync_stage_type_to_phase(player_state)
 	player_state.stage_round = int(save_data.get("stage_round", player_state.stage_round))
 	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
 	player_state.pending_trip_selection = Dictionary(save_data.get("pending_trip_selection", {})).duplicate(true)
@@ -115,7 +121,10 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	var saved_story_triggers: Array = save_data.get("story_triggers", [])
 	for trigger_data in saved_story_triggers:
 		if trigger_data is Dictionary:
-			player_state.story_triggers.append((trigger_data as Dictionary).duplicate(true))
+			var normalized_trigger := StoryTriggerService.normalize_trigger(player_state, (trigger_data as Dictionary).duplicate(true))
+			if normalized_trigger.is_empty():
+				continue
+			player_state.story_triggers.append(normalized_trigger)
 	var needs_story_trigger_save := StoryTriggerService.ensure_required_story_triggers(player_state.story_triggers)
 	player_state.consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
 	player_state.upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
@@ -123,6 +132,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
+	player_state.unlocked_gallery_images = Dictionary(save_data.get("unlocked_gallery_images", {})).duplicate(true)
+	player_state.gallery_image_unlocks_initialized = bool(save_data.get("gallery_image_unlocks_initialized", saved_version >= 4))
 	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
 	player_state.ride_select_tutorial_shown = bool(save_data.get("ride_select_tutorial_shown", player_state.ride_select_tutorial_shown))
 	player_state.store_tutorial_shown = bool(save_data.get("store_tutorial_shown", player_state.store_tutorial_shown))
@@ -158,6 +169,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"current_stage_special_type": player_state.current_stage_special_type,
 		"current_special_stage_id": player_state.current_special_stage_id,
 		"current_day": player_state.current_day,
+		"current_phase": player_state.current_phase,
 		"stage_round": player_state.stage_round,
 		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,
 		"pending_trip_selection": player_state.pending_trip_selection.duplicate(true),
@@ -201,6 +213,8 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"last_seen_story_sections": player_state.last_seen_story_sections.duplicate(true),
 		"last_seen_story_id": player_state.last_seen_story_id,
 		"event_values": player_state.event_values.duplicate(true),
+		"unlocked_gallery_images": player_state.unlocked_gallery_images.duplicate(true),
+		"gallery_image_unlocks_initialized": player_state.gallery_image_unlocks_initialized,
 		"resume_scene_path": player_state.resume_scene_path,
 		"ride_select_tutorial_shown": player_state.ride_select_tutorial_shown,
 		"store_tutorial_shown": player_state.store_tutorial_shown,

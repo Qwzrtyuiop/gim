@@ -82,10 +82,55 @@ static func build() -> Dictionary:
 		],
 	})
 
-	var agree_question_index: int = composition.size()
+	composition.append({
+		"text": "...",
+	})
+	composition.append({
+		"text": "I rev the engine of my ride once more.",
+	})
+	composition.append({
+		"text": "But it seems like Benny isn't done yet.",
+	})
 	composition.append({
 		"speaker": "Benny",
-		"text": "One more thing. Weren't you working in the city? What happened?\nI never expected you to take over your father's job. Doesn't seem like your thing.",
+		"text": "Oh right. Can I ask you something?",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "Depends.",
+	})
+
+	composition.append({
+		"speaker": "Benny",
+		"text": "Weren't you working in the city?",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "What happened?",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "I never expected you to take over your father's job.",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "Doesn't seem like your thing.",
+	})
+	composition.append({
+		"text": "I didn't think Benny would be the one to bring that up.",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "I...",
+	})
+	var agree_answer_choice_index: int = composition.size()
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
 		"choices": [],
 	})
 
@@ -102,10 +147,60 @@ static func build() -> Dictionary:
 		],
 	})
 
-	var dont_go_question_index: int = composition.size()
+	composition.append({
+		"text": "...",
+	})
+	composition.append({
+		"text": "I rev the engine of my ride once more.",
+	})
+	composition.append({
+		"text": "But it seems like Benny isn't done yet.",
+	})
 	composition.append({
 		"speaker": "Benny",
-		"text": "Fair enough. Still... weren't you working in the city? What happened?\nI never expected you to take over your father's job. Doesn't seem like your thing.",
+		"text": "Oh right. Can I ask you something?",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "Depends.",
+	})
+
+
+	composition.append({
+		"speaker": "Benny",
+		"text": "Fair enough.",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "Still... weren't you working in the city?",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "What happened?",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "I never expected you to take over your father's job.",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "Doesn't seem like your thing.",
+	})
+	composition.append({
+		"text": "I didn't think Benny would be the one to bring that up.",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "I...",
+	})
+	var dont_go_answer_choice_index: int = composition.size()
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
 		"choices": [],
 	})
 
@@ -113,7 +208,7 @@ static func build() -> Dictionary:
 	composition.append_array([
 		{
 			"speaker": "John Toda",
-			"text": "I lost the job.",
+			"text": "..I lost my job.",
 			"actions": [
 				{
 					"type": "set_event_value",
@@ -137,7 +232,12 @@ static func build() -> Dictionary:
 		},
 		{
 			"speaker": "John Toda",
-			"text": "That's how I ended up driving.",
+			"text": "So I thought. Why not?",
+			"required_achievements": ["tapat"],
+		},
+		{
+			"speaker": "John Toda",
+			"text": "That's pretty much how I ended up driving.",
 			"required_achievements": ["tapat"],
 		},
 		{
@@ -152,7 +252,7 @@ static func build() -> Dictionary:
 		},
 		{
 			"speaker": "Benny",
-			"text": "See you later if you can make it.",
+			"text": "Well...See you later if you can make it.",
 			"actions": [
 				{
 					"type": "set_event_value",
@@ -224,7 +324,7 @@ static func build() -> Dictionary:
 		},
 	]
 
-	composition[agree_question_index]["choices"] = [
+	composition[agree_answer_choice_index]["choices"] = [
 		{
 			"text": "Tell the truth",
 			"next_index": truth_index,
@@ -235,7 +335,7 @@ static func build() -> Dictionary:
 		},
 	]
 
-	composition[dont_go_question_index]["choices"] = [
+	composition[dont_go_answer_choice_index]["choices"] = [
 		{
 			"text": "Tell the truth",
 			"next_index": truth_index,

@@ -7,6 +7,7 @@ const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
+const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const HOME_BGM_PATH := "res://assets/story/music/peace.mp3"
 const HOME_REST_FADE_SECONDS := 0.28
@@ -146,14 +147,14 @@ func _build_crt_lines() -> void:
 func _ride_now() -> void:
 	if is_transitioning:
 		return
-	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
+	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _open_store() -> void:
 	if is_transitioning:
 		return
-	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
+	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(STORE_SCENE)
 
 
@@ -322,81 +323,17 @@ func _show_tutorial_step(step_index: int) -> void:
 
 
 func _layout_tutorial_for_targets(targets: Array) -> void:
-	var rect := _union_global_rect(targets)
-	var label_size := Vector2(620.0, 88.0)
-	if tutorial_text_label != null:
-		var text_len := tutorial_text_label.text.length()
-		if text_len > 180:
-			label_size.y = 170.0
-		elif text_len > 120:
-			label_size.y = 140.0
-	if rect.size == Vector2.ZERO:
-		tutorial_highlight.visible = false
-		tutorial_text_panel.size = label_size
-		tutorial_text_panel.global_position = Vector2(
-			(get_viewport_rect().size.x - label_size.x) * 0.5,
-			120.0
-		)
-		return
-
-	var padding := 14.0
-	rect.position -= Vector2(padding, padding)
-	rect.size += Vector2(padding * 2.0, padding * 2.0)
-	tutorial_highlight.visible = true
-	tutorial_highlight.global_position = rect.position
-	tutorial_highlight.size = rect.size
-
-	var label_pos := rect.position + Vector2((rect.size.x - label_size.x) * 0.5, rect.size.y + 16.0)
-	if label_pos.y + label_size.y > get_viewport_rect().size.y - 12.0:
-		label_pos.y = rect.position.y - label_size.y - 16.0
-	label_pos.y = maxf(label_pos.y, 12.0)
-	label_pos.x = clampf(label_pos.x, 20.0, get_viewport_rect().size.x - label_size.x - 20.0)
-	tutorial_text_panel.size = label_size
-	tutorial_text_panel.global_position = label_pos
+	TutorialOverlayHelper.layout_for_targets(self, tutorial_highlight, tutorial_text_panel, tutorial_text_label, targets)
 
 
 func _union_global_rect(targets: Array) -> Rect2:
-	var has_rect := false
-	var rect := Rect2()
-	for target in targets:
-		var control := target as Control
-		if control == null or not control.visible:
-			continue
-		var target_rect := control.get_global_rect()
-		if not has_rect:
-			rect = target_rect
-			has_rect = true
-		else:
-			rect = rect.merge(target_rect)
-	return rect
+	return TutorialOverlayHelper.union_global_rect(targets)
 
 
 func _set_tutorial_active(is_active: bool) -> void:
 	tutorial_active = is_active
-	if tutorial_overlay != null:
-		tutorial_overlay.visible = is_active
-		if is_active:
-			tutorial_overlay.grab_focus()
-	if tutorial_text_panel != null:
-		tutorial_text_panel.visible = is_active
-	if tutorial_text_label != null:
-		tutorial_text_label.visible = is_active
-
-	var buttons := [rest_button, store_button, ride_button]
-	if is_active:
-		tutorial_disabled_buttons.clear()
-		for button in buttons:
-			if button == null:
-				continue
-			tutorial_disabled_buttons[button] = button.disabled
-			button.disabled = true
-	else:
-		for button_variant in tutorial_disabled_buttons.keys():
-			var button := button_variant as BaseButton
-			if button == null:
-				continue
-			button.disabled = bool(tutorial_disabled_buttons.get(button, false))
-		tutorial_disabled_buttons.clear()
+	TutorialOverlayHelper.set_overlay_visible(is_active, tutorial_overlay, tutorial_text_panel, tutorial_text_label)
+	TutorialOverlayHelper.set_buttons_disabled(is_active, [rest_button, store_button, ride_button], tutorial_disabled_buttons)
 
 
 func _end_tutorial() -> void:
@@ -404,26 +341,11 @@ func _end_tutorial() -> void:
 
 
 func _make_tutorial_label() -> Label:
-	var label := Label.new()
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_override("font", UI_FONT)
-	label.add_theme_font_size_override("font_size", 12)
-	label.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88, 1.0))
-	label.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.04, 0.95))
-	label.add_theme_constant_override("outline_size", 2)
-	return label
+	return TutorialOverlayHelper.make_label(UI_FONT)
 
 
 func _is_any_press(event: InputEvent) -> bool:
-	if event is InputEventKey and event.pressed and not event.echo:
-		return true
-	if event is InputEventMouseButton and event.pressed:
-		return true
-	if event is InputEventJoypadButton and event.pressed:
-		return true
-	return false
+	return TutorialOverlayHelper.is_any_press(event)
 
 
 func _transition_home_rest(next_time: String) -> void:

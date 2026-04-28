@@ -6,11 +6,18 @@ extends Node
 # Shared services
 const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
+const PlayerCharacterProgressState := preload("res://scripts/state/player_character_progress_state.gd")
+const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
+const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
+const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
+const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
+const PlayerRunState := preload("res://scripts/state/player_run_state.gd")
+const PlayerStageState := preload("res://scripts/state/player_stage_state.gd")
+const PlayerStoryState := preload("res://scripts/state/player_story_state.gd")
+const PlayerUpgradeState := preload("res://scripts/state/player_upgrade_state.gd")
+const PlayerWeatherState := preload("res://scripts/state/player_weather_state.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
-const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
-const StoryTriggerRuntime := preload("res://scripts/story/story_trigger_runtime.gd")
-const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 
 # Signals
 signal money_changed(amount: int)
@@ -36,7 +43,7 @@ const STAGE_SPECIAL_TYPES := [
 ]
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const TOTAL_DEBT_GOAL := 50000
-const WEEKLY_DEBT_GOALS := [1000]
+const WEEKLY_DEBT_GOALS := [2500]
 const DEFAULT_STARTING_ENERGY := 10
 const DEFAULT_MAX_ENERGY := 10
 const DEFAULT_STARTING_GAS_PERCENT := 100.0
@@ -45,8 +52,8 @@ const GAS_CAN_PERCENT := 10.0
 const GAS_DRAIN_PERCENT_PER_1000_UNITS := 5.0
 const FUEL_EFFICIENCY_UPGRADE_ID := "fuel_efficiency"
 const LEGACY_TIRE_GRIP_UPGRADE_ID := "tire_grip"
-const FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL := 0.07
-const FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL := 0.04
+const FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL := 0.04
+const FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL := 0.025
 const LOW_GAS_PERCENT_THRESHOLD := 20.0
 const DEFAULT_GAS_PRICE := 70
 const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := 30.0
@@ -75,7 +82,7 @@ const STAGE_DISTANCE_RANGES := {
 	"long": Vector2(1150.0, 1650.0),
 }
 const SAVE_PATH := "user://progress_save.tres"
-const SAVE_VERSION := 2
+const SAVE_VERSION := 4
 const REST_ENERGY_BONUSES := {
 	TRANSITION_RIDE: 0,
 	TRANSITION_REST_TO_NIGHT: 2,
@@ -111,8 +118,8 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 	"chill": 0.92,
 	"normal": 1.0,
 	"traffic-jam": 1.12,
-	"busy": 1.24,
-	"speeders": 1.34,
+	"busy": 1.55,
+	"speeders": 1.24,
 }
 
 # Persistent run state
@@ -123,6 +130,7 @@ var current_stage_type := FIRST_STAGE_TYPE
 var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
 var current_special_stage_id := ""
 var current_day := 1
+var current_phase := "morning"
 var stage_round := 0
 var pending_stage_energy_cost := false
 var pending_trip_selection: Dictionary = {}
@@ -165,6 +173,8 @@ var consumed_story_triggers: Dictionary = {}
 var last_seen_story_sections: Dictionary = {}
 var last_seen_story_id := ""
 var event_values: Dictionary = {}
+var unlocked_gallery_images: Dictionary = {}
+var gallery_image_unlocks_initialized: bool = true
 var resume_scene_path := ""
 var ride_select_tutorial_shown := false
 var store_tutorial_shown := false
@@ -238,6 +248,10 @@ func flush_deferred_save() -> void:
 	save_progress()
 
 
+func _mark_deferred_save() -> void:
+	_has_deferred_save = true
+
+
 func _begin_state_batch() -> void:
 	_state_batch_depth += 1
 	_suppress_auto_save = true
@@ -257,59 +271,63 @@ func _end_state_batch(save_after := true, discard_deferred := false) -> void:
 
 # Story event and resume state
 func set_last_seen_story_section(story_id: String, section_index: int) -> void:
-	var safe_story_id := str(story_id).strip_edges()
-	if safe_story_id.is_empty():
-		return
-	last_seen_story_id = safe_story_id
-	last_seen_story_sections[safe_story_id] = max(-1, section_index)
-	save_progress()
+	PlayerStoryState.set_last_seen_story_section(self, story_id, section_index)
 
 
 func get_last_seen_story_section(story_id: String) -> int:
-	var safe_story_id := str(story_id).strip_edges()
-	if safe_story_id.is_empty():
-		return -1
-	return int(last_seen_story_sections.get(safe_story_id, -1))
+	return PlayerStoryState.get_last_seen_story_section(self, story_id)
 
 
 func get_last_seen_story_id() -> String:
-	return last_seen_story_id
+	return PlayerStoryState.get_last_seen_story_id(self)
+
+
+func has_seen_story(story_id: String) -> bool:
+	return PlayerStoryState.has_seen_story(self, story_id)
+
+
+func get_seen_story_ids() -> Array[String]:
+	return PlayerStoryState.get_seen_story_ids(self)
+
+
+func unlock_gallery_image(image_path: String) -> bool:
+	return PlayerStoryState.unlock_gallery_image(self, image_path)
+
+
+func unlock_gallery_images(image_paths: Array) -> int:
+	return PlayerStoryState.unlock_gallery_images(self, image_paths)
+
+
+func get_unlocked_gallery_image_paths() -> Array[String]:
+	return PlayerStoryState.get_unlocked_gallery_image_paths(self)
 
 
 func set_event_value(event_id: String, value) -> void:
-	if not StoryEventHandler.set_event_value(event_values, event_id, value):
-		return
-	save_progress()
+	PlayerStoryState.set_event_value(self, event_id, value)
 
 
 func set_event_values(values: Dictionary) -> void:
-	if not StoryEventHandler.set_event_values(event_values, values):
-		return
-	save_progress()
+	PlayerStoryState.set_event_values(self, values)
 
 
 func get_event_value(event_id: String, default_value = null):
-	return StoryEventHandler.get_event_value(event_values, event_id, default_value)
+	return PlayerStoryState.get_event_value(self, event_id, default_value)
 
 
 func has_event_value(event_id: String) -> bool:
-	return StoryEventHandler.has_event_value(event_values, event_id)
+	return PlayerStoryState.has_event_value(self, event_id)
 
 
 func clear_event_value(event_id: String) -> void:
-	if not StoryEventHandler.clear_event_value(event_values, event_id):
-		return
-	save_progress()
+	PlayerStoryState.clear_event_value(self, event_id)
 
 
 func get_event_values() -> Dictionary:
-	return StoryEventHandler.get_event_values(event_values)
+	return PlayerStoryState.get_event_values(self)
 
 
 func clear_event_values() -> void:
-	if not StoryEventHandler.clear_event_values(event_values):
-		return
-	save_progress()
+	PlayerStoryState.clear_event_values(self)
 
 
 func has_save_data() -> bool:
@@ -317,113 +335,77 @@ func has_save_data() -> bool:
 
 
 func set_resume_scene(scene_path: String) -> void:
-	var safe_scene_path := str(scene_path).strip_edges()
-	if safe_scene_path.is_empty() or resume_scene_path == safe_scene_path:
-		return
-	resume_scene_path = safe_scene_path
-	save_progress()
+	PlayerStoryState.set_resume_scene(self, scene_path)
 
 
 func get_resume_scene() -> String:
-	return resume_scene_path
+	return PlayerStoryState.get_resume_scene(self)
 
 
 # Tutorial state
 func has_ride_select_tutorial_shown() -> bool:
-	return ride_select_tutorial_shown
+	return PlayerStoryState.has_ride_select_tutorial_shown(self)
 
 
 func mark_ride_select_tutorial_shown() -> void:
-	if ride_select_tutorial_shown:
-		return
-	ride_select_tutorial_shown = true
-	save_progress()
+	PlayerStoryState.mark_ride_select_tutorial_shown(self)
 
 
 func has_store_tutorial_shown() -> bool:
-	return store_tutorial_shown
+	return PlayerStoryState.has_store_tutorial_shown(self)
 
 
 func mark_store_tutorial_shown() -> void:
-	if store_tutorial_shown:
-		return
-	store_tutorial_shown = true
-	save_progress()
+	PlayerStoryState.mark_store_tutorial_shown(self)
 
 
 func has_home_tutorial_shown() -> bool:
-	return home_tutorial_shown
+	return PlayerStoryState.has_home_tutorial_shown(self)
 
 
 func mark_home_tutorial_shown() -> void:
-	if home_tutorial_shown:
-		return
-	home_tutorial_shown = true
-	save_progress()
+	PlayerStoryState.mark_home_tutorial_shown(self)
 
 
 # Run setup and progression
 func begin_stage_sequence() -> void:
-	_begin_state_batch()
-	_apply_new_run_defaults()
-	last_stage_result.clear()
-	save_progress()
-	_end_state_batch()
+	PlayerRunState.begin_stage_sequence(self)
 
 
 func get_current_stage_type() -> String:
-	if current_stage_type.is_empty():
-		current_stage_type = FIRST_STAGE_TYPE
-	return current_stage_type
+	return PlayerRunState.current_stage_type(self)
 
 
 func normalize_stage_special_type(stage_special_type: String) -> String:
-	var safe_special_type: String = str(stage_special_type).strip_edges().to_lower()
-	return safe_special_type if STAGE_SPECIAL_TYPES.has(safe_special_type) else STAGE_SPECIAL_TYPE_NONE
+	return PlayerStageState.normalize_stage_special_type(self, stage_special_type)
 
 
 func normalize_special_stage_id(special_stage_id: String) -> String:
-	return str(special_stage_id).strip_edges().to_lower()
+	return PlayerStageState.normalize_special_stage_id(self, special_stage_id)
 
 
 func set_current_stage_special_type(stage_special_type: String) -> void:
-	current_stage_special_type = normalize_stage_special_type(stage_special_type)
-	if current_stage_special_type != STAGE_SPECIAL_TYPE_SPECIAL:
-		current_special_stage_id = ""
-	save_progress()
+	PlayerStageState.set_current_stage_special_type(self, stage_special_type)
 
 
 func get_current_stage_special_type() -> String:
-	return normalize_stage_special_type(current_stage_special_type)
+	return PlayerStageState.get_current_stage_special_type(self)
 
 
 func set_current_special_stage_id(special_stage_id: String) -> void:
-	if get_current_stage_special_type() != STAGE_SPECIAL_TYPE_SPECIAL:
-		current_special_stage_id = ""
-	else:
-		current_special_stage_id = normalize_special_stage_id(special_stage_id)
-	save_progress()
+	PlayerStageState.set_current_special_stage_id(self, special_stage_id)
 
 
 func get_current_special_stage_id() -> String:
-	if get_current_stage_special_type() != STAGE_SPECIAL_TYPE_SPECIAL:
-		return ""
-	return normalize_special_stage_id(current_special_stage_id)
+	return PlayerStageState.get_current_special_stage_id(self)
 
 
 func get_stage_special_display_name(stage_special_type: String) -> String:
-	match normalize_stage_special_type(stage_special_type):
-		STAGE_SPECIAL_TYPE_URGENT:
-			return "URGENT"
-		STAGE_SPECIAL_TYPE_CAREFUL:
-			return "CAREFUL"
-		STAGE_SPECIAL_TYPE_SPECIAL:
-			return "SPECIAL"
-	return ""
+	return PlayerStageState.stage_special_display_name(self, stage_special_type)
 
 
 func get_current_day() -> int:
-	return max(1, current_day)
+	return PlayerDayPhaseTracker.get_current_day(self)
 
 
 func get_current_debt_goal() -> int:
@@ -435,542 +417,265 @@ func get_total_debt_goal() -> int:
 
 
 func get_current_weekly_goal() -> int:
-	if remaining_debt <= 0:
-		return 0
-	if WEEKLY_DEBT_GOALS.is_empty():
-		return 0
-
-	var goal_index := clampi(debt_goal_index, 0, WEEKLY_DEBT_GOALS.size() - 1)
-	return mini(int(WEEKLY_DEBT_GOALS[goal_index]), remaining_debt)
+	return PlayerDebtState.current_weekly_goal(self)
 
 
 func get_days_until_debt_collection(day_number := -1) -> int:
-	var effective_day: int = int(day_number) if int(day_number) > 0 else get_current_day()
-	var cycle_day: int = ((effective_day - 1) % DEBT_COLLECTION_INTERVAL_DAYS) + 1
-	return DEBT_COLLECTION_INTERVAL_DAYS - cycle_day + 1
+	return PlayerDebtState.days_until_debt_collection(self, day_number)
 
 
 func get_week_number(day_number := -1) -> int:
-	var effective_day: int = int(day_number) if int(day_number) > 0 else get_current_day()
-	return maxi(1, int(floor(float(maxi(1, effective_day) - 1) / float(DEBT_COLLECTION_INTERVAL_DAYS))) + 1)
+	return PlayerDebtState.week_number(self, day_number)
 
 
 func get_stage_distance_range(difficulty: String) -> Vector2:
-	var safe_difficulty := difficulty if STAGE_DIFFICULTIES.has(difficulty) else "short"
-	return STAGE_DISTANCE_RANGES.get(safe_difficulty, STAGE_DISTANCE_RANGES["short"])
+	return PlayerStageState.stage_distance_range(self, difficulty)
 
 
 func get_stage_distance_average(difficulty: String) -> float:
-	var distance_range := get_stage_distance_range(difficulty)
-	return (distance_range.x + distance_range.y) * 0.5
+	return PlayerStageState.stage_distance_average(self, difficulty)
 
 
 func roll_stage_target_distance(difficulty: String) -> float:
-	var distance_range := get_stage_distance_range(difficulty)
-	return rng.randf_range(distance_range.x, distance_range.y)
+	return PlayerStageState.roll_stage_target_distance(self, difficulty)
 
 
 func get_debt_status_text(day_number := -1) -> String:
-	return "WEEKLY GOAL: PhP %d\nDebt Remaining: PhP %d     %s" % [
-		get_current_weekly_goal(),
-		get_total_debt_goal(),
-		get_debt_due_text(day_number),
-	]
+	return PlayerDebtState.debt_status_text(self, day_number)
 
 
 func get_debt_due_text(day_number := -1) -> String:
-	var days_left := get_days_until_debt_collection(day_number)
-	if days_left <= 0:
-		return "Collection Day."
-	var day_label := "day" if days_left == 1 else "days"
-	return "Debt due in %d %s" % [
-		days_left,
-		day_label,
-	]
+	return PlayerDebtState.debt_due_text(self, day_number)
 
 
 func get_current_time_of_day() -> String:
-	return _parse_stage_type(get_current_stage_type())["time"]
+	return PlayerDayPhaseTracker.get_current_phase(self)
 
 
 func normalize_transition_mode(transition_mode: String) -> String:
-	match transition_mode:
-		TRANSITION_CURRENT_STAGE, TRANSITION_REST_TO_NIGHT, TRANSITION_REST_TO_NEXT_DAY, TRANSITION_SLEEP_TO_NEXT_DAY:
-			return transition_mode
-	return TRANSITION_RIDE
+	return PlayerRunState.normalize_transition_mode(self, transition_mode)
 
 
 func get_next_stage_time(transition_mode: String = TRANSITION_RIDE) -> String:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	var current_time := get_current_time_of_day()
-
-	if safe_transition_mode == TRANSITION_CURRENT_STAGE:
-		return current_time
-	if _should_skip_night_phase_transition(safe_transition_mode, current_time):
-		return "morning"
-	if safe_transition_mode == TRANSITION_REST_TO_NIGHT and current_time == "morning":
-		return "night"
-	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY and current_time == "noon":
-		return "morning"
-	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		return "morning"
-
-	match current_time:
-		"morning":
-			return "noon"
-		"noon":
-			return "night"
-	return "morning"
+	return PlayerDayPhaseTracker.next_phase(self, transition_mode)
 
 
 func can_rest_after_stage() -> bool:
-	var current_time := get_current_time_of_day()
-	return (current_time == "morning" or current_time == "noon") and last_rest_day != get_current_day()
+	return PlayerRunState.can_rest_after_stage(self)
+
+
+func can_rest_after_stage_result(stage_time_of_day: String, stage_day := -1) -> bool:
+	return PlayerRunState.can_rest_after_stage_result(self, stage_time_of_day, stage_day)
 
 
 func has_rested_today() -> bool:
-	return last_rest_day == get_current_day()
+	return PlayerRunState.has_rested_today(self)
 
 
 func get_transition_display_day(transition_mode: String = TRANSITION_RIDE) -> int:
-	var display_day := get_current_day()
-	if will_advance_day(transition_mode):
-		display_day += 1
-	return max(1, display_day)
+	return PlayerDayPhaseTracker.transition_display_day(self, transition_mode)
+
+
+func get_home_ride_transition_mode() -> String:
+	return PlayerDayPhaseTracker.home_ride_transition_mode(self)
 
 
 # Economy and resource helpers
-func get_trip_gas_cost(_stage_descriptor := "") -> float:
-	return 0.0
-
-
 func get_distance_gas_cost(distance_units: float) -> float:
-	return maxf(0.0, distance_units) / 1000.0 * GAS_DRAIN_PERCENT_PER_1000_UNITS * get_distance_gas_consumption_multiplier()
+	return PlayerResourceState.distance_gas_cost(self, distance_units)
 
 
 func estimate_stage_gas_usage(stage_type: String) -> float:
-	var parts := _parse_stage_type(stage_type)
-	var difficulty_key := str(parts.get("difficulty", "short"))
-	return get_distance_gas_cost(get_stage_distance_average(difficulty_key))
+	return PlayerResourceState.estimate_stage_gas_usage(self, stage_type)
 
 
 func get_distance_gas_consumption_multiplier() -> float:
-	return maxf(0.45, 1.0 - get_fuel_efficiency_level() * FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL)
+	return PlayerResourceState.distance_gas_consumption_multiplier(self)
 
 
 func get_boost_gas_consumption_multiplier() -> float:
-	return maxf(0.60, 1.0 - get_fuel_efficiency_level() * FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL)
+	return PlayerResourceState.boost_gas_consumption_multiplier(self)
 
 
 func get_fuel_efficiency_level() -> int:
-	return maxi(
-		get_upgrade_level(FUEL_EFFICIENCY_UPGRADE_ID),
-		get_upgrade_level(LEGACY_TIRE_GRIP_UPGRADE_ID)
-	)
+	return PlayerUpgradeState.fuel_efficiency_level(self)
 
 
 func get_gas_price() -> int:
-	return max(0, gas_price)
+	return PlayerWeatherState.gas_price(self)
 
 
 func get_gas_price_text() -> String:
-	return "PhP %d.00" % get_gas_price()
+	return PlayerWeatherState.gas_price_text(self)
 
 
 func get_gas_price_change_text() -> String:
-	var absolute_delta: int = gas_price_delta
-	if absolute_delta < 0:
-		absolute_delta *= -1
-	if gas_price_delta > 0:
-		return "+PhP %d.00" % absolute_delta
-	if gas_price_delta < 0:
-		return "-PhP %d.00" % absolute_delta
-	return "PhP 0.00"
+	return PlayerWeatherState.gas_price_change_text(self)
 
 
 func get_gas_price_yesterday_percent_text() -> String:
-	var yesterday_price: float = maxf(1.0, float(previous_gas_price))
-	var raw_percent_change: float = (float(get_gas_price()) - yesterday_price) / yesterday_price * 100.0
-	var percent_change: float = clampf(raw_percent_change, -DAILY_GAS_PRICE_MAX_PERCENT_CHANGE, DAILY_GAS_PRICE_MAX_PERCENT_CHANGE)
-	if percent_change > 0.0:
-		return "+%.1f%%" % percent_change
-	if percent_change < 0.0:
-		return "%.1f%%" % percent_change
-	return "0.0%"
+	return PlayerWeatherState.gas_price_yesterday_percent_text(self)
 
 
 func set_gas_price(price: int) -> void:
-	gas_price = max(0, price)
-	gas_price_delta = gas_price - previous_gas_price
-	save_progress()
+	PlayerWeatherState.set_gas_price(self, price)
 
 
 func get_current_weather() -> String:
-	return get_stage_weather(get_current_time_of_day())
+	return PlayerWeatherState.current_weather(self)
 
 
 func get_current_weather_text() -> String:
-	return weather_text(get_current_weather())
+	return PlayerWeatherState.current_weather_text(self)
 
 
 func get_today_weather_forecast() -> String:
-	return get_weather_forecast_for_day(get_current_day())
+	return PlayerWeatherState.today_weather_forecast(self)
 
 
 func get_tomorrow_weather_forecast() -> String:
-	return get_weather_forecast_for_day(get_current_day() + 1)
+	return PlayerWeatherState.tomorrow_weather_forecast(self)
 
 
 func get_weather_forecast_for_day(day_number: int) -> String:
-	var safe_day: int = maxi(1, day_number)
-	_ensure_weather_forecast_for_day(safe_day)
-	return _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+	return PlayerWeatherState.weather_forecast_for_day(self, day_number)
 
 
 func get_stage_weather(day_time := "") -> String:
-	var safe_day: int = get_current_day()
-	if safe_day < WEATHER_SYSTEM_START_DAY:
-		return DEFAULT_WEATHER
-
-	_ensure_weather_forecast_for_day(safe_day)
-	var safe_time: String = str(day_time).strip_edges().to_lower()
-	if not STAGE_TIMES.has(safe_time):
-		safe_time = get_current_time_of_day()
-	var phase_key: String = _weather_phase_key(safe_day, safe_time)
-	if not weather_phase_cache.has(phase_key):
-		weather_phase_cache[phase_key] = _roll_weather_for_phase(get_weather_forecast_for_day(safe_day), safe_time)
-		save_progress()
-
-	current_weather = _normalize_weather(str(weather_phase_cache.get(phase_key, DEFAULT_WEATHER)))
-	return current_weather
+	return PlayerWeatherState.stage_weather(self, day_time)
 
 
 func weather_text(weather_value: String) -> String:
-	var safe_weather: String = _normalize_weather(weather_value)
-	match safe_weather:
-		WEATHER_CLOUDY:
-			return "Cloudy"
-		WEATHER_RAIN:
-			return "Rain"
-		WEATHER_HEAVY_RAIN:
-			return "Heavy Rain"
-	return "Clear"
+	return PlayerWeatherState.weather_text(self, weather_value)
 
 
 func get_daily_news_text() -> String:
-	return "TODAY'S NEWS\nGas Price:   %s      %s\nChange:   %s\nToday:   %s\nTomorrow:   %s" % [
-		get_gas_price_text(),
-		get_gas_price_yesterday_percent_text(),
-		get_gas_price_change_text(),
-		weather_text(get_today_weather_forecast()),
-		weather_text(get_tomorrow_weather_forecast()),
-	]
+	return PlayerWeatherState.daily_news_text(self)
 
 
 func ensure_daily_conditions_for_current_day() -> void:
-	var safe_day: int = get_current_day()
-	var needs_save: bool = false
-	if daily_conditions_day != safe_day:
-		_roll_daily_conditions_for_day(safe_day)
-		needs_save = true
-	if _ensure_weather_forecast_for_day(safe_day):
-		needs_save = true
-	if _ensure_weather_forecast_for_day(safe_day + 1):
-		needs_save = true
-	if needs_save:
-		save_progress()
+	PlayerWeatherState.ensure_daily_conditions_for_current_day(self)
 
 
 func add_gas(amount: float) -> void:
-	gas += amount
+	PlayerResourceState.add_gas(self, amount)
 
 
 func spend_gas(amount: float, save_immediately := true) -> bool:
-	if amount < 0.0 or gas + 0.001 < amount:
-		return false
-
-	_set_gas_with_save_mode(gas - amount, save_immediately)
-	return true
+	return PlayerResourceState.spend_gas(self, amount, save_immediately)
 
 
 func drain_gas(amount: float, save_immediately := true) -> float:
-	var consumed_amount: float = minf(maxf(0.0, amount), gas)
-	if consumed_amount <= 0.0:
-		return 0.0
-
-	_set_gas_with_save_mode(gas - consumed_amount, save_immediately)
-	return consumed_amount
-
-
-func _set_gas_with_save_mode(value: float, save_immediately: bool) -> void:
-	if save_immediately:
-		gas = value
-		return
-
-	_suppress_auto_save = true
-	gas = value
-	_suppress_auto_save = false
-	_has_deferred_save = true
+	return PlayerResourceState.drain_gas(self, amount, save_immediately)
 
 
 func gas_text() -> String:
-	return "%.1f%%" % gas
+	return PlayerResourceState.gas_text(self)
 
 
 func gas_capacity_text() -> String:
-	return "%.1f%%" % max_gas
+	return PlayerResourceState.gas_capacity_text(self)
 
 
 func gas_ratio() -> float:
-	return clampf(gas / maxf(1.0, max_gas), 0.0, 1.0)
+	return PlayerResourceState.gas_ratio(self)
 
 
 func is_low_gas() -> bool:
-	return gas <= LOW_GAS_PERCENT_THRESHOLD
+	return PlayerResourceState.is_low_gas(self)
 
 
 func get_energy_vehicle_modifiers() -> Dictionary:
-	var high_energy_level: int = maxi(0, energy - 7)
-	if high_energy_level > 0:
-		return {
-			"player_acceleration_x": 1.0 + high_energy_level * 0.05,
-			"player_max_speed": 1.0 + high_energy_level * 0.035,
-			"player_brake_x": 1.0 + high_energy_level * 0.04,
-			"player_lane_lerp_x": 1.0 + high_energy_level * 0.04,
-			"player_coast_x": 1.0,
-			"player_wiggle_intensity_x": 0.92,
-		}
-
-	var fatigue_level: int = maxi(0, 6 - energy)
-	var fatigue_ratio: float = float(fatigue_level) / 6.0
-	return {
-		"player_acceleration_x": 1.0 - fatigue_ratio * 0.45,
-		"player_max_speed": 1.0 - fatigue_ratio * 0.30,
-		"player_brake_x": 1.0 - fatigue_ratio * 0.35,
-		"player_lane_lerp_x": 1.0 - fatigue_ratio * 0.40,
-		"player_coast_x": 1.0 + fatigue_ratio * 0.35,
-		"player_wiggle_intensity_x": 1.0 + fatigue_ratio * 0.45,
-	}
+	return PlayerResourceState.energy_vehicle_modifiers(self)
 
 
 func boost_gas_is_available() -> bool:
-	return gas > 0.05
+	return PlayerResourceState.boost_gas_is_available(self)
 
 
 func apply_night_rest_bonus() -> int:
-	var applied_bonus := mini(NIGHT_SLEEP_ENERGY_BONUS, max_energy - energy)
-	record_rest()
-	if applied_bonus > 0:
-		add_energy(applied_bonus)
-	return applied_bonus
+	return PlayerResourceState.apply_night_rest_bonus(self)
 
 
 func get_stage_start_error(stage_descriptor := "") -> String:
-	if pending_stage_energy_cost:
-		return ""
-	if energy <= 0:
-		return "Not enough energy to start this trip."
+	return PlayerResourceState.stage_start_error(self, stage_descriptor)
 
-	if gas <= 0.0:
-		return "Not enough gas for this trip."
 
-	return ""
+func get_stage_start_error_after_transition(stage_descriptor := "", transition_mode: String = TRANSITION_RIDE) -> String:
+	return PlayerResourceState.stage_start_error_after_transition(self, stage_descriptor, transition_mode)
 
 
 func prepare_stage_start(stage_descriptor := "") -> bool:
-	if pending_stage_energy_cost:
-		return true
+	return PlayerResourceState.prepare_stage_start(self, stage_descriptor)
 
-	if not get_stage_start_error(stage_descriptor).is_empty():
-		return false
 
-	spend_energy(1)
-	current_trip_low_energy = energy <= AchievementService.LOW_ENERGY_THRESHOLD
-	current_trip_low_gas = is_low_gas()
-	pending_stage_energy_cost = true
-	save_progress()
-	return true
+func prepare_stage_start_after_transition(stage_descriptor := "", transition_mode: String = TRANSITION_RIDE) -> bool:
+	return PlayerResourceState.prepare_stage_start_after_transition(self, stage_descriptor, transition_mode)
 
 
 func confirm_stage_started() -> void:
-	pending_stage_energy_cost = false
-	save_progress()
+	PlayerResourceState.confirm_stage_started(self)
 
 
 func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	if _should_skip_night_phase_transition(safe_transition_mode, get_current_time_of_day()):
-		return true
-	if safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		return true
-	return safe_transition_mode == TRANSITION_RIDE and get_current_time_of_day() == "night"
+	return PlayerDayPhaseTracker.will_advance_day(self, transition_mode)
 
 
 func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		return 0
-	var energy_bonus := int(REST_ENERGY_BONUSES.get(safe_transition_mode, 0))
-	if will_advance_day(safe_transition_mode):
-		energy_bonus += END_OF_DAY_ENERGY_BONUS
-	return energy_bonus
+	return PlayerDayPhaseTracker.transition_energy_bonus(self, transition_mode)
 
 
 func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	var applied_bonus := mini(get_transition_energy_bonus(safe_transition_mode), max_energy - energy)
-	if safe_transition_mode == TRANSITION_REST_TO_NIGHT or safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY or safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY:
-		record_rest(1, get_current_time_of_day())
-	if applied_bonus > 0:
-		add_energy(applied_bonus)
-	return applied_bonus
+	return PlayerResourceState.apply_transition_energy_bonus(self, transition_mode)
 
 
 # Stage flow and transitions
 func advance_to_next_stage(transition_mode: String = TRANSITION_RIDE, selected_difficulty := "", forced_traffic := "") -> String:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	var current_time_before_advance := get_current_time_of_day()
-	var next_time := get_next_stage_time(safe_transition_mode)
-	var current_day_before_advance := get_current_day()
-	var next_day := current_day_before_advance
+	return PlayerRunState.advance_to_next_stage(self, transition_mode, selected_difficulty, forced_traffic)
 
-	if safe_transition_mode == TRANSITION_REST_TO_NIGHT or safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY:
-		last_rest_day = get_current_day()
 
-	if will_advance_day(safe_transition_mode):
-		next_day += 1
-
-	var next_stage := _random_stage_type_for_time(next_time, selected_difficulty, forced_traffic)
-	stage_round += 1
-	current_day = next_day
-	current_stage_type = next_stage
-	if current_day != current_day_before_advance:
-		_reset_daily_consumable_counters(current_day)
-		_roll_daily_conditions_for_day(current_day)
-	if will_advance_day(safe_transition_mode):
-		_resolve_debt_collection_for_day(current_day)
-	if pending_skip_night_phase and current_time_before_advance != "night" and next_time == "morning" and current_day > current_day_before_advance:
-		pending_skip_night_phase = false
-	save_progress()
-	return current_stage_type
+func advance_phase_after_stage_result(stage_time_of_day: String) -> bool:
+	return PlayerRunState.advance_phase_after_stage_result(self, stage_time_of_day)
 
 
 func prepare_day_start(target_day: int) -> void:
-	var safe_target_day: int = maxi(1, target_day)
-	if get_current_day() == safe_target_day and get_current_time_of_day() == "morning":
-		return
-
-	current_day = safe_target_day
-	current_stage_type = build_stage_type("short", "morning", "chill")
-	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
-	current_special_stage_id = ""
-	pending_stage_energy_cost = false
-	_reset_daily_consumable_counters(current_day)
-	_roll_daily_conditions_for_day(current_day)
-	_resolve_debt_collection_for_day(current_day)
-	save_progress()
+	PlayerRunState.prepare_day_start(self, target_day)
 
 
 func set_current_stage_time(day_time: String) -> void:
-	var safe_time := day_time if STAGE_TIMES.has(day_time) else "morning"
-	var stage_parts := _parse_stage_type(get_current_stage_type())
-	current_stage_type = build_stage_type(
-		str(stage_parts.get("difficulty", "short")),
-		safe_time,
-		str(stage_parts.get("traffic", "chill"))
-	)
-	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
-	current_special_stage_id = ""
-	save_progress()
+	PlayerRunState.set_current_stage_time(self, day_time)
 
 
 func _random_stage_type_for_time(day_time: String, selected_difficulty := "", forced_traffic := "") -> String:
-	var difficulty: String = selected_difficulty
-	if difficulty == "easy":
-		difficulty = "short"
-	if not STAGE_DIFFICULTIES.has(difficulty):
-		difficulty = STAGE_DIFFICULTIES[rng.randi_range(0, STAGE_DIFFICULTIES.size() - 1)]
-	var traffic_type := forced_traffic if STAGE_TRAFFIC_TYPES.has(forced_traffic) else get_random_stage_traffic_type()
-	return build_stage_type(difficulty, day_time, traffic_type)
+	return PlayerStageState.random_stage_type_for_time(self, day_time, selected_difficulty, forced_traffic)
 
 
 func _parse_stage_type(type_name: String) -> Dictionary:
-	var parts := type_name.split("-")
-	if parts.size() < 3:
-		return {
-			"difficulty": "short",
-			"time": "morning",
-			"traffic": "chill",
-		}
-
-	var traffic_name := ""
-	for index in range(2, parts.size()):
-		if not traffic_name.is_empty():
-			traffic_name += "-"
-		traffic_name += parts[index]
-
-	if parts[0] == "easy":
-		parts[0] = "short"
-	if not STAGE_DIFFICULTIES.has(parts[0]):
-		parts[0] = "short"
-	if not STAGE_TIMES.has(parts[1]):
-		parts[1] = "morning"
-	if not STAGE_TRAFFIC_TYPES.has(traffic_name):
-		traffic_name = "chill"
-
-	return {
-		"difficulty": parts[0],
-		"time": parts[1],
-		"traffic": traffic_name,
-	}
-
-
-func _difficulty_from_stage_descriptor(stage_descriptor: String) -> String:
-	var descriptor := stage_descriptor
-	if descriptor.is_empty():
-		descriptor = get_current_stage_type()
-	if descriptor == "easy":
-		return "short"
-	if STAGE_DIFFICULTIES.has(descriptor):
-		return descriptor
-	return str(_parse_stage_type(descriptor).get("difficulty", "short"))
+	return PlayerStageState.parse_stage_type(self, type_name)
 
 
 func add_money(amount: int) -> void:
-	money += amount
+	PlayerResourceState.add_money(self, amount)
 
 
 func spend_money(amount: int) -> bool:
-	if amount < 0 or money < amount:
-		return false
-
-	money -= amount
-	return true
+	return PlayerResourceState.spend_money(self, amount)
 
 
 func add_energy(amount: int) -> void:
-	energy += amount
+	PlayerResourceState.add_energy(self, amount)
 
 
 func add_max_energy(amount: int) -> void:
-	var safe_amount: int = int(amount)
-	if safe_amount == 0:
-		return
-	max_energy = maxi(1, max_energy + safe_amount)
-	energy = mini(energy, max_energy)
-	save_progress()
+	PlayerResourceState.add_max_energy(self, amount)
 
 
 func spend_energy(amount: int) -> bool:
-	if amount < 0 or energy < amount:
-		return false
-
-	energy -= amount
-	return true
+	return PlayerResourceState.spend_energy(self, amount)
 
 
 func add_karma(amount: int) -> void:
-	karma += amount
+	PlayerResourceState.add_karma(self, amount)
 
 
 func set_last_stage_result(result: Dictionary) -> void:
@@ -987,7 +692,7 @@ func claim_last_stage_total() -> int:
 	if last_stage_result.is_empty() or bool(last_stage_result.get("paid_out", false)):
 		return 0
 
-	var total := int(last_stage_result.get("total", 0))
+	var total: int = int(last_stage_result.get("total", 0))
 	add_money(total)
 	last_stage_result["paid_out"] = true
 	save_progress()
@@ -1004,84 +709,35 @@ func get_run_fail_reason() -> String:
 
 # Pending scene and transition state
 func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE, allow_back := true) -> void:
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	var should_preserve_locked_selection: bool = (
-		safe_transition_mode == TRANSITION_RIDE
-		or safe_transition_mode == TRANSITION_CURRENT_STAGE
-	)
-	var locked_characters: Array = []
-	var locked_character_pools: Dictionary = {}
-	var locked_distance := ""
-	if should_preserve_locked_selection:
-		locked_characters = pending_trip_selection.get("locked_characters", [])
-		locked_characters = locked_characters.duplicate(true)
-		locked_character_pools = Dictionary(pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
-		locked_distance = str(pending_trip_selection.get("selected_distance", ""))
-	pending_trip_selection = {
-		"return_scene": return_scene,
-		"transition_mode": safe_transition_mode,
-		"allow_back": bool(allow_back),
-	}
-	if not locked_character_pools.is_empty():
-		pending_trip_selection["locked_character_pools"] = locked_character_pools
-	if not locked_characters.is_empty():
-		pending_trip_selection["locked_characters"] = locked_characters
-	if STAGE_DIFFICULTIES.has(locked_distance):
-		pending_trip_selection["selected_distance"] = locked_distance
-	save_progress()
+	PlayerPendingState.set_pending_trip_selection(self, return_scene, transition_mode, allow_back)
 
 
 func get_pending_trip_selection() -> Dictionary:
-	return pending_trip_selection.duplicate(true)
+	return PlayerPendingState.get_pending_trip_selection(self)
 
 
 func has_locked_pending_trip_selection() -> bool:
-	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {}))
-	for difficulty_variant in STAGE_DIFFICULTIES:
-		var difficulty := str(difficulty_variant)
-		var pool: Array = locked_character_pools.get(difficulty, [])
-		if not pool.is_empty():
-			return true
-	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
-	return not locked_characters.is_empty()
+	return PlayerPendingState.has_locked_pending_trip_selection(self)
 
 
 func get_locked_pending_trip_character_pools() -> Dictionary:
-	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {}))
-	return locked_character_pools.duplicate(true)
+	return PlayerPendingState.get_locked_pending_trip_character_pools(self)
 
 
 func get_locked_pending_trip_characters() -> Array:
-	var locked_character_pools := Dictionary(pending_trip_selection.get("locked_character_pools", {}))
-	if not locked_character_pools.is_empty():
-		var selected_distance := get_locked_pending_trip_distance()
-		if selected_distance.is_empty():
-			selected_distance = "short"
-		var selected_pool: Array = locked_character_pools.get(selected_distance, [])
-		return selected_pool.duplicate(true)
-	var locked_characters: Array = pending_trip_selection.get("locked_characters", [])
-	return locked_characters.duplicate(true)
+	return PlayerPendingState.get_locked_pending_trip_characters(self)
 
 
 func get_locked_pending_trip_distance() -> String:
-	var locked_distance := str(pending_trip_selection.get("selected_distance", ""))
-	return locked_distance if STAGE_DIFFICULTIES.has(locked_distance) else ""
+	return PlayerPendingState.get_locked_pending_trip_distance(self)
 
 
 func lock_pending_trip_selection(locked_character_data, selected_distance: String) -> void:
-	pending_trip_selection.erase("locked_characters")
-	pending_trip_selection.erase("locked_character_pools")
-	if locked_character_data is Dictionary:
-		pending_trip_selection["locked_character_pools"] = Dictionary(locked_character_data).duplicate(true)
-	elif locked_character_data is Array:
-		pending_trip_selection["locked_characters"] = Array(locked_character_data).duplicate(true)
-	pending_trip_selection["selected_distance"] = selected_distance if STAGE_DIFFICULTIES.has(selected_distance) else "short"
-	save_progress()
+	PlayerPendingState.lock_pending_trip_selection(self, locked_character_data, selected_distance)
 
 
 func clear_pending_trip_selection() -> void:
-	pending_trip_selection.clear()
-	save_progress()
+	PlayerPendingState.clear_pending_trip_selection(self)
 
 
 # Seeded rider runtime
@@ -1089,7 +745,7 @@ func add_seeded_rider_rule(rule_data: Dictionary) -> void:
 	if rule_data.is_empty():
 		return
 
-	var normalized_rule := SeededRiderRuntime.normalize_rule(self, rule_data)
+	var normalized_rule: Dictionary = SeededRiderRuntime.normalize_rule(self, rule_data)
 	if normalized_rule.is_empty():
 		return
 
@@ -1124,7 +780,7 @@ func get_seeded_rider_rules() -> Array:
 
 
 func consume_seeded_rider_rules(rule_ids: Array) -> void:
-	var consumed_any := SeededRiderRuntime.consume_rules(consumed_seeded_rider_rules, rule_ids)
+	var consumed_any: bool = SeededRiderRuntime.consume_rules(consumed_seeded_rider_rules, rule_ids)
 	if consumed_any:
 		save_progress()
 
@@ -1134,129 +790,105 @@ func get_seeded_rider_pool_setup(selection_context: Dictionary) -> Dictionary:
 
 
 # Pending story state
-func set_pending_story(story_payload: Dictionary) -> void:
-	pending_story = story_payload.duplicate(true)
-	save_progress()
+func set_pending_story(story_payload: Dictionary, save_immediately: bool = true) -> void:
+	PlayerPendingState.set_pending_story(self, story_payload, save_immediately)
 
 
 func get_pending_story() -> Dictionary:
-	return pending_story.duplicate(true)
+	return PlayerPendingState.get_pending_story(self)
 
 
 func clear_pending_story() -> void:
-	pending_story.clear()
-	save_progress()
+	PlayerPendingState.clear_pending_story(self)
 
 
 func set_pending_sleep_transition_state(state: Dictionary) -> void:
-	pending_sleep_transition_state = state.duplicate(true)
-	save_progress()
+	PlayerPendingState.set_pending_sleep_transition_state(self, state)
 
 
 func get_pending_sleep_transition_state() -> Dictionary:
-	return pending_sleep_transition_state.duplicate(true)
+	return PlayerPendingState.get_pending_sleep_transition_state(self)
 
 
 func clear_pending_sleep_transition_state() -> void:
-	pending_sleep_transition_state.clear()
-	save_progress()
+	PlayerPendingState.clear_pending_sleep_transition_state(self)
 
 
 func set_pending_gameplay_entry_fade(duration: float) -> void:
-	pending_gameplay_entry_fade_duration = maxf(0.0, duration)
-	save_progress()
+	PlayerPendingState.set_pending_gameplay_entry_fade(self, duration)
 
 
 func consume_pending_gameplay_entry_fade() -> float:
-	var duration := pending_gameplay_entry_fade_duration
-	pending_gameplay_entry_fade_duration = 0.0
-	save_progress()
-	return maxf(0.0, duration)
+	return PlayerPendingState.consume_pending_gameplay_entry_fade(self)
 
 
 func clear_pending_gameplay_entry_fade() -> void:
-	pending_gameplay_entry_fade_duration = 0.0
-	save_progress()
+	PlayerPendingState.clear_pending_gameplay_entry_fade(self)
 
 
 func set_pending_result_music(music_state: Dictionary) -> void:
-	pending_result_music = music_state.duplicate(true)
+	PlayerPendingState.set_pending_result_music(self, music_state)
 
 
 func has_pending_night_phase_skip() -> bool:
-	return pending_skip_night_phase
+	return PlayerPendingState.has_pending_night_phase_skip(self)
 
 
 func set_pending_night_phase_skip(enabled: bool) -> void:
-	pending_skip_night_phase = bool(enabled)
-	save_progress()
+	PlayerPendingState.set_pending_night_phase_skip(self, enabled)
 
 
 func clear_pending_night_phase_skip() -> void:
-	if not pending_skip_night_phase:
-		return
-	pending_skip_night_phase = false
-	save_progress()
+	PlayerPendingState.clear_pending_night_phase_skip(self)
 
 
 func consume_pending_result_music() -> Dictionary:
-	var music_state := pending_result_music.duplicate(true)
-	pending_result_music.clear()
-	return music_state
+	return PlayerPendingState.consume_pending_result_music(self)
 
 
 func clear_pending_result_music() -> void:
-	pending_result_music.clear()
+	PlayerPendingState.clear_pending_result_music(self)
 
 
 func set_sleep_transition_resume_step(resume_step: String) -> void:
-	pending_sleep_transition_state["resume_step"] = resume_step
-	save_progress()
+	PlayerPendingState.set_sleep_transition_resume_step(self, resume_step)
 
 
 func get_sleep_transition_resume_step() -> String:
-	return str(pending_sleep_transition_state.get("resume_step", ""))
+	return PlayerPendingState.get_sleep_transition_resume_step(self)
 
 
 # Story trigger state
 func add_story_trigger(trigger_data: Dictionary) -> void:
-	if trigger_data.is_empty():
-		return
-
-	story_triggers.append(trigger_data.duplicate(true))
-	save_progress()
+	PlayerStoryState.add_story_trigger(self, trigger_data)
 
 
 func clear_story_triggers() -> void:
-	story_triggers.clear()
-	consumed_story_triggers.clear()
-	save_progress()
+	PlayerStoryState.clear_story_triggers(self)
 
 
 func get_story_triggers() -> Array:
-	return story_triggers.duplicate(true)
+	return PlayerStoryState.get_story_triggers(self)
 
 
 func normalize_story_trigger_phase(phase: String) -> String:
-	return StoryTriggerService.normalize_story_trigger_phase(phase)
+	return PlayerStoryState.normalize_story_trigger_phase(phase)
 
 
 func find_story_trigger_for_phase(phase: String, day_number := -1, context: Dictionary = {}) -> Dictionary:
-	return StoryTriggerRuntime.find_story_trigger_for_phase(self, phase, day_number, context)
+	return PlayerStoryState.find_story_trigger_for_phase(self, phase, day_number, context)
 
 
 func has_story_trigger_for_phase(phase: String, day_number := -1, context: Dictionary = {}) -> bool:
-	return not find_story_trigger_for_phase(phase, day_number, context).is_empty()
+	return PlayerStoryState.has_story_trigger_for_phase(self, phase, day_number, context)
 
 
 func get_story_payload_for_trigger(trigger_data: Dictionary) -> Dictionary:
-	return StoryTriggerService.get_story_payload_for_trigger(trigger_data)
+	return PlayerStoryState.get_story_payload_for_trigger(trigger_data)
 
 
 func consume_story_trigger(trigger_data: Dictionary) -> void:
-	if not StoryTriggerService.consume_story_trigger(consumed_story_triggers, trigger_data):
-		return
-	save_progress()
+	PlayerStoryState.consume_story_trigger(self, trigger_data)
 
 
 # Character catalog and stage previews
@@ -1301,222 +933,88 @@ func get_current_mock_character_session_dialogue(context: Dictionary = {}) -> Di
 
 
 func get_random_stage_traffic_type() -> String:
-	return str(STAGE_TRAFFIC_TYPES[rng.randi_range(0, STAGE_TRAFFIC_TYPES.size() - 1)])
+	return PlayerStageState.random_stage_traffic_type(self)
 
 
 func build_stage_type(difficulty: String, day_time: String, traffic_type: String) -> String:
-	var safe_difficulty := difficulty
-	if safe_difficulty == "easy":
-		safe_difficulty = "short"
-	if not STAGE_DIFFICULTIES.has(safe_difficulty):
-		safe_difficulty = "short"
-
-	var safe_time := day_time if STAGE_TIMES.has(day_time) else "morning"
-	var safe_traffic := traffic_type if STAGE_TRAFFIC_TYPES.has(traffic_type) else "chill"
-	return "%s-%s-%s" % [safe_difficulty, safe_time, safe_traffic]
+	return PlayerStageState.build_stage_type(self, difficulty, day_time, traffic_type)
 
 
 func get_stage_earnings_multiplier(day_time: String, traffic_type: String) -> float:
-	var time_multiplier := float(TIME_EARNINGS_MULTIPLIERS.get(day_time, 1.0))
-	var traffic_multiplier := float(TRAFFIC_EARNINGS_MULTIPLIERS.get(traffic_type, 1.0))
-	return time_multiplier * traffic_multiplier
+	return PlayerStageState.stage_earnings_multiplier(self, day_time, traffic_type)
 
 
 func apply_stage_earnings_modifiers(fare: int, bonus: int, day_time: String, traffic_type: String) -> Dictionary:
-	var multiplier := get_stage_earnings_multiplier(day_time, traffic_type)
-	return {
-		"fare": roundi(fare * multiplier),
-		"bonus": roundi(bonus * multiplier),
-		"multiplier": multiplier,
-	}
+	return PlayerStageState.apply_stage_earnings_modifiers(self, fare, bonus, day_time, traffic_type)
 
 
 func estimate_stage_earnings(stage_type: String, character_id := "") -> int:
-	var parts: Dictionary = _parse_stage_type(stage_type)
-	var difficulty_key := str(parts.get("difficulty", "short"))
-	var difficulty_profile: Dictionary = ESTIMATED_STAGE_PROFILES[difficulty_key].duplicate(true) if ESTIMATED_STAGE_PROFILES.has(difficulty_key) else ESTIMATED_STAGE_PROFILES["short"].duplicate(true)
-	var modifier_context := {
-		"stage_type": stage_type,
-		"difficulty": difficulty_key,
-		"time_of_day": str(parts.get("time", "morning")),
-		"traffic": str(parts.get("traffic", "chill")),
-	}
-	var effective_character_id: String = str(character_id).strip_edges().to_lower()
-	if effective_character_id.is_empty():
-		effective_character_id = current_mock_character_id
-	_apply_estimated_stage_profile_modifiers(
-		difficulty_profile,
-		get_character_stage_modifiers(effective_character_id, modifier_context)
-	)
-	var estimated_distance := get_stage_distance_average(difficulty_key)
-	var base_fare := estimated_distance * float(difficulty_profile["fare_php_per_meter"])
-	var estimated_bonus_seconds := float(difficulty_profile["time_limit"]) * ESTIMATED_BONUS_TIME_RATIO
-	var base_bonus := estimated_bonus_seconds * float(difficulty_profile["time_bonus_php_per_second"])
-	var multiplier := get_stage_earnings_multiplier(parts["time"], parts["traffic"])
-	return roundi((base_fare + base_bonus) * multiplier)
+	return PlayerStageState.estimate_stage_earnings(self, stage_type, character_id)
 
 
 # Achievements and failure state
 func _should_collect_debt_for_day(day_number: int) -> bool:
-	return day_number > 1 and ((day_number - 1) % DEBT_COLLECTION_INTERVAL_DAYS) == 0
+	return PlayerDebtState.should_collect_for_day(self, day_number)
 
 
 func _resolve_debt_collection_for_day(day_number: int) -> bool:
-	if last_debt_collection_day == day_number:
-		return not run_failed
-	if not _should_collect_debt_for_day(day_number):
-		return true
-
-	last_debt_collection_day = day_number
-	var goal_amount := get_current_weekly_goal()
-	if goal_amount <= 0:
-		return true
-	if money < goal_amount:
-		run_failed = true
-		run_fail_reason = "Debt collector came for PhP %d on Day %d. Hold R to reset progress." % [
-			goal_amount,
-			day_number,
-		]
-		save_progress()
-		return false
-
-	spend_money(goal_amount)
-	if debt_goal_index == 0 and non_gas_store_purchases_this_week == 0:
-		unlock_achievement("matipid")
-	remaining_debt = maxi(0, remaining_debt - goal_amount)
-	non_gas_store_purchases_this_week = 0
-	if debt_goal_index < WEEKLY_DEBT_GOALS.size() - 1:
-		debt_goal_index += 1
-	save_progress()
-	return true
+	return PlayerDebtState.resolve_collection_for_day(self, day_number)
 
 
 func set_current_mock_character(character_id: String) -> void:
-	var safe_character_id := str(character_id).strip_edges().to_lower()
-	current_mock_character_id = safe_character_id
-	save_progress()
+	PlayerCharacterProgressState.set_current_mock_character(self, character_id)
 
 
 func get_current_mock_character_id() -> String:
-	return current_mock_character_id
+	return PlayerCharacterProgressState.get_current_mock_character_id(self)
 
 
 func mark_mock_character_seen(character_id: String) -> void:
-	seen_mock_characters[character_id] = true
-	save_progress()
+	PlayerCharacterProgressState.mark_mock_character_seen(self, character_id)
 
 
 func has_seen_mock_character(character_id: String) -> bool:
-	return bool(seen_mock_characters.get(character_id, false))
+	return PlayerCharacterProgressState.has_seen_mock_character(self, character_id)
 
 
 func get_unique_character_progress(character_id: String) -> int:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	if safe_id.is_empty():
-		return 0
-	return int(unique_character_progress.get(safe_id, 0))
+	return PlayerCharacterProgressState.unique_character_progress(self, character_id)
 
 
 func is_unique_character_story_locked(character_id: String) -> bool:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	if safe_id.is_empty() or not is_unique_character(safe_id):
-		return false
-	return bool(locked_unique_character_stories.get(safe_id, false))
+	return PlayerCharacterProgressState.is_unique_character_story_locked(self, character_id)
 
 
 func set_unique_character_story_locked(character_id: String, locked := true) -> bool:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	if safe_id.is_empty() or not is_unique_character(safe_id):
-		return false
-	var should_lock: bool = bool(locked)
-	if should_lock:
-		locked_unique_character_stories[safe_id] = true
-	else:
-		locked_unique_character_stories.erase(safe_id)
-	save_progress()
-	return should_lock
+	return PlayerCharacterProgressState.set_unique_character_story_locked(self, character_id, locked)
 
 
 func set_unique_character_progress(character_id: String, progress: int) -> int:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	if safe_id.is_empty() or not is_unique_character(safe_id):
-		return get_unique_character_progress(safe_id)
-	unique_character_progress[safe_id] = maxi(0, int(progress))
-	save_progress()
-	return int(unique_character_progress[safe_id])
+	return PlayerCharacterProgressState.set_unique_character_progress(self, character_id, progress)
 
 
 func increment_unique_character_progress(character_id: String, amount := 1) -> int:
-	var safe_id := str(character_id).strip_edges().to_lower()
-	var safe_amount: int = maxi(0, int(amount))
-	if safe_id.is_empty() or safe_amount <= 0 or not is_unique_character(safe_id):
-		return get_unique_character_progress(safe_id)
-	if is_unique_character_story_locked(safe_id):
-		return get_unique_character_progress(safe_id)
-	unique_character_progress[safe_id] = get_unique_character_progress(safe_id) + safe_amount
-	save_progress()
-	return int(unique_character_progress[safe_id])
+	return PlayerCharacterProgressState.increment_unique_character_progress(self, character_id, amount)
 
 
 func has_consumed_unique_session_dialogue(entry_id: String) -> bool:
-	var safe_entry_id: String = str(entry_id).strip_edges()
-	if safe_entry_id.is_empty():
-		return false
-	return bool(consumed_unique_session_dialogue.get(safe_entry_id, false))
+	return PlayerCharacterProgressState.has_consumed_unique_session_dialogue(self, entry_id)
 
 
 func consume_unique_session_dialogue(entry_id: String) -> void:
-	var safe_entry_id: String = str(entry_id).strip_edges()
-	if safe_entry_id.is_empty() or has_consumed_unique_session_dialogue(safe_entry_id):
-		return
-	consumed_unique_session_dialogue[safe_entry_id] = true
-	save_progress()
+	PlayerCharacterProgressState.consume_unique_session_dialogue(self, entry_id)
 
 
 func is_unique_character(character_id: String) -> bool:
-	return StoryCatalog.is_unique_character(character_id)
-
-
-func _apply_estimated_stage_profile_modifiers(profile: Dictionary, modifiers: Dictionary) -> void:
-	if profile.is_empty() or modifiers.is_empty():
-		return
-	_apply_numeric_profile_modifier(profile, modifiers, "fare_php_per_meter")
-	_apply_numeric_profile_modifier(profile, modifiers, "time_limit")
-	_apply_numeric_profile_modifier(profile, modifiers, "time_bonus_php_per_second")
-
-
-func _apply_numeric_profile_modifier(profile: Dictionary, modifiers: Dictionary, key: String) -> void:
-	if not profile.has(key):
-		return
-
-	var resolved_value := float(profile.get(key, 0.0))
-	if modifiers.has(key):
-		resolved_value = float(modifiers[key])
-	if modifiers.has("%s_multiplier" % key):
-		resolved_value *= float(modifiers["%s_multiplier" % key])
-	if modifiers.has("%s_delta" % key):
-		resolved_value += float(modifiers["%s_delta" % key])
-	if modifiers.has("%s_min" % key):
-		resolved_value = maxf(resolved_value, float(modifiers["%s_min" % key]))
-	if modifiers.has("%s_cap" % key):
-		resolved_value = minf(resolved_value, float(modifiers["%s_cap" % key]))
-	profile[key] = resolved_value
+	return PlayerCharacterProgressState.is_unique_character(character_id)
 
 
 func set_upgrade_level(upgrade_id: String, level: int) -> void:
-	var safe_level: int = max(0, level)
-	upgrades[upgrade_id] = safe_level
-	upgrade_changed.emit(upgrade_id, safe_level)
-	save_progress()
+	PlayerUpgradeState.set_upgrade_level(self, upgrade_id, level)
 
 
 func get_upgrade_level(upgrade_id: String) -> int:
-	if upgrade_id == FUEL_EFFICIENCY_UPGRADE_ID:
-		return maxi(
-			int(upgrades.get(FUEL_EFFICIENCY_UPGRADE_ID, 0)),
-			int(upgrades.get(LEGACY_TIRE_GRIP_UPGRADE_ID, 0))
-		)
-	return int(upgrades.get(upgrade_id, 0))
+	return PlayerUpgradeState.get_upgrade_level(self, upgrade_id)
 
 
 func get_yosi_energy_restore() -> int:
@@ -1532,7 +1030,7 @@ func record_rest(amount := 1, time_of_day := "") -> int:
 
 
 func record_store_purchase(item_type: String) -> void:
-	var safe_item_type := str(item_type).strip_edges().to_lower()
+	var safe_item_type: String = str(item_type).strip_edges().to_lower()
 	if safe_item_type.is_empty() or safe_item_type == "gas":
 		return
 	non_gas_store_purchases_this_week += 1
@@ -1554,7 +1052,7 @@ func unlock_achievement(achievement_id: String) -> void:
 
 
 func fail_run(reason: String) -> void:
-	var safe_reason := str(reason).strip_edges()
+	var safe_reason: String = str(reason).strip_edges()
 	run_failed = true
 	run_fail_reason = safe_reason if not safe_reason.is_empty() else "John's run came to an end."
 	save_progress()
@@ -1572,117 +1070,37 @@ func get_unlocked_achievement_ids() -> Array[String]:
 	return AchievementService.get_unlocked_achievement_ids(self)
 
 
-func _apply_achievement_effects(achievement_id: String) -> void:
-	AchievementService.apply_achievement_effects(self, achievement_id)
-
-
 # Weather and daily condition state
 func _reset_daily_consumable_counters(day_number: int) -> void:
 	AchievementService.reset_daily_consumable_counters(self, day_number)
 
 
 func _roll_daily_conditions_for_day(day_number: int) -> void:
-	var safe_day: int = maxi(1, day_number)
-	previous_gas_price = gas_price
-	daily_conditions_day = safe_day
-	if safe_day > 1:
-		var percent_delta: float = rng.randf_range(-DAILY_GAS_PRICE_MAX_PERCENT_CHANGE, DAILY_GAS_PRICE_MAX_PERCENT_CHANGE)
-		var previous_price_float: float = maxf(1.0, float(previous_gas_price))
-		var raw_price: int = roundi(previous_price_float * (1.0 + percent_delta / 100.0))
-		var min_price: int = ceili(previous_price_float * (1.0 - DAILY_GAS_PRICE_MAX_PERCENT_CHANGE / 100.0))
-		var max_price: int = floori(previous_price_float * (1.0 + DAILY_GAS_PRICE_MAX_PERCENT_CHANGE / 100.0))
-		gas_price = clampi(raw_price, min_price, maxi(min_price, max_price))
-	else:
-		gas_price = DEFAULT_GAS_PRICE
-	gas_price_delta = gas_price - previous_gas_price
-	_ensure_weather_forecast_for_day(safe_day)
-	_ensure_weather_forecast_for_day(safe_day + 1)
-	current_weather = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
+	PlayerWeatherState.roll_daily_conditions_for_day(self, day_number)
 
 
 func _ensure_weather_forecast_for_day(day_number: int) -> bool:
-	var safe_day: int = maxi(1, day_number)
-	if weather_forecasts.has(safe_day):
-		weather_forecasts[safe_day] = _normalize_weather(str(weather_forecasts.get(safe_day, DEFAULT_WEATHER)))
-		return false
-
-	if safe_day < WEATHER_SYSTEM_START_DAY:
-		weather_forecasts[safe_day] = DEFAULT_WEATHER
-	else:
-		weather_forecasts[safe_day] = _roll_weather_forecast()
-	return true
+	return PlayerWeatherState.ensure_weather_forecast_for_day(self, day_number)
 
 
 func _roll_weather_forecast() -> String:
-	var roll: int = rng.randi_range(1, 100)
-	if roll <= 45:
-		return DEFAULT_WEATHER
-	if roll <= 70:
-		return WEATHER_CLOUDY
-	if roll <= 93:
-		return WEATHER_RAIN
-	return WEATHER_HEAVY_RAIN
+	return PlayerWeatherState.roll_weather_forecast(self)
 
 
 func _roll_weather_for_phase(day_forecast: String, day_time: String) -> String:
-	var safe_forecast: String = _normalize_weather(day_forecast)
-	var safe_time: String = day_time
-	if not STAGE_TIMES.has(safe_time):
-		safe_time = "morning"
-	if safe_time == "night":
-		return _roll_night_weather_for_forecast(safe_forecast)
-
-	var roll: int = rng.randi_range(1, 100)
-	match safe_forecast:
-		WEATHER_CLOUDY:
-			if roll <= 70:
-				return WEATHER_CLOUDY
-			return DEFAULT_WEATHER
-		WEATHER_RAIN:
-			if roll <= 68:
-				return WEATHER_RAIN
-			return WEATHER_CLOUDY
-		WEATHER_HEAVY_RAIN:
-			if roll <= 52:
-				return WEATHER_HEAVY_RAIN
-			if roll <= 87:
-				return WEATHER_RAIN
-			return WEATHER_CLOUDY
-	if roll <= 82:
-		return DEFAULT_WEATHER
-	return WEATHER_CLOUDY
+	return PlayerWeatherState.roll_weather_for_phase(self, day_forecast, day_time)
 
 
 func _roll_night_weather_for_forecast(day_forecast: String) -> String:
-	var safe_forecast: String = _normalize_weather(day_forecast)
-	var roll: int = rng.randi_range(1, 100)
-	match safe_forecast:
-		WEATHER_CLOUDY:
-			if roll <= 18:
-				return WEATHER_RAIN
-			return DEFAULT_WEATHER
-		WEATHER_RAIN:
-			if roll <= 82:
-				return WEATHER_RAIN
-			return WEATHER_HEAVY_RAIN
-		WEATHER_HEAVY_RAIN:
-			if roll <= 62:
-				return WEATHER_HEAVY_RAIN
-			return WEATHER_RAIN
-	return DEFAULT_WEATHER
+	return PlayerWeatherState.roll_night_weather_for_forecast(self, day_forecast)
 
 
 func _weather_phase_key(day_number: int, day_time: String) -> String:
-	return "%d:%s" % [maxi(1, day_number), day_time]
+	return PlayerWeatherState.weather_phase_key(day_number, day_time)
 
 
 func _normalize_weather(weather_value: String) -> String:
-	var safe_weather: String = str(weather_value).strip_edges().to_lower()
-	if safe_weather == "heavy-rain" or safe_weather == "heavy_rain":
-		safe_weather = WEATHER_HEAVY_RAIN
-	if WEATHER_TYPES.has(safe_weather):
-		return safe_weather
-	return DEFAULT_WEATHER
+	return PlayerWeatherState.normalize_weather(self, weather_value)
 
 
 # Reset helpers
@@ -1709,73 +1127,31 @@ func _normalize_tamad_rest_time(time_of_day: String) -> String:
 
 
 func _reset_story_triggers() -> void:
-	story_triggers = StoryTriggerService.build_default_story_triggers()
-	consumed_story_triggers.clear()
+	PlayerStoryState.reset_story_triggers(self)
 
 
 func _reset_resource_state() -> void:
-	money = 0
-	max_energy = DEFAULT_MAX_ENERGY
-	energy = DEFAULT_STARTING_ENERGY
-	max_gas = DEFAULT_MAX_GAS_PERCENT
-	gas = DEFAULT_STARTING_GAS_PERCENT
-	karma = 0
+	PlayerResourceState.reset_resource_state(self)
 
 
 func _reset_weather_state() -> void:
-	gas_price = DEFAULT_GAS_PRICE
-	gas_price_delta = 0
-	previous_gas_price = DEFAULT_GAS_PRICE
-	current_weather = DEFAULT_WEATHER
-	weather_forecasts.clear()
-	weather_forecasts[1] = DEFAULT_WEATHER
-	weather_phase_cache.clear()
-	daily_conditions_day = 1
+	PlayerWeatherState.reset_weather_state(self)
 
 
 func _reset_pending_runtime_state() -> void:
-	pending_stage_energy_cost = false
-	pending_trip_selection.clear()
-	pending_story.clear()
-	pending_sleep_transition_state.clear()
-	pending_gameplay_entry_fade_duration = 0.0
-	pending_result_music.clear()
-	pending_skip_night_phase = false
+	PlayerPendingState.reset_pending_runtime_state(self)
 
 
 func _reset_daily_run_state() -> void:
-	last_rest_day = 0
-	yosi_bought_today = 0
-	yosi_bought_day = 1
-	yosi_bought_total = 0
-	rests_taken_today = 0
-	rests_taken_day = 1
-	tamad_rest_day = 1
-	tamad_rest_times_today.clear()
-	rides_completed_today = 0
-	rides_completed_day = 1
-	non_gas_store_purchases_this_week = 0
-	clean_stage_streak = 0
-	current_trip_low_energy = false
-	current_trip_low_gas = false
-	low_resource_trip_count = 0
-	low_both_resource_trip_count = 0
+	PlayerRunState.reset_daily_run_state(self)
 
 
 func _reset_debt_and_failure_state() -> void:
-	debt_goal_index = 0
-	last_debt_collection_day = 0
-	remaining_debt = TOTAL_DEBT_GOAL
-	run_failed = false
-	run_fail_reason = ""
+	PlayerDebtState.reset_debt_and_failure_state(self)
 
 
 func _reset_character_progress_state() -> void:
-	current_mock_character_id = ""
-	seen_mock_characters.clear()
-	unique_character_progress.clear()
-	locked_unique_character_stories.clear()
-	consumed_unique_session_dialogue.clear()
+	PlayerCharacterProgressState.reset_character_progress_state(self)
 
 
 func _reset_seeded_rider_state() -> void:
@@ -1784,43 +1160,19 @@ func _reset_seeded_rider_state() -> void:
 
 
 func _reset_story_progress_state() -> void:
-	last_seen_story_sections.clear()
-	last_seen_story_id = ""
-	event_values.clear()
-	_reset_story_triggers()
+	PlayerStoryState.reset_story_progress_state(self)
 
 
 func _reset_tutorial_state() -> void:
-	ride_select_tutorial_shown = false
-	store_tutorial_shown = false
-	home_tutorial_shown = false
+	PlayerStoryState.reset_tutorial_state(self)
 
 
 func _apply_new_run_defaults() -> void:
-	stage_round = 0
-	current_stage_type = FIRST_STAGE_TYPE
-	current_stage_special_type = STAGE_SPECIAL_TYPE_NONE
-	current_special_stage_id = ""
-	current_day = 1
-	_reset_weather_state()
-	_reset_pending_runtime_state()
-	_reset_daily_run_state()
-	_reset_debt_and_failure_state()
-	_reset_story_triggers()
+	PlayerRunState.apply_new_run_defaults(self)
 
 
 func _should_skip_night_phase_transition(transition_mode: String, current_time: String) -> bool:
-	if not pending_skip_night_phase:
-		return false
-	var safe_transition_mode := normalize_transition_mode(str(transition_mode))
-	var safe_current_time := str(current_time).strip_edges().to_lower()
-	if safe_current_time == "night":
-		return false
-	if safe_transition_mode == TRANSITION_SLEEP_TO_NEXT_DAY or safe_transition_mode == TRANSITION_REST_TO_NEXT_DAY:
-		return false
-	if safe_current_time == "noon":
-		return safe_transition_mode == TRANSITION_RIDE
-	return safe_current_time == "morning" and safe_transition_mode == TRANSITION_REST_TO_NIGHT
+	return PlayerRunState.should_skip_night_phase_transition(self, transition_mode, current_time)
 
 
 func _delete_save_file() -> void:

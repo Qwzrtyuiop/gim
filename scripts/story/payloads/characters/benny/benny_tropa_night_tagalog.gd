@@ -1,6 +1,7 @@
 extends RefCounted
 
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
+const TROPA_CG := "res://assets/specialCG/tropaCg.png"
 
 
 static func build() -> Dictionary:
@@ -198,9 +199,11 @@ static func build() -> Dictionary:
 				"speaker": "Ben",
 				"text": "Gag-.",
 			},
-			{
-				"text": "At parang ganun lang, nagsitawanan kaming lahat.",
-			},
+				{
+					"background": TROPA_CG,
+					"background_fade": 0.45,
+					"text": "At parang ganun lang, nagsitawanan kaming lahat.",
+				},
 			{
 				"text": "Di nagtagal, at nagsimula silang magkwento tungkol sakanilang buhay.",
 			},

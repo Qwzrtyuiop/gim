@@ -6,7 +6,9 @@ extends Control
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -64,17 +66,21 @@ var background_motion_tween: Tween
 var bgm_fade_tween: Tween
 var debt_overlay_tween: Tween
 var is_input_locked := false
+var shown_gallery_images: Dictionary = {}
 
 
 func _ready() -> void:
-	PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
 	_apply_theme()
 	_load_story_payload()
+	if not _is_replay_mode():
+		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
 	_refresh_background_transform()
 	await _play_intro_fade()
-	var resume_index := PlayerState.get_last_seen_story_section(story_id)
-	if resume_index < 0 or resume_index >= story_lines.size():
-		resume_index = 0
+	var resume_index: int = 0
+	if not _is_replay_mode():
+		resume_index = PlayerState.get_last_seen_story_section(story_id)
+		if resume_index < 0 or resume_index >= story_lines.size():
+			resume_index = 0
 	await _restore_story_music_state(resume_index)
 	await _show_line(resume_index)
 
@@ -105,6 +111,7 @@ func _load_story_payload() -> void:
 	else:
 		story_payload = pending_story
 
+	shown_gallery_images.clear()
 	story_lines.clear()
 	var raw_lines: Array = []
 	if story_payload.has("composition"):
@@ -126,6 +133,9 @@ func _load_story_payload() -> void:
 	current_background_ref = story_payload.get("background", null)
 	current_left_portrait_ref = story_payload.get("left_portrait", null)
 	current_right_portrait_ref = story_payload.get("right_portrait", null)
+	_remember_gallery_image(current_background_ref)
+	_remember_gallery_image(current_left_portrait_ref)
+	_remember_gallery_image(current_right_portrait_ref)
 
 
 func _restore_story_music_state(resume_index: int) -> void:
@@ -196,7 +206,8 @@ func _show_line(index: int) -> void:
 
 	is_input_locked = true
 	current_line_index = resolved_index
-	PlayerState.set_last_seen_story_section(story_id, resolved_index)
+	if not _is_replay_mode():
+		PlayerState.set_last_seen_story_section(story_id, resolved_index)
 	var line := story_lines[resolved_index]
 	continue_label.visible = false
 	await _pause_for_seconds(float(line.get("pause_before", 0.0)))
@@ -278,7 +289,7 @@ func _render_choices(line: Dictionary) -> void:
 		button.text = str(choice_data.get("text", "CONTINUE"))
 		var is_disabled := bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
 		button.disabled = is_disabled
-		button.focus_mode = Control.FOCUS_NONE if is_disabled else Control.FOCUS_ALL
+		button.focus_mode = Control.FOCUS_NONE
 		_apply_choice_button_theme(button)
 		if not is_disabled:
 			button.pressed.connect(_choose_branch.bind(choice_data))
@@ -287,16 +298,23 @@ func _render_choices(line: Dictionary) -> void:
 		if not is_disabled:
 			ButtonGlow.attach(self, button)
 
-	for button in choice_buttons:
-		if is_instance_valid(button) and not button.disabled:
-			button.grab_focus()
-			break
 	if choice_buttons.is_empty():
 		choice_container.visible = false
 		continue_label.visible = true
 
 
 func _run_choice_actions(choice_data: Dictionary) -> void:
+	if _is_replay_mode():
+		var replay_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
+		for replay_action_variant in replay_actions:
+			if not replay_action_variant is Dictionary:
+				continue
+			var replay_action: Dictionary = (replay_action_variant as Dictionary).duplicate(true)
+			if not _matches_story_conditions(replay_action):
+				continue
+			await _run_story_action(replay_action)
+		return
+
 	if choice_data.has("event_values"):
 		PlayerState.set_event_values(choice_data.get("event_values", {}))
 	elif choice_data.has("event_id") or choice_data.has("event_value") or choice_data.has("key"):
@@ -404,10 +422,13 @@ func _finish_story() -> void:
 	if target_scene.is_empty():
 		target_scene = FALLBACK_SCENE
 
-	if bool(story_payload.get("prepare_stage_start", false)):
+	if not _is_replay_mode() and bool(story_payload.get("prepare_stage_start", false)):
 		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
 		if not PlayerState.prepare_stage_start(stage_descriptor):
 			target_scene = return_scene_path if not return_scene_path.is_empty() else FALLBACK_SCENE
+
+	if not _is_replay_mode():
+		StoryGalleryUnlocker.unlock_gallery_images(PlayerState, _shown_gallery_image_paths())
 
 	await _play_outro_fade()
 	PlayerState.clear_pending_story()
@@ -435,6 +456,8 @@ func _set_portrait(frame: Panel, portrait_rect: TextureRect, texture_ref) -> voi
 	var portrait_texture := _resolve_texture(texture_ref)
 	frame.visible = portrait_texture != null
 	portrait_rect.texture = portrait_texture
+	if portrait_texture != null:
+		_remember_gallery_image(texture_ref)
 	if frame.visible:
 		frame.modulate = INACTIVE_PORTRAIT_MODULATE
 
@@ -443,10 +466,29 @@ func _set_background_texture(texture_ref, reset_camera := false) -> void:
 	var resolved_texture := _resolve_texture(texture_ref)
 	background.texture = resolved_texture
 	background.visible = resolved_texture != null
+	if resolved_texture != null:
+		_remember_gallery_image(texture_ref)
 	if reset_camera:
 		background_zoom = 1.0
 		background_pan = Vector2.ZERO
 	_refresh_background_transform()
+
+
+func _remember_gallery_image(texture_ref) -> void:
+	var image_path: String = StoryGalleryUnlocker.normalize_image_path(texture_ref)
+	if image_path.is_empty():
+		return
+	shown_gallery_images[image_path] = true
+
+
+func _shown_gallery_image_paths() -> Array:
+	var image_paths: Array = []
+	for image_path_variant in shown_gallery_images.keys():
+		var image_path: String = str(image_path_variant)
+		if image_path.is_empty():
+			continue
+		image_paths.append(image_path)
+	return image_paths
 
 
 func _resolve_texture(texture_ref) -> Texture2D:
@@ -505,9 +547,16 @@ func _resolve_visible_story_index(index: int) -> int:
 		var line: Dictionary = story_lines[candidate_index]
 		if _matches_story_conditions(line):
 			return candidate_index
-		candidate_index = _next_story_index_from_line(line, candidate_index)
+		candidate_index = _next_story_index_from_hidden_line(line, candidate_index)
 		safety_limit -= 1
 	return -1
+
+
+func _next_story_index_from_hidden_line(line: Dictionary, fallback_index: int) -> int:
+	var skip_index: int = int(line.get("skip_index", line.get("next_index_if_skipped", -1)))
+	if skip_index >= 0:
+		return skip_index
+	return _next_story_index_from_line(line, fallback_index)
 
 
 func _next_story_index_from_line(line: Dictionary, fallback_index: int) -> int:
@@ -544,6 +593,8 @@ func _matches_story_conditions(data: Dictionary) -> bool:
 	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "required_event_values", "required_event_value"), true):
 		return false
 	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "forbidden_event_values", "forbidden_event_value"), false):
+		return false
+	if not _matches_money_conditions(condition_source):
 		return false
 	return true
 
@@ -582,6 +633,38 @@ func _condition_dictionary(condition_source: Dictionary, plural_key: String, sin
 	if singular_variant is Dictionary:
 		values.merge((singular_variant as Dictionary).duplicate(true), true)
 	return values
+
+
+func _matches_money_conditions(condition_source: Dictionary) -> bool:
+	var current_money: int = int(PlayerState.money)
+	var exact_money = _first_condition_value(condition_source, ["money", "money_equals", "required_money"])
+	if exact_money != null and current_money != int(exact_money):
+		return false
+
+	var min_money = _first_condition_value(condition_source, ["min_money", "money_at_least", "required_min_money", "required_money_at_least"])
+	if min_money != null and current_money < int(min_money):
+		return false
+
+	var max_money = _first_condition_value(condition_source, ["max_money", "money_at_most", "required_max_money", "required_money_at_most"])
+	if max_money != null and current_money > int(max_money):
+		return false
+
+	var money_less_than = _first_condition_value(condition_source, ["money_less_than", "required_money_less_than"])
+	if money_less_than != null and current_money >= int(money_less_than):
+		return false
+
+	var money_more_than = _first_condition_value(condition_source, ["money_more_than", "required_money_more_than"])
+	if money_more_than != null and current_money <= int(money_more_than):
+		return false
+
+	return true
+
+
+func _first_condition_value(condition_source: Dictionary, keys: Array[String]):
+	for key in keys:
+		if condition_source.has(key):
+			return condition_source[key]
+	return null
 
 
 func _preview_story_payload() -> Dictionary:
@@ -726,91 +809,57 @@ func _play_outro_fade() -> void:
 
 
 func _run_story_action(action_data: Dictionary) -> void:
-	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
+	if _is_replay_mode() and _is_persistent_story_action(action_data):
+		return
+	await StoryActionRunner.run(self, action_data)
+
+
+func _is_replay_mode() -> bool:
+	return bool(story_payload.get("replay", story_payload.get("memory_replay", false)))
+
+
+func _is_persistent_story_action(action_data: Dictionary) -> bool:
+	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
-		"pause", "wait":
-			await _pause_for_seconds(float(action_data.get("duration", action_data.get("time", 0.0))))
-		"fade_to_black", "screen_fade_out":
-			await _fade_background_overlay(1.0, float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS)))
-		"fade_from_black", "screen_fade_in":
-			await _fade_background_overlay(0.0, float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS)))
-		"fade_screen":
-			await _fade_background_overlay(
-				clampf(float(action_data.get("alpha", action_data.get("target_alpha", background_fade_overlay.color.a))), 0.0, 1.0),
-				float(action_data.get("duration", DEFAULT_SCREEN_FADE_SECONDS))
-			)
-		"play_music", "music_play":
-			await _play_music_action(action_data)
-		"stop_music", "music_stop":
-			await _stop_music_action(action_data)
 		"unlock_achievement", "achievement_unlock":
-			PlayerState.unlock_achievement(str(action_data.get("id", action_data.get("achievement_id", ""))))
+			return true
 		"set_event_value", "story_event", "event_value":
-			_apply_set_event_value_action(action_data)
+			return true
 		"set_event_values", "story_events", "event_values":
-			_apply_set_event_values_action(action_data)
+			return true
 		"clear_event_value", "erase_event_value":
-			PlayerState.clear_event_value(str(action_data.get("id", action_data.get("event_id", action_data.get("key", "")))))
+			return true
 		"clear_event_values", "erase_event_values":
-			PlayerState.clear_event_values()
+			return true
+		"add_story_trigger", "insert_story_trigger", "queue_story_trigger":
+			return true
+		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
+			return true
 		"add_money", "gain_money":
-			PlayerState.add_money(int(action_data.get("amount", 0)))
+			return true
+		"spend_money", "pay_money":
+			return true
+		"spend_all_money", "take_all_money":
+			return true
+		"collect_debt", "pay_debt_goal":
+			return true
 		"add_energy", "gain_energy":
-			PlayerState.add_energy(int(action_data.get("amount", 0)))
+			return true
 		"add_max_energy", "gain_max_energy":
-			PlayerState.add_max_energy(int(action_data.get("amount", 0)))
+			return true
 		"add_karma", "change_karma":
-			PlayerState.add_karma(int(action_data.get("amount", 0)))
+			return true
 		"add_character_progress", "increase_character_progress", "character_progress":
-			_apply_character_progress_action(action_data)
+			return true
 		"set_character_progress", "character_progress_set":
-			_apply_set_character_progress_action(action_data)
+			return true
 		"set_character_story_lock", "character_story_lock":
-			_apply_character_story_lock_action(action_data)
+			return true
 		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
-			PlayerState.set_pending_night_phase_skip(bool(action_data.get("enabled", action_data.get("value", true))))
+			return true
 		"clear_pending_night_skip":
-			PlayerState.clear_pending_night_phase_skip()
-		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
-			_play_sfx_action(action_data)
-		"stop_sfx", "sfx_stop":
-			sfx_player.stop()
-		"set_portrait", "change_portrait":
-			_apply_portrait_action(action_data)
-		"clear_portrait":
-			_clear_portrait_action(action_data)
-		"portrait_switch", "focus_portrait":
-			_apply_portrait_focus_from_side(str(action_data.get("side", action_data.get("focus", "none"))))
-		"set_dialogue", "dialogue":
-			_set_dialogue_content(
-				str(action_data.get("speaker", speaker_label.text)),
-				str(action_data.get("text", body_label.text)),
-				str(action_data.get("continue_hint", continue_label.text if not continue_label.text.is_empty() else DEFAULT_CONTINUE_HINT)),
-				bool(action_data.get("visible", true))
-			)
-		"background_camera", "bg_camera", "camera":
-			_apply_background_camera_action(action_data)
-		"zoom_background", "bg_zoom":
-			_apply_background_camera_action({
-				"zoom": action_data.get("zoom", action_data.get("value", action_data.get("amount", background_zoom))),
-				"duration": action_data.get("duration", DEFAULT_BG_CAMERA_DURATION),
-			})
-		"pan_background", "bg_pan":
-			_apply_background_camera_action({
-				"pan": action_data.get("pan", action_data.get("value", action_data.get("offset", action_data.get("focus", null)))),
-				"duration": action_data.get("duration", DEFAULT_BG_CAMERA_DURATION),
-			})
-		"reset_background_camera", "bg_reset":
-			_set_background_camera(1.0, Vector2.ZERO, float(action_data.get("duration", DEFAULT_BG_CAMERA_DURATION)))
-		"hide_dialogue":
-			dialogue_panel.visible = false
-		"show_dialogue":
-			dialogue_panel.visible = true
-		"set_background":
-			current_background_ref = action_data.get("texture", action_data.get("background", action_data.get("path", null)))
-			_set_background_texture(current_background_ref, not bool(action_data.get("preserve_camera", false)))
-			if _has_background_camera_data(action_data):
-				_apply_background_camera_action(action_data)
+			return true
+	return false
 
 
 func _play_music_action(action_data: Dictionary) -> void:

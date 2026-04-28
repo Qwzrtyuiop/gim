@@ -8,9 +8,9 @@ static func player_upgrade_modifiers() -> Dictionary:
 	var engine_level := PlayerState.get_upgrade_level("engine_tune")
 	var brakes_level := PlayerState.get_upgrade_level("brake_kit")
 	return {
-		"player_acceleration_x": 1.0 + engine_level * 0.2,
-		"player_max_speed": 1.0 + engine_level * 0.2,
-		"player_brake_x": 1.0 + brakes_level * 0.10,
+		"player_acceleration_x": 1.0 + engine_level * 0.12,
+		"player_max_speed": 1.0 + engine_level * 0.12,
+		"player_brake_x": 1.0 + brakes_level * 0.06,
 		"player_lane_lerp_x": 1.0,
 	}
 
@@ -78,6 +78,7 @@ static func store_stage_result(
 		"overtime": overtime_seconds,
 		"completed": true,
 	})
+	PlayerState.advance_phase_after_stage_result(stage_time_of_day)
 	PlayerState.record_stage_completion()
 
 
@@ -124,6 +125,7 @@ static func store_failed_stage_result(
 		"completed": false,
 		"failure_reason": failure_reason,
 	})
+	PlayerState.advance_phase_after_stage_result(stage_time_of_day)
 
 
 static func stage_complete_story_payload(stage_type: String, stage_difficulty: String, stage_time_of_day: String, stage_traffic: String) -> Dictionary:

@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://d1efue5uhvbjs" path="res://assets/menu/buttons/start_inactive.png" id="6_d72k0"]
 [ext_resource type="Texture2D" uid="uid://duotevl0m03dt" path="res://assets/menu/buttons/quit_inactive.png" id="8_xc3vo"]
 [ext_resource type="Texture2D" path="res://assets/ui/button_generic.png" id="9_achbtn"]
+[ext_resource type="Texture2D" uid="uid://bt02h2f4nnxt5" path="res://assets/menu/buttons/gallery_inactive.png" id="10_gallery"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("5_y265i")
@@ -109,16 +110,16 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -160.0
-offset_top = -2.0
-offset_right = 160.0
-offset_bottom = 396.0
+offset_left = -195.0
+offset_top = -76.0
+offset_right = 195.0
+offset_bottom = 290.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 6
 
 [node name="StartButton" type="TextureButton" parent="Menu" unique_id=57344172]
-custom_minimum_size = Vector2(390, 144)
+custom_minimum_size = Vector2(390, 118)
 layout_mode = 2
 tooltip_text = "Start Ride"
 texture_normal = ExtResource("6_d72k0")
@@ -128,8 +129,32 @@ texture_focused = ExtResource("6_d72k0")
 ignore_texture_size = true
 stretch_mode = 0
 
+[node name="GalleryButton" type="TextureButton" parent="Menu"]
+custom_minimum_size = Vector2(390, 118)
+layout_mode = 2
+tooltip_text = "Gallery"
+texture_normal = ExtResource("10_gallery")
+texture_pressed = ExtResource("10_gallery")
+texture_hover = ExtResource("10_gallery")
+texture_focused = ExtResource("10_gallery")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="GalleryLabel" type="Label" parent="Menu/GalleryButton"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "GALLERY"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="QuitButton" type="TextureButton" parent="Menu" unique_id=1859904405]
-custom_minimum_size = Vector2(390, 144)
+custom_minimum_size = Vector2(390, 118)
 layout_mode = 2
 tooltip_text = "Quit"
 texture_normal = ExtResource("8_xc3vo")
@@ -139,9 +164,52 @@ texture_focused = ExtResource("8_xc3vo")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="AchievementsButton" type="TextureButton" parent="Menu"]
-custom_minimum_size = Vector2(320, 72)
-layout_mode = 2
+[node name="DebugUnlockAllButton" type="TextureButton" parent="."]
+visible = false
+z_index = 10
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -308.0
+offset_top = -118.0
+offset_right = -26.0
+offset_bottom = -70.0
+grow_horizontal = 0
+grow_vertical = 0
+tooltip_text = "Debug: Unlock Achievements and Memories"
+texture_normal = ExtResource("9_achbtn")
+texture_pressed = ExtResource("9_achbtn")
+texture_hover = ExtResource("9_achbtn")
+texture_focused = ExtResource("9_achbtn")
+ignore_texture_size = true
+stretch_mode = 0
+
+[node name="DebugUnlockAllLabel" type="Label" parent="DebugUnlockAllButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "DEBUG UNLOCK"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="AchievementsButton" type="TextureButton" parent="."]
+z_index = 10
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 38.0
+offset_top = -56.0
+offset_right = 286.0
+offset_bottom = -14.0
+grow_vertical = 0
 tooltip_text = "Achievements"
 texture_normal = ExtResource("9_achbtn")
 texture_pressed = ExtResource("9_achbtn")
@@ -150,7 +218,7 @@ texture_focused = ExtResource("9_achbtn")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="AchievementsLabel" type="Label" parent="Menu/AchievementsButton"]
+[node name="AchievementsLabel" type="Label" parent="AchievementsButton"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -194,9 +262,9 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -410.0
+offset_left = -300.0
 offset_top = -64.0
-offset_right = 410.0
+offset_right = 300.0
 offset_bottom = -12.0
 grow_horizontal = 2
 grow_vertical = 0
