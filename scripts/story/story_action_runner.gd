@@ -36,6 +36,15 @@ static func run(owner, action_data: Dictionary) -> void:
 			_add_seeded_rider_from_action(action_data)
 		"add_money", "gain_money":
 			PlayerState.add_money(int(action_data.get("amount", 0)))
+		"spend_money", "pay_money":
+			PlayerState.spend_money(int(action_data.get("amount", 0)))
+			PlayerState.save_progress()
+		"spend_all_money", "take_all_money":
+			PlayerState.spend_money(maxi(0, int(PlayerState.money)))
+			PlayerState.save_progress()
+		"collect_debt", "pay_debt_goal":
+			var collection_day: int = int(action_data.get("day", action_data.get("day_number", PlayerState.get_current_day())))
+			PlayerState._resolve_debt_collection_for_day(collection_day)
 		"add_energy", "gain_energy":
 			PlayerState.add_energy(int(action_data.get("amount", 0)))
 		"add_max_energy", "gain_max_energy":

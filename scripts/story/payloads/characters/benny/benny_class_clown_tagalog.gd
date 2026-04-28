@@ -75,11 +75,34 @@ static func build() -> Dictionary:
 			},
 		],
 	})
+	
+	composition.append({
+		"text": "...",
+	})
+	composition.append({
+		"text": "Pinaandar ko muli ang makina ng aking motor.",
+	})
+	composition.append({
+		"text": "Pero mukhang hindi pa tapos magtanong si Benny.",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "Teka lang. May tanong lang ako bago ka umalis.",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "Ano yun?",
+	})
+	
 
 	var agree_question_index: int = composition.size()
 	composition.append({
 		"speaker": "Benny",
-		"text": "Oo nga pala. Hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nBa't ka nag-trirtricycle driver ngayon?",
+		"text": "Hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nBa't ka nag-trirtricycle driver ngayon?",
 		"choices": [],
 	})
 
@@ -95,18 +118,45 @@ static func build() -> Dictionary:
 			},
 		],
 	})
+	composition.append({
+		"text": "...",
+	})
+	composition.append({
+		"text": "Pinaandar ko muli ang makina ng aking motor.",
+	})
+	composition.append({
+		"text": "Pero mukhang hindi pa tapos magtanong si Benny.",
+	})
+	composition.append({
+		"speaker": "Benny",
+		"text": "Teka lang. May tanong lang ako bago ka umalis.",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
+	})
+	composition.append({
+		"speaker": "John Toda",
+		"text": "Ano yun?",
+	})
 
 	var dont_go_question_index: int = composition.size()
 	composition.append({
 		"speaker": "Benny",
-		"text": "Sige. Pero... hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nBa't ka nag-trirtricycle driver ngayon?",
+		"text": "Hindi ba sa siyudad ka nagtatrabaho dati? Ano'ng nangyari?\nBa't ka nag-trirtricycle driver ngayon?",
 	})
 
 	var truth_index: int = composition.size()
+
+	composition.append({
+		"speaker": "John Toda",
+		"text": "...",
+	})
+
 	composition.append_array([
 		{
 			"speaker": "John Toda",
-			"text": "Ayun, nawalan ako ng trabaho.",
+			"text": "Nawalan ako ng trabaho. Tapos masyadong mahal rin manirahan sa siyudad kaya yun, umalis ako.",
 			"actions": [
 				{
 					"type": "set_event_value",

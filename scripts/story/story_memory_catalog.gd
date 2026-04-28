@@ -187,6 +187,29 @@ static func unlock_all(player_state) -> void:
 	player_state.save_progress()
 
 
+static func unlock_gallery_and_memories_only(player_state) -> void:
+	var unlock_entries: Array = MEMORY_ENTRIES.duplicate(true)
+	var image_paths: Array[String] = []
+
+	for entry_variant in unlock_entries:
+		if not entry_variant is Dictionary:
+			continue
+
+		var entry: Dictionary = entry_variant as Dictionary
+		var story_id: String = str(entry.get("unlock_story_id", "")).strip_edges()
+		if story_id.is_empty():
+			continue
+
+		var section_index: int = maxi(0, player_state.get_last_seen_story_section(story_id))
+		player_state.set_last_seen_story_section(story_id, section_index)
+		var payload: Dictionary = _build_payload_for_story_id(story_id)
+		_append_unique_image_paths(image_paths, StoryGalleryUnlocker.collect_payload_gallery_image_paths(payload))
+
+	player_state.unlock_gallery_images(image_paths)
+	player_state.gallery_image_unlocks_initialized = true
+	player_state.save_progress()
+
+
 static func _migrate_seen_story_gallery_images(player_state) -> void:
 	if bool(player_state.gallery_image_unlocks_initialized):
 		return

@@ -289,7 +289,7 @@ func _render_choices(line: Dictionary) -> void:
 		button.text = str(choice_data.get("text", "CONTINUE"))
 		var is_disabled := bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
 		button.disabled = is_disabled
-		button.focus_mode = Control.FOCUS_NONE if is_disabled else Control.FOCUS_ALL
+		button.focus_mode = Control.FOCUS_NONE
 		_apply_choice_button_theme(button)
 		if not is_disabled:
 			button.pressed.connect(_choose_branch.bind(choice_data))
@@ -298,10 +298,6 @@ func _render_choices(line: Dictionary) -> void:
 		if not is_disabled:
 			ButtonGlow.attach(self, button)
 
-	for button in choice_buttons:
-		if is_instance_valid(button) and not button.disabled:
-			button.grab_focus()
-			break
 	if choice_buttons.is_empty():
 		choice_container.visible = false
 		continue_label.visible = true
@@ -551,9 +547,16 @@ func _resolve_visible_story_index(index: int) -> int:
 		var line: Dictionary = story_lines[candidate_index]
 		if _matches_story_conditions(line):
 			return candidate_index
-		candidate_index = _next_story_index_from_line(line, candidate_index)
+		candidate_index = _next_story_index_from_hidden_line(line, candidate_index)
 		safety_limit -= 1
 	return -1
+
+
+func _next_story_index_from_hidden_line(line: Dictionary, fallback_index: int) -> int:
+	var skip_index: int = int(line.get("skip_index", line.get("next_index_if_skipped", -1)))
+	if skip_index >= 0:
+		return skip_index
+	return _next_story_index_from_line(line, fallback_index)
 
 
 func _next_story_index_from_line(line: Dictionary, fallback_index: int) -> int:
@@ -590,6 +593,8 @@ func _matches_story_conditions(data: Dictionary) -> bool:
 	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "required_event_values", "required_event_value"), true):
 		return false
 	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "forbidden_event_values", "forbidden_event_value"), false):
+		return false
+	if not _matches_money_conditions(condition_source):
 		return false
 	return true
 
@@ -628,6 +633,38 @@ func _condition_dictionary(condition_source: Dictionary, plural_key: String, sin
 	if singular_variant is Dictionary:
 		values.merge((singular_variant as Dictionary).duplicate(true), true)
 	return values
+
+
+func _matches_money_conditions(condition_source: Dictionary) -> bool:
+	var current_money: int = int(PlayerState.money)
+	var exact_money = _first_condition_value(condition_source, ["money", "money_equals", "required_money"])
+	if exact_money != null and current_money != int(exact_money):
+		return false
+
+	var min_money = _first_condition_value(condition_source, ["min_money", "money_at_least", "required_min_money", "required_money_at_least"])
+	if min_money != null and current_money < int(min_money):
+		return false
+
+	var max_money = _first_condition_value(condition_source, ["max_money", "money_at_most", "required_max_money", "required_money_at_most"])
+	if max_money != null and current_money > int(max_money):
+		return false
+
+	var money_less_than = _first_condition_value(condition_source, ["money_less_than", "required_money_less_than"])
+	if money_less_than != null and current_money >= int(money_less_than):
+		return false
+
+	var money_more_than = _first_condition_value(condition_source, ["money_more_than", "required_money_more_than"])
+	if money_more_than != null and current_money <= int(money_more_than):
+		return false
+
+	return true
+
+
+func _first_condition_value(condition_source: Dictionary, keys: Array[String]):
+	for key in keys:
+		if condition_source.has(key):
+			return condition_source[key]
+	return null
 
 
 func _preview_story_payload() -> Dictionary:
@@ -799,6 +836,12 @@ func _is_persistent_story_action(action_data: Dictionary) -> bool:
 		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
 			return true
 		"add_money", "gain_money":
+			return true
+		"spend_money", "pay_money":
+			return true
+		"spend_all_money", "take_all_money":
+			return true
+		"collect_debt", "pay_debt_goal":
 			return true
 		"add_energy", "gain_energy":
 			return true
