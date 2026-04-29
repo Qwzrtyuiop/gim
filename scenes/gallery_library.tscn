@@ -132,10 +132,13 @@ offset_right = -28.0
 offset_bottom = -86.0
 grow_horizontal = 2
 grow_vertical = 2
+horizontal_scroll_mode = 0
+follow_focus = true
 
 [node name="ListContainer" type="VBoxContainer" parent="Panel/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="EmptyLabel" type="Label" parent="Panel"]

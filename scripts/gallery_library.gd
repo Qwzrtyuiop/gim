@@ -8,6 +8,7 @@ const MODE_MEMORY := "memory"
 const GALLERY_COLUMNS := 3
 const GALLERY_TILE_SIZE := Vector2(330.0, 184.0)
 const MEMORY_ROW_SIZE := Vector2(0.0, 72.0)
+const MOUSE_WHEEL_SCROLL_STEP := 96
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const StoryMemoryCatalog := preload("res://scripts/story/story_memory_catalog.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -53,6 +54,9 @@ func _ready() -> void:
 	replay_button.pressed.connect(_replay_selected_memory)
 	back_button.pressed.connect(_go_back)
 	close_image_button.pressed.connect(_hide_expanded_image)
+	scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll_container.follow_focus = true
+	list_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	image_overlay.visible = false
 	_show_gallery()
 
@@ -156,6 +160,7 @@ func _make_gallery_tile(entry: Dictionary) -> Button:
 	texture_rect.texture = _load_texture(str(entry.get("image", "")))
 	button.add_child(texture_rect)
 	button.pressed.connect(_show_expanded_image.bind(entry))
+	button.gui_input.connect(_on_scrollable_child_gui_input)
 	ButtonGlow.attach(self, button)
 	return button
 
@@ -205,8 +210,41 @@ func _make_memory_button(entry: Dictionary) -> Button:
 	button.add_child(subtitle_label)
 
 	button.pressed.connect(_select_entry.bind(entry))
+	button.gui_input.connect(_on_scrollable_child_gui_input)
 	ButtonGlow.attach(self, button)
 	return button
+
+
+func _on_scrollable_child_gui_input(event: InputEvent) -> void:
+	if _apply_mouse_wheel_scroll(event):
+		get_viewport().set_input_as_handled()
+
+
+func _apply_mouse_wheel_scroll(event: InputEvent) -> bool:
+	if not event is InputEventMouseButton:
+		return false
+
+	var mouse_event := event as InputEventMouseButton
+	if not mouse_event.pressed:
+		return false
+
+	var direction := 0
+	match mouse_event.button_index:
+		MOUSE_BUTTON_WHEEL_UP:
+			direction = -1
+		MOUSE_BUTTON_WHEEL_DOWN:
+			direction = 1
+		_:
+			return false
+
+	var scrollbar := scroll_container.get_v_scroll_bar()
+	var max_scroll := int(maxf(0.0, scrollbar.max_value - scrollbar.page))
+	scroll_container.scroll_vertical = clampi(
+		scroll_container.scroll_vertical + direction * MOUSE_WHEEL_SCROLL_STEP,
+		0,
+		max_scroll
+	)
+	return true
 
 
 func _select_entry(entry: Dictionary) -> void:
