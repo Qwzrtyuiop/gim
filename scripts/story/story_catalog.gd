@@ -63,6 +63,11 @@ static func get_unique_character_story_state(player_state, character_id: String,
 	var current_stage: Dictionary = story_stages[stage_index]
 	var next_stage: Dictionary = story_stages[stage_index + 1] if stage_index + 1 < story_stages.size() else {}
 	var resolved_modifiers: Dictionary = _resolve_story_stage_modifiers(current_stage, context)
+	var base_ride_modifiers: Variant = character_data.get("ride_modifiers", {})
+	if base_ride_modifiers is Dictionary:
+		var merged_modifiers: Dictionary = (base_ride_modifiers as Dictionary).duplicate(true)
+		merged_modifiers.merge(resolved_modifiers, true)
+		resolved_modifiers = merged_modifiers
 
 	return {
 		"character_id": safe_id,
