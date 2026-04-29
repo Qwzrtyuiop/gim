@@ -7,6 +7,7 @@ const MODE_GALLERY := "gallery"
 const MODE_MEMORY := "memory"
 const GALLERY_COLUMNS := 3
 const GALLERY_TILE_SIZE := Vector2(330.0, 184.0)
+const GALLERY_BOTTOM_SPACER_HEIGHT := 48.0
 const MEMORY_ROW_SIZE := Vector2(0.0, 60.0)
 const MEMORY_BOTTOM_SPACER_HEIGHT := 96.0
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
@@ -84,6 +85,8 @@ func _populate_current_mode() -> void:
 	selected_entry.clear()
 	_refresh_tab_buttons()
 	_apply_mode_layout()
+	scroll_container.scroll_horizontal = 0
+	scroll_container.scroll_vertical = 0
 	var entries: Array[Dictionary] = []
 	if current_mode == MODE_MEMORY:
 		entries = StoryMemoryCatalog.get_unlocked_memory_entries(PlayerState)
@@ -140,6 +143,12 @@ func _populate_gallery_tiles(entries: Array[Dictionary]) -> void:
 		spacer.custom_minimum_size = GALLERY_TILE_SIZE
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		current_row.add_child(spacer)
+
+	var bottom_spacer: Control = Control.new()
+	bottom_spacer.custom_minimum_size = Vector2(0.0, GALLERY_BOTTOM_SPACER_HEIGHT)
+	bottom_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	list_container.add_child(bottom_spacer)
 
 
 func _make_gallery_tile(entry: Dictionary) -> Button:
