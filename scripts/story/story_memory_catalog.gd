@@ -48,8 +48,8 @@ const MEMORY_ENTRIES := [
 	},
 	{
 		"id": "scene_03_day7_night",
-		"title": "Scene 3",
-		"subtitle": "The night before the first collection.",
+		"title": "Collection",
+		"subtitle": "Debt collection day.",
 		"unlock_story_id": "scene_03_day7_night",
 		"preview_image": BACKGROUND_INHOUSE,
 	},

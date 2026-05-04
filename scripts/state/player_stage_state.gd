@@ -155,7 +155,9 @@ static func estimate_stage_earnings(player_state, stage_type: String, character_
 	var estimated_bonus_seconds: float = float(difficulty_profile["time_limit"]) * player_state.ESTIMATED_BONUS_TIME_RATIO
 	var base_bonus: float = estimated_bonus_seconds * float(difficulty_profile["time_bonus_php_per_second"])
 	var multiplier: float = stage_earnings_multiplier(player_state, str(parts["time"]), str(parts["traffic"]))
-	return roundi((base_fare + base_bonus) * multiplier)
+	var fare_total: float = base_fare * multiplier
+	var bonus_total: float = base_bonus * multiplier
+	return roundi(fare_total + bonus_total)
 
 
 static func _apply_estimated_stage_profile_modifiers(profile: Dictionary, modifiers: Dictionary) -> void:

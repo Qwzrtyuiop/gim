@@ -7,7 +7,9 @@ const MODE_GALLERY := "gallery"
 const MODE_MEMORY := "memory"
 const GALLERY_COLUMNS := 3
 const GALLERY_TILE_SIZE := Vector2(330.0, 184.0)
-const MEMORY_ROW_SIZE := Vector2(0.0, 72.0)
+const GALLERY_BOTTOM_SPACER_HEIGHT := 48.0
+const MEMORY_ROW_SIZE := Vector2(0.0, 60.0)
+const MEMORY_BOTTOM_SPACER_HEIGHT := 96.0
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const StoryMemoryCatalog := preload("res://scripts/story/story_memory_catalog.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -83,6 +85,8 @@ func _populate_current_mode() -> void:
 	selected_entry.clear()
 	_refresh_tab_buttons()
 	_apply_mode_layout()
+	scroll_container.scroll_horizontal = 0
+	scroll_container.scroll_vertical = 0
 	var entries: Array[Dictionary] = []
 	if current_mode == MODE_MEMORY:
 		entries = StoryMemoryCatalog.get_unlocked_memory_entries(PlayerState)
@@ -103,6 +107,12 @@ func _populate_current_mode() -> void:
 	for entry in entries:
 		var button: Button = _make_memory_button(entry)
 		list_container.add_child(button)
+
+	var spacer: Control = Control.new()
+	spacer.custom_minimum_size = Vector2(0.0, MEMORY_BOTTOM_SPACER_HEIGHT)
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	list_container.add_child(spacer)
 
 	_select_entry(entries[0])
 	var first_child: Node = list_container.get_child(0)
@@ -133,6 +143,12 @@ func _populate_gallery_tiles(entries: Array[Dictionary]) -> void:
 		spacer.custom_minimum_size = GALLERY_TILE_SIZE
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		current_row.add_child(spacer)
+
+	var bottom_spacer: Control = Control.new()
+	bottom_spacer.custom_minimum_size = Vector2(0.0, GALLERY_BOTTOM_SPACER_HEIGHT)
+	bottom_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	list_container.add_child(bottom_spacer)
 
 
 func _make_gallery_tile(entry: Dictionary) -> Button:
@@ -165,44 +181,10 @@ func _make_memory_button(entry: Dictionary) -> Button:
 	button.custom_minimum_size = MEMORY_ROW_SIZE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.toggle_mode = true
-	button.text = ""
+	button.text = str(entry.get("title", "")).to_upper()
 	button.tooltip_text = str(entry.get("title", ""))
 	button.set_meta("memory_id", str(entry.get("id", "")))
 	_apply_button_theme(button)
-
-	var title_label: Label = Label.new()
-	title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	title_label.anchor_right = 1.0
-	title_label.offset_left = 18.0
-	title_label.offset_top = 12.0
-	title_label.offset_right = -18.0
-	title_label.offset_bottom = 34.0
-	title_label.text = str(entry.get("title", "")).to_upper()
-	title_label.add_theme_font_override("font", UI_FONT)
-	title_label.add_theme_font_size_override("font_size", 12)
-	title_label.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1.0))
-	title_label.add_theme_color_override("font_outline_color", Color(0.04, 0.02, 0.01, 1.0))
-	title_label.add_theme_constant_override("outline_size", 1)
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	button.add_child(title_label)
-
-	var subtitle_label: Label = Label.new()
-	subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	subtitle_label.anchor_right = 1.0
-	subtitle_label.offset_left = 18.0
-	subtitle_label.offset_top = 40.0
-	subtitle_label.offset_right = -18.0
-	subtitle_label.offset_bottom = 58.0
-	subtitle_label.text = str(entry.get("subtitle", ""))
-	subtitle_label.add_theme_font_override("font", UI_FONT)
-	subtitle_label.add_theme_font_size_override("font_size", 8)
-	subtitle_label.add_theme_color_override("font_color", Color(0.90, 0.78, 0.58, 1.0))
-	subtitle_label.add_theme_color_override("font_outline_color", Color(0.04, 0.02, 0.01, 1.0))
-	subtitle_label.add_theme_constant_override("outline_size", 1)
-	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	button.add_child(subtitle_label)
 
 	button.pressed.connect(_select_entry.bind(entry))
 	ButtonGlow.attach(self, button)

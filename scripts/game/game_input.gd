@@ -44,7 +44,7 @@ static func is_boosting() -> bool:
 
 
 static func is_stage_complete_debug_shortcut(event: InputEvent) -> bool:
-	if not bool(ProjectSettings.get_setting("application/config/enable_debug_shortcuts", false)):
+	if not OS.is_debug_build() and not bool(ProjectSettings.get_setting("application/config/enable_debug_shortcuts", false)):
 		return false
 	if not (event is InputEventKey):
 		return false
