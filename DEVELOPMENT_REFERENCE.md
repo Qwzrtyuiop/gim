@@ -1,7 +1,7 @@
 # Gulong development reference
 
 Source audit: 5 October 2026. Baseline commit: `aff7e0e`.
-Updated through 20 October 2026 for the tutorial click fix, Maingat crash tracking, and centralized tuning. Other findings describe the audited revision, not a promised feature roadmap.
+Updated through 20 October 2026 for the tutorial click fix, Maingat crash tracking, centralized tuning, menu traffic, wheel animation, and crash repairs. Other findings describe the audited revision, not a promised feature roadmap.
 
 ## Editing tricycle, store and upgrades
 
@@ -9,6 +9,7 @@ Use **`scripts/config/game_tuning.gd`** as the shared tuning source, then restar
 
 - `PLAYER_MAX_SPEED`, `PLAYER_ACCELERATION`, and `PLAYER_BRAKE_DECELERATION` set base movement. Noon and barangay shoulder overrides are explicitly named in the same file.
 - `PLAYER_BOOST_MAX_SPEED_X`, `BOOST_GAS_CONSUMPTION_PERCENT_PER_SECOND`, and `CRASH_*` control boost and crash behavior.
+- `CRASH_REPAIR_*` controls trip-ending crash costs and recovery. Defaults: 25% base plus an integer random 0–25 percentage points, capped at 50% of cash and rounded down to whole pesos; one calendar day; full energy recovery.
 - `ENGINE_*_BONUS_PER_LEVEL`, `BRAKE_POWER_BONUS_PER_LEVEL`, and `FUEL_EFFICIENCY_*` set upgrade effects.
 - `STORE_ITEMS` holds names, descriptions, prices, per-level price increases, purchase caps, and consumable amounts. Upgrade price is `cost + current_level * cost_step`.
 - `GAS_CAN_PERCENT`, `DEFAULT_GAS_PRICE`, and `DAILY_GAS_PRICE_MAX_PERCENT_CHANGE` control refill size and gas pricing. Cigarette restoration and consequences have their own constants. Food/gas descriptions and gas labels follow configured amounts.
@@ -18,6 +19,10 @@ Use **`scripts/config/game_tuning.gd`** as the shared tuning source, then restar
 Menu traffic is handled by `scripts/game/menu_traffic_controller.gd`, using the shared vehicle geometry and shadow helpers. Cars follow in lane order, resume their configured speed when clear, and wrap fully offscreen behind the existing queue. An isolated check using the actual vehicle artwork passed five simulated minutes, both directions, long frames, simultaneous exits, initial overlaps, and speed recovery; Godot editor import also passed.
 
 `vehicle_wheel_animation.gd` and `vehicle_wheels.gdshader` animate exposed rims and rolling tire highlights using signed road speed, independent of camera movement. Each vehicle has its own material/phase; no shader wall-clock time is used, so stopped/paused vehicles freeze. Parked sprites receive no animation. Bike wheels with overlaid forks/chains use tire highlights, with no hub rotation. The pixel anchors in `VehicleWheelAnimation.LAYOUTS` must be updated when replacing vehicle artwork. Verification covered speed/stop/direction/cap behavior, material independence, menu/speeder regression checks, and a rendered comparison of all 12 moving vehicle types: changes stayed inside the wheel regions.
+
+Trip-ending collisions now open `repair_transition.tscn`; mini crashes retain their previous behavior. `player_crash_repair_state.gd` saves the rolled bill and deduction together, plus a fixed target date and a recovery flag. Continue uses the existing sleep/story transition flow to reach the next morning, resolve debt, recover energy, and return home. Fuel and upgrades carry over, and failed trips earn no fare. Debt failure still ends the run. Reloading a pending repair neither rerolls the bill nor repeats recovery; older saves default to no pending repair. Checks covered morning/noon/night crashes, mini-crash invincibility, 300 cash/RNG cases including zero and odd balances, save/reload, reset, debt success/failure, and a rendered repair-screen-to-home transition using isolated saves.
+
+Before repairs, the driving scene holds while crash audio finishes, then fades to black using `CRASH_REPAIR_HOLD_SECONDS` (minimum hold, default 0.35) and `CRASH_REPAIR_FADE_SECONDS` (default 1.2). Driving/retry input is blocked during the transition; the repair checkpoint is already saved. The existing entry fade is cancelled and the blackout covers dialogue as well as the HUD. Timing checks cover uninterrupted audio, a partial fade, a fully black frame, and a single scene change.
 
 Normal stage profiles and runtime defaults now reference this file, so profile setup does not overwrite edited base values with old literals. Scene Inspector overrides for these tricycle fields have been removed. Weather, energy, upgrade, character, and special-stage modifiers still apply in their existing order. NPC traffic tuning, scene artwork/lane guides, and story-specific modifiers remain with their existing owners.
 
@@ -91,18 +96,21 @@ Controls are substantially keyboard based. Built-in `ui_*` actions cover some na
 - Debt collection normally occurs on Days 8, 15, 22, etc., for PHP 2,500 per collection, capped by remaining debt. The first collection also has an authored story with payment/interest choices.
 - Seven store entries: Engine Tune, Brake Kit, Fuel Efficiency, Warlboro Blue cigarettes, Energy Bar, Budget Meal, and Gas Can. The three upgrades have five purchasable levels each.
 - Smoking has persistent consequences: ten purchases in one day unlock the smoker achievement and reduce maximum energy; fifty lifetime purchases cause a hospital-related run failure.
-- Eleven achievements, pop-up notifications, and a library. The smoker achievement has mechanical effects as well as descriptive text. Achievements and gallery unlocks are run-local: resetting the run clears them.
+- Twelve achievements, pop-up notifications, and a library. Smoker and Malasakit have mechanical effects as well as descriptive text. Achievements and gallery unlocks are run-local: resetting the run clears them.
 - Fare combines completed distance, overtime reduction, remaining-time bonus, time/traffic earnings multipliers, character modifiers, and passenger penalties. `game_economy_manager.gd` is authoritative; selection estimates are separate.
 
 ### Story and presentation
 
 - A shared story interpreter renders dictionary payloads with backgrounds, portraits, speaker focus, dialogue, choices, conditional lines/actions, fades, pauses, camera changes, music/SFX, and debt overlays.
+- Malasakit is a 10% random event after a completed generic-passenger ride, once per run, behind scheduled story priority. Both languages use Day 2's station/ambience and a placeholder passenger portrait. Collect preserves the saved original payout; waive pays zero and unlocks a non-stacking +5% fare bonus for the run, also reflected in ride estimates. Chance and bonus are editable in game_tuning.gd. See scripts/story/random_ride_events_guide.md.
+- Named `portraits` arrays support multiple sprites above the dialogue panel, independent `flip_h`/`flip_v`, height/position/offset controls, and per-ID set/clear actions. Placement defaults to the left. Named and legacy portraits receive a 2px black outline drawn over the art inside their transparent edges at render time. Omitted arrays preserve the cast; `[]` clears it. Portrait state saves with the pending story and replays do not persist it. See `scripts/story/story_portraits_guide.md` and the payload template. Legacy left/right frames remain supported and now fit above the text box.
+- Authored English/Tagalog payloads enable `speaker_portraits`: John/John Toda and Benny/Ben automatically show their artwork while speaking; narration clears the automatic portrait. The Collector/Man Outside uses `assets/characters/placeholder.png`; Arvin and Dylan intentionally have no sprites. Explicit portrait arrays override automatic casting. Backgrounds under `specialCG` suppress all portrait overlays, including on actions and resume; the background reference now saves with portrait state.
 - Event values and karma preserve decisions. Character encounters and consumed dialogue track progression across rides.
 - Triggers can launch at stage completion, day end, sleep midpoint, or day start, with conditions, ordered selection, one-shot tracking, and queued events.
 - Scripted rider rules can force a passenger into a chosen day/phase/slot and constrain the route. “Seeded riders” refers to scheduling, not deterministic traffic RNG.
 - Ten named rider definitions and six generic passenger archetypes. Named riders include Alma, Benny, Celina, Dante, Elena, Magda, Gardo, Hana, Isidro, and Jessa. Some internal IDs differ from display names; keep saved IDs stable.
 - Dedicated English/Tagalog payload pairs exist for the intro, Day 2 lost banknote, Benny's class-clown encounter, Benny's night with friends, and Day 7 debt collection. Existence of a pair does not establish translation completeness: the Tagalog Day 7 payload is a placeholder.
-- Five memory entries and six curated gallery metadata entries, with dynamic unlocks for other displayed backgrounds/portraits. Memories include branch-specific entries. Replay suppresses persistent story effects but uses live run conditions; it is not a historical state snapshot.
+- Memories automatically populate from the shared story_payload_catalog.gd registry (six stories, including Malasakit), unlocking when seen. Events and localized memory replay use the same builders. Six curated gallery metadata entries supplement dynamic background/CG unlocks; portrait fields/actions and character artwork are excluded, including old saved portrait unlocks. Replay suppresses persistent story effects but uses live run conditions; it is not a historical state snapshot.
 - Story/passenger language is selectable and saved independently. Most menus and tutorials remain English; this is not full UI localization.
 - Global audio controls for master, music, SFX, and UI; pause menu with achievements; reusable button effects and tutorial overlays.
 
@@ -160,15 +168,15 @@ Paths without a directory in the table are relative to the directory of that row
 | Tune normal driving or traffic difficulty | Edit tricycle values in `scripts/config/game_tuning.gd`; NPC traffic remains in `stage_profiles.gd`. Inspect setup modifiers and selection estimates when adjusting route balance. |
 | Add a traffic vehicle | Add texture/visual definition, spawn selection, reference scale/hitbox behavior, and any new AI rule in the relevant controller |
 | Add a rider | Add catalog metadata, stable ID, portrait, dialogue and optional ride modifiers; use progression helpers/seed rules for scheduling |
-| Add a story scene | Start from `scripts/story/payloads/templates/story_payload_template.gd`; register routing/trigger, both language variants, event keys, and optional memory/gallery unlocks |
+| Add a story scene | Start from `scripts/story/payloads/templates/story_payload_template.gd`; register both language scripts once in `story_payload_catalog.gd`, then configure routing/trigger and event keys. Memories populate automatically from the registry. |
 | Extend the currently open Day 7 scene | Read both payloads, debt actions and day-end trigger together; preserve collection idempotency and language parity |
-| Add a special stage | Read `scripts/game/special_stage_blueprint_guide.md`; register `SPECIAL_STAGE_BLUEPRINTS`, carry the ID from rider selection, and implement custom behavior in its owning controller |
+| Add a special stage | Read `scripts/game/special_stage_blueprint_guide.md`; define an explicit profile in `scripts/config/special_stages.gd`, queue `start_special_stage` from event actions, and implement custom behavior in its owning controller |
 | Add a shop item or upgrade | Extend `GameTuning.STORE_ITEMS` and its effect constants; new item behaviors also need purchase dispatch and appropriate resource/gameplay logic. Include persistence if needed. |
 | Add an achievement | Extend ordered definitions, event/counter logic, persistent fields and any one-time effect; existing library/popup code consumes the catalog |
 | Add persistent state | Update `PlayerState`, its owning state helper, codec load/save, defaults/reset, migration, and any signals/UI consumers |
 | Add a screen | Add `.tscn` and script, verify pause behavior, store its resume path if appropriate, and update main-menu resume routing |
 
-The special-stage system is currently **scaffolding**: `SPECIAL_STAGE_BLUEPRINTS` is empty. Police chases and other examples in its guide are proposed examples, not playable modes. Likewise, catalog progression templates are not evidence of fully authored arcs for every character.
+The special-stage registry is intentionally empty; no scenarios are playable yet. Event actions now support `start_special_stage`: after the event ends, the registered explicit stage starts without energy/fuel entry requirements or trip-start energy cost. The saved `active_event_special_stage` context preserves the definition and completion status. The explicit time in `stage_type` replaces a calendar trip slot; launch clears pending sleep/selection transitions, and completion advances the phase normally and opens the special trip's results. Earlier or already-used slots roll to the next day with normal daily/debt handling. The prior fare is settled before launch. Fatal collisions enter normal repairs. Memory replays ignore the action. See `scripts/game/special_stage_blueprint_guide.md` for the authoring format. Catalog progression templates likewise are not evidence of fully authored arcs for every character.
 
 ## Findings to address before substantial expansion
 
@@ -176,7 +184,7 @@ These are source-traced findings, not interactive gameplay reproductions. No gam
 
 | Priority | Finding and impact | Evidence / next verification |
 | --- | --- | --- |
-| High | Day 2 “Keep” falls through into “Return”: player retains PHP 200, can receive both achievements, karma changes cancel, and the saved choice becomes Return. Both languages share this structure. | `scripts/story/payloads/events/day_02_station_bill.gd:132–180`; default sequential advancement in `scripts/story_scene.gd:378–397`. Verify branch endpoints in both payloads. |
+| Fixed 20 Oct | Day 2 Keep choices now ask “Should I?” / “Sigurado ba ako?” with Yes/No. No returns to the same decision; Yes commits Keep. Both outcome branches explicitly end, preventing Keep from falling through into Return. | Confirmation nodes are appended to preserve existing line indices. All five Keep choices and both endings passed branch/reward checks in both languages. |
 | High | Tagalog Day 7 debt scene contains three `test` lines, omitting the English scene's authored choices/effects. Language selection changes available content and potentially the payment path. | `scripts/story/payloads/events/scene_03_day7_night_tagalog.gd:6–25`; compare English payload and debt-trigger routing. |
 | High | Reloading a story can apply its current line's rewards again: line position is saved before actions, and resume displays that same line. Benny's maximum-energy reward is a concrete non-idempotent action. | `scripts/story_scene.gd:80–85, 201–216`; `scripts/story/payloads/characters/benny/benny_tropa_night.gd:242`; `scripts/state/player_resource_state.gd:191–197`. Verify saving/reloading on a reward line. |
 | Medium | A rejected traffic spawn leaves an allocated, unattached Sprite2D and its visual children without explicit cleanup. Repeated spawn retries can accumulate orphan nodes. | `scripts/game/vehicle_spawner.gd:19, 73–92`. Measure orphan counts under crowded spawns. |

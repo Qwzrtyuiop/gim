@@ -1,5 +1,7 @@
 extends Node
 
+const PlayerSpecialStageState := preload("res://scripts/state/player_special_stage_state.gd")
+
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 # Central run-state authority.
@@ -9,6 +11,7 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
 const PlayerCharacterProgressState := preload("res://scripts/state/player_character_progress_state.gd")
+const PlayerCrashRepairState := preload("res://scripts/state/player_crash_repair_state.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
@@ -137,7 +140,9 @@ var stage_round := 0
 var pending_stage_energy_cost := false
 var pending_trip_selection: Dictionary = {}
 var pending_story: Dictionary = {}
+var active_event_special_stage: Dictionary = {}
 var pending_sleep_transition_state: Dictionary = {}
+var pending_crash_repair: Dictionary = {}
 var pending_gameplay_entry_fade_duration := 0.0
 var pending_result_music: Dictionary = {}
 var pending_skip_night_phase := false
@@ -376,7 +381,17 @@ func begin_stage_sequence() -> void:
 
 
 func get_current_stage_type() -> String:
+	if not active_event_special_stage.is_empty():
+		return str(active_event_special_stage["definition"]["stage_type"])
 	return PlayerRunState.current_stage_type(self)
+
+
+func begin_event_special_stage(stage_id: String, continuation: String) -> bool:
+	return PlayerSpecialStageState.begin(self, stage_id, continuation)
+
+
+func finish_event_special_stage() -> String:
+	return PlayerSpecialStageState.finish(self)
 
 
 func normalize_stage_special_type(stage_special_type: String) -> String:
@@ -392,6 +407,8 @@ func set_current_stage_special_type(stage_special_type: String) -> void:
 
 
 func get_current_stage_special_type() -> String:
+	if not active_event_special_stage.is_empty():
+		return STAGE_SPECIAL_TYPE_SPECIAL
 	return PlayerStageState.get_current_stage_special_type(self)
 
 
@@ -400,6 +417,8 @@ func set_current_special_stage_id(special_stage_id: String) -> void:
 
 
 func get_current_special_stage_id() -> String:
+	if not active_event_special_stage.is_empty():
+		return str(active_event_special_stage["id"])
 	return PlayerStageState.get_current_special_stage_id(self)
 
 
@@ -694,11 +713,15 @@ func get_last_stage_result() -> Dictionary:
 func claim_last_stage_total() -> int:
 	if last_stage_result.is_empty() or bool(last_stage_result.get("paid_out", false)):
 		return 0
+	if not str(last_stage_result.get("random_ride_event", "")).is_empty() and str(last_stage_result.get("random_ride_outcome", "")).is_empty():
+		return 0
 
 	var total: int = int(last_stage_result.get("total", 0))
+	_begin_state_batch()
 	add_money(total)
 	last_stage_result["paid_out"] = true
 	save_progress()
+	_end_state_batch()
 	return total
 
 
@@ -807,6 +830,26 @@ func clear_pending_story() -> void:
 
 func set_pending_sleep_transition_state(state: Dictionary) -> void:
 	PlayerPendingState.set_pending_sleep_transition_state(self, state)
+
+
+func begin_crash_repair() -> void:
+	PlayerCrashRepairState.begin(self)
+
+
+func get_pending_crash_repair() -> Dictionary:
+	return pending_crash_repair.duplicate(true)
+
+
+func start_crash_repair_transition() -> bool:
+	return PlayerCrashRepairState.start_transition(self)
+
+
+func prepare_crash_repair_day() -> void:
+	PlayerCrashRepairState.prepare_recovery_day(self)
+
+
+func finish_crash_repair() -> void:
+	PlayerCrashRepairState.finish(self)
 
 
 func get_pending_sleep_transition_state() -> Dictionary:

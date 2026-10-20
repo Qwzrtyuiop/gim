@@ -3,12 +3,7 @@ extends RefCounted
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const StoryTriggerRuntime := preload("res://scripts/story/story_trigger_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
-const GALLERY_IMAGE_EXTENSIONS := {
-	"jpeg": true,
-	"jpg": true,
-	"png": true,
-	"webp": true,
-}
+const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 
 
 static func set_last_seen_story_section(player_state, story_id: String, section_index: int) -> void:
@@ -231,11 +226,4 @@ static func reset_tutorial_state(player_state) -> void:
 
 
 static func _normalize_gallery_image_path(image_path: String) -> String:
-	var safe_image_path: String = str(image_path).strip_edges()
-	if safe_image_path.is_empty() or not safe_image_path.begins_with("res://"):
-		return ""
-	if not GALLERY_IMAGE_EXTENSIONS.has(safe_image_path.get_extension().to_lower()):
-		return ""
-	if not ResourceLoader.exists(safe_image_path):
-		return ""
-	return safe_image_path
+	return StoryGalleryUnlocker.normalize_image_path(image_path)

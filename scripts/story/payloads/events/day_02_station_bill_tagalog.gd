@@ -2,10 +2,15 @@ extends RefCounted
 
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
 
+# Confirmation lines are appended so existing story indices stay stable.
+const KEEP_OUTCOME_INDEX := 13
+const STORY_END_INDEX := 25
+
 
 static func build() -> Dictionary:
 	return {
 		"story_id": "day_02_station_bill",
+		"speaker_portraits": true,
 		"chapter_title": "Day 2",
 		"background": StoryConstants.BACKGROUND_STATION,
 		"music": {
@@ -44,7 +49,7 @@ static func build() -> Dictionary:
 					},
 					{
 						"text": "Itago",
-						"next_index": 13,
+						"next_index": 20,
 					},
 				],
 			},
@@ -62,7 +67,7 @@ static func build() -> Dictionary:
 					},
 					{
 						"text": "Itago",
-						"next_index": 13,
+						"next_index": 21,
 					},
 				],
 			},
@@ -80,7 +85,7 @@ static func build() -> Dictionary:
 					},
 					{
 						"text": "Itago",
-						"next_index": 13,
+						"next_index": 22,
 					},
 				],
 			},
@@ -98,7 +103,7 @@ static func build() -> Dictionary:
 					},
 					{
 						"text": "Itago",
-						"next_index": 13,
+						"next_index": 23,
 					},
 				],
 			},
@@ -135,7 +140,7 @@ static func build() -> Dictionary:
 					},
 					{
 						"text": "Itago",
-						"next_index": 13,
+						"next_index": 24,
 					},
 				],
 			},
@@ -161,6 +166,7 @@ static func build() -> Dictionary:
 			{
 				"text": "Bumaba ang iyong karma.",
 				"pause_after": 1.4,
+				"next_index": STORY_END_INDEX,
 				"actions": [
 					{
 						"type": "set_event_value",
@@ -196,6 +202,7 @@ static func build() -> Dictionary:
 			{
 				"text": "Tumaas ang iyong karma.",
 				"pause_after": 1.4,
+				"next_index": STORY_END_INDEX,
 				"actions": [
 					{
 						"type": "set_event_value",
@@ -212,5 +219,21 @@ static func build() -> Dictionary:
 					}
 				],
 			},
+			_keep_confirmation(3),
+			_keep_confirmation(5),
+			_keep_confirmation(7),
+			_keep_confirmation(9),
+			_keep_confirmation(12),
+		],
+	}
+
+
+static func _keep_confirmation(return_index: int) -> Dictionary:
+	return {
+		"speaker": "John Toda",
+		"text": "Sigurado ba ako?",
+		"choices": [
+			{"text": "Yes", "next_index": KEEP_OUTCOME_INDEX},
+			{"text": "No", "next_index": return_index},
 		],
 	}

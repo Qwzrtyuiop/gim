@@ -7,6 +7,7 @@ const StoryConstants := preload("res://scripts/story/story_constants.gd")
 static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 	return {
 		"story_id": "scene_01_intro",
+		"speaker_portraits": true,
 		"chapter_title": "Prologue",
 		"return_scene": RETURN_SCENE,
 		"next_scene": next_scene,

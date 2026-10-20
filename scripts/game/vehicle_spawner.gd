@@ -55,8 +55,8 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 					"jeepney": 4.0,
 					"sedan": 4.0,
 				})
-				min_world_speed = minf(owner.shoulder_vehicle_min_speed, owner.shoulder_vehicle_max_speed)
-				max_world_speed = maxf(owner.shoulder_vehicle_min_speed, owner.shoulder_vehicle_max_speed)
+				min_world_speed = owner.shoulder_vehicle_min_speed
+				max_world_speed = maxf(owner.main_vehicle_min_speed, owner.main_vehicle_max_speed)
 				fallback_height = 90.0
 
 	if not is_parked:

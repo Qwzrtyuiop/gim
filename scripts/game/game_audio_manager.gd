@@ -116,6 +116,10 @@ func play_crash_sfx() -> void:
 	crash_sfx_player.play()
 
 
+func is_crash_sfx_playing() -> bool:
+	return is_instance_valid(crash_sfx_player) and crash_sfx_player.playing
+
+
 func get_result_music_carry_state() -> Dictionary:
 	var state: Dictionary = {}
 	var stage_music_is_playing := stage_bgm_player != null and is_instance_valid(stage_bgm_player) and stage_bgm_player.playing

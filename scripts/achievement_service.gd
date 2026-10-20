@@ -4,6 +4,7 @@ class_name AchievementService
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 const ORDER := [
+	"malasakit",
 	"mapagsamantala",
 	"tapat",
 	"sinungaling",
@@ -18,6 +19,11 @@ const ORDER := [
 ]
 
 const DEFINITIONS := {
+	"malasakit": {
+		"title": "Malasakit",
+		"subtitle": "Compassion",
+		"description": "Malasakit means caring about another person's hardship.\n\nJohn let a passenger who had forgotten their wallet ride for free.\n\nAll fares increase by %d%% for the rest of this run." % roundi(GameTuning.MALASAKIT_FARE_BONUS * 100.0),
+	},
 	"mapagsamantala": {
 		"title": "Mapagsamantala",
 		"subtitle": "Opportunistic",

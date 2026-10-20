@@ -9,6 +9,9 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
+const StoryPortraitLayer := preload("res://scripts/story/story_portrait_layer.gd")
+const StoryPortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
+const StorySpeakerPortraits := preload("res://scripts/story/story_speaker_portraits.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -67,10 +70,16 @@ var bgm_fade_tween: Tween
 var debt_overlay_tween: Tween
 var is_input_locked := false
 var shown_gallery_images: Dictionary = {}
+var is_finishing_story := false
+var portrait_layer: Control
 
 
 func _ready() -> void:
 	_apply_theme()
+	portrait_layer = StoryPortraitLayer.new()
+	add_child(portrait_layer)
+	move_child(portrait_layer, chapter_label.get_index())
+	portrait_layer.setup(dialogue_panel, _resolve_texture)
 	_load_story_payload()
 	if not _is_replay_mode():
 		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
@@ -133,9 +142,13 @@ func _load_story_payload() -> void:
 	current_background_ref = story_payload.get("background", null)
 	current_left_portrait_ref = story_payload.get("left_portrait", null)
 	current_right_portrait_ref = story_payload.get("right_portrait", null)
+	var portrait_state: Dictionary = {} if _is_replay_mode() else Dictionary(story_payload.get("_portrait_state", {}))
+	current_left_portrait_ref = portrait_state.get("left", current_left_portrait_ref)
+	current_right_portrait_ref = portrait_state.get("right", current_right_portrait_ref)
+	portrait_layer.replace_portraits(portrait_state.get("portraits", story_payload.get("portraits", [])))
+	current_background_ref = portrait_state.get("background", current_background_ref)
+	_set_background_texture(current_background_ref, true)
 	_remember_gallery_image(current_background_ref)
-	_remember_gallery_image(current_left_portrait_ref)
-	_remember_gallery_image(current_right_portrait_ref)
 
 
 func _restore_story_music_state(resume_index: int) -> void:
@@ -220,6 +233,8 @@ func _show_line(index: int) -> void:
 
 
 func _apply_line_visuals(line: Dictionary) -> void:
+	if line.has("portraits"):
+		portrait_layer.replace_portraits(line["portraits"])
 	var background_changed := false
 	var next_background_ref = current_background_ref
 	if line.has("background"):
@@ -245,10 +260,14 @@ func _apply_line_visuals(line: Dictionary) -> void:
 	_set_portrait(left_portrait_frame, left_portrait, current_left_portrait_ref)
 	_set_portrait(right_portrait_frame, right_portrait, current_right_portrait_ref)
 	_apply_portrait_focus_from_side(str(line.get("focus", line.get("speaker_side", "none"))))
+	_save_portrait_state()
 
 
 func _apply_line_text(line: Dictionary) -> void:
 	var speaker := str(line.get("speaker", ""))
+	if bool(line.get("speaker_portraits", story_payload.get("speaker_portraits", false))) and not line.has("portraits"):
+		portrait_layer.replace_portraits(StorySpeakerPortraits.for_speaker(speaker))
+		_save_portrait_state()
 	var body_text := str(line.get("text", ""))
 	var continue_text := str(line.get("continue_hint", DEFAULT_CONTINUE_HINT))
 	_set_dialogue_content(speaker, body_text, continue_text, true)
@@ -349,6 +368,7 @@ func _build_choice_response_line(choice_data: Dictionary, explicit_next_scene: S
 			"focus": "response_focus",
 			"left_portrait": "response_left_portrait",
 			"right_portrait": "response_right_portrait",
+			"portraits": "response_portraits",
 			"background_fade": "response_background_fade",
 			"pause_before": "response_pause_before",
 			"pause_after": "response_pause_after",
@@ -416,21 +436,28 @@ func _choose_branch(choice_data: Dictionary) -> void:
 
 
 func _finish_story() -> void:
+	if is_finishing_story:
+		return
+	is_finishing_story = true
+	is_input_locked = true
 	var target_scene := complete_scene_path
 	if target_scene.is_empty():
 		target_scene = return_scene_path
 	if target_scene.is_empty():
 		target_scene = FALLBACK_SCENE
 
-	if not _is_replay_mode() and bool(story_payload.get("prepare_stage_start", false)):
-		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
-		if not PlayerState.prepare_stage_start(stage_descriptor):
-			target_scene = return_scene_path if not return_scene_path.is_empty() else FALLBACK_SCENE
-
+	var special_stage_id := "" if _is_replay_mode() else str(story_payload.get("queued_special_stage_id", ""))
 	if not _is_replay_mode():
 		StoryGalleryUnlocker.unlock_gallery_images(PlayerState, _shown_gallery_image_paths())
 
 	await _play_outro_fade()
+	if not special_stage_id.is_empty() and PlayerState.begin_event_special_stage(special_stage_id, target_scene):
+		get_tree().change_scene_to_file("res://scenes/game_over.tscn" if PlayerState.is_run_failed() else "res://scenes/main.tscn")
+		return
+	if not _is_replay_mode() and bool(story_payload.get("prepare_stage_start", false)):
+		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
+		if not PlayerState.prepare_stage_start(stage_descriptor):
+			target_scene = return_scene_path if not return_scene_path.is_empty() else FALLBACK_SCENE
 	PlayerState.clear_pending_story()
 	get_tree().change_scene_to_file(target_scene)
 
@@ -453,16 +480,25 @@ func _apply_portrait_focus_from_side(focus_side: String) -> void:
 
 
 func _set_portrait(frame: Panel, portrait_rect: TextureRect, texture_ref) -> void:
+	var options: Dictionary = texture_ref if texture_ref is Dictionary else {}
+	if texture_ref is Dictionary:
+		texture_ref = options.get("texture", options.get("path", null))
 	var portrait_texture := _resolve_texture(texture_ref)
+	portrait_rect.flip_h = bool(options.get("flip_h", false))
+	portrait_rect.flip_v = bool(options.get("flip_v", false))
 	frame.visible = portrait_texture != null
 	portrait_rect.texture = portrait_texture
-	if portrait_texture != null:
-		_remember_gallery_image(texture_ref)
+	StoryPortraitOutline.apply_to(portrait_rect)
 	if frame.visible:
 		frame.modulate = INACTIVE_PORTRAIT_MODULATE
+		# Legacy left/right portraits also sit above the dialogue box.
+		frame.position.y = maxf(0.0, dialogue_panel.position.y - 350.0)
+		frame.size.y = dialogue_panel.position.y - frame.position.y
+	_refresh_portrait_visibility()
 
 
 func _set_background_texture(texture_ref, reset_camera := false) -> void:
+	current_background_ref = texture_ref
 	var resolved_texture := _resolve_texture(texture_ref)
 	background.texture = resolved_texture
 	background.visible = resolved_texture != null
@@ -472,6 +508,21 @@ func _set_background_texture(texture_ref, reset_camera := false) -> void:
 		background_zoom = 1.0
 		background_pan = Vector2.ZERO
 	_refresh_background_transform()
+	_refresh_portrait_visibility()
+	_save_portrait_state()
+
+
+func _refresh_portrait_visibility() -> void:
+	var path := ""
+	if background.texture != null:
+		path = background.texture.resource_path
+	if path.is_empty() and current_background_ref is String:
+		path = current_background_ref
+	var hide_portraits := "/specialcg/" in path.replace("\\", "/").to_lower()
+	if is_instance_valid(portrait_layer):
+		portrait_layer.visible = not hide_portraits
+	left_portrait_frame.visible = left_portrait.texture != null and not hide_portraits
+	right_portrait_frame.visible = right_portrait.texture != null and not hide_portraits
 
 
 func _remember_gallery_image(texture_ref) -> void:
@@ -821,6 +872,10 @@ func _is_replay_mode() -> bool:
 func _is_persistent_story_action(action_data: Dictionary) -> bool:
 	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
+		"resolve_random_ride_fare":
+			return true
+		"start_special_stage":
+			return true
 		"unlock_achievement", "achievement_unlock":
 			return true
 		"set_event_value", "story_event", "event_value":
@@ -1060,8 +1115,14 @@ func _hide_debt_overlay(overlay_data) -> void:
 
 
 func _apply_portrait_action(action_data: Dictionary) -> void:
+	if action_data.has("id"):
+		portrait_layer.set_portrait(action_data)
+		_save_portrait_state()
+		return
 	var side := str(action_data.get("side", "left")).to_lower()
 	var texture_ref = action_data.get("texture", action_data.get("portrait", action_data.get("path", null)))
+	if action_data.has("flip_h") or action_data.has("flip_v"):
+		texture_ref = {"texture": texture_ref, "flip_h": action_data.get("flip_h", false), "flip_v": action_data.get("flip_v", false)}
 	match side:
 		"right":
 			current_right_portrait_ref = texture_ref
@@ -1071,6 +1132,10 @@ func _apply_portrait_action(action_data: Dictionary) -> void:
 
 
 func _clear_portrait_action(action_data: Dictionary) -> void:
+	if action_data.has("id"):
+		portrait_layer.remove_portrait(str(action_data["id"]))
+		_save_portrait_state()
+		return
 	var side := str(action_data.get("side", "left")).to_lower()
 	match side:
 		"right":
@@ -1084,6 +1149,27 @@ func _refresh_portrait_state() -> void:
 	_set_portrait(left_portrait_frame, left_portrait, current_left_portrait_ref)
 	_set_portrait(right_portrait_frame, right_portrait, current_right_portrait_ref)
 	_apply_portrait_focus_from_side(current_focus_side)
+	_save_portrait_state()
+
+
+func _replace_portraits(entries: Array) -> void:
+	portrait_layer.replace_portraits(entries)
+	_save_portrait_state()
+
+
+func _save_portrait_state() -> void:
+	if _is_replay_mode():
+		return
+	var state := {
+		"portraits": portrait_layer.entries.duplicate(true),
+		"left": current_left_portrait_ref,
+		"right": current_right_portrait_ref,
+		"background": current_background_ref,
+	}
+	if state == story_payload.get("_portrait_state", {"portraits": [], "left": null, "right": null}):
+		return
+	story_payload["_portrait_state"] = state
+	PlayerState.set_pending_story(story_payload)
 
 
 func _set_dialogue_content(speaker: String, body_text: String, continue_text: String, is_visible: bool) -> void:

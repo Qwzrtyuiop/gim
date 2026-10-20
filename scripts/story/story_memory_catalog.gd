@@ -1,59 +1,12 @@
 extends RefCounted
 
-const Scene01IntroPayloadEnglish := preload("res://scripts/story/payloads/intro/scene_01_intro.gd")
-const Scene01IntroPayloadTagalog := preload("res://scripts/story/payloads/intro/scene_01_intro_tagalog.gd")
-const Day02StationBillPayloadEnglish := preload("res://scripts/story/payloads/events/day_02_station_bill.gd")
-const Day02StationBillPayloadTagalog := preload("res://scripts/story/payloads/events/day_02_station_bill_tagalog.gd")
-const BennyClassClownPayloadEnglish := preload("res://scripts/story/payloads/characters/benny/benny_class_clown.gd")
-const BennyClassClownPayloadTagalog := preload("res://scripts/story/payloads/characters/benny/benny_class_clown_tagalog.gd")
-const BennyTropaNightPayloadEnglish := preload("res://scripts/story/payloads/characters/benny/benny_tropa_night.gd")
-const BennyTropaNightPayloadTagalog := preload("res://scripts/story/payloads/characters/benny/benny_tropa_night_tagalog.gd")
-const Scene03Day7NightPayloadEnglish := preload("res://scripts/story/payloads/events/scene_03_day7_night.gd")
-const Scene03Day7NightPayloadTagalog := preload("res://scripts/story/payloads/events/scene_03_day7_night_tagalog.gd")
+const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
 const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 const BACKGROUND_INHOUSE := "res://assets/story/backgrounds/inhouse.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/station.png"
 const BACKGROUND_BAR := "res://assets/story/backgrounds/bar.jpeg"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/city.png"
 const TROPA_CG := "res://assets/specialCG/tropaCg.png"
-
-const MEMORY_ENTRIES := [
-	{
-		"id": "scene_01_intro",
-		"title": "Prologue",
-		"subtitle": "John's first morning as a tricycle driver.",
-		"unlock_story_id": "scene_01_intro",
-		"preview_image": BACKGROUND_INHOUSE,
-	},
-	{
-		"id": "day_02_station_bill",
-		"title": "Day 2",
-		"subtitle": "A folded bill lands at John's feet.",
-		"unlock_story_id": "day_02_station_bill",
-		"preview_image": BACKGROUND_STATION,
-	},
-	{
-		"id": "benny_class_clown",
-		"title": "Class Clown",
-		"subtitle": "Benny asks John what happened in the city.",
-		"unlock_story_id": "benny_class_clown",
-		"preview_image": BACKGROUND_STATION,
-	},
-	{
-		"id": "benny_tropa_night",
-		"title": "Tropa",
-		"subtitle": "Old friends meet under city lights.",
-		"unlock_story_id": "benny_tropa_night",
-		"preview_image": BACKGROUND_BAR,
-	},
-	{
-		"id": "scene_03_day7_night",
-		"title": "Collection",
-		"subtitle": "Debt collection day.",
-		"unlock_story_id": "scene_03_day7_night",
-		"preview_image": BACKGROUND_INHOUSE,
-	},
-]
 
 const GALLERY_ENTRIES := [
 	{
@@ -114,12 +67,12 @@ static func get_unlocked_gallery_entries(player_state) -> Array[Dictionary]:
 
 
 static func get_unlocked_memory_entries(player_state) -> Array[Dictionary]:
-	return _unlocked_entries(player_state, MEMORY_ENTRIES)
+	return _unlocked_entries(player_state, StoryPayloadCatalog.memory_entries())
 
 
 static func get_memory_entry(memory_id: String) -> Dictionary:
 	var safe_id: String = str(memory_id).strip_edges().to_lower()
-	for entry_variant in MEMORY_ENTRIES:
+	for entry_variant in StoryPayloadCatalog.memory_entries():
 		if not entry_variant is Dictionary:
 			continue
 		var entry: Dictionary = entry_variant as Dictionary
@@ -129,22 +82,7 @@ static func get_memory_entry(memory_id: String) -> Dictionary:
 
 
 static func build_memory_payload(memory_id: String, return_scene: String) -> Dictionary:
-	var safe_id: String = str(memory_id).strip_edges().to_lower()
-	var payload: Dictionary = {}
-	match safe_id:
-		"scene_01_intro":
-			if StoryLanguageManager.is_tagalog():
-				payload = Scene01IntroPayloadTagalog.build(return_scene, "")
-			else:
-				payload = Scene01IntroPayloadEnglish.build(return_scene, "")
-		"day_02_station_bill":
-			payload = Day02StationBillPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else Day02StationBillPayloadEnglish.build()
-		"benny_class_clown":
-			payload = BennyClassClownPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else BennyClassClownPayloadEnglish.build()
-		"benny_tropa_night":
-			payload = BennyTropaNightPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else BennyTropaNightPayloadEnglish.build()
-		"scene_03_day7_night":
-			payload = Scene03Day7NightPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else Scene03Day7NightPayloadEnglish.build()
+	var payload: Dictionary = StoryPayloadCatalog.build(memory_id, return_scene)
 
 	if payload.is_empty():
 		return {}
@@ -159,7 +97,7 @@ static func build_memory_payload(memory_id: String, return_scene: String) -> Dic
 
 
 static func unlock_all(player_state) -> void:
-	var unlock_entries: Array = MEMORY_ENTRIES.duplicate(true)
+	var unlock_entries: Array = StoryPayloadCatalog.memory_entries()
 	var image_paths: Array[String] = []
 
 	for entry_variant in unlock_entries:
@@ -188,7 +126,7 @@ static func unlock_all(player_state) -> void:
 
 
 static func unlock_gallery_and_memories_only(player_state) -> void:
-	var unlock_entries: Array = MEMORY_ENTRIES.duplicate(true)
+	var unlock_entries: Array = StoryPayloadCatalog.memory_entries()
 	var image_paths: Array[String] = []
 
 	for entry_variant in unlock_entries:
@@ -276,18 +214,4 @@ static func _is_entry_unlocked(player_state, entry: Dictionary) -> bool:
 
 
 static func _build_payload_for_story_id(story_id: String) -> Dictionary:
-	var safe_id: String = str(story_id).strip_edges().to_lower()
-	match safe_id:
-		"scene_01_intro":
-			if StoryLanguageManager.is_tagalog():
-				return Scene01IntroPayloadTagalog.build("", "")
-			return Scene01IntroPayloadEnglish.build("", "")
-		"day_02_station_bill":
-			return Day02StationBillPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else Day02StationBillPayloadEnglish.build()
-		"benny_class_clown":
-			return BennyClassClownPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else BennyClassClownPayloadEnglish.build()
-		"benny_tropa_night":
-			return BennyTropaNightPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else BennyTropaNightPayloadEnglish.build()
-		"scene_03_day7_night":
-			return Scene03Day7NightPayloadTagalog.build() if StoryLanguageManager.is_tagalog() else Scene03Day7NightPayloadEnglish.build()
-	return {}
+	return StoryPayloadCatalog.build(story_id)

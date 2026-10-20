@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 
 static func normalize_stage_special_type(player_state, stage_special_type: String) -> String:
 	var safe_special_type: String = str(stage_special_type).strip_edges().to_lower()
@@ -127,10 +129,14 @@ static func stage_earnings_multiplier(player_state, day_time: String, traffic_ty
 static func apply_stage_earnings_modifiers(player_state, fare: int, bonus: int, day_time: String, traffic_type: String) -> Dictionary:
 	var multiplier: float = stage_earnings_multiplier(player_state, day_time, traffic_type)
 	return {
-		"fare": roundi(fare * multiplier),
+		"fare": roundi(fare * multiplier * fare_buff_multiplier(player_state)),
 		"bonus": roundi(bonus * multiplier),
 		"multiplier": multiplier,
 	}
+
+
+static func fare_buff_multiplier(player_state) -> float:
+	return 1.0 + GameTuning.MALASAKIT_FARE_BONUS if player_state.has_achievement("malasakit") else 1.0
 
 
 static func estimate_stage_earnings(player_state, stage_type: String, character_id: String = "") -> int:
@@ -155,7 +161,7 @@ static func estimate_stage_earnings(player_state, stage_type: String, character_
 	var estimated_bonus_seconds: float = float(difficulty_profile["time_limit"]) * player_state.ESTIMATED_BONUS_TIME_RATIO
 	var base_bonus: float = estimated_bonus_seconds * float(difficulty_profile["time_bonus_php_per_second"])
 	var multiplier: float = stage_earnings_multiplier(player_state, str(parts["time"]), str(parts["traffic"]))
-	var fare_total: float = base_fare * multiplier
+	var fare_total: float = base_fare * multiplier * fare_buff_multiplier(player_state)
 	var bonus_total: float = base_bonus * multiplier
 	return roundi(fare_total + bonus_total)
 

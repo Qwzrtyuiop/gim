@@ -1,10 +1,18 @@
 extends RefCounted
 class_name StoryActionRunner
 
+const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
+
 
 static func run(owner, action_data: Dictionary) -> void:
 	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
+		"resolve_random_ride_fare":
+			RandomRideEventService.resolve_fare(PlayerState, owner.story_payload, str(action_data.get("outcome", "")))
+		"start_special_stage":
+			# Queue the handoff; the rest of the event still plays normally.
+			owner.story_payload["queued_special_stage_id"] = str(action_data.get("id", action_data.get("special_stage_id", "")))
+			PlayerState.set_pending_story(owner.story_payload)
 		"pause", "wait":
 			await owner._pause_for_seconds(float(action_data.get("duration", action_data.get("time", 0.0))))
 		"fade_to_black", "screen_fade_out":
@@ -67,6 +75,10 @@ static func run(owner, action_data: Dictionary) -> void:
 			owner.sfx_player.stop()
 		"set_portrait", "change_portrait":
 			owner._apply_portrait_action(action_data)
+		"set_portraits":
+			owner._replace_portraits(action_data.get("portraits", []))
+		"clear_portraits":
+			owner._replace_portraits([])
 		"clear_portrait":
 			owner._clear_portrait_action(action_data)
 		"portrait_switch", "focus_portrait":

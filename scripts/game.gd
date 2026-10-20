@@ -214,8 +214,6 @@ var boost_gas_consumption_percent_per_second := GameTuning.BOOST_GAS_CONSUMPTION
 @export_range(50.0, 900.0, 5.0) var main_vehicle_min_speed := 190.0
 @export_range(50.0, 900.0, 5.0) var main_vehicle_max_speed := 280.0
 @export_range(0.0, 300.0, 5.0) var shoulder_vehicle_min_speed := 35.0
-@export_range(0.0, 300.0, 5.0) var shoulder_vehicle_max_speed := 95.0
-@export_range(0.0, 900.0, 5.0) var bottom_lane_vehicle_max_speed := 140.0
 @export_range(0.2, 12.0, 0.1) var vehicle_speed_change_min_delay := 1.2
 @export_range(0.2, 12.0, 0.1) var vehicle_speed_change_max_delay := 3.8
 @export_range(10.0, 600.0, 5.0) var vehicle_speed_acceleration := 120.0
@@ -360,6 +358,9 @@ var passenger_rule_violation_count := 0
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
 var stage_clear_fade_time := 0.0
+var crash_repair_transition_active := false
+var crash_repair_hold_remaining := 0.0
+var crash_repair_fade_time := 0.0
 var stage_difficulty := "short"
 var stage_time_of_day := "morning"
 var stage_traffic := "chill"
@@ -394,6 +395,11 @@ var player_hit_flicker_visible := true
 
 
 func _ready() -> void:
+	if use_player_state_stage_sequence and bool(PlayerState.active_event_special_stage.get("completed", false)):
+		set_process(false)
+		set_process_unhandled_input(false)
+		get_tree().change_scene_to_file.call_deferred(PlayerState.finish_event_special_stage())
+		return
 	PlayerState.set_resume_scene("res://scenes/main.tscn")
 	GameEnvironmentController.hide_editor_preview(self)
 	rng.randomize()
@@ -455,6 +461,8 @@ func _background_pool_tag() -> String:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if crash_repair_transition_active:
+		return
 	if GameInput.is_any_press(event) and game_state == "GAME OVER":
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
 		return
@@ -483,6 +491,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	if crash_repair_transition_active:
+		GameFlowController.update_crash_repair_transition(self, delta)
+		return
 	if stage_tutorial != null and stage_tutorial.active:
 		stage_tutorial.update_positions(
 			player,

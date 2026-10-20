@@ -20,6 +20,10 @@ const RESUME_AFTER_DAY_START_STORY := "after_day_start_story"
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/sleep_transition.tscn")
 	message_label.text = "SLEEPING..."
+	var repair := PlayerState.get_pending_crash_repair()
+	if not repair.is_empty():
+		var days := int(repair["days"])
+		message_label.text = "REPAIRING...\n%d %s" % [days, "DAY" if days == 1 else "DAYS"]
 	message_label.visible = true
 	message_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	day_label.visible = false
@@ -75,7 +79,14 @@ func _run_after_day_end_story() -> void:
 func _run_after_sleep_midpoint_story() -> void:
 	var target_day := _target_day_number()
 	await _show_day_card()
-	PlayerState.prepare_day_start(target_day)
+	if not PlayerState.get_pending_crash_repair().is_empty():
+		PlayerState.prepare_crash_repair_day()
+		if PlayerState.is_run_failed():
+			PlayerState.finish_crash_repair()
+			get_tree().change_scene_to_file(GAME_OVER_SCENE)
+			return
+	else:
+		PlayerState.prepare_day_start(target_day)
 	if _launch_story_trigger(PlayerState.STORY_TRIGGER_DAY_START, target_day, RESUME_AFTER_DAY_START_STORY):
 		return
 	_finish_transition()
@@ -100,6 +111,9 @@ func _show_day_card() -> void:
 
 
 func _target_day_number() -> int:
+	var repair := PlayerState.get_pending_crash_repair()
+	if not repair.is_empty():
+		return int(repair["target_day"])
 	if _transition_mode() == PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY and PlayerState.get_current_time_of_day() == "morning":
 		return PlayerState.get_current_day()
 	return PlayerState.get_transition_display_day(_transition_mode())
@@ -111,6 +125,11 @@ func _finish_transition() -> void:
 		get_tree().change_scene_to_file(HOUSE_DAY_START_SCENE)
 		return
 	if _transition_mode() == PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY:
+		if not PlayerState.get_pending_crash_repair().is_empty():
+			PlayerState.prepare_crash_repair_day()
+			PlayerState.finish_crash_repair()
+			get_tree().change_scene_to_file(GAME_OVER_SCENE if PlayerState.is_run_failed() else HOUSE_DAY_START_SCENE)
+			return
 		if PlayerState.get_current_time_of_day() != "morning":
 			PlayerState.prepare_day_start(_target_day_number())
 		if PlayerState.is_run_failed():

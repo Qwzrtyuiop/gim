@@ -1,5 +1,10 @@
 extends RefCounted
 
+# Random ride stories: probability per eligible unnamed-passenger ride (0..1).
+const MALASAKIT_EVENT_CHANCE := 0.10
+# Permanent for the current run after waiving the fare; does not stack.
+const MALASAKIT_FARE_BONUS := 0.05
+
 # CENTRAL TRICYCLE / STORE / UPGRADE / MENU TRAFFIC TUNING
 # Edit this file, then restart the running game. No autoload is needed.
 # Speeds and acceleration are world units, durations are seconds, fuel is
@@ -49,6 +54,18 @@ const CRASH_RECOVERY_SECONDS := 0.45
 const CRASH_INVINCIBLE_SECONDS := 1.6
 const CRASH_FLICKER_INTERVAL := 0.08
 const CRASH_FLICKER_ALPHA := 0.35
+
+# Trip-ending crashes: lose a percentage of cash, then spend days in repair.
+# Bill = floor(cash * min(base + random(0..extra), cap) / 100).
+const CRASH_REPAIR_BASE_PERCENT := 25
+const CRASH_REPAIR_RANDOM_PERCENT := 25
+const CRASH_REPAIR_MAX_PERCENT := 50
+const CRASH_REPAIR_DAYS := 1
+const CRASH_REPAIR_ENERGY_RECOVERY_RATIO := 1.0 # 1.0 restores full energy.
+# Hold the crash frame until the sound finishes (at least this many seconds),
+# then fade to black before opening the repair screen.
+const CRASH_REPAIR_HOLD_SECONDS := 0.35
+const CRASH_REPAIR_FADE_SECONDS := 1.2
 
 # Perspective, headlights and stage-exit animation.
 const INCOMING_LANE_SCALE := 0.78

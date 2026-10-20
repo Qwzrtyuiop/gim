@@ -348,6 +348,7 @@ static func build() -> Dictionary:
 
 	return {
 		"story_id": "benny_class_clown",
+		"speaker_portraits": true,
 		"chapter_title": "Class Clown",
 		"background": StoryConstants.BACKGROUND_STATION,
 		"music": {

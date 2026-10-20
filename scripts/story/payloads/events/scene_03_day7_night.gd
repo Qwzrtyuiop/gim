@@ -353,6 +353,7 @@ static func build() -> Dictionary:
 
 	return {
 		"story_id": "scene_03_day7_night",
+		"speaker_portraits": true,
 		"chapter_title": "Scene 3",
 		"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
 		"composition": composition,

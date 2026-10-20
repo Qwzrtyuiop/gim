@@ -1,45 +1,86 @@
-# Special Stage Blueprint Guide
+﻿# Special stages after story events
 
-`special` stages are custom gameplay variants that sit on top of the normal stage flow.
+Definitions live in `scripts/config/special_stages.gd`. Its `STAGES` registry is
+intentionally empty until actual stages are designed. Ordinary trips are unchanged.
 
-## Already Wired
-- `PlayerState.current_stage_special_type` can now be `special`.
-- `PlayerState.current_special_stage_id` stores the concrete custom mode id, such as `police_chase`.
-- `ride_selection.gd` passes `special_stage_id` into `PlayerState` when a rider card is chosen.
-- `game.gd` exposes `special_stage_id` and `special_stage_blueprint` at runtime.
-- `game_stage_setup.gd` has `SPECIAL_STAGE_BLUEPRINTS` plus `apply_special_stage_blueprint(owner)`.
-- Stage results now preserve `special_stage_id` for completed and failed stages.
+## Define a stage
 
-## Current Behavior
-- Nothing new happens yet by default.
-- `SPECIAL_STAGE_BLUEPRINTS` is empty, so all `special` stages are still inert until you register one.
-- The scaffold only applies blueprint modifiers if both of these are true:
-- `stage_special_type == "special"`
-- `special_stage_id` matches an entry in `SPECIAL_STAGE_BLUEPRINTS`
-
-## Blueprint Shape
-Use this shape inside `scripts/game/game_stage_setup.gd`:
+Add an entry to `STAGES`. This is an example only, not an enabled stage:
 
 ```gdscript
-const SPECIAL_STAGE_BLUEPRINTS := {
-	"police_chase": {
-		"display_name": "Police Chase",
-		"modifiers": {
-			"time_limit_multiplier": 0.78,
-			"player_acceleration_x_multiplier": 1.12,
-			"player_max_speed_limit": 640.0,
-		},
-		"metadata": {
-			"spawn_police": true,
-			"heat_level": 2,
-			"vehicle_override": "res://assets/vehicles/player_tricycle.png",
-		},
-	},
+const STAGES := {
+    "example_trip": {
+        "display_name": "Example Trip",
+        "stage_type": "short-night-speeders",
+        "target_distance": 800.0,
+        # Optional: omit to retain the current passenger.
+        "character_id": "benny",
+        "modifiers": {
+            "time_limit": 90.0,
+            "fare_php_per_meter": 0.0,
+            "time_bonus_php_per_second": 0.0,
+        },
+        "metadata": {},
+    },
 }
 ```
 
-## Supported Modifier Keys
-These already flow through `_apply_numeric_owner_modifier(...)`:
+`stage_type` is required and explicit: distance (`short`, `medium`, `long`),
+time (`morning`, `noon`, `night`), and traffic (`chill`, `normal`, `traffic-jam`,
+`busy`, `speeders`). Invalid or missing definitions warn and leave the event's
+normal destination intact; they do not silently pick a random stage.
+
+`target_distance` is optional; without it, the usual distance range is used.
+`display_name` and `metadata` are available to future custom UI/controllers;
+metadata alone does not implement new behavior.
+
+## Trigger it from an event
+
+Put this action on a dialogue line or choice in the event payload:
+
+```gdscript
+{
+    "speaker": "John",
+    "text": "Let's go.",
+    "actions": [
+        {"type": "start_special_stage", "id": "example_trip"},
+    ],
+}
+```
+
+The action queues the stage. Remaining dialogue plays normally, then the story's
+outro fades directly into gameplay, bypassing ride selection. The queue is saved
+with the story; the last executed `start_special_stage` action wins. Put it on a
+branch if only that choice should launch the stage. Add it to both language
+payloads when they should behave identically.
+
+Gallery/memory replays ignore this action and cannot launch a real trip.
+
+## Entry and completion
+
+- No energy or fuel entry requirement, and no trip-start energy deduction.
+  Even zero energy and zero fuel do not block the handoff.
+- Normal driving rules still apply: fatigue, fuel use/boost restrictions, and
+  collision energy loss. Entering at zero energy means a collision ends the trip.
+- The stage replaces the next trip, using the explicit time in `stage_type` as
+  its calendar slot. Morning completion advances to noon; noon advances to night;
+  night completion offers the normal overnight rest, not another night trip.
+- An earlier time than the current phase, or an already-used slot, belongs to
+  the next day. A later explicit time skips intervening slots. Day rollover uses
+  normal daily conditions and debt collection.
+- Successful completion pays once and opens the special trip's results. It does
+  not restore the preceding result or return to an interrupted sleep/ride
+  selection. Those pending transitions are cleared when the special trip starts.
+  The preceding fare is paid before launch so it cannot be overwritten.
+- Fatal collisions abandon the special stage and enter the normal repair flow.
+- Save/resume preserves the chosen definition and calendar slot. A saved
+  completed special stage finishes its handoff instead of replaying the trip.
+  In-progress driving resumes from the beginning, as ordinary driving does.
+
+## Modifiers and custom behavior
+
+Supported numeric keys:
+
 - `fare_php_per_meter`
 - `time_limit`
 - `time_bonus_php_per_second`
@@ -50,55 +91,13 @@ These already flow through `_apply_numeric_owner_modifier(...)`:
 - `player_lane_lerp_x`
 - `player_coast_x`
 
-You can also use the existing suffix patterns:
-- `_multiplier`
-- `_delta`
-- `_min`
-- `_cap`
+Each supports `_multiplier`, `_delta`, `_min`, and `_cap` suffixes.
+`player_max_speed_limit` is also supported.
 
-Special case already supported:
-- `player_max_speed_limit`
+Gameplay exposes `owner.stage_special_type`, `owner.special_stage_id`, and
+`owner.special_stage_blueprint`. Put future scenario mechanics in the relevant
+controller, reading the blueprint's `metadata`.
 
-## How To Assign One
-Wherever you build the chosen rider/stage payload, set:
-
-```gdscript
-{
-	"stage_special_type": "special",
-	"special_stage_id": "police_chase",
-}
-```
-
-If `stage_special_type` is not `special`, the runtime automatically clears `special_stage_id`.
-
-## Runtime Access
-Inside gameplay:
-- `owner.stage_special_type`
-- `owner.special_stage_id`
-- `owner.special_stage_blueprint`
-
-That means later you can branch on either the id or metadata:
-
-```gdscript
-if owner.special_stage_id == "police_chase":
-	# Spawn cop vehicles, sirens, chase UI, etc.
-	pass
-```
-
-## Recommended Pattern
-- Use `stage_special_type = "special"` as the top-level bucket.
-- Use `special_stage_id` for the actual scenario name.
-- Keep numeric tuning in `modifiers`.
-- Keep non-numeric flags, asset paths, and custom behavior settings in `metadata`.
-- Put bespoke runtime logic in the controller that owns that behavior, not all inside `game_stage_setup.gd`.
-
-## Good Future Examples
-- `police_chase`
-- `borrowed_motorcycle`
-- `flooded_road`
-- `broken_brakes`
-- `vip_convoy`
-- `escape_route`
-
-## Suggested Next Step
-When you are ready to build the first one, start with a blueprint that only changes modifiers and one metadata flag. Then wire one controller to react to that metadata so the first custom mode stays easy to test.
+The existing rider-card assignment (`stage_special_type: "special"` and
+`special_stage_id`) still works and shares this registry. The event entry bypass
+applies only to `start_special_stage`, not ordinary ride selection.

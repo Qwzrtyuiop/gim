@@ -4,13 +4,14 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
+const SpecialStages := preload("res://scripts/config/special_stages.gd")
 
-# Custom special stages can be registered here later.
+# Register custom special stages in scripts/config/special_stages.gd.
 # Each blueprint is keyed by special_stage_id and may provide:
 # - display_name: String
 # - modifiers: Dictionary of numeric owner modifiers, reusing _apply_numeric_owner_modifier keys
 # - metadata: Dictionary for bespoke stage scripts to inspect at runtime
-const SPECIAL_STAGE_BLUEPRINTS := {}
+const SPECIAL_STAGE_BLUEPRINTS := SpecialStages.STAGES
 
 
 static func apply_stage_profile(owner) -> void:
@@ -134,6 +135,8 @@ static func apply_special_stage_blueprint(owner) -> void:
 		return
 
 	owner.special_stage_blueprint = blueprint.duplicate(true)
+	if blueprint.has("target_distance"):
+		owner.target_distance = maxf(1.0, float(blueprint["target_distance"]))
 	var modifiers: Dictionary = blueprint.get("modifiers", {})
 	if modifiers.is_empty():
 		return
@@ -153,6 +156,8 @@ static func special_stage_blueprint(special_stage_id: String) -> Dictionary:
 	var safe_special_stage_id: String = PlayerState.normalize_special_stage_id(special_stage_id)
 	if safe_special_stage_id.is_empty():
 		return {}
+	if str(PlayerState.active_event_special_stage.get("id", "")) == safe_special_stage_id:
+		return Dictionary(PlayerState.active_event_special_stage["definition"]).duplicate(true)
 	return Dictionary(SPECIAL_STAGE_BLUEPRINTS.get(safe_special_stage_id, {})).duplicate(true)
 
 
@@ -192,7 +197,6 @@ static func apply_hidden_special_modifiers(owner) -> void:
 			owner.main_vehicle_min_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.main_vehicle_max_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.shoulder_vehicle_min_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
-			owner.shoulder_vehicle_max_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.npc_lane_change_chance_per_second *= owner.special_mode_hidden_modifiers["lane_weave_x"]
 			owner.npc_collision_lookahead *= owner.special_mode_hidden_modifiers["close_call_x"]
 		"speeders":

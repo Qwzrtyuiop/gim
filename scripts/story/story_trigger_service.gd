@@ -4,14 +4,7 @@ class_name StoryTriggerService
 # Story trigger registry and payload resolver.
 # Add new payloads and default trigger rules here when you want them to enter the main game flow.
 
-const Day02StationBillPayloadEnglish := preload("res://scripts/story/payloads/events/day_02_station_bill.gd")
-const Day02StationBillPayloadTagalog := preload("res://scripts/story/payloads/events/day_02_station_bill_tagalog.gd")
-const BennyClassClownPayloadEnglish := preload("res://scripts/story/payloads/characters/benny/benny_class_clown.gd")
-const BennyClassClownPayloadTagalog := preload("res://scripts/story/payloads/characters/benny/benny_class_clown_tagalog.gd")
-const BennyTropaNightPayloadEnglish := preload("res://scripts/story/payloads/characters/benny/benny_tropa_night.gd")
-const BennyTropaNightPayloadTagalog := preload("res://scripts/story/payloads/characters/benny/benny_tropa_night_tagalog.gd")
-const Scene03Day7NightPayloadEnglish := preload("res://scripts/story/payloads/events/scene_03_day7_night.gd")
-const Scene03Day7NightPayloadTagalog := preload("res://scripts/story/payloads/events/scene_03_day7_night_tagalog.gd")
+const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const NUMERIC_TRIGGER_FIELDS := [
 	"energy",
@@ -78,7 +71,8 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 		{
 			"id": "benny_tropa_night",
 			"phase": STORY_TRIGGER_DAY_END,
-			"times": ["noon"],
+			# Completing the noon trip has already advanced the clock to night.
+			"times": ["noon", "night"],
 			"required_events": ["benny_class_clown_seen"],
 			"required_event_values": {
 				"benny_class_clown_drink_choice": "agree",
@@ -149,26 +143,7 @@ static func get_story_payload_for_trigger(trigger_data: Dictionary) -> Dictionar
 
 
 static func _build_localized_payload(payload_id: String) -> Dictionary:
-	var safe_payload_id := str(payload_id).strip_edges()
-	var use_tagalog := StoryLanguageManager.is_tagalog()
-	match safe_payload_id:
-		"day_02_station_bill", "day_2_station_bill":
-			if use_tagalog:
-				return Day02StationBillPayloadTagalog.build()
-			return Day02StationBillPayloadEnglish.build()
-		"benny_class_clown":
-			if use_tagalog:
-				return BennyClassClownPayloadTagalog.build()
-			return BennyClassClownPayloadEnglish.build()
-		"benny_tropa_night":
-			if use_tagalog:
-				return BennyTropaNightPayloadTagalog.build()
-			return BennyTropaNightPayloadEnglish.build()
-		"scene_03_day7_night", "day_7_night_scene_03":
-			if use_tagalog:
-				return Scene03Day7NightPayloadTagalog.build()
-			return Scene03Day7NightPayloadEnglish.build()
-	return {}
+	return StoryPayloadCatalog.build(payload_id)
 
 
 static func consume_story_trigger(consumed_story_triggers: Dictionary, trigger_data: Dictionary) -> bool:
@@ -196,6 +171,19 @@ static func consume_story_trigger(consumed_story_triggers: Dictionary, trigger_d
 
 static func ensure_required_story_triggers(story_triggers: Array) -> bool:
 	var changed := false
+	# Saves retain their trigger dictionaries. Upgrade the old built-in rule
+	# without replacing custom rules or resetting consumed/seen event state.
+	for trigger_data in story_triggers:
+		if not trigger_data is Dictionary:
+			continue
+		if (
+			str(trigger_data.get("id", "")) == "benny_tropa_night"
+			and str(trigger_data.get("phase", "")) == STORY_TRIGGER_DAY_END
+			and str(trigger_data.get("payload_id", "")) == "benny_tropa_night"
+			and trigger_data.get("times", []) == ["noon"]
+		):
+			trigger_data["times"] = ["noon", "night"]
+			changed = true
 	for required_trigger in build_default_story_triggers():
 		var required_id := str(required_trigger.get("id", ""))
 		if required_id.is_empty() or _has_trigger_with_id(story_triggers, required_id):

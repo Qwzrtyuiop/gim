@@ -1,6 +1,7 @@
 extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
 
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
@@ -56,7 +57,9 @@ static func store_stage_result(
 			detail_lines.append("Passenger Warnings: %d/3" % passenger_rule_violation_count)
 	detail_lines.append("Total: PhP %d" % total)
 
+	PlayerState._begin_state_batch()
 	PlayerState.set_last_stage_result({
+		"character_id": PlayerState.get_current_mock_character_id(),
 		"day": PlayerState.get_current_day(),
 		"stage_type": stage_type,
 		"difficulty": stage_difficulty,
@@ -81,7 +84,11 @@ static func store_stage_result(
 		"completed": true,
 	})
 	PlayerState.advance_phase_after_stage_result(stage_time_of_day)
+	if not PlayerState.active_event_special_stage.is_empty():
+		PlayerState.active_event_special_stage["completed"] = true
 	PlayerState.record_stage_completion()
+	PlayerState.save_progress()
+	PlayerState._end_state_batch()
 
 
 static func store_failed_stage_result(
@@ -143,7 +150,7 @@ static func stage_complete_story_payload(stage_type: String, stage_difficulty: S
 		}
 	)
 	if stage_story_trigger.is_empty():
-		return {}
+		return RandomRideEventService.prepare(PlayerState)
 
 	var story_payload := PlayerState.get_story_payload_for_trigger(stage_story_trigger)
 	if story_payload.is_empty():

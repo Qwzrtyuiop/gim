@@ -8,6 +8,7 @@ const TROPA_CG := "res://assets/specialCG/tropaCg.png"
 static func build() -> Dictionary:
 	return {
 		"story_id": "benny_tropa_night",
+		"speaker_portraits": true,
 		"chapter_title": "Tropa",
 		"background": StoryConstants.BACKGROUND_INHOUSE,
 		"music": {

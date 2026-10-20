@@ -9,6 +9,7 @@ const StoryConstants := preload("res://scripts/story/story_constants.gd")
 static func build() -> Dictionary:
 	return {
 		"story_id": "template_story_id",
+		"speaker_portraits": true,
 		"chapter_title": "Template Story",
 
 		# Optional scene defaults.
@@ -31,9 +32,14 @@ static func build() -> Dictionary:
 				"text": "Narration line goes here.",
 			},
 			{
-				# Speaker line.
+				# Multiple borderless sprites sit directly above the dialogue box.
+				# Omit portraits on later lines to keep them; [] removes them all.
 				"speaker": "John Toda",
 				"text": "Dialogue line goes here.",
+				"portraits": [
+					{"id": "john", "texture": "res://assets/characters/John.png", "position": "left", "height": 300},
+					{"id": "benny", "texture": "res://assets/characters/Benny.png", "position": "right", "height": 300, "flip_h": true},
+				],
 			},
 			{
 				# Optional background camera motion.

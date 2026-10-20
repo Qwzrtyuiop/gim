@@ -726,7 +726,7 @@ static func is_overtake_speed_exempt(entity: Dictionary) -> bool:
 
 
 static func apply_bottom_lane_speed_cap(owner) -> void:
-	var cap := float(owner.bottom_lane_vehicle_max_speed)
+	var cap := maxf(owner.main_vehicle_min_speed, owner.main_vehicle_max_speed)
 	if cap <= 0.0:
 		return
 

@@ -34,9 +34,12 @@ const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 
 var current_mode: String = MODE_GALLERY
 var selected_entry: Dictionary = {}
+var memory_bottom_spacer: Control
 
 
 func _ready() -> void:
+	scroll_container.resized.connect(_update_memory_scroll_space)
+	list_container.mouse_filter = Control.MOUSE_FILTER_PASS
 	_apply_panel_theme(main_panel, Color(0.08, 0.08, 0.08, 0.92))
 	_apply_panel_theme(preview_panel, Color(0.11, 0.10, 0.08, 0.94))
 	_apply_button_theme(gallery_tab_button)
@@ -78,6 +81,7 @@ func _show_memory() -> void:
 
 
 func _populate_current_mode() -> void:
+	memory_bottom_spacer = null
 	for child in list_container.get_children():
 		list_container.remove_child(child)
 		child.queue_free()
@@ -109,15 +113,33 @@ func _populate_current_mode() -> void:
 		list_container.add_child(button)
 
 	var spacer: Control = Control.new()
-	spacer.custom_minimum_size = Vector2(0.0, MEMORY_BOTTOM_SPACER_HEIGHT)
+	spacer.name = "MemoryBottomSpace"
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spacer.focus_mode = Control.FOCUS_NONE
 	list_container.add_child(spacer)
+	memory_bottom_spacer = spacer
+	_update_memory_scroll_space()
 
 	_select_entry(entries[0])
 	var first_child: Node = list_container.get_child(0)
 	if first_child is Button:
 		(first_child as Button).grab_focus()
+
+
+func _update_memory_scroll_space() -> void:
+	if current_mode != MODE_MEMORY or not is_instance_valid(memory_bottom_spacer):
+		return
+	var rows_height := 0.0
+	for child in list_container.get_children():
+		if child is Control and child != memory_bottom_spacer:
+			rows_height += child.get_combined_minimum_size().y
+	rows_height += list_container.get_theme_constant("separation") * (list_container.get_child_count() - 1)
+	# Keep at least one row of scrolling even when only one memory is unlocked.
+	memory_bottom_spacer.custom_minimum_size.y = maxf(
+		MEMORY_BOTTOM_SPACER_HEIGHT,
+		scroll_container.size.y + MEMORY_ROW_SIZE.y - rows_height
+	)
 
 
 func _populate_gallery_tiles(entries: Array[Dictionary]) -> void:
@@ -178,6 +200,8 @@ func _make_gallery_tile(entry: Dictionary) -> Button:
 
 func _make_memory_button(entry: Dictionary) -> Button:
 	var button: Button = Button.new()
+	button.mouse_filter = Control.MOUSE_FILTER_PASS
+	button.mouse_force_pass_scroll_events = true
 	button.custom_minimum_size = MEMORY_ROW_SIZE
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.toggle_mode = true
@@ -266,6 +290,7 @@ func _refresh_tab_buttons() -> void:
 
 
 func _apply_mode_layout() -> void:
+	scroll_container.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_ALWAYS if current_mode == MODE_MEMORY else ScrollContainer.SCROLL_MODE_AUTO
 	if current_mode == MODE_GALLERY:
 		preview_panel.visible = false
 		scroll_container.offset_left = 28.0

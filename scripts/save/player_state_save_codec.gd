@@ -72,7 +72,9 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
 	player_state.pending_trip_selection = Dictionary(save_data.get("pending_trip_selection", {})).duplicate(true)
 	player_state.pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
+	player_state.active_event_special_stage = Dictionary(save_data.get("active_event_special_stage", {})).duplicate(true)
 	player_state.pending_sleep_transition_state = Dictionary(save_data.get("pending_sleep_transition_state", {})).duplicate(true)
+	player_state.pending_crash_repair = Dictionary(save_data.get("pending_crash_repair", {})).duplicate(true)
 	player_state.pending_gameplay_entry_fade_duration = float(save_data.get("pending_gameplay_entry_fade_duration", player_state.pending_gameplay_entry_fade_duration))
 	player_state.pending_skip_night_phase = bool(save_data.get("pending_skip_night_phase", player_state.pending_skip_night_phase))
 	player_state.current_mock_character_id = str(save_data.get("current_mock_character_id", player_state.current_mock_character_id))
@@ -175,7 +177,9 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,
 		"pending_trip_selection": player_state.pending_trip_selection.duplicate(true),
 		"pending_story": player_state.pending_story.duplicate(true),
+		"active_event_special_stage": player_state.active_event_special_stage.duplicate(true),
 		"pending_sleep_transition_state": player_state.pending_sleep_transition_state.duplicate(true),
+		"pending_crash_repair": player_state.pending_crash_repair.duplicate(true),
 		"pending_gameplay_entry_fade_duration": player_state.pending_gameplay_entry_fade_duration,
 		"pending_skip_night_phase": player_state.pending_skip_night_phase,
 		"current_mock_character_id": player_state.current_mock_character_id,

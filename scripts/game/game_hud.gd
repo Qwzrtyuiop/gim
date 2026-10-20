@@ -7,6 +7,7 @@ const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")
 
 var refs: Dictionary = {}
+var entry_fade_tween: Tween
 
 
 func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String) -> Dictionary:
@@ -126,6 +127,7 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 
 
 func begin_gameplay_entry_fade(parent: Node, gameplay_entry_fade_seconds: float) -> void:
+	cancel_gameplay_entry_fade()
 	var fade_rect := refs.get("fade_rect") as ColorRect
 	if fade_rect == null:
 		return
@@ -133,8 +135,14 @@ func begin_gameplay_entry_fade(parent: Node, gameplay_entry_fade_seconds: float)
 		fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
 		return
 
-	var tween := parent.create_tween()
-	tween.tween_property(fade_rect, "color:a", 0.0, gameplay_entry_fade_seconds)
+	entry_fade_tween = parent.create_tween()
+	entry_fade_tween.tween_property(fade_rect, "color:a", 0.0, gameplay_entry_fade_seconds)
+
+
+func cancel_gameplay_entry_fade() -> void:
+	if entry_fade_tween != null and entry_fade_tween.is_valid():
+		entry_fade_tween.kill()
+	entry_fade_tween = null
 
 
 func layout(size: Vector2, player_x: float, player_lane: int, stage_type: String, lane_y_provider: Callable) -> void:

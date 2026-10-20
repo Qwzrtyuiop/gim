@@ -9,11 +9,8 @@ const IMAGE_EXTENSIONS := {
 const IMAGE_KEYS := {
 	"background": true,
 	"image": true,
-	"left_portrait": true,
 	"path": true,
-	"portrait": true,
 	"preview_image": true,
-	"right_portrait": true,
 	"texture": true,
 }
 
@@ -58,6 +55,9 @@ static func normalize_image_path(image_ref) -> String:
 		image_path = str(image_ref)
 
 	image_path = image_path.strip_edges()
+	# Older saves may contain speaker sprites. Never expose these as gallery art.
+	if image_path.replace("\\", "/").to_lower().begins_with("res://assets/characters/"):
+		return ""
 	if image_path.is_empty() or not image_path.begins_with("res://"):
 		return ""
 	if not IMAGE_EXTENSIONS.has(image_path.get_extension().to_lower()):
@@ -70,8 +70,13 @@ static func normalize_image_path(image_ref) -> String:
 static func _collect_gallery_images_from_value(value, image_paths: Array[String], parent_key: String = "") -> void:
 	if value is Dictionary:
 		var value_dictionary: Dictionary = value as Dictionary
+		var action_type := str(value_dictionary.get("type", value_dictionary.get("action", ""))).to_lower()
+		if action_type in ["set_portrait", "change_portrait", "set_portraits", "clear_portrait", "clear_portraits", "portrait_switch", "focus_portrait"]:
+			return
 		for key_variant in value_dictionary.keys():
 			var key: String = str(key_variant)
+			if key in ["portraits", "portrait", "left_portrait", "right_portrait", "response_portraits", "_portrait_state"]:
+				continue
 			var item = value_dictionary.get(key_variant)
 			if IMAGE_KEYS.has(key):
 				_append_image_path(image_paths, item)

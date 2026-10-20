@@ -168,10 +168,12 @@ static func get_sleep_transition_resume_step(player_state) -> String:
 
 
 static func reset_pending_runtime_state(player_state) -> void:
+	player_state.active_event_special_stage.clear()
 	player_state.pending_stage_energy_cost = false
 	player_state.pending_trip_selection.clear()
 	player_state.pending_story.clear()
 	player_state.pending_sleep_transition_state.clear()
 	player_state.pending_gameplay_entry_fade_duration = 0.0
+	player_state.pending_crash_repair.clear()
 	player_state.pending_result_music.clear()
 	player_state.pending_skip_night_phase = false

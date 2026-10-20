@@ -10,6 +10,7 @@ const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_co
 
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
+const REPAIR_SCENE := "res://scenes/repair_transition.tscn"
 const GAS_SAVE_INTERVAL := 0.75
 
 
@@ -59,9 +60,11 @@ static func end_game(owner, title: String, detail: String) -> void:
 	PlayerState.flush_deferred_save()
 	if title == "CRASH":
 		owner.audio_manager.play_crash_sfx()
-	if title == "CRASH" or title == "TIME OUT":
+		send_to_crash_repair(owner, detail)
+		return
+	if title == "TIME OUT":
 		PlayerState.record_stage_failure()
-	if (title == "CRASH" or title == "TIME OUT") and PlayerState.energy <= 0:
+	if title == "TIME OUT" and PlayerState.energy <= 0:
 		owner.game_state = "GAME OVER"
 		owner.end_message = "Out of energy. Press any key to return to menu."
 	else:
@@ -99,7 +102,15 @@ static func handle_player_hit(owner, detail: String) -> void:
 	if PlayerState.energy > 0:
 		return
 
+	send_to_crash_repair(owner, detail)
+
+
+static func send_to_crash_repair(owner, detail: String) -> void:
+	if owner.game_state != "playing":
+		return
+	owner.game_state = "CRASH"
 	PlayerState.flush_deferred_save()
+	PlayerState._begin_state_batch()
 	PlayerState.record_stage_failure()
 	GameEconomyManager.store_failed_stage_result(
 		owner.stage_type,
@@ -112,12 +123,46 @@ static func handle_player_hit(owner, detail: String) -> void:
 		owner.target_distance,
 		detail
 	)
-	PlayerState.set_pending_result_music(owner.audio_manager.get_result_music_carry_state())
-	owner.get_tree().change_scene_to_file(STAGE_RESULTS_SCENE)
+	# A fatal crash abandons the event interruption and follows normal repairs.
+	PlayerState.active_event_special_stage.clear()
+	PlayerState.begin_crash_repair()
+	PlayerState._end_state_batch()
+	# Save the bill now, but keep this scene (and its crash audio player) alive.
+	owner.player_speed = 0.0
+	owner.boost_active = false
+	owner.crash_repair_transition_active = true
+	owner.crash_repair_hold_remaining = maxf(0.0, GameTuning.CRASH_REPAIR_HOLD_SECONDS)
+	owner.crash_repair_fade_time = 0.0
+	if owner.game_hud != null:
+		owner.game_hud.cancel_gameplay_entry_fade()
+	if owner.fade_rect != null:
+		# Dialogue bubbles are added after the HUD; fade over them as well.
+		owner.fade_rect.z_index = 100
+		owner.fade_rect.color = Color(0.0, 0.0, 0.0, 0.0)
+
+
+static func update_crash_repair_transition(owner, delta: float) -> void:
+	if not owner.crash_repair_transition_active:
+		return
+	owner.crash_repair_hold_remaining = maxf(0.0, owner.crash_repair_hold_remaining - delta)
+	if owner.crash_repair_hold_remaining > 0.0 or owner.audio_manager.is_crash_sfx_playing():
+		return
+	var fade_seconds := maxf(0.001, GameTuning.CRASH_REPAIR_FADE_SECONDS)
+	# Leave a fully black frame on screen before changing scenes.
+	if owner.crash_repair_fade_time >= fade_seconds:
+		owner.crash_repair_transition_active = false
+		owner.get_tree().change_scene_to_file(REPAIR_SCENE)
+		return
+	owner.crash_repair_fade_time += delta
+	var alpha := smoothstep(0.0, fade_seconds, owner.crash_repair_fade_time)
+	if owner.fade_rect != null:
+		owner.fade_rect.color = Color(0.0, 0.0, 0.0, alpha)
 
 
 static func try_retry_stage(owner) -> void:
-	if owner.use_player_state_stage_sequence and not PlayerState.spend_energy(GameTuning.TRIP_ENERGY_COST):
+	if owner.crash_repair_transition_active:
+		return
+	if owner.use_player_state_stage_sequence and PlayerState.active_event_special_stage.is_empty() and not PlayerState.spend_energy(GameTuning.TRIP_ENERGY_COST):
 		owner.end_message = "No energy left. Visit the store or reset progress."
 		return
 	reset_game(owner)
@@ -126,6 +171,7 @@ static func try_retry_stage(owner) -> void:
 static func reset_game(owner) -> void:
 	GameStageSetup.apply_stage_profile(owner)
 	GameStageSetup.apply_player_upgrades(owner)
+	GameStageSetup.apply_special_stage_blueprint(owner)
 	for entity in owner.active_entities:
 		if entity.has("sprite") and entity["sprite"] != null and is_instance_valid(entity["sprite"]):
 			entity["sprite"].queue_free()
@@ -143,6 +189,9 @@ static func reset_game(owner) -> void:
 	owner.passenger_rule_violation_count = 0
 	owner.stage_clear_transition_started = false
 	owner.stage_clear_fade_time = 0.0
+	owner.crash_repair_transition_active = false
+	owner.crash_repair_hold_remaining = 0.0
+	owner.crash_repair_fade_time = 0.0
 	owner.boost_active = false
 	owner.boost_speed_x = 1.0
 	owner.boost_gas_save_timer = 0.0
@@ -177,6 +226,9 @@ static func update_stage_clear_transition(owner, delta: float) -> void:
 
 
 static func go_to_profit_screen(owner) -> void:
+	if not PlayerState.active_event_special_stage.is_empty():
+		owner.get_tree().change_scene_to_file(PlayerState.finish_event_special_stage())
+		return
 	var story_payload: Dictionary = GameEconomyManager.stage_complete_story_payload(
 		owner.stage_type,
 		owner.stage_difficulty,

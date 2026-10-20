@@ -14,6 +14,7 @@ const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
+const REPAIR_SCENE := "res://scenes/repair_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
 const AchievementServiceData := preload("res://scripts/achievement_service.gd")
@@ -578,9 +579,11 @@ func _fade_to_scene(scene_path: String) -> void:
 
 
 func _saved_resume_scene() -> String:
+	if not PlayerState.active_event_special_stage.is_empty():
+		return GAME_SCENE
 	var saved_scene := PlayerState.get_resume_scene()
 	match saved_scene:
-		GAME_SCENE, STORY_SCENE, DAY_START_SCENE, HOUSE_DAY_START_SCENE, RIDE_SELECTION_SCENE, STORE_SCENE, STAGE_RESULTS_SCENE, SLEEP_TRANSITION_SCENE, GAME_OVER_SCENE:
+		GAME_SCENE, STORY_SCENE, DAY_START_SCENE, HOUSE_DAY_START_SCENE, RIDE_SELECTION_SCENE, STORE_SCENE, STAGE_RESULTS_SCENE, SLEEP_TRANSITION_SCENE, GAME_OVER_SCENE, REPAIR_SCENE:
 			return saved_scene
 
 	if PlayerState.is_run_failed():
@@ -588,6 +591,8 @@ func _saved_resume_scene() -> String:
 
 	if not PlayerState.get_pending_story().is_empty():
 		return STORY_SCENE
+	if not PlayerState.get_pending_crash_repair().is_empty():
+		return SLEEP_TRANSITION_SCENE if bool(PlayerState.get_pending_crash_repair().get("transition_started", false)) else REPAIR_SCENE
 	if not PlayerState.get_pending_sleep_transition_state().is_empty():
 		return SLEEP_TRANSITION_SCENE
 	if not PlayerState.get_pending_trip_selection().is_empty():
