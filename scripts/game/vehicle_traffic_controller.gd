@@ -1,11 +1,13 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameLabelFactory := preload("res://scripts/game/game_label_factory.gd")
 const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleSpawner := preload("res://scripts/game/vehicle_spawner.gd")
 const VehicleSpawnScheduler := preload("res://scripts/game/vehicle_spawn_scheduler.gd")
+const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
 
 const SAME_DIRECTION_BEHIND_DESPAWN_X := -960.0
 const INCOMING_BEHIND_DESPAWN_X := -260.0
@@ -1273,9 +1275,14 @@ static func update_entities(owner, delta: float) -> void:
 		)
 
 		sprite.position.x += screen_velocity * delta
+		update_speeder_bob(entity, delta)
 		update_entity_lane_position(owner, entity, delta)
 
 	resolve_vehicle_overlaps(owner)
+	for entity in owner.active_entities:
+		var road_speed := 0.0 if bool(entity.get("is_parked", false)) else float(entity["world_speed"])
+		var direction := 1.0 if entity_moves_with_player(entity, int(entity["lane"])) else -1.0
+		VehicleWheelAnimation.update(entity["sprite"], road_speed * direction, delta)
 
 	var dead_entities := []
 	for entity in owner.active_entities:
@@ -1364,6 +1371,19 @@ static func clear_removed_sprite_references(owner, sprite) -> void:
 			finish_top_lane_overtake_or_clear(entity)
 
 
+static func update_speeder_bob(entity: Dictionary, delta: float) -> void:
+	if entity.get("kind", "traffic") != "speeder":
+		return
+	var sprite: Sprite2D = entity["sprite"]
+	# Apply only the offset difference so oscillation never accumulates as travel.
+	var previous_offset := float(entity.get("bob_x_offset", 0.0))
+	var phase := fposmod(float(entity.get("bob_phase", 0.0)) + delta * TAU * GameTuning.SPEEDER_BOB_CYCLES_PER_SECOND, TAU)
+	var offset := sin(phase) * GameTuning.SPEEDER_BOB_X_PIXELS
+	sprite.position.x += offset - previous_offset
+	entity["bob_phase"] = phase
+	entity["bob_x_offset"] = offset
+
+
 static func resolve_vehicle_overlaps(owner) -> void:
 	for lane_index in range(3):
 		resolve_direction_overlaps(owner, lane_index, true)
@@ -1402,16 +1422,24 @@ static func resolve_direction_overlaps(owner, lane_index: int, moves_with_player
 
 		var front_rect: Rect2 = VehicleGeometry.collision_rect(front_entity["sprite"], owner.VEHICLE_HITBOX_INSET, owner)
 		var rear_rect: Rect2 = VehicleGeometry.collision_rect(rear_entity["sprite"], owner.VEHICLE_HITBOX_INSET, owner)
+		var separation_gap := NPC_OVERLAP_SEPARATION_GAP
+		if rear_entity.get("kind", "traffic") == "speeder":
+			# Use visible bumper edges for following clearance. The inset contact
+			# hitboxes remain unchanged for collisions with the player's tricycle.
+			var bumper_inset := Vector4(0.0, owner.VEHICLE_HITBOX_INSET.y, 0.0, owner.VEHICLE_HITBOX_INSET.w)
+			front_rect = VehicleGeometry.collision_rect(front_entity["sprite"], bumper_inset, owner)
+			rear_rect = VehicleGeometry.collision_rect(rear_entity["sprite"], bumper_inset, owner)
+			separation_gap = maxf(0.0, GameTuning.SPEEDER_FRONT_CLEARANCE_PIXELS)
 
 		if moves_with_player:
 			var rear_right: float = rear_rect.position.x + rear_rect.size.x
-			var desired_rear_right: float = front_rect.position.x - NPC_OVERLAP_SEPARATION_GAP
+			var desired_rear_right: float = front_rect.position.x - separation_gap
 			if rear_right > desired_rear_right:
 				rear_entity["sprite"].position.x += desired_rear_right - rear_right
 				limit_entity_speed(rear_entity, float(front_entity.get("world_speed", 0.0)))
 		else:
 			var front_right: float = front_rect.position.x + front_rect.size.x
-			var desired_rear_left: float = front_right + NPC_OVERLAP_SEPARATION_GAP
+			var desired_rear_left: float = front_right + separation_gap
 			if rear_rect.position.x < desired_rear_left:
 				rear_entity["sprite"].position.x += desired_rear_left - rear_rect.position.x
 				limit_entity_speed(rear_entity, float(front_entity.get("world_speed", 0.0)))

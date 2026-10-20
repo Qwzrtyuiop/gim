@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 
@@ -8,9 +10,9 @@ static func player_upgrade_modifiers() -> Dictionary:
 	var engine_level := PlayerState.get_upgrade_level("engine_tune")
 	var brakes_level := PlayerState.get_upgrade_level("brake_kit")
 	return {
-		"player_acceleration_x": 1.0 + engine_level * 0.20,
-		"player_max_speed": 1.0 + engine_level * 0.9,
-		"player_brake_x": 1.0 + brakes_level * 0.20,
+		"player_acceleration_x": 1.0 + engine_level * GameTuning.ENGINE_ACCELERATION_BONUS_PER_LEVEL,
+		"player_max_speed": 1.0 + engine_level * GameTuning.ENGINE_SPEED_BONUS_PER_LEVEL,
+		"player_brake_x": 1.0 + brakes_level * GameTuning.BRAKE_POWER_BONUS_PER_LEVEL,
 		"player_lane_lerp_x": 1.0,
 	}
 

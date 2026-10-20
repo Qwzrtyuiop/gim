@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
 
@@ -72,15 +74,9 @@ static func apply_target_distance_roll(owner) -> void:
 
 
 static func apply_weather_modifiers(owner) -> void:
-	match owner.stage_weather:
-		"rain":
-			owner.player_brake_deceleration *= 0.85
-			owner.player_brake_x *= 0.85
-			owner.player_coast_deceleration *= 0.86
-		"heavy rain":
-			owner.player_brake_deceleration *= 0.72
-			owner.player_brake_x *= 0.75
-			owner.player_coast_deceleration *= 0.72
+	var modifiers: Dictionary = GameTuning.WEATHER_HANDLING_MULTIPLIERS.get(owner.stage_weather, {})
+	for key in modifiers:
+		owner.set(key, float(owner.get(key)) * float(modifiers[key]))
 
 
 static func apply_player_upgrades(owner) -> void:

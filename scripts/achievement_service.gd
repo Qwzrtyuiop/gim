@@ -1,6 +1,8 @@
 extends RefCounted
 class_name AchievementService
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const ORDER := [
 	"mapagsamantala",
 	"tapat",
@@ -73,16 +75,16 @@ const DEFINITIONS := {
 	},
 }
 
-const SMOKER_YOSI_GOAL := 10
-const SMOKER_MAX_ENERGY_PENALTY := 2
-const SMOKER_DANGER_YOSI_TOTAL := 50
+const SMOKER_YOSI_GOAL := GameTuning.SMOKER_YOSI_GOAL
+const SMOKER_MAX_ENERGY_PENALTY := GameTuning.SMOKER_MAX_ENERGY_PENALTY
+const SMOKER_DANGER_YOSI_TOTAL := GameTuning.SMOKER_DANGER_YOSI_TOTAL
 const TAMAD_REQUIRED_REST_TIMES := ["morning", "noon", "night"]
 const LOW_ENERGY_THRESHOLD := 5
 const LOW_RESOURCE_STREAK_TARGET := 5
 
 
 static func get_yosi_energy_restore(player_state) -> int:
-	return 3 if has_achievement(player_state, "maninigarilyo") else 2
+	return GameTuning.SMOKER_YOSI_ENERGY_RESTORE if has_achievement(player_state, "maninigarilyo") else GameTuning.YOSI_ENERGY_RESTORE
 
 
 static func record_yosi_purchase(player_state, amount := 1) -> int:
@@ -129,7 +131,10 @@ static func record_stage_completion(player_state) -> void:
 	if player_state.rides_completed_today >= 3:
 		unlock_achievement(player_state, "masipag")
 
-	player_state.clean_stage_streak += 1
+	if player_state.current_trip_had_crash:
+		player_state.clean_stage_streak = 0
+	else:
+		player_state.clean_stage_streak += 1
 	if player_state.clean_stage_streak >= 5:
 		unlock_achievement(player_state, "maingat")
 
@@ -144,13 +149,21 @@ static func record_stage_completion(player_state) -> void:
 		if player_state.low_both_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
 			unlock_achievement(player_state, "maparaan")
 
+	player_state.current_trip_had_crash = false
 	player_state.current_trip_low_energy = false
 	player_state.current_trip_low_gas = false
 	player_state.save_progress()
 
 
+static func record_stage_crash(player_state) -> void:
+	player_state.clean_stage_streak = 0
+	player_state.current_trip_had_crash = true
+	player_state.save_progress()
+
+
 static func record_stage_failure(player_state) -> void:
 	player_state.clean_stage_streak = 0
+	player_state.current_trip_had_crash = false
 	player_state.current_trip_low_energy = false
 	player_state.current_trip_low_gas = false
 	player_state.save_progress()

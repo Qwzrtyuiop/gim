@@ -1,5 +1,7 @@
 extends Control
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const STORE_SCENE := "res://scenes/store.tscn"
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
@@ -199,7 +201,7 @@ func _layout_dynamic_result_text(detail_line_count: int) -> void:
 
 
 func _attempt_next_stage() -> void:
-	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= 2:
+	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
 		ride_confirm_dialog.popup_centered()
 		return
 

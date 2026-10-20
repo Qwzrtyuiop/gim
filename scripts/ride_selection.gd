@@ -144,11 +144,15 @@ func _ready() -> void:
 		call_deferred("_start_tutorial")
 
 
+func _input(event: InputEvent) -> void:
+	if tutorial_active and event is InputEventMouseButton and event.pressed:
+		# Handle the click before the tutorial overlay consumes GUI input.
+		get_viewport().set_input_as_handled()
+		_advance_tutorial()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if tutorial_active:
-		if event is InputEventMouseButton and event.pressed:
-			_advance_tutorial()
-			return
 		if _is_any_press(event):
 			_advance_tutorial()
 		return
@@ -621,7 +625,7 @@ func _build_tutorial() -> void:
 	var stats_row := stats_row_refs.get("row") as Control
 	var stats_targets := [stats_row] if stats_row != null else [money_label]
 	tutorial_steps.append({
-		"text": "Money buys upgrades and items. Energy is spent when starting a ride; if it hits 0 you cannot start. Gas starts at 100%, drains as you drive, and burns faster while boosting.",
+		"text": "Money buys upgrades and items. Energy is spent when starting a ride; if it hits 0 you cannot start. Gas starts at %s%%, drains as you drive, and burns faster while boosting." % String.num(PlayerState.DEFAULT_STARTING_GAS_PERCENT).trim_suffix(".0"),
 		"targets": stats_targets,
 	})
 	tutorial_steps.append({
@@ -669,7 +673,7 @@ func _advance_tutorial() -> void:
 func _show_tutorial_step(step_index: int) -> void:
 	tutorial_step_index = clampi(step_index, 0, tutorial_steps.size() - 1)
 	var step: Dictionary = tutorial_steps[tutorial_step_index]
-	tutorial_text_label.text = "%s\n\nPress any key to continue" % str(step.get("text", ""))
+	tutorial_text_label.text = "%s\n\nPress any key or click to continue" % str(step.get("text", ""))
 	tutorial_text_label.visible = true
 	_layout_tutorial_for_targets(step.get("targets", []))
 

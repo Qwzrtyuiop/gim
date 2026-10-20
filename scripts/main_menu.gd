@@ -1,5 +1,8 @@
 extends Control
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const MenuTrafficController := preload("res://scripts/game/menu_traffic_controller.gd")
+
 const GAME_SCENE := "res://scenes/main.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
@@ -27,11 +30,8 @@ const VEHICLE_TEXTURES := {
 	"sedan": preload("res://assets/vehicles/sedan.png"),
 	"truck": preload("res://assets/vehicles/truck.png"),
 }
-const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const ROAD_ACTOR_Z_BASE := 10
 const ROAD_ACTOR_Z_STEP := 10
-const INCOMING_LANE_SCALE := 0.78
-const MAIN_LANE_SCALE := 1.0
 const RESET_HOLD_SECONDS := 1.4
 const LAST_ENERGY_WARNING := "Start the day with critically low energy?\nYour vehicle will handle worse until John recovers."
 const START_FADE_SECONDS := 0.35
@@ -103,26 +103,14 @@ func _ready() -> void:
 	_build_language_button()
 	_build_debug_unlock_panel()
 	_create_dialogs()
-	_spawn_menu_traffic()
+	MenuTrafficController.spawn(self)
 	_start_main_menu_bgm()
 	hint_label.text = _default_hint_text()
 
 
 func _process(delta: float) -> void:
 	_update_reset_progress(delta)
-	for vehicle in menu_vehicles:
-		var sprite: Sprite2D = vehicle["sprite"]
-		var lane_index: int = vehicle["lane"]
-		var world_speed: float = vehicle["world_speed"]
-		var screen_velocity := world_speed
-		if lane_index == 0:
-			screen_velocity = -world_speed
-
-		sprite.position.x += screen_velocity * delta
-		if sprite.position.x < -260.0:
-			sprite.position.x = get_viewport_rect().size.x + rng.randf_range(120.0, 420.0)
-		elif sprite.position.x > get_viewport_rect().size.x + 360.0:
-			sprite.position.x = -rng.randf_range(120.0, 420.0)
+	MenuTrafficController.update(self, delta)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -156,7 +144,7 @@ func _start_game() -> void:
 		return
 
 	PlayerState.begin_stage_sequence()
-	if PlayerState.energy <= 2:
+	if PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
 		start_confirm_dialog.popup_centered()
 		return
 
@@ -639,124 +627,3 @@ func _default_hint_text() -> String:
 	if PlayerState.is_run_failed():
 		return "%s" % PlayerState.get_run_fail_reason()
 	return "ENTER select     ESC quit     HOLD R reset progress"
-
-
-func _spawn_menu_traffic() -> void:
-	var viewport_width := get_viewport_rect().size.x
-	var top_y := _trace_line_y("TopTraceLine", 415.0)
-	var main_y := _trace_line_y("MainTraceLine", 492.0)
-	_add_menu_vehicle("blue_truck", 0, Vector2(viewport_width * 0.92, top_y), 210.0, 0.32, true)
-	_add_menu_vehicle("jeepney", 0, Vector2(viewport_width * 0.46, top_y), 160.0, 0.42, true)
-	_add_menu_vehicle("gray_sedan", 1, Vector2(viewport_width * 0.24, main_y), 125.0, 0.38, false)
-	_add_menu_vehicle("sedan", 1, Vector2(viewport_width * 0.72, main_y), 145.0, 0.38, false)
-
-
-func _add_menu_vehicle(vehicle_key: String, lane_index: int, position: Vector2, world_speed: float, scale_value: float, flip_h: bool) -> void:
-	var sprite := Sprite2D.new()
-	sprite.texture = VEHICLE_TEXTURES[vehicle_key]
-	sprite.centered = true
-	sprite.scale = Vector2(scale_value, scale_value) * _perspective_scale_for_lane(lane_index)
-	sprite.flip_h = flip_h
-	sprite.position = Vector2(
-		position.x,
-		_sprite_y_for_hitbox_bottom(sprite, position.y, VEHICLE_HITBOX_INSET)
-	)
-	sprite.z_index = _z_for_lane(lane_index)
-	_apply_vehicle_shadow(sprite, VEHICLE_HITBOX_INSET)
-	traffic_layer.add_child(sprite)
-
-	menu_vehicles.append({
-		"sprite": sprite,
-		"lane": lane_index,
-		"world_speed": world_speed,
-	})
-
-
-func _trace_line_y(line_name: String, fallback: float) -> float:
-	var line := get_node_or_null("MenuTraceLines/%s" % line_name)
-	if line:
-		return line.position.y
-	return fallback
-
-
-func _sprite_y_for_hitbox_bottom(sprite: Sprite2D, guide_y: float, inset: Vector4) -> float:
-	var local_rect := _local_hitbox_rect(sprite, inset)
-	var local_bottom := local_rect.position.y + local_rect.size.y
-	return guide_y - local_bottom * sprite.scale.y
-
-
-func _local_hitbox_rect(sprite: Sprite2D, inset: Vector4) -> Rect2:
-	var texture_size := sprite.texture.get_size()
-	var visible_rect := _visible_texture_rect(sprite.texture)
-
-	var left := visible_rect.position.x + visible_rect.size.x * inset.x
-	var top := visible_rect.position.y + visible_rect.size.y * inset.y
-	var right := visible_rect.position.x + visible_rect.size.x * (1.0 - inset.z)
-	var bottom := visible_rect.position.y + visible_rect.size.y * (1.0 - inset.w)
-
-	if sprite.flip_h:
-		var mirrored_left := texture_size.x - right
-		right = texture_size.x - left
-		left = mirrored_left
-
-	return Rect2(
-		Vector2(left, top) - texture_size * 0.5,
-		Vector2(maxf(1.0, right - left), maxf(1.0, bottom - top))
-	)
-
-
-func _visible_texture_rect(texture: Texture2D) -> Rect2:
-	var cache_key := texture.resource_path
-	if texture_hitbox_cache.has(cache_key):
-		return texture_hitbox_cache[cache_key]
-
-	var image := texture.get_image()
-	if image == null or image.is_empty():
-		var fallback_rect := Rect2(Vector2.ZERO, texture.get_size())
-		texture_hitbox_cache[cache_key] = fallback_rect
-		return fallback_rect
-
-	var used_rect_i := image.get_used_rect()
-	var used_rect := Rect2(Vector2(used_rect_i.position), Vector2(used_rect_i.size))
-	if used_rect.size.x <= 0.0 or used_rect.size.y <= 0.0:
-		used_rect = Rect2(Vector2.ZERO, texture.get_size())
-
-	texture_hitbox_cache[cache_key] = used_rect
-	return used_rect
-
-
-func _apply_vehicle_shadow(sprite: Sprite2D, inset: Vector4) -> void:
-	var shadow := Polygon2D.new()
-	shadow.name = "Shadow"
-	shadow.z_index = -1
-	shadow.color = Color(0.0, 0.0, 0.0, 0.34)
-	sprite.add_child(shadow)
-
-	var local_rect := _local_hitbox_rect(sprite, inset)
-	var shadow_width := local_rect.size.x * 0.92
-	var shadow_height := maxf(20.0, local_rect.size.y * 0.20)
-	var center_x := local_rect.position.x + local_rect.size.x * 0.5
-	var center_y := local_rect.position.y + local_rect.size.y - shadow_height * 0.28
-	var half_width := shadow_width * 0.5
-	var half_height := shadow_height * 0.5
-
-	shadow.polygon = PackedVector2Array([
-		Vector2(center_x - half_width, center_y),
-		Vector2(center_x - half_width * 0.72, center_y - half_height),
-		Vector2(center_x, center_y - half_height * 0.86),
-		Vector2(center_x + half_width * 0.72, center_y - half_height),
-		Vector2(center_x + half_width, center_y),
-		Vector2(center_x + half_width * 0.72, center_y + half_height),
-		Vector2(center_x, center_y + half_height * 0.86),
-		Vector2(center_x - half_width * 0.72, center_y + half_height),
-	])
-
-
-func _perspective_scale_for_lane(lane_index: int) -> float:
-	if lane_index == 0:
-		return INCOMING_LANE_SCALE
-	return MAIN_LANE_SCALE
-
-
-func _z_for_lane(lane_index: int, offset := 0) -> int:
-	return ROAD_ACTOR_Z_BASE + lane_index * ROAD_ACTOR_Z_STEP + offset

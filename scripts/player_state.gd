@@ -1,5 +1,7 @@
 extends Node
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 # Central run-state authority.
 # If a feature needs to survive scene changes or be saved, it usually belongs here.
 
@@ -44,19 +46,19 @@ const STAGE_SPECIAL_TYPES := [
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const TOTAL_DEBT_GOAL := 50000
 const WEEKLY_DEBT_GOALS := [2500]
-const DEFAULT_STARTING_ENERGY := 10
-const DEFAULT_MAX_ENERGY := 10
-const DEFAULT_STARTING_GAS_PERCENT := 100.0
-const DEFAULT_MAX_GAS_PERCENT := 100.0
-const GAS_CAN_PERCENT := 10.0
-const GAS_DRAIN_PERCENT_PER_1000_UNITS := 5.0
+const DEFAULT_STARTING_ENERGY := GameTuning.DEFAULT_STARTING_ENERGY
+const DEFAULT_MAX_ENERGY := GameTuning.DEFAULT_MAX_ENERGY
+const DEFAULT_STARTING_GAS_PERCENT := GameTuning.DEFAULT_STARTING_GAS_PERCENT
+const DEFAULT_MAX_GAS_PERCENT := GameTuning.DEFAULT_MAX_GAS_PERCENT
+const GAS_CAN_PERCENT := GameTuning.GAS_CAN_PERCENT
+const GAS_DRAIN_PERCENT_PER_1000_UNITS := GameTuning.GAS_DRAIN_PERCENT_PER_1000_UNITS
 const FUEL_EFFICIENCY_UPGRADE_ID := "fuel_efficiency"
 const LEGACY_TIRE_GRIP_UPGRADE_ID := "tire_grip"
-const FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL := 0.04
-const FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL := 0.025
-const LOW_GAS_PERCENT_THRESHOLD := 20.0
-const DEFAULT_GAS_PRICE := 70
-const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := 30.0
+const FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL := GameTuning.FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL
+const FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL := GameTuning.FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL
+const LOW_GAS_PERCENT_THRESHOLD := GameTuning.LOW_GAS_PERCENT_THRESHOLD
+const DEFAULT_GAS_PRICE := GameTuning.DEFAULT_GAS_PRICE
+const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := GameTuning.DAILY_GAS_PRICE_MAX_PERCENT_CHANGE
 const DEFAULT_WEATHER := "clear"
 const WEATHER_CLOUDY := "cloudy"
 const WEATHER_RAIN := "rain"
@@ -158,6 +160,7 @@ var rides_completed_today := 0
 var rides_completed_day := 1
 var non_gas_store_purchases_this_week := 0
 var clean_stage_streak := 0
+var current_trip_had_crash := false
 var current_trip_low_energy := false
 var current_trip_low_gas := false
 var low_resource_trip_count := 0
@@ -1041,6 +1044,10 @@ func record_stage_completion() -> void:
 	if is_unique_character(current_mock_character_id):
 		increment_unique_character_progress(current_mock_character_id)
 	AchievementService.record_stage_completion(self)
+
+
+func record_stage_crash() -> void:
+	AchievementService.record_stage_crash(self)
 
 
 func record_stage_failure() -> void:

@@ -1,5 +1,7 @@
 extends Control
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const STORE_SCENE := "res://scenes/store.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
@@ -138,7 +140,10 @@ func _build_items() -> void:
 
 
 func _item_text(item: Dictionary) -> String:
-	var description := str(item["description"])
+	var description_values := item.duplicate()
+	if item.has("gas"):
+		description_values["gas"] = String.num(float(item["gas"])).trim_suffix(".0")
+	var description := str(item["description"]).format(description_values)
 	if str(item.get("id", "")) == "yosi":
 		if PlayerState.has_achievement("maninigarilyo"):
 			description = "Restore %d energy. Continued usage will lead to severe consequences." % PlayerState.get_yosi_energy_restore()
@@ -201,8 +206,9 @@ func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxConta
 
 func _refresh_header() -> void:
 	_refresh_stats_row()
-	money_label.text = "Gas Price: %s / 10%%\n%s" % [
+	money_label.text = "Gas Price: %s / %s%%\n%s" % [
 		PlayerState.get_gas_price_text(),
+		String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
 		PlayerState.get_debt_status_text(),
 	]
 
@@ -425,7 +431,7 @@ func _build_tutorial() -> void:
 		"targets": stats_targets,
 	})
 	tutorial_steps.append({
-		"text": "This is the store list. Upgrades improve the vehicle, food restores energy, and gas adds 10%.",
+		"text": "This is the store list. Upgrades improve the vehicle, food restores energy, and gas adds %s%%." % String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
 		"targets": [item_list],
 	})
 	if not store_item_rows.is_empty():
@@ -439,7 +445,7 @@ func _build_tutorial() -> void:
 			"targets": [store_buy_buttons[0]],
 		})
 	tutorial_steps.append({
-		"text": "Gas price changes by day. One gas can always fills 10% of the tank.",
+		"text": "Gas price changes by day. One gas can always fills %s%% of the tank." % String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
 		"targets": [money_label],
 	})
 	tutorial_steps.append({
@@ -546,7 +552,7 @@ func _make_buy_button_style(color: Color) -> StyleBoxFlat:
 
 
 func _attempt_ride() -> void:
-	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= 2:
+	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
 		ride_confirm_dialog.popup_centered()
 		return
 

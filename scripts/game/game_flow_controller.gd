@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
@@ -79,6 +81,7 @@ static func handle_player_hit(owner, detail: String) -> void:
 	if owner.game_state != "playing" or owner.player_hit_invincible_timer > 0.0:
 		return
 
+	PlayerState.record_stage_crash()
 	owner.audio_manager.play_crash_sfx()
 	owner.player_speed = 0.0
 	owner.boost_active = false
@@ -114,7 +117,7 @@ static func handle_player_hit(owner, detail: String) -> void:
 
 
 static func try_retry_stage(owner) -> void:
-	if owner.use_player_state_stage_sequence and not PlayerState.spend_energy(1):
+	if owner.use_player_state_stage_sequence and not PlayerState.spend_energy(GameTuning.TRIP_ENERGY_COST):
 		owner.end_message = "No energy left. Visit the store or reset progress."
 		return
 	reset_game(owner)
@@ -129,7 +132,7 @@ static func reset_game(owner) -> void:
 	owner.active_entities.clear()
 	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	owner.spawn_timers = [0.4, 0.8, 1.2]
-	owner.player_lane = 1
+	owner.player_lane = GameTuning.PLAYER_START_LANE
 	owner.player_speed = owner.player_start_speed
 	owner.distance = 0.0
 	owner.time_left = owner.time_limit

@@ -107,6 +107,7 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.rides_completed_day = int(save_data.get("rides_completed_day", player_state.rides_completed_day))
 	player_state.non_gas_store_purchases_this_week = int(save_data.get("non_gas_store_purchases_this_week", player_state.non_gas_store_purchases_this_week))
 	player_state.clean_stage_streak = int(save_data.get("clean_stage_streak", player_state.clean_stage_streak))
+	player_state.current_trip_had_crash = bool(save_data.get("current_trip_had_crash", false))
 	player_state.current_trip_low_energy = bool(save_data.get("current_trip_low_energy", player_state.current_trip_low_energy))
 	player_state.current_trip_low_gas = bool(save_data.get("current_trip_low_gas", player_state.current_trip_low_gas))
 	player_state.low_resource_trip_count = int(save_data.get("low_resource_trip_count", player_state.low_resource_trip_count))
@@ -196,6 +197,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"rides_completed_day": player_state.rides_completed_day,
 		"non_gas_store_purchases_this_week": player_state.non_gas_store_purchases_this_week,
 		"clean_stage_streak": player_state.clean_stage_streak,
+		"current_trip_had_crash": player_state.current_trip_had_crash,
 		"current_trip_low_energy": player_state.current_trip_low_energy,
 		"current_trip_low_gas": player_state.current_trip_low_gas,
 		"low_resource_trip_count": player_state.low_resource_trip_count,

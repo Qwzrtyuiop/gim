@@ -6,6 +6,7 @@ const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleSpawnScheduler := preload("res://scripts/game/vehicle_spawn_scheduler.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
+const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
 
 const SPAWN_HITBOX_CLEARANCE_X := 12.0
 const PARKED_FALLBACK_HEIGHTS := {
@@ -78,6 +79,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 	VehicleVisuals.apply_shadow(owner, sprite, owner.VEHICLE_HITBOX_INSET)
 	if not is_parked:
 		VehicleVisuals.apply_headlight(owner, sprite, owner.VEHICLE_HITBOX_INSET)
+		VehicleWheelAnimation.attach(sprite, vehicle_key)
 	sprite.position = Vector2(
 		VehicleSpawnScheduler.vehicle_spawn_x(owner, size, spawn_side),
 		VehicleGeometry.sprite_y_for_hitbox_bottom(
@@ -135,6 +137,7 @@ static func spawn_speeder(owner) -> void:
 	)
 	VehicleVisuals.apply_shadow(owner, sprite, owner.VEHICLE_HITBOX_INSET)
 	VehicleVisuals.apply_headlight(owner, sprite, owner.VEHICLE_HITBOX_INSET)
+	VehicleWheelAnimation.attach(sprite, vehicle_key)
 	sprite.position = Vector2(
 		-220.0,
 		VehicleGeometry.sprite_y_for_hitbox_bottom(

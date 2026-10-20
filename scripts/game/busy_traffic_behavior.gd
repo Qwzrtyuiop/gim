@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const LEFT_SPAWN_SIDE := "left"
 const RIGHT_SPAWN_SIDE := "right"
 const BACK_SPAWN_CHANCE_AT_SLOW_SPEED := 0.72
@@ -14,7 +16,7 @@ const FAST_SPAWN_ROOM_EXTRA := 260.0
 
 
 static func player_x(viewport_size: Vector2) -> float:
-	return viewport_size.x * 0.5
+	return viewport_size.x * GameTuning.BUSY_PLAYER_X_RATIO
 
 
 static func spawn_side(rng: RandomNumberGenerator, player_speed: float, player_max_speed: float) -> String:

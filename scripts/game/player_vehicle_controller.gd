@@ -1,10 +1,13 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const PlayerVehicleBehavior := preload("res://scripts/game/player_vehicle_behavior.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
+const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
 
 const BOOST_GAS_SAVE_INTERVAL := 0.75
 
@@ -13,6 +16,7 @@ static func create_player(owner) -> void:
 	owner.player = Sprite2D.new()
 	owner.player.texture = owner.PLAYER_TEXTURE
 	owner.player.centered = true
+	VehicleWheelAnimation.attach(owner.player, "player_tricycle")
 	owner.player.z_index = VehicleGeometry.z_for_lane(owner, owner.player_lane, 1)
 	owner.add_child(owner.player)
 	VehicleVisuals.apply_headlight(owner, owner.player, owner.PLAYER_HITBOX_INSET)
@@ -25,7 +29,7 @@ static func layout_player(owner, size: Vector2) -> void:
 	owner.player.scale = VehicleGeometry.scale_for_vehicle_in_lane(
 		owner,
 		"player_tricycle",
-		VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(116.0, size.y * 0.155)),
+		VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(GameTuning.PLAYER_FALLBACK_HEIGHT, size.y * GameTuning.PLAYER_FALLBACK_HEIGHT_RATIO)),
 		owner.player_lane
 	)
 	VehicleVisuals.apply_shadow(owner, owner.player, owner.PLAYER_HITBOX_INSET)
@@ -88,10 +92,16 @@ static func consume_boost_gas(owner, delta: float) -> void:
 
 
 static func update_player(owner, delta: float, move_forward := false) -> void:
+	var wheel_speed := 0.0
+	if owner.game_state == "playing":
+		wheel_speed = owner.player_speed
+	elif owner.player_is_stage_clear_exiting:
+		wheel_speed = owner.stage_clear_player_exit_speed
+	VehicleWheelAnimation.update(owner.player, wheel_speed, delta)
 	var target_scale: Vector2 = VehicleGeometry.scale_for_vehicle_in_lane(
 		owner,
 		"player_tricycle",
-		VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(116.0, owner.get_viewport_rect().size.y * 0.155)),
+		VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(GameTuning.PLAYER_FALLBACK_HEIGHT, owner.get_viewport_rect().size.y * GameTuning.PLAYER_FALLBACK_HEIGHT_RATIO)),
 		owner.player_lane
 	)
 	owner.player.scale = owner.player.scale.lerp(target_scale, minf(1.0, delta * owner.player_perspective_lerp_speed))

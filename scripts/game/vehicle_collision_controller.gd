@@ -2,6 +2,7 @@ extends RefCounted
 
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
+const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
 
 
 static func collision_detail(owner) -> String:
@@ -67,6 +68,8 @@ static func update_stage_clear_entities(owner, delta: float) -> void:
 			screen_velocity = -world_speed
 
 		sprite.position.x += screen_velocity * delta
+		if not bool(entity.get("is_parked", false)):
+			VehicleWheelAnimation.update(sprite, screen_velocity, delta)
 
 		if lane_index == 0 and sprite.position.x < -260.0:
 			dead_entities.append(entity)

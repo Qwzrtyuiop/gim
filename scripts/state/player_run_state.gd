@@ -127,6 +127,7 @@ static func reset_daily_run_state(player_state) -> void:
 	player_state.rides_completed_day = 1
 	player_state.non_gas_store_purchases_this_week = 0
 	player_state.clean_stage_streak = 0
+	player_state.current_trip_had_crash = false
 	player_state.current_trip_low_energy = false
 	player_state.current_trip_low_gas = false
 	player_state.low_resource_trip_count = 0

@@ -1,5 +1,7 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const AchievementService := preload("res://scripts/achievement_service.gd")
 
 
@@ -14,11 +16,11 @@ static func estimate_stage_gas_usage(player_state, stage_type: String) -> float:
 
 
 static func distance_gas_consumption_multiplier(player_state) -> float:
-	return maxf(0.45, 1.0 - player_state.get_fuel_efficiency_level() * player_state.FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL)
+	return maxf(GameTuning.MIN_DISTANCE_FUEL_MULTIPLIER, 1.0 - player_state.get_fuel_efficiency_level() * player_state.FUEL_EFFICIENCY_GAS_REDUCTION_PER_LEVEL)
 
 
 static func boost_gas_consumption_multiplier(player_state) -> float:
-	return maxf(0.60, 1.0 - player_state.get_fuel_efficiency_level() * player_state.FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL)
+	return maxf(GameTuning.MIN_BOOST_FUEL_MULTIPLIER, 1.0 - player_state.get_fuel_efficiency_level() * player_state.FUEL_EFFICIENCY_BOOST_REDUCTION_PER_LEVEL)
 
 
 static func add_gas(player_state, amount: float) -> void:
@@ -67,7 +69,7 @@ static func stage_start_error(player_state, _stage_descriptor: String = "", proj
 		return ""
 
 	var effective_energy: int = player_state.energy if projected_energy < 0 else int(projected_energy)
-	if effective_energy <= 0:
+	if effective_energy < GameTuning.TRIP_ENERGY_COST:
 		return "Not enough energy to start this trip."
 
 	if player_state.gas <= 0.0:
@@ -96,31 +98,23 @@ static func is_low_gas(player_state) -> bool:
 
 
 static func boost_gas_is_available(player_state) -> bool:
-	return player_state.gas > 0.05
+	return player_state.gas > GameTuning.MIN_BOOST_GAS_PERCENT
 
 
 static func energy_vehicle_modifiers(player_state) -> Dictionary:
-	var high_energy_level: int = maxi(0, player_state.energy - 7)
+	var high_energy_level: int = maxi(0, player_state.energy - GameTuning.HIGH_ENERGY_THRESHOLD)
 	if high_energy_level > 0:
-		return {
-			"player_acceleration_x": 1.0 + high_energy_level * 0.05,
-			"player_max_speed": 1.0 + high_energy_level * 0.035,
-			"player_brake_x": 1.0 + high_energy_level * 0.04,
-			"player_lane_lerp_x": 1.0 + high_energy_level * 0.04,
-			"player_coast_x": 1.0,
-			"player_wiggle_intensity_x": 0.92,
-		}
+		var modifiers: Dictionary = GameTuning.HIGH_ENERGY_BASE_MODIFIERS.duplicate()
+		for key in GameTuning.HIGH_ENERGY_BONUS_PER_POINT:
+			modifiers[key] += high_energy_level * float(GameTuning.HIGH_ENERGY_BONUS_PER_POINT[key])
+		return modifiers
 
-	var fatigue_level: int = maxi(0, 6 - player_state.energy)
-	var fatigue_ratio: float = float(fatigue_level) / 6.0
-	return {
-		"player_acceleration_x": 1.0 - fatigue_ratio * 0.45,
-		"player_max_speed": 1.0 - fatigue_ratio * 0.30,
-		"player_brake_x": 1.0 - fatigue_ratio * 0.35,
-		"player_lane_lerp_x": 1.0 - fatigue_ratio * 0.40,
-		"player_coast_x": 1.0 + fatigue_ratio * 0.35,
-		"player_wiggle_intensity_x": 1.0 + fatigue_ratio * 0.45,
-	}
+	var fatigue_level: int = maxi(0, GameTuning.FATIGUE_ENERGY_BOUNDARY - player_state.energy)
+	var fatigue_ratio: float = float(fatigue_level) / GameTuning.FATIGUE_REFERENCE_POINTS
+	var modifiers: Dictionary = {}
+	for key in GameTuning.FATIGUE_MODIFIER_DELTAS:
+		modifiers[key] = 1.0 + fatigue_ratio * float(GameTuning.FATIGUE_MODIFIER_DELTAS[key])
+	return modifiers
 
 
 static func apply_night_rest_bonus(player_state) -> int:
@@ -138,7 +132,8 @@ static func prepare_stage_start(player_state, stage_descriptor: String = "") -> 
 	if not stage_start_error(player_state, stage_descriptor).is_empty():
 		return false
 
-	spend_energy(player_state, 1)
+	spend_energy(player_state, GameTuning.TRIP_ENERGY_COST)
+	player_state.current_trip_had_crash = false
 	player_state.current_trip_low_energy = player_state.energy <= AchievementService.LOW_ENERGY_THRESHOLD
 	player_state.current_trip_low_gas = is_low_gas(player_state)
 	player_state.pending_stage_energy_cost = true

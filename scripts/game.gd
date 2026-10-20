@@ -1,5 +1,7 @@
 extends Node2D
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 # Gameplay scene coordinator.
 # This file wires the stage together, while most driving logic lives in scripts/game/*.gd helpers.
 
@@ -48,9 +50,9 @@ const VEHICLE_TEXTURES := {
 }
 
 const LANE_NAMES := ["INCOMING", "MAIN", "SHOULDER"]
-const BASE_DISTANCE_SCALE := 0.0297619
-const VISUAL_DISTANCE_SCALE := 2.35294
-const PLAYER_HITBOX_INSET := Vector4(0.08, 0.08, 0.08, 0.0)
+const BASE_DISTANCE_SCALE := GameTuning.BASE_DISTANCE_SCALE
+const VISUAL_DISTANCE_SCALE := GameTuning.VISUAL_DISTANCE_SCALE
+const PLAYER_HITBOX_INSET := GameTuning.PLAYER_HITBOX_INSET
 const VEHICLE_HITBOX_INSET := Vector4(0.06, 0.08, 0.06, 0.0)
 const NPC_LANE_CHANGE_WARNING_PULSES := 3
 const NPC_LANE_CHANGE_WARNING_INTERVAL := 0.28
@@ -60,9 +62,9 @@ const POST_DAY_SEVEN_BUSY_CAR_CHANCE_SHOULDER := 0.08
 const POST_DAY_SEVEN_BUSY_CAR_LANE_CHANGE_CHANCE_PER_SECOND := 0.035
 const PARKED_VEHICLE_KEYS := ["truck", "jeepney", "sedan", "parkedmoped", "parkedtruck"]
 const PARKED_VEHICLE_Y_OFFSET := 26.0
-const PARKED_COLLISION_MIN_KMH := 40
+const PARKED_COLLISION_MIN_KMH := GameTuning.PARKED_COLLISION_MIN_KMH
 const PARKED_VEHICLE_Z_OFFSET := 4
-const SPEEDER_PLAYER_LANE_CHANGE_BUFFER := 260.0
+const SPEEDER_PLAYER_LANE_CHANGE_BUFFER := GameTuning.SPEEDER_PLAYER_LANE_CHANGE_BUFFER
 const SPAWN_ROOM_EDGE_BUFFER := 120.0
 const SPAWN_MIN_OFFSET := 90.0
 const SPAWN_MAX_OFFSET := 360.0
@@ -111,9 +113,9 @@ void fragment() {
 	COLOR = vec4(glow_color.rgb, glow_color.a * alpha);
 }
 "
-const SPEEDOMETER_MAX_KMH := 180
-const SPEEDOMETER_REFERENCE_MAX_SPEED := 560.0
-const SPEEDOMETER_BASE_MAX_KMH := 60.0
+const SPEEDOMETER_MAX_KMH := GameTuning.SPEEDOMETER_MAX_KMH
+const SPEEDOMETER_REFERENCE_MAX_SPEED := GameTuning.SPEEDOMETER_REFERENCE_MAX_SPEED
+const SPEEDOMETER_BASE_MAX_KMH := GameTuning.SPEEDOMETER_BASE_MAX_KMH
 
 @export_group("Stage")
 @export_enum(
@@ -169,33 +171,33 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(1.0, 10000.0, 1.0) var target_distance := 525.0
 @export_range(1.0, 600.0, 0.5) var time_limit := 58.0
 
-@export_group("Player Movement")
-@export_range(0.0, 600.0, 1.0) var player_x := 220.0
-@export_range(0.0, 900.0, 5.0) var player_start_speed := 320.0
-@export_range(0.0, 900.0, 5.0) var player_min_cruise_speed := 180.0
-@export_range(0.0, 1200.0, 5.0) var player_max_speed := 560.0
-@export_range(0.0, 1200.0, 5.0) var player_acceleration := 280.0
-@export_range(0.0, 5.0, 0.05) var player_acceleration_x := 1.0
-@export_range(0.0, 5.0, 0.05) var bottom_lane_player_acceleration_x := 1.0
-@export_range(0.0, 1200.0, 5.0) var player_brake_deceleration := 280.0
-@export_range(0.0, 5.0, 0.05) var player_brake_x := 1.0
-@export_range(0.0, 1200.0, 5.0) var player_coast_deceleration := 85.0
-@export_range(0.0, 5.0, 0.05) var player_coast_x := 1.0
-@export_range(0.0, 30.0, 0.25) var player_lane_lerp_speed := 9.0
-@export_range(0.0, 5.0, 0.05) var player_lane_lerp_x := 1.0
-@export_range(0.0, 5.0, 0.05) var player_distance_gain_x := 1.0
-@export_range(0.0, 300.0, 1.0) var player_wiggle_stop_speed := 45.0
-@export_range(0.0, 20.0, 0.25) var player_wiggle_x_pixels := 2.0
-@export_range(0.0, 0.1, 0.001) var player_wiggle_x_frequency := 0.012
-@export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_radians := 0.012
-@export_range(0.0, 0.1, 0.001) var player_wiggle_rotation_frequency := 0.018
-@export_range(0.0, 4.0, 0.05) var player_wiggle_intensity_x := 1.0
+# Player Movement: edit scripts/config/game_tuning.gd.
+var player_x := GameTuning.PLAYER_X
+var player_start_speed := GameTuning.PLAYER_START_SPEED
+var player_min_cruise_speed := GameTuning.PLAYER_MIN_CRUISE_SPEED
+var player_max_speed := GameTuning.PLAYER_MAX_SPEED
+var player_acceleration := GameTuning.PLAYER_ACCELERATION
+var player_acceleration_x := GameTuning.PLAYER_ACCELERATION_X
+var bottom_lane_player_acceleration_x := GameTuning.BOTTOM_LANE_PLAYER_ACCELERATION_X
+var player_brake_deceleration := GameTuning.PLAYER_BRAKE_DECELERATION
+var player_brake_x := GameTuning.PLAYER_BRAKE_X
+var player_coast_deceleration := GameTuning.PLAYER_COAST_DECELERATION
+var player_coast_x := GameTuning.PLAYER_COAST_X
+var player_lane_lerp_speed := GameTuning.PLAYER_LANE_LERP_SPEED
+var player_lane_lerp_x := GameTuning.PLAYER_LANE_LERP_X
+var player_distance_gain_x := GameTuning.PLAYER_DISTANCE_GAIN_X
+var player_wiggle_stop_speed := GameTuning.PLAYER_WIGGLE_STOP_SPEED
+var player_wiggle_x_pixels := GameTuning.PLAYER_WIGGLE_X_PIXELS
+var player_wiggle_x_frequency := GameTuning.PLAYER_WIGGLE_X_FREQUENCY
+var player_wiggle_rotation_radians := GameTuning.PLAYER_WIGGLE_ROTATION_RADIANS
+var player_wiggle_rotation_frequency := GameTuning.PLAYER_WIGGLE_ROTATION_FREQUENCY
+var player_wiggle_intensity_x := GameTuning.PLAYER_WIGGLE_INTENSITY_X
 
-@export_group("Boost")
-@export_range(1.0, 2.0, 0.01) var player_boost_max_speed_x := 1.2
-@export_range(1.0, 3.0, 0.05) var player_boost_acceleration_x := 1.4
-@export_range(0.05, 3.0, 0.05) var player_boost_release_decay_x := 0.45
-@export_range(0.0, 20.0, 0.1) var boost_gas_consumption_percent_per_second := 0.75
+# Boost: edit scripts/config/game_tuning.gd.
+var player_boost_max_speed_x := GameTuning.PLAYER_BOOST_MAX_SPEED_X
+var player_boost_acceleration_x := GameTuning.PLAYER_BOOST_ACCELERATION_X
+var player_boost_release_decay_x := GameTuning.PLAYER_BOOST_RELEASE_DECAY_X
+var boost_gas_consumption_percent_per_second := GameTuning.BOOST_GAS_CONSUMPTION_PERCENT_PER_SECOND
 
 @export_group("Spawn Frequency")
 @export_range(0.15, 60.0, 0.05) var incoming_spawn_min_delay := 18.0
@@ -228,9 +230,9 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.1, 5.0, 0.1) var npc_overtake_speed_boost_seconds := 1.6
 @export_range(0.0, 700.0, 5.0) var top_lane_overtake_speed_boost := 280.0
 @export_range(0.1, 8.0, 0.1) var top_lane_overtake_speed_boost_seconds := 4.0
-@export_range(0.0, 600.0, 5.0) var stage_clear_min_exit_speed := 180.0
-@export_range(0.0, 600.0, 5.0) var stage_clear_player_exit_speed := 120.0
-@export_range(0.1, 5.0, 0.05) var stage_clear_fade_seconds := 0.9
+var stage_clear_min_exit_speed := GameTuning.STAGE_CLEAR_MIN_EXIT_SPEED
+var stage_clear_player_exit_speed := GameTuning.STAGE_CLEAR_PLAYER_EXIT_SPEED
+var stage_clear_fade_seconds := GameTuning.STAGE_CLEAR_FADE_SECONDS
 
 @export_group("Speeders")
 @export var speeder_enabled := false
@@ -243,10 +245,10 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(40.0, 400.0, 10.0) var speeder_safe_gap := 150.0
 
 @export_group("Fairness")
-@export_range(0.0, 400.0, 5.0) var player_lane_change_front_padding := 120.0
-@export_range(0.0, 400.0, 5.0) var player_lane_change_back_padding := 150.0
-@export_range(0.0, 120.0, 2.0) var player_lane_change_side_padding := 36.0
-@export_range(0.0, 3.0, 0.05) var player_lane_change_prediction_seconds := 1.2
+var player_lane_change_front_padding := GameTuning.PLAYER_LANE_CHANGE_FRONT_PADDING
+var player_lane_change_back_padding := GameTuning.PLAYER_LANE_CHANGE_BACK_PADDING
+var player_lane_change_side_padding := GameTuning.PLAYER_LANE_CHANGE_SIDE_PADDING
+var player_lane_change_prediction_seconds := GameTuning.PLAYER_LANE_CHANGE_PREDICTION_SECONDS
 @export_range(0.0, 220.0, 5.0) var npc_lane_change_planning_padding_x := 64.0
 @export_range(0.0, 80.0, 2.0) var npc_lane_change_planning_padding_y := 18.0
 @export_range(0.0, 2.0, 0.05) var npc_lane_change_fault_grace_seconds := 0.65
@@ -260,28 +262,28 @@ const SPEEDOMETER_BASE_MAX_KMH := 60.0
 @export_range(0.0, 100.0, 0.5) var time_bonus_php_per_second := 2.0
 @export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
 
-@export_group("Crash Recovery")
-@export_range(0, 10, 1) var crash_energy_loss := 1
-@export_range(0.0, 3.0, 0.05) var crash_recovery_seconds := 0.45
-@export_range(0.0, 5.0, 0.05) var crash_invincible_seconds := 1.6
-@export_range(0.02, 0.5, 0.01) var crash_flicker_interval := 0.08
-@export_range(0.1, 1.0, 0.05) var crash_flicker_alpha := 0.35
+# Crash Recovery: edit scripts/config/game_tuning.gd.
+var crash_energy_loss := GameTuning.CRASH_ENERGY_LOSS
+var crash_recovery_seconds := GameTuning.CRASH_RECOVERY_SECONDS
+var crash_invincible_seconds := GameTuning.CRASH_INVINCIBLE_SECONDS
+var crash_flicker_interval := GameTuning.CRASH_FLICKER_INTERVAL
+var crash_flicker_alpha := GameTuning.CRASH_FLICKER_ALPHA
 
-@export_group("Perspective")
-@export_range(0.2, 2.0, 0.01) var incoming_lane_scale := 0.78
-@export_range(0.2, 2.0, 0.01) var main_lane_scale := 1.0
-@export_range(0.2, 2.0, 0.01) var shoulder_lane_scale := 1.18
-@export_range(1.0, 20.0, 0.5) var player_perspective_lerp_speed := 9.0
+# Perspective: edit scripts/config/game_tuning.gd.
+var incoming_lane_scale := GameTuning.INCOMING_LANE_SCALE
+var main_lane_scale := GameTuning.MAIN_LANE_SCALE
+var shoulder_lane_scale := GameTuning.SHOULDER_LANE_SCALE
+var player_perspective_lerp_speed := GameTuning.PLAYER_PERSPECTIVE_LERP_SPEED
 
 @export_group("Time Filters")
 @export var morning_filter_color := Color(0.0, 0.0, 0.0, 0.0)
 @export var noon_filter_color := Color(1.0, 0.84, 0.26, 0.26)
 @export var night_filter_color := Color(0.0, 0.02, 0.10, 0.62)
-@export_range(0.0, 1.0, 0.01) var morning_headlight_alpha := 0.0
-@export_range(0.0, 1.0, 0.01) var noon_headlight_alpha := 0.0
-@export_range(0.0, 1.0, 0.01) var night_headlight_alpha := 0.84
-@export_range(0.2, 5.0, 0.05) var headlight_cone_length_x := 3.35
-@export_range(0.1, 2.0, 0.05) var headlight_cone_height_x := 1.18
+var morning_headlight_alpha := GameTuning.MORNING_HEADLIGHT_ALPHA
+var noon_headlight_alpha := GameTuning.NOON_HEADLIGHT_ALPHA
+var night_headlight_alpha := GameTuning.NIGHT_HEADLIGHT_ALPHA
+var headlight_cone_length_x := GameTuning.HEADLIGHT_CONE_LENGTH_X
+var headlight_cone_height_x := GameTuning.HEADLIGHT_CONE_HEIGHT_X
 @export var noon_glow_color := Color(1.0, 0.86, 0.30, 0.22)
 @export var noon_glow_center := Vector2(0.52, 0.22)
 @export var noon_glow_radius := Vector2(0.72, 0.56)
@@ -322,7 +324,7 @@ var night_visibility_rect: ColorRect
 var night_visibility_material: ShaderMaterial
 var headlight_cone_texture: Texture2D
 var player: Sprite2D
-var player_lane := 1
+var player_lane := GameTuning.PLAYER_START_LANE
 var player_speed := 0.0
 var distance := 0.0
 var time_left := 0.0
