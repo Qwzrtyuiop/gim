@@ -2,6 +2,7 @@ extends RefCounted
 
 # Random ride stories: probability per eligible unnamed-passenger ride (0..1).
 const MALASAKIT_EVENT_CHANCE := 0.10
+const MALASAKIT_EPILOGUE_DELAY_DAYS := 1 # Guaranteed on the next eligible ride from this day onward.
 # Permanent for the current run after waiving the fare; does not stack.
 const MALASAKIT_FARE_BONUS := 0.05
 

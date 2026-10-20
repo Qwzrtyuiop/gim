@@ -872,7 +872,7 @@ func _is_replay_mode() -> bool:
 func _is_persistent_story_action(action_data: Dictionary) -> bool:
 	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
-		"resolve_random_ride_fare":
+		"resolve_random_ride_fare", "repay_malasakit_fare":
 			return true
 		"start_special_stage":
 			return true

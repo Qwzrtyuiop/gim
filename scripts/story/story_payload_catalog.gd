@@ -34,6 +34,11 @@ const STORIES := {
 		"tagalog": preload("res://scripts/story/payloads/events/malasakit_tagalog.gd"),
 		"subtitle": "A passenger reaches the destination without their wallet.",
 	},
+	"malasakit_epilogue": {
+		"english": preload("res://scripts/story/payloads/events/malasakit_epilogue.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/malasakit_epilogue_tagalog.gd"),
+		"subtitle": "A familiar passenger returns to settle an old fare.",
+	},
 }
 
 

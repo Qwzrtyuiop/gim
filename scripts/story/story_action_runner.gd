@@ -7,6 +7,8 @@ const RandomRideEventService := preload("res://scripts/story/random_ride_event_s
 static func run(owner, action_data: Dictionary) -> void:
 	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
+		"repay_malasakit_fare":
+			RandomRideEventService.repay_malasakit_fare(PlayerState, owner.story_payload)
 		"resolve_random_ride_fare":
 			RandomRideEventService.resolve_fare(PlayerState, owner.story_payload, str(action_data.get("outcome", "")))
 		"start_special_stage":

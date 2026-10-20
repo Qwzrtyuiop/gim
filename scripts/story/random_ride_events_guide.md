@@ -40,3 +40,23 @@ bonus; memory replay cannot change earnings or unlock the reward.
 The final line of each branch runs `resolve_random_ride_fare`, then jumps to
 the end of the composition so one branch cannot fall through into the other.
 The settlement and achievement save together, and repeat execution is harmless.
+
+## Malasakit epilogue
+
+Waiving the original fare also saves its exact earnings breakdown and day in
+`event_values.malasakit_waived_earnings`. This survives subsequent rides.
+Starting the following day, the epilogue is guaranteed after the next eligible
+completed unnamed-passenger ride. Scheduled stories still take priority; named
+passengers and failed rides do not consume it. The delay is editable through
+`MALASAKIT_EPILOGUE_DELAY_DAYS` (minimum one day).
+
+The final line pays back the original waived total directly. The latest ride's
+earnings remain separate, and the Malasakit fare bonus stays active. Payment and
+`malasakit_repaid` save together, preventing duplicate payments on resume.
+The epilogue occurs once per run and automatically becomes a replayable Memory
+when seen. Replay does not pay money.
+
+Older saves recover the amount from the original Malasakit result or pending
+story snapshot when available. If later rides already overwrote that snapshot,
+the exact old amount cannot be recovered; the epilogue stays ineligible rather
+than using a different ride's earnings.

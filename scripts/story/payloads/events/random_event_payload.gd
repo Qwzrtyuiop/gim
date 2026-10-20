@@ -19,6 +19,10 @@ static func build(story_id: String, title: String, opening: Array, collect: Arra
 	composition[end_index - 1]["next_index"] = end_index
 	composition[waive_index - 1]["actions"] = [{"type": "resolve_random_ride_fare", "outcome": "collect"}]
 	composition[end_index - 1]["actions"] = [{"type": "resolve_random_ride_fare", "outcome": "waive"}]
+	return build_scene(story_id, title, composition)
+
+
+static func build_scene(story_id: String, title: String, composition: Array) -> Dictionary:
 	return {
 		"story_id": story_id,
 		"chapter_title": title,
@@ -28,5 +32,5 @@ static func build(story_id: String, title: String, opening: Array, collect: Arra
 			"type": "play_music", "path": StoryConstants.MUSIC_CITY_AMBIENCE,
 			"loop": true, "fade_in": 0.55, "volume_db": -9.0,
 		},
-		"composition": composition,
+		"composition": composition.duplicate(true),
 	}

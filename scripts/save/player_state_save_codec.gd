@@ -5,6 +5,7 @@ const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
+const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
 
 
 static func load_from_path(player_state, save_path: String) -> bool:
@@ -135,6 +136,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
+	if RandomRideEventService.migrate_waived_earnings(player_state):
+		needs_migration_save = true
 	player_state.unlocked_gallery_images = Dictionary(save_data.get("unlocked_gallery_images", {})).duplicate(true)
 	player_state.gallery_image_unlocks_initialized = bool(save_data.get("gallery_image_unlocks_initialized", saved_version >= 4))
 	player_state.resume_scene_path = str(save_data.get("resume_scene_path", ""))
