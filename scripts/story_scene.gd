@@ -12,6 +12,8 @@ const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocke
 const StoryPortraitLayer := preload("res://scripts/story/story_portrait_layer.gd")
 const StoryPortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const StorySpeakerPortraits := preload("res://scripts/story/story_speaker_portraits.gd")
+const StoryDebtTransition := preload("res://scripts/story/story_debt_transition.gd")
+const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -72,6 +74,7 @@ var is_input_locked := false
 var shown_gallery_images: Dictionary = {}
 var is_finishing_story := false
 var portrait_layer: Control
+var weekly_debt_transition: Panel
 
 
 func _ready() -> void:
@@ -896,7 +899,7 @@ func _is_persistent_story_action(action_data: Dictionary) -> bool:
 			return true
 		"spend_all_money", "take_all_money":
 			return true
-		"collect_debt", "pay_debt_goal":
+		"collect_debt", "pay_debt_goal", "collect_first_week_interest":
 			return true
 		"add_energy", "gain_energy":
 			return true
@@ -1063,6 +1066,22 @@ func _fade_audio_player_volume(player: AudioStreamPlayer, duration: float, from_
 	bgm_fade_tween.tween_property(player, "volume_db", to_db, duration)
 	await bgm_fade_tween.finished
 	bgm_fade_tween = null
+
+
+func _show_weekly_debt_transition() -> void:
+	_hide_weekly_debt_transition()
+	weekly_debt_transition = StoryDebtTransition.new()
+	add_child(weekly_debt_transition)
+	weekly_debt_transition.setup(PlayerDebtState.first_week_transition_report(PlayerState))
+	dialogue_panel.visible = false
+	await weekly_debt_transition.play()
+
+
+func _hide_weekly_debt_transition() -> void:
+	if is_instance_valid(weekly_debt_transition):
+		remove_child(weekly_debt_transition)
+		weekly_debt_transition.queue_free()
+	weekly_debt_transition = null
 
 
 func _show_debt_overlay(overlay_data) -> void:

@@ -116,6 +116,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.low_resource_trip_count = int(save_data.get("low_resource_trip_count", player_state.low_resource_trip_count))
 	player_state.low_both_resource_trip_count = int(save_data.get("low_both_resource_trip_count", player_state.low_both_resource_trip_count))
 	player_state.debt_goal_index = int(save_data.get("debt_goal_index", player_state.debt_goal_index))
+	player_state.debt_carryover = maxi(0, int(save_data.get("debt_carryover", 0)))
+	player_state.last_debt_collection = Dictionary(save_data.get("last_debt_collection", {})).duplicate(true)
 	player_state.last_debt_collection_day = int(save_data.get("last_debt_collection_day", player_state.last_debt_collection_day))
 	player_state.remaining_debt = int(save_data.get("remaining_debt", player_state.remaining_debt))
 	player_state.run_failed = bool(save_data.get("run_failed", player_state.run_failed))
@@ -136,6 +138,10 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
+	# Earlier builds had only one weekly goal, so successful collections kept index 0.
+	if not save_data.has("debt_carryover") and player_state.last_debt_collection_day >= 8 and not player_state.run_failed and player_state.debt_goal_index == 0:
+		player_state.debt_goal_index = mini(1, player_state.WEEKLY_DEBT_GOALS.size() - 1)
+		needs_migration_save = true
 	if RandomRideEventService.migrate_waived_earnings(player_state):
 		needs_migration_save = true
 	player_state.unlocked_gallery_images = Dictionary(save_data.get("unlocked_gallery_images", {})).duplicate(true)
@@ -210,6 +216,8 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"low_resource_trip_count": player_state.low_resource_trip_count,
 		"low_both_resource_trip_count": player_state.low_both_resource_trip_count,
 		"debt_goal_index": player_state.debt_goal_index,
+		"debt_carryover": player_state.debt_carryover,
+		"last_debt_collection": player_state.last_debt_collection.duplicate(true),
 		"last_debt_collection_day": player_state.last_debt_collection_day,
 		"remaining_debt": player_state.remaining_debt,
 		"run_failed": player_state.run_failed,

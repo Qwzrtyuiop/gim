@@ -48,7 +48,7 @@ const STAGE_SPECIAL_TYPES := [
 ]
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const TOTAL_DEBT_GOAL := 50000
-const WEEKLY_DEBT_GOALS := [2500]
+const WEEKLY_DEBT_GOALS := GameTuning.WEEKLY_DEBT_GOALS
 const DEFAULT_STARTING_ENERGY := GameTuning.DEFAULT_STARTING_ENERGY
 const DEFAULT_MAX_ENERGY := GameTuning.DEFAULT_MAX_ENERGY
 const DEFAULT_STARTING_GAS_PERCENT := GameTuning.DEFAULT_STARTING_GAS_PERCENT
@@ -173,6 +173,8 @@ var low_both_resource_trip_count := 0
 var debt_goal_index := 0
 var last_debt_collection_day := 0
 var remaining_debt := TOTAL_DEBT_GOAL
+var debt_carryover := 0
+var last_debt_collection: Dictionary = {}
 var run_failed := false
 var run_fail_reason := ""
 var rng := RandomNumberGenerator.new()

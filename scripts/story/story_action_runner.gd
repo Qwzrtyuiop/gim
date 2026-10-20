@@ -2,11 +2,18 @@ extends RefCounted
 class_name StoryActionRunner
 
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
+const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 
 
 static func run(owner, action_data: Dictionary) -> void:
 	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
+		"show_weekly_debt_transition":
+			await owner._show_weekly_debt_transition()
+		"hide_weekly_debt_transition":
+			owner._hide_weekly_debt_transition()
+		"collect_first_week_interest":
+			PlayerDebtState.collect_first_week_interest(PlayerState, int(action_data.get("amount", 500)))
 		"repay_malasakit_fare":
 			RandomRideEventService.repay_malasakit_fare(PlayerState, owner.story_payload)
 		"resolve_random_ride_fare":

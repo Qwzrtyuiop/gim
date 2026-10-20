@@ -1,8 +1,9 @@
 extends RefCounted
 
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
-const FIRST_PAYMENT := 2500
+const FIRST_PAYMENT := GameTuning.WEEKLY_DEBT_GOALS[0]
 const INTEREST_PAYMENT := 500
 const COLLECTION_DAY := 8
 
@@ -32,6 +33,13 @@ static func build() -> Dictionary:
 		{
 			"text": "Then someone knocks.",
 			"actions": [
+				{
+					"type": "play_music",
+					"path": "res://assets/story/music/mind.mp3",
+					"loop": true,
+					"fade_in": 0.0,
+					"volume_db": -9.0,
+				},
 				{
 					"type": "play_sfx",
 					"path": StoryConstants.SFX_KNOCK,
@@ -194,7 +202,7 @@ static func build() -> Dictionary:
 			"text": "He slips it out and folds it into his own pocket.",
 			"actions": [
 				{
-					"type": "spend_money",
+					"type": "collect_first_week_interest",
 					"amount": INTEREST_PAYMENT,
 				},
 			],
@@ -270,7 +278,8 @@ static func build() -> Dictionary:
 					"volume_db": -1.5,
 				},
 				{
-					"type": "spend_all_money",
+					"type": "collect_debt",
+					"day": COLLECTION_DAY,
 				},
 			],
 		},
@@ -321,6 +330,11 @@ static func build() -> Dictionary:
 		{
 			"text": "I wipe the blood from my mouth with the back of my hand.",
 		},
+		{
+			"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
+			"background_fade": 0.25,
+			"text": "I brace a hand against the wall and get back on my feet.",
+		},
 	])
 	var violent_departure_end_index: int = composition.size() - 1
 
@@ -339,6 +353,14 @@ static func build() -> Dictionary:
 				"duration": 0.35,
 			},
 		],
+	})
+	composition.append({
+		"text": "",
+		"actions": [{"type": "show_weekly_debt_transition"}],
+	})
+	composition.append({
+		"text": "Thus ended the first week of my new job.",
+		"actions": [{"type": "hide_weekly_debt_transition"}],
 	})
 
 	composition[not_enough_gate_index]["next_index"] = not_enough_index
