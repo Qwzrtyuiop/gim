@@ -21,6 +21,11 @@ static func prepare(state) -> Dictionary:
 		return {}
 	state._begin_state_batch()
 	result["random_event_checked"] = true
+	# All new random events share this gate; blocked rides cannot roll later.
+	if not StoryTriggerService.random_events_unlocked(state.event_values, int(result.get("day", state.get_current_day()))):
+		state.save_progress()
+		state._end_state_batch()
+		return {}
 	var character: Dictionary = state.get_character_by_id(str(result.get("character_id", "")))
 	var is_generic := bool(character.get("is_generic", false))
 	var eligible := is_generic and not bool(state.consumed_story_triggers.get(CONSUMED_KEY, false))

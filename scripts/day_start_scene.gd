@@ -108,17 +108,13 @@ func _render_day_start() -> void:
 		rest_note = "Rest: stay home, recover +2 energy, and move to night."
 	if current_time == "night":
 		rest_note = "Rest: sleep, recover +3 energy, then start the next day at home."
-	status_label.text = "%s\n%s" % [
-		PlayerState.get_debt_status_text(),
-		rest_note,
-	]
+	rest_button.tooltip_text = rest_note
+	status_label.text = PlayerState.get_debt_status_text()
 
 
 func _render_daily_news() -> void:
-	var should_show_news: bool = PlayerState.get_current_day() >= 2
-	news_panel.visible = should_show_news
-	if should_show_news:
-		news_label.text = PlayerState.get_daily_news_text()
+	news_panel.visible = true
+	news_label.text = PlayerState.get_daily_news_text()
 
 
 func _build_crt_lines() -> void:
@@ -277,7 +273,7 @@ func _build_tutorial() -> void:
 		"targets": stats_targets,
 	})
 	tutorial_steps.append({
-		"text": "Debt status and rest notes appear here. Rest changes the time and restores energy.",
+		"text": "Debt status appears here. Hover over Rest to see its energy recovery and time change.",
 		"targets": [status_label],
 	})
 	tutorial_steps.append({

@@ -91,12 +91,12 @@ Controls are substantially keyboard based. Built-in `ui_*` actions cover some na
 
 - Morning, noon, and night phases; a home screen with rest/store/ride options and daily news.
 - Starting money PHP 0, energy 10/10, gas 100%, and karma 0. A selected ride costs one energy. Distance consumes 5 percentage points of gas per 1,000 distance units before efficiency modifiers; boost costs extra.
-- Gas cans restore 10%. Initial gas price is PHP 70. Weather variation and the home's daily news display begin on Day 2; the news reports gas-price changes and includes tomorrow's weather forecast.
+- Gas cans restore 10%. Initial gas price is PHP 70. The home's TV/news display is available from Day 1 and reports gas-price changes and tomorrow's weather forecast. Weather variation begins on Day 2.
 - Rest at home restores two energy while advancing morning to noon or noon to night. Night sleep restores three. Results-screen rest has additional transition rules; reuse those rules rather than applying home-rest numbers everywhere.
-- Debt collection normally occurs on Days 8, 15, 22, etc., for PHP 2,500 per collection, capped by remaining debt. The first collection also has an authored story with payment/interest choices.
+- Debt collection occurs on Days 8, 15, 22, etc., capped by remaining debt. The first weekly goal is PHP 2,500; subsequent goals are PHP 5,000. Any unpaid first-week amount carries into the following goal. Actual payment reduces principal; the first story's extra PHP 500 interest is separate. The English Day 7 scene starts `mind.mp3` at the knock and ends with an animated weekly-debt card and closing narration.
 - Seven store entries: Engine Tune, Brake Kit, Fuel Efficiency, Warlboro Blue cigarettes, Energy Bar, Budget Meal, and Gas Can. The three upgrades have five purchasable levels each.
 - Smoking has persistent consequences: ten purchases in one day unlock the smoker achievement and reduce maximum energy; fifty lifetime purchases cause a hospital-related run failure.
-- Twelve achievements, pop-up notifications, and a library. Smoker and Malasakit have mechanical effects as well as descriptive text. Achievements and gallery unlocks are run-local: resetting the run clears them.
+- Twelve achievements, pop-up notifications, and a library. Each new unlock also shows its library description in a centered modal; click or Enter advances the FIFO queue. Gameplay pauses until the queue closes, preserving an existing pause. Corner popups follow the same queue. Smoker and Malasakit have mechanical effects as well as descriptive text. Achievements and gallery unlocks are run-local: resetting the run clears them.
 - Fare combines completed distance, overtime reduction, remaining-time bonus, time/traffic earnings multipliers, character modifiers, and passenger penalties. `game_economy_manager.gd` is authoritative; selection estimates are separate.
 
 ### Story and presentation
@@ -196,7 +196,7 @@ Additional watch points:
 
 - Story resume reconstructs music more thoroughly than visuals. Starting on a line without an explicit background change can leave the background unset; replay also evaluates live event/money conditions rather than a recorded branch state.
 - The optional choice-response feature inserts a new line without rebasing indices (`story_scene.gd:406`). Default continuation can point back to that inserted line. Existing authored stories do not use this feature; fix/verify it before adopting it in new content.
-- `Matipid` is described as a first-collection achievement, but its `debt_goal_index == 0` guard remains true with the one-entry weekly-goal array. It can be earned in a later qualifying week.
+- `Matipid` requires the full first collection and no non-gas store purchases that week. The weekly-goal index advances after the first collection, including partial payments.
 - A generic `advance_to_next_stage` path rechecks day advancement after mutating phase. Current results/sleep flow uses other paths, so treat this as a latent API hazard, not a demonstrated normal-loop debt failure.
 - The legacy retry path reapplies fewer modifiers than initial stage setup. Revisit it if retry is exposed again.
 - Collision uses discrete rectangles in `_process`, and logical lane changes precede visual interpolation. Test high speed, low frame rate, and lane transitions before changing collision fairness.

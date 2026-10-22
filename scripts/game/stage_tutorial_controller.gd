@@ -68,6 +68,8 @@ func handle_input(event: InputEvent) -> bool:
 	elif phase == "move" and GameInput.is_up_down_input(event):
 		_set_phase("speed")
 	elif phase == "speed" and GameInput.is_left_right_input(event):
+		_set_phase("boost")
+	elif phase == "boost" and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SHIFT:
 		end()
 	return true
 
@@ -106,6 +108,15 @@ func _set_phase(new_phase: String) -> void:
 	if arrow_right_label != null:
 		arrow_right_label.visible = phase == "speed"
 	if hint_label != null:
+		var is_boost_step := phase == "boost"
+		hint_label.anchor_left = 0.05 if is_boost_step else 0.5
+		hint_label.anchor_right = 0.95 if is_boost_step else 0.5
+		hint_label.anchor_top = 0.5 if is_boost_step else 1.0
+		hint_label.anchor_bottom = 0.5 if is_boost_step else 1.0
+		hint_label.offset_left = 0.0 if is_boost_step else -260.0
+		hint_label.offset_right = 0.0 if is_boost_step else 260.0
+		hint_label.offset_top = -70.0 if is_boost_step else -60.0
+		hint_label.offset_bottom = 70.0 if is_boost_step else -20.0
 		match phase:
 			"image":
 				hint_label.text = "Press any key to close tutorial"
@@ -113,6 +124,8 @@ func _set_phase(new_phase: String) -> void:
 				hint_label.text = "Press UP or DOWN to continue"
 			"speed":
 				hint_label.text = "Press LEFT or RIGHT to continue"
+			"boost":
+				hint_label.text = "Press Shift to boost\n\nWARNING: this increases the use of gas"
 			_:
 				hint_label.text = ""
 		hint_label.visible = not hint_label.text.is_empty()
@@ -139,14 +152,12 @@ func _build_overlay(parent: Node) -> void:
 
 	image_rect = TextureRect.new()
 	image_rect.texture = TUTORIAL_IMAGE
-	image_rect.anchor_left = 0.5
-	image_rect.anchor_top = 0.5
-	image_rect.anchor_right = 0.5
-	image_rect.anchor_bottom = 0.5
-	image_rect.offset_left = -401.5
-	image_rect.offset_top = -253.0
-	image_rect.offset_right = 401.5
-	image_rect.offset_bottom = 193.0
+	image_rect.anchor_right = 1.0
+	image_rect.anchor_bottom = 1.0
+	image_rect.offset_left = 24.0
+	image_rect.offset_top = 24.0
+	image_rect.offset_right = -24.0
+	image_rect.offset_bottom = -72.0
 	image_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	image_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	image_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -155,12 +166,12 @@ func _build_overlay(parent: Node) -> void:
 	hint_label = _make_label(14, Color(0.98, 0.96, 0.88, 1.0), 3)
 	hint_label.anchor_left = 0.5
 	hint_label.anchor_right = 0.5
-	hint_label.anchor_top = 0.5
-	hint_label.anchor_bottom = 0.5
+	hint_label.anchor_top = 1.0
+	hint_label.anchor_bottom = 1.0
 	hint_label.offset_left = -260.0
-	hint_label.offset_top = 210.0
+	hint_label.offset_top = -60.0
 	hint_label.offset_right = 260.0
-	hint_label.offset_bottom = 250.0
+	hint_label.offset_bottom = -20.0
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	overlay.add_child(hint_label)

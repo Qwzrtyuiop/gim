@@ -45,6 +45,9 @@ func _input(event: InputEvent) -> void:
 
 
 func request_toggle() -> bool:
+	var achievement_popups := get_node_or_null("/root/AchievementPopupManager")
+	if achievement_popups != null and achievement_popups.is_description_open():
+		return true
 	if visible:
 		if detail_overlay.visible:
 			_hide_detail()

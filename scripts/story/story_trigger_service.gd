@@ -257,6 +257,8 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 		return false
 	if normalize_story_trigger_phase(str(trigger_data.get("phase", ""))) != phase:
 		return false
+	if _trigger_uses_random_payloads(trigger_data) and not random_events_unlocked(event_values, day_number):
+		return false
 	if not _trigger_has_available_payload(trigger_data, consumed_story_triggers):
 		return false
 
@@ -363,6 +365,10 @@ static func _is_character_story_trigger(trigger_data: Dictionary) -> bool:
 		return not str(trigger_data.get("character_id", "")).strip_edges().is_empty()
 	var character_ids_variant = trigger_data.get("character_ids", [])
 	return character_ids_variant is Array and not (character_ids_variant as Array).is_empty()
+
+
+static func random_events_unlocked(event_values: Dictionary, day_number: int) -> bool:
+	return day_number > 2 and StoryEventHandler.has_event_value(event_values, "day_2_station_bill")
 
 
 static func _character_story_gate_satisfied(trigger_data: Dictionary, event_values: Dictionary) -> bool:

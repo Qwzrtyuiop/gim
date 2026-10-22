@@ -1,5 +1,10 @@
 # Random ride events
 
+All random events unlock on Day 3 or later, after either choice has completed
+the Day 2 station-bill event (`day_2_station_bill`). This shared gate covers
+Malasakit, its epilogue, and random story pools. Blocked rides do not roll or
+consume an event. A previously selected pending story can still resume.
+
 Malasakit rolls after a completed ride with a passenger marked `is_generic` in
 the character catalog. Scheduled and character stories take priority. Named
 characters, unknown passengers, failed trips, and already-paid results are

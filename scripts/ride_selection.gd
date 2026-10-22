@@ -29,6 +29,7 @@ const UNIQUE_CHARACTER_PORTRAITS := {
 	"jessa": preload("res://assets/characters/Jessa.png"),
 }
 const EMPTY_CARD_CHANCE := 0.28
+const LOCKED_DISTANCE_MODULATE := Color(0.45, 0.45, 0.45, 1.0)
 const RIDE_SELECT_BGM_PATH := "res://assets/stagebgm/normalstage1.mp3"
 const RISK_DISTANCE_SCORES := {
 	"short": 1,
@@ -114,7 +115,14 @@ func _ready() -> void:
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	for button in [back_button, short_button, medium_button, long_button]:
-		ButtonGlow.attach(self, button)
+		if _is_forced_first_day_ride() and button in [medium_button, long_button]:
+			ButtonGlow.attach(self, button, LOCKED_DISTANCE_MODULATE, LOCKED_DISTANCE_MODULATE)
+		else:
+			ButtonGlow.attach(self, button)
+	for button in [short_button, medium_button, long_button]:
+		for child in button.get_children():
+			if child is Label:
+				child.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_create_card_special_labels()
 	_create_portrait_images()
@@ -213,8 +221,13 @@ func _refresh_distance_buttons() -> void:
 		var button := button_data["button"] as BaseButton
 		var button_id: String = str(button_data["id"])
 		var is_selected: bool = button_id == selected_distance
-		button.disabled = is_selected or (_is_forced_first_day_ride() and button_id != "short")
-		ButtonGlow.set_state(self, button, is_selected)
+		var is_locked: bool = _is_forced_first_day_ride() and button_id != "short"
+		button.disabled = is_selected or is_locked
+		button.tooltip_text = "Please select a short ride." if is_locked else ""
+		if is_locked:
+			ButtonGlow.set_state(self, button, false, LOCKED_DISTANCE_MODULATE, LOCKED_DISTANCE_MODULATE)
+		else:
+			ButtonGlow.set_state(self, button, is_selected)
 
 
 func _refresh_character_cards() -> void:
