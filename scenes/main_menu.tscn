@@ -1,12 +1,12 @@
 [gd_scene format=3 uid="uid://fdmm23pg34ea"]
 
 [ext_resource type="Script" uid="uid://cstjurkv3hhyn" path="res://scripts/main_menu.gd" id="1_ax3lt"]
-[ext_resource type="Texture2D" path="res://assets/story/backgrounds/roads/bg1_loop.png" id="2_mfjxx"]
+[ext_resource type="Texture2D" uid="uid://p53fpb8grxe8" path="res://assets/story/backgrounds/roads/bg1_loop.png" id="2_mfjxx"]
 [ext_resource type="Texture2D" uid="uid://dnjhxq5xjsg6" path="res://assets/ui/branding/logo.png" id="4_14rdd"]
 [ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="5_y265i"]
 [ext_resource type="Texture2D" uid="uid://d1efue5uhvbjs" path="res://assets/ui/buttons/main_menu/start_inactive.png" id="6_d72k0"]
 [ext_resource type="Texture2D" uid="uid://duotevl0m03dt" path="res://assets/ui/buttons/main_menu/quit_inactive.png" id="8_xc3vo"]
-[ext_resource type="Texture2D" path="res://assets/ui/buttons/button_generic.png" id="9_achbtn"]
+[ext_resource type="Texture2D" uid="uid://buwkwy70ahfgb" path="res://assets/ui/buttons/button_generic.png" id="9_achbtn"]
 [ext_resource type="Texture2D" uid="uid://bt02h2f4nnxt5" path="res://assets/ui/buttons/main_menu/gallery_inactive.png" id="10_gallery"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
@@ -129,7 +129,7 @@ texture_focused = ExtResource("6_d72k0")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="GalleryButton" type="TextureButton" parent="Menu"]
+[node name="GalleryButton" type="TextureButton" parent="Menu" unique_id=248968428]
 custom_minimum_size = Vector2(390, 118)
 layout_mode = 2
 tooltip_text = "Gallery"
@@ -140,7 +140,7 @@ texture_focused = ExtResource("10_gallery")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="GalleryLabel" type="Label" parent="Menu/GalleryButton"]
+[node name="GalleryLabel" type="Label" parent="Menu/GalleryButton" unique_id=299452401]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -164,7 +164,7 @@ texture_focused = ExtResource("8_xc3vo")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="DebugUnlockAllButton" type="TextureButton" parent="."]
+[node name="DebugUnlockAllButton" type="TextureButton" parent="." unique_id=1070409326]
 visible = false
 z_index = 10
 layout_mode = 1
@@ -187,7 +187,7 @@ texture_focused = ExtResource("9_achbtn")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="DebugUnlockAllLabel" type="Label" parent="DebugUnlockAllButton"]
+[node name="DebugUnlockAllLabel" type="Label" parent="DebugUnlockAllButton" unique_id=1167154182]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -199,7 +199,7 @@ label_settings = SubResource("LabelSettings_subtitle")
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="AchievementsButton" type="TextureButton" parent="."]
+[node name="AchievementsButton" type="TextureButton" parent="." unique_id=1938148114]
 z_index = 10
 layout_mode = 1
 anchors_preset = 2
@@ -218,7 +218,7 @@ texture_focused = ExtResource("9_achbtn")
 ignore_texture_size = true
 stretch_mode = 0
 
-[node name="AchievementsLabel" type="Label" parent="AchievementsButton"]
+[node name="AchievementsLabel" type="Label" parent="AchievementsButton" unique_id=910963085]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

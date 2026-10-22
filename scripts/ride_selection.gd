@@ -87,6 +87,7 @@ var tutorial_disabled_buttons: Dictionary = {}
 var tutorial_card_filters: Dictionary = {}
 var bgm_player: AudioStreamPlayer
 var card_special_labels: Array[Label] = []
+var store_button: TextureButton
 
 
 func _ready() -> void:
@@ -103,6 +104,7 @@ func _ready() -> void:
 	_create_stats_row()
 
 	back_button.pressed.connect(_handle_back_button_pressed)
+	_create_store_button()
 	short_button.pressed.connect(_set_distance.bind("short"))
 	medium_button.pressed.connect(_set_distance.bind("medium"))
 	long_button.pressed.connect(_set_distance.bind("long"))
@@ -135,8 +137,8 @@ func _ready() -> void:
 	_refresh_header()
 	_refresh_action_button()
 	_set_distance(selected_distance)
-	if _show_store_shortcut():
-		back_button.grab_focus()
+	if _needs_refuel():
+		store_button.grab_focus()
 	else:
 		match selected_distance:
 			"medium":
@@ -203,7 +205,7 @@ func _set_distance(difficulty: String) -> void:
 	_refresh_subtitle()
 	_refresh_distance_buttons()
 	_refresh_character_cards()
-	if _show_store_shortcut():
+	if _needs_refuel():
 		status_label.text = "Not enough gas. Visit the store to refuel before Day %d begins." % _display_day()
 	else:
 		status_label.text = "Choose a passenger for a %s trip." % difficulty.capitalize()
@@ -698,7 +700,7 @@ func _union_global_rect(targets: Array) -> Rect2:
 
 func _set_tutorial_active(is_active: bool) -> void:
 	tutorial_active = is_active
-	var buttons := [back_button, short_button, medium_button, long_button]
+	var buttons := [back_button, store_button, short_button, medium_button, long_button]
 	TutorialOverlayHelper.set_overlay_visible(is_active, tutorial_overlay, tutorial_text_panel, tutorial_text_label)
 	TutorialOverlayHelper.set_buttons_disabled(is_active, buttons, tutorial_disabled_buttons)
 	TutorialOverlayHelper.set_mouse_filter(is_active, [card_a, card_b, card_c], tutorial_card_filters, Control.MOUSE_FILTER_IGNORE)
@@ -835,7 +837,7 @@ func _choose_character(card_index: int) -> void:
 
 	if not PlayerState.prepare_stage_start_after_transition(stage_distance, transition_mode):
 		var start_error := PlayerState.get_stage_start_error_after_transition(stage_distance, transition_mode)
-		if _show_store_shortcut() and start_error == "Not enough gas for this trip.":
+		if start_error == "Not enough gas for this trip.":
 			status_label.text = "Not enough gas for this trip. Visit the store to refuel."
 		else:
 			status_label.text = start_error
@@ -868,10 +870,27 @@ func _go_back() -> void:
 	get_tree().change_scene_to_file(return_scene if not return_scene.is_empty() else FALLBACK_SCENE)
 
 
+func _create_store_button() -> void:
+	# Keep shopping available now that home navigation uses room objects.
+	store_button = back_button.duplicate(0) as TextureButton
+	store_button.name = "StoreButton"
+	store_button.visible = true
+	store_button.tooltip_text = "Store: upgrades, energy and gas"
+	(store_button.get_node("BackLabel") as Label).text = "STORE"
+	$Panel.add_child(store_button)
+	back_button.offset_left = 330.0
+	back_button.offset_right = 550.0
+	store_button.offset_left = 608.0
+	store_button.offset_right = 828.0
+	store_button.pressed.connect(_open_store)
+	ButtonGlow.attach(self, store_button)
+
+
+func _open_store() -> void:
+	get_tree().change_scene_to_file(STORE_SCENE)
+
+
 func _handle_back_button_pressed() -> void:
-	if _show_store_shortcut():
-		get_tree().change_scene_to_file(STORE_SCENE)
-		return
 	_go_back()
 
 
@@ -901,17 +920,13 @@ func _display_day() -> int:
 	return PlayerState.get_transition_display_day(_transition_mode())
 
 
-func _can_open_store_from_selection() -> bool:
-	return _display_day() >= 2 and PlayerState.gas <= 0.0
-
-
-func _show_store_shortcut() -> bool:
-	return not _allow_back() and _can_open_store_from_selection()
+func _needs_refuel() -> bool:
+	return PlayerState.gas <= 0.0
 
 
 func _refresh_action_button() -> void:
-	back_button.visible = _allow_back() or _show_store_shortcut()
-	back_label.text = "STORE" if _show_store_shortcut() else "BACK"
+	back_button.visible = _allow_back()
+	back_label.text = "BACK"
 
 
 func _create_stats_row() -> void:

@@ -1,34 +1,28 @@
 extends Control
 
 const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
-const STORE_SCENE := "res://scenes/store.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
-const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
-const HubMenuLayout := preload("res://scripts/ui/hub_menu_layout.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const HOME_BGM_PATH := "res://assets/audio/music/story/peace.mp3"
 const HOME_REST_FADE_SECONDS := 0.28
-const CRT_LINE_SPACING := 7.0
-const CRT_LINE_ALPHA := 0.16
 
-@onready var header_label: Label = $HeaderLabel
-@onready var news_panel: Panel = $NewsPanel
-@onready var news_label: Label = $NewsPanel/NewsLabel
-@onready var crt_lines: Control = $NewsPanel/CrtLines
-@onready var status_label: Label = $StatusLabel
-@onready var night_filter: ColorRect = $NightFilter
-@onready var rest_button: BaseButton = $BreakButtons/RestButton
-@onready var store_button: BaseButton = $BreakButtons/StoreButton
-@onready var ride_button: BaseButton = $BreakButtons/RideButton
+@onready var house = $House
 @onready var fade_overlay: ColorRect = $FadeOverlay
 
+var header_label: Label
 var stats_row_refs: Dictionary = {}
 var is_transitioning := false
 var bgm_player: AudioStreamPlayer
+var info_overlay: ColorRect
+var info_panel: PanelContainer
+var info_title: Label
+var info_body: Label
+var info_close: Button
+var info_action := ""
 var tutorial_overlay: Control
 var tutorial_highlight: Panel
 var tutorial_text_panel: Panel
@@ -36,7 +30,6 @@ var tutorial_text_label: Label
 var tutorial_step_index := 0
 var tutorial_steps: Array[Dictionary] = []
 var tutorial_active := false
-var tutorial_disabled_buttons: Dictionary = {}
 
 
 func _ready() -> void:
@@ -44,152 +37,206 @@ func _ready() -> void:
 	if PlayerState.is_run_failed():
 		get_tree().change_scene_to_file(GAME_OVER_SCENE)
 		return
-	var current_time := PlayerState.get_current_time_of_day()
-	var has_pending_trip_selection := not PlayerState.get_pending_trip_selection().is_empty()
-	if current_time != "morning" and current_time != "noon" and current_time != "night":
+	if PlayerState.get_current_day() <= 1 and PlayerState.get_pending_trip_selection().is_empty():
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 		return
-	if PlayerState.get_current_day() <= 1 and not has_pending_trip_selection:
-		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
-		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
-		return
-
-	_create_stats_row()
-	HubMenuLayout.build(self, header_label, stats_row_refs["row"], news_panel, [status_label], $BreakButtons)
-	crt_lines.clip_contents = true
-	crt_lines.resized.connect(_build_crt_lines)
 	PlayerState.ensure_daily_conditions_for_current_day()
 	if PlayerState.get_current_day() >= 2 and int(PlayerState.stage_round) > 0 and not PlayerState.has_home_tutorial_shown():
 		PlayerState.mark_home_tutorial_shown()
-	ButtonGlow.attach(self, rest_button)
-	ButtonGlow.attach(self, store_button)
-	ButtonGlow.attach(self, ride_button)
-	rest_button.pressed.connect(_rest_then_noon)
-	store_button.pressed.connect(_open_store)
-	ride_button.pressed.connect(_ride_now)
+	_create_hud()
+	_create_info_overlay()
+	house.action_pressed.connect(_on_house_action)
+	resized.connect(_layout_ui)
 	_start_home_bgm()
-	call_deferred("_build_crt_lines")
 	_render_day_start()
 	_build_tutorial()
+	_layout_ui()
 	if not PlayerState.has_home_tutorial_shown():
 		call_deferred("_start_tutorial")
-	rest_button.grab_focus()
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if is_transitioning:
+func _input(event: InputEvent) -> void:
+	if tutorial_active and _is_any_press(event):
+		get_viewport().set_input_as_handled()
+		_advance_tutorial()
+	elif info_overlay != null and info_overlay.visible and event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_close_info()
+
+
+func _on_house_action(action: String) -> void:
+	if is_transitioning or tutorial_active or info_overlay.visible:
 		return
-	if tutorial_active:
-		if event is InputEventMouseButton and event.pressed:
-			_advance_tutorial()
-			return
-		if _is_any_press(event):
-			_advance_tutorial()
-		return
-	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
-		return
-	if event.is_action_pressed("ui_accept"):
-		if rest_button.has_focus():
+	match action:
+		"radio", "calendar":
+			_show_info(action)
+		"rest":
 			_rest_then_noon()
-		elif store_button.has_focus():
-			_open_store()
-		else:
+		"ride":
 			_ride_now()
+
+
+func _create_hud() -> void:
+	header_label = _label(16)
+	header_label.name = "DayAndTime"
+	add_child(header_label)
+	stats_row_refs = PlayerStatsRow.create({
+		"font": UI_FONT, "font_size": 11,
+		"font_color": Color(0.98, 0.94, 0.82),
+		"outline_color": Color(0.08, 0.06, 0.04),
+	})
+	add_child(stats_row_refs["row"])
+
+
+func _label(font_size: int) -> Label:
+	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.82))
+	label.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.04))
+	label.add_theme_constant_override("outline_size", 3)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return label
+
+
+func _create_info_overlay() -> void:
+	info_overlay = ColorRect.new()
+	info_overlay.name = "HouseInfoOverlay"
+	info_overlay.color = Color(0, 0, 0, 0.55)
+	info_overlay.z_index = 50
+	info_overlay.hide()
+	add_child(info_overlay)
+	info_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	info_overlay.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			get_viewport().set_input_as_handled()
+			_close_info()
+	)
+	info_panel = PanelContainer.new()
+	info_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.10, 0.085, 0.065, 0.97)
+	style.border_color = Color(0.78, 0.61, 0.34)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 24
+	style.content_margin_right = 24
+	style.content_margin_top = 24
+	style.content_margin_bottom = 24
+	info_panel.add_theme_stylebox_override("panel", style)
+	info_overlay.add_child(info_panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 22)
+	info_panel.add_child(content)
+	info_title = _label(20)
+	content.add_child(info_title)
+	info_body = _label(14)
+	info_body.custom_minimum_size.x = 600
+	info_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	info_body.add_theme_constant_override("line_spacing", 12)
+	content.add_child(info_body)
+	info_close = Button.new()
+	info_close.text = "CLOSE"
+	info_close.custom_minimum_size.y = 46
+	info_close.add_theme_font_override("font", UI_FONT)
+	info_close.add_theme_font_size_override("font_size", 14)
+	info_close.pressed.connect(_close_info)
+	content.add_child(info_close)
+
+
+func _layout_ui() -> void:
+	if header_label == null:
+		return
+	header_label.position = Vector2(20, 16)
+	header_label.size = Vector2(size.x - 40, 32)
+	var stats: Control = stats_row_refs["row"]
+	stats.position = Vector2(20, 52)
+	stats.size = Vector2(size.x - 40, 28)
+	info_body.custom_minimum_size.x = minf(700, size.x - 48) - 48
+	info_panel.size = Vector2(minf(700, size.x - 48), minf(420, size.y - 64))
+	info_panel.position = (size - info_panel.size) * 0.5
+	if tutorial_active:
+		_show_tutorial_step(tutorial_step_index)
 
 
 func _render_day_start() -> void:
 	var current_time := PlayerState.get_current_time_of_day()
-	_refresh_stats_row()
-	night_filter.visible = current_time == "night"
-	_render_daily_news()
-	header_label.text = "DAY %d  /  %s At Home" % [
-		PlayerState.get_current_day(),
-		current_time.capitalize(),
-	]
-	var rest_note := "Rest: stay home, recover +2 energy, and move to noon."
+	house.set_night(current_time == "night")
+	PlayerStatsRow.refresh(stats_row_refs)
+	header_label.text = "DAY %d / %s" % [PlayerState.get_current_day(), current_time.capitalize()]
+	var rest_note := "Rest: recover +2 energy and move to noon."
 	if current_time == "noon":
-		rest_note = "Rest: stay home, recover +2 energy, and move to night."
-	if current_time == "night":
-		rest_note = "Rest: sleep, recover +3 energy, then start the next day at home."
-	rest_button.tooltip_text = rest_note
-	status_label.text = "WEEKLY GOAL\nPhP %d\n\nDebt remaining: PhP %d\n\n%s" % [PlayerState.get_current_weekly_goal(), PlayerState.get_total_debt_goal(), PlayerState.get_debt_due_text()]
+		rest_note = "Rest: recover +2 energy and move to night."
+	elif current_time == "night":
+		rest_note = "Sleep: recover +3 energy and start the next day at home."
+	house.buttons["rest"].tooltip_text = rest_note
 
 
-func _render_daily_news() -> void:
-	news_panel.visible = true
-	news_label.text = PlayerState.get_daily_news_text()
+func _show_info(action: String) -> void:
+	info_action = action
+	if action == "radio":
+		info_title.text = "RADIO / DAILY NEWS"
+		info_body.text = PlayerState.get_daily_news_text()
+	else:
+		info_title.text = "CALENDAR"
+		info_body.text = "WEEKLY GOAL: PhP %d\n\nDebt remaining: PhP %d\n\n%s" % [PlayerState.get_current_weekly_goal(), PlayerState.get_total_debt_goal(), PlayerState.get_debt_due_text()]
+	house.set_enabled(false)
+	info_overlay.show()
+	_layout_ui()
+	info_close.grab_focus()
 
 
-func _build_crt_lines() -> void:
-	if crt_lines == null:
-		return
-	for child in crt_lines.get_children():
-		child.queue_free()
-
-	var line_area_height: float = crt_lines.size.y
-	if line_area_height <= 0.0:
-		line_area_height = 150.0
-	var line_count: int = ceili(line_area_height / CRT_LINE_SPACING)
-	for index in range(line_count):
-		var line: ColorRect = ColorRect.new()
-		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		line.color = Color(0.0, 0.0, 0.0, CRT_LINE_ALPHA)
-		line.anchor_left = 0.0
-		line.anchor_right = 1.0
-		line.offset_left = 0.0
-		line.offset_right = 0.0
-		line.offset_top = float(index) * CRT_LINE_SPACING
-		line.offset_bottom = line.offset_top + 1.0
-		crt_lines.add_child(line)
+func _close_info() -> void:
+	info_overlay.hide()
+	info_close.release_focus()
+	house.set_enabled(not is_transitioning and not tutorial_active)
 
 
 func _ride_now() -> void:
 	if is_transitioning:
 		return
+	is_transitioning = true
+	house.set_enabled(false)
 	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
-
-
-func _open_store() -> void:
-	if is_transitioning:
-		return
-	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
-	get_tree().change_scene_to_file(STORE_SCENE)
 
 
 func _rest_then_noon() -> void:
 	if is_transitioning:
 		return
 	if PlayerState.get_current_time_of_day() == "night":
+		is_transitioning = true
+		house.set_enabled(false)
 		PlayerState.apply_night_rest_bonus()
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY, false)
 		get_tree().change_scene_to_file(SLEEP_TRANSITION_SCENE)
 		return
-
 	var next_time := "noon" if PlayerState.get_current_time_of_day() == "morning" else "night"
 	await _transition_home_rest(next_time)
 
 
-func _create_stats_row() -> void:
-	stats_row_refs = PlayerStatsRow.create({
-		"spread": true,
-		"font": UI_FONT,
-		"font_size": 11,
-		"font_color": Color(0.27, 0.18, 0.10, 1.0),
-		"outline_color": Color(0.95, 0.90, 0.78, 0.92),
-	})
-	var stats_row := stats_row_refs["row"] as HBoxContainer
-	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_row.position = Vector2(330.0, 348.0)
-	stats_row.size = Vector2(620.0, 24.0)
-	add_child(stats_row)
+func _transition_home_rest(next_time: String) -> void:
+	is_transitioning = true
+	house.set_enabled(false)
+	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
+	PlayerState.record_rest()
+	PlayerState.add_energy(2)
+	PlayerState.set_current_stage_time(next_time)
+	PlayerState.clear_pending_trip_selection()
+	_render_day_start()
+	await _fade_overlay_to(0.0, HOME_REST_FADE_SECONDS)
+	house.set_enabled(true)
+	is_transitioning = false
 
 
-func _refresh_stats_row() -> void:
-	if stats_row_refs.is_empty():
-		return
-	PlayerStatsRow.refresh(stats_row_refs)
+func _fade_overlay_to(alpha_value: float, duration: float) -> void:
+	var tween := create_tween()
+	tween.tween_property(fade_overlay, "color:a", alpha_value, duration)
+	await tween.finished
 
 
 func _start_home_bgm() -> void:
@@ -262,37 +309,13 @@ func _build_tutorial() -> void:
 	tutorial_text_label.offset_bottom = -10.0
 	tutorial_text_panel.add_child(tutorial_text_label)
 
-	tutorial_steps.append({
-		"text": "This is home. The header shows the current day and time of day.",
-		"targets": [header_label],
-	})
-	if news_panel.visible:
-		tutorial_steps.append({
-			"text": "Today's news shows gas price changes and the weather forecast for today and tomorrow.",
-			"targets": [news_panel],
-		})
-	var stats_row := stats_row_refs.get("row") as Control
-	var stats_targets := [stats_row] if stats_row != null else [status_label]
-	tutorial_steps.append({
-		"text": "Money, energy, and gas are shown here. Check these before choosing what to do next.",
-		"targets": stats_targets,
-	})
-	tutorial_steps.append({
-		"text": "Debt status appears here. Hover over Rest to see its energy recovery and time change.",
-		"targets": [status_label],
-	})
-	tutorial_steps.append({
-		"text": "REST recovers energy and moves time forward. At night, it sleeps until the next day.",
-		"targets": [rest_button],
-	})
-	tutorial_steps.append({
-		"text": "STORE lets you buy upgrades, energy, and gas before choosing a passenger.",
-		"targets": [store_button],
-	})
-	tutorial_steps.append({
-		"text": "RIDE opens passenger selection for the current trip.",
-		"targets": [ride_button],
-	})
+	tutorial_steps = [
+		{"text": "This is home. Hover over objects to see what you can use.", "targets": [header_label]},
+		{"text": "Click the radio for today's news, gas prices and weather forecast.", "targets": [house.buttons["radio"]]},
+		{"text": "Click the calendar to check your weekly goal, remaining debt and due date.", "targets": [house.buttons["calendar"]]},
+		{"text": "Click the curtained sleeping area to rest. Hover over it to see the energy recovery and time change.", "targets": [house.buttons["rest"]]},
+		{"text": "Click the bottom-right exit to leave the house.", "targets": [house.buttons["ride"]]},
+	]
 
 
 func _start_tutorial() -> void:
@@ -318,7 +341,7 @@ func _advance_tutorial() -> void:
 func _show_tutorial_step(step_index: int) -> void:
 	tutorial_step_index = clampi(step_index, 0, tutorial_steps.size() - 1)
 	var step: Dictionary = tutorial_steps[tutorial_step_index]
-	tutorial_text_label.text = "%s\n\nPress any key to continue" % str(step.get("text", ""))
+	tutorial_text_label.text = "%s\n\nClick or press any key to continue" % str(step.get("text", ""))
 	tutorial_text_label.visible = true
 	_layout_tutorial_for_targets(step.get("targets", []))
 
@@ -334,7 +357,7 @@ func _union_global_rect(targets: Array) -> Rect2:
 func _set_tutorial_active(is_active: bool) -> void:
 	tutorial_active = is_active
 	TutorialOverlayHelper.set_overlay_visible(is_active, tutorial_overlay, tutorial_text_panel, tutorial_text_label)
-	TutorialOverlayHelper.set_buttons_disabled(is_active, [rest_button, store_button, ride_button], tutorial_disabled_buttons)
+	house.set_enabled(not is_active)
 
 
 func _end_tutorial() -> void:
@@ -347,31 +370,3 @@ func _make_tutorial_label() -> Label:
 
 func _is_any_press(event: InputEvent) -> bool:
 	return TutorialOverlayHelper.is_any_press(event)
-
-
-func _transition_home_rest(next_time: String) -> void:
-	is_transitioning = true
-	_set_buttons_disabled(true)
-	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
-	PlayerState.record_rest()
-	PlayerState.add_energy(2)
-	PlayerState.set_current_stage_time(next_time)
-	PlayerState.clear_pending_trip_selection()
-	_render_day_start()
-	await _fade_overlay_to(0.0, HOME_REST_FADE_SECONDS)
-	_set_buttons_disabled(false)
-	is_transitioning = false
-
-
-func _set_buttons_disabled(is_disabled: bool) -> void:
-	rest_button.disabled = is_disabled
-	store_button.disabled = is_disabled
-	ride_button.disabled = is_disabled
-
-
-func _fade_overlay_to(alpha_value: float, duration: float) -> void:
-	if fade_overlay == null:
-		return
-	var tween := create_tween()
-	tween.tween_property(fade_overlay, "color:a", alpha_value, duration)
-	await tween.finished
