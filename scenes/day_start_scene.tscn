@@ -2,10 +2,10 @@
 
 [ext_resource type="Script" path="res://scripts/day_start_scene.gd" id="1_daystart"]
 [ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/rest.png" id="3_rest"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/store.png" id="4_store"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/ride.png" id="5_ride"]
-[ext_resource type="Texture2D" path="res://assets/story/backgrounds/inhouse.png" id="6_bg"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/hub/rest.png" id="3_rest"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/hub/store.png" id="4_store"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/hub/ride.png" id="5_ride"]
+[ext_resource type="Texture2D" path="res://assets/story/backgrounds/locations/inhouse.png" id="6_bg"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.94, 0.89, 0.78, 0.82)

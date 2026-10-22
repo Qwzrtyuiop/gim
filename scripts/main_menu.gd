@@ -22,8 +22,8 @@ const StoryMemoryCatalog := preload("res://scripts/story/story_memory_catalog.gd
 const Scene01IntroPayloadEnglish := preload("res://scripts/story/payloads/intro/scene_01_intro.gd")
 const Scene01IntroPayloadTagalog := preload("res://scripts/story/payloads/intro/scene_01_intro_tagalog.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const GENERIC_BUTTON_TEXTURE := preload("res://assets/ui/button_generic.png")
-const MAIN_MENU_BGM_PATH := "res://assets/story/music/peace.mp3"
+const GENERIC_BUTTON_TEXTURE := preload("res://assets/ui/buttons/button_generic.png")
+const MAIN_MENU_BGM_PATH := "res://assets/audio/music/story/peace.mp3"
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
 	"gray_sedan": preload("res://assets/vehicles/gray_sedan.png"),

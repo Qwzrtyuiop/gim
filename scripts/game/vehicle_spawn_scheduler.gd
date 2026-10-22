@@ -1,15 +1,28 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const VehicleSpawner := preload("res://scripts/game/vehicle_spawner.gd")
 
 
 static func update_spawns(owner, delta: float) -> void:
+	if owner.game_state != "playing":
+		VehicleTrafficController.clear_oncoming_warning(owner)
+		return
 	var progress: float = clampf(owner.distance / maxf(1.0, owner.target_distance), 0.0, 1.0)
 	for lane_index in range(3):
 		owner.spawn_timers[lane_index] -= delta
 		if owner.spawn_timers[lane_index] <= 0.0:
 			var spawn_side: String = vehicle_spawn_side(owner, lane_index)
+			if lane_index == 0 and GameTuning.ONCOMING_WARNING_ENABLED:
+				if owner.oncoming_warning_elapsed >= 0.0:
+					if not VehicleTrafficController.update_oncoming_warning(owner, delta):
+						continue
+				elif lane_has_spawn_room(owner, lane_index, spawn_side):
+					owner.oncoming_warning_elapsed = 0.0
+					VehicleTrafficController.update_oncoming_warning(owner, 0.0)
+					continue
 			if lane_has_spawn_room(owner, lane_index, spawn_side) and VehicleSpawner.spawn_traffic(owner, lane_index, spawn_side):
 				owner.spawn_timers[lane_index] = next_spawn_delay(owner, lane_index, progress)
 			else:

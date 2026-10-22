@@ -22,7 +22,7 @@ const STORIES := {
 		"english": preload("res://scripts/story/payloads/characters/benny/benny_tropa_night.gd"),
 		"tagalog": preload("res://scripts/story/payloads/characters/benny/benny_tropa_night_tagalog.gd"),
 		"title": "Tropa", "subtitle": "Old friends meet under city lights.",
-		"preview_image": "res://assets/story/backgrounds/bar.jpeg",
+		"preview_image": "res://assets/story/backgrounds/locations/bar.jpeg",
 	},
 	"scene_03_day7_night": {
 		"english": preload("res://scripts/story/payloads/events/scene_03_day7_night.gd"),

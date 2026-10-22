@@ -7,9 +7,10 @@ const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
+const HubMenuLayout := preload("res://scripts/ui/hub_menu_layout.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const HOME_BGM_PATH := "res://assets/story/music/peace.mp3"
+const HOME_BGM_PATH := "res://assets/audio/music/story/peace.mp3"
 const HOME_REST_FADE_SECONDS := 0.28
 const CRT_LINE_SPACING := 7.0
 const CRT_LINE_ALPHA := 0.16
@@ -55,6 +56,9 @@ func _ready() -> void:
 		return
 
 	_create_stats_row()
+	HubMenuLayout.build(self, header_label, stats_row_refs["row"], news_panel, [status_label], $BreakButtons)
+	crt_lines.clip_contents = true
+	crt_lines.resized.connect(_build_crt_lines)
 	PlayerState.ensure_daily_conditions_for_current_day()
 	if PlayerState.get_current_day() >= 2 and int(PlayerState.stage_round) > 0 and not PlayerState.has_home_tutorial_shown():
 		PlayerState.mark_home_tutorial_shown()
@@ -99,7 +103,7 @@ func _render_day_start() -> void:
 	_refresh_stats_row()
 	night_filter.visible = current_time == "night"
 	_render_daily_news()
-	header_label.text = "DAY %d\n%s At Home" % [
+	header_label.text = "DAY %d  /  %s At Home" % [
 		PlayerState.get_current_day(),
 		current_time.capitalize(),
 	]
@@ -109,7 +113,7 @@ func _render_day_start() -> void:
 	if current_time == "night":
 		rest_note = "Rest: sleep, recover +3 energy, then start the next day at home."
 	rest_button.tooltip_text = rest_note
-	status_label.text = PlayerState.get_debt_status_text()
+	status_label.text = "WEEKLY GOAL\nPhP %d\n\nDebt remaining: PhP %d\n\n%s" % [PlayerState.get_current_weekly_goal(), PlayerState.get_total_debt_goal(), PlayerState.get_debt_due_text()]
 
 
 func _render_daily_news() -> void:
@@ -169,6 +173,7 @@ func _rest_then_noon() -> void:
 
 func _create_stats_row() -> void:
 	stats_row_refs = PlayerStatsRow.create({
+		"spread": true,
 		"font": UI_FONT,
 		"font_size": 11,
 		"font_color": Color(0.27, 0.18, 0.10, 1.0),

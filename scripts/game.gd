@@ -11,9 +11,9 @@ const BACKGROUND_POOL_TAGS_BY_TYPE := {
 }
 const STAGE_BACKGROUND_POOLS := {
 	"rural": [
-		preload("res://assets/background/bg1_loop.png"),
-		preload("res://assets/background/backgroundfishing.png"),
-		preload("res://assets/background/farmloop.png"),
+		preload("res://assets/story/backgrounds/roads/bg1_loop.png"),
+		preload("res://assets/story/backgrounds/roads/backgroundfishing.png"),
+		preload("res://assets/story/backgrounds/roads/farmloop.png"),
 	],
 }
 const RAIN_DIAGONAL_TEXTURE := preload("res://assets/weather/rain_diagonal.svg")
@@ -329,6 +329,9 @@ var time_left := 0.0
 var overtime_seconds := 0.0
 var active_entities: Array = []
 var spawn_timers := [0.4, 0.8, 1.2]
+var oncoming_warning_elapsed := -1.0
+var oncoming_warning_beep_index := -1
+var oncoming_warning_label: Label
 var game_state := "playing"
 var end_message := ""
 var player_is_stage_clear_exiting := false
@@ -540,9 +543,9 @@ func _process(delta: float) -> void:
 		PlayerVehicleController.update_player(self, delta)
 		if passenger_dialogue_controller != null:
 			passenger_dialogue_controller.update(self, delta)
-		var collision_detail: String = VehicleCollisionController.collision_detail(self)
-		if not collision_detail.is_empty():
-			GameFlowController.handle_player_hit(self, collision_detail)
+		var collision: Dictionary = VehicleCollisionController.collision_data(self)
+		if not collision.is_empty():
+			GameFlowController.handle_player_hit(self, collision["detail"], collision["energy_loss"])
 	elif game_state == "YOU MADE IT":
 		VehicleCollisionController.update_stage_clear_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta, true)

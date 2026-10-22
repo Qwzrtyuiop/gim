@@ -8,6 +8,7 @@ const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
+const HubMenuLayout := preload("res://scripts/ui/hub_menu_layout.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const LAST_ENERGY_WARNING := "Start this trip with critically low energy?\nYour vehicle will handle worse until John recovers."
 
@@ -21,8 +22,7 @@ var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
 var earnings_summary_label: Label
 var carried_music_players: Array[AudioStreamPlayer] = []
-var earnings_summary_base_top := -46.0
-var earnings_summary_base_bottom := 18.0
+var heading_label: Label
 
 
 func _ready() -> void:
@@ -30,6 +30,16 @@ func _ready() -> void:
 	_start_carried_result_music()
 	_create_earnings_summary_label()
 	_create_stats_row()
+	heading_label = Label.new()
+	heading_label.label_settings = results_label.label_settings.duplicate()
+	heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(heading_label)
+	results_label.label_settings = results_label.label_settings.duplicate()
+	results_label.label_settings.font_size = 13
+	results_label.label_settings.line_spacing = 8
+	results_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	results_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	HubMenuLayout.build(self, heading_label, stats_row_refs["row"], results_label, [earnings_summary_label, status_label], $BreakButtons)
 	ButtonGlow.attach(self, rest_button)
 	ButtonGlow.attach(self, store_button)
 	ButtonGlow.attach(self, ride_button)
@@ -68,14 +78,14 @@ func _render_results(result: Dictionary) -> void:
 	if detail_lines.is_empty():
 		detail_lines = _fallback_detail_lines(result)
 
-	var header_line := "Day %d  %s" % [day_number, stage_name]
+	heading_label.text = "RIDE COMPLETE" if completed else "TRIP ENDED"
+	var header_line := "Day %d / %s\n%s" % [day_number, time_of_day.capitalize(), stage_name]
 	if not stage_special_label.is_empty():
 		header_line += "  [%s]" % stage_special_label
-	var rendered_lines: Array[String] = [header_line, "Complete" if completed else "Failed", ""]
+	var rendered_lines: Array[String] = [header_line, ""]
 	for detail_line_variant in detail_lines:
 		rendered_lines.append(str(detail_line_variant))
 	results_label.text = "\n".join(rendered_lines)
-	_layout_dynamic_result_text(detail_lines.size())
 	_render_earnings_summary(total)
 
 	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage_result(time_of_day, day_number) or has_pending_night_skip
@@ -149,9 +159,8 @@ func _open_store() -> void:
 
 func _refresh_status(note := "") -> void:
 	_refresh_stats_row()
-	status_label.text = PlayerState.get_debt_status_text()
-	if not note.is_empty():
-		status_label.text += "\n%s" % note
+	status_label.text = "WEEKLY GOAL: PhP %d\n\nDebt remaining: PhP %d\n%s" % [PlayerState.get_current_weekly_goal(), PlayerState.get_total_debt_goal(), PlayerState.get_debt_due_text()]
+	rest_button.tooltip_text = note if not note.is_empty() else "Rest"
 
 
 func _render_earnings_summary(total: int) -> void:
@@ -190,14 +199,6 @@ func _stringify_detail_lines(detail_line_variants: Variant) -> Array[String]:
 	for detail_line_variant in detail_line_variants:
 		detail_lines.append(str(detail_line_variant))
 	return detail_lines
-
-
-func _layout_dynamic_result_text(detail_line_count: int) -> void:
-	var extra_lines: int = maxi(0, int(detail_line_count) - 4)
-	var vertical_shift: float = float(extra_lines) * 16.0
-	if earnings_summary_label != null:
-		earnings_summary_label.offset_top = earnings_summary_base_top + vertical_shift
-		earnings_summary_label.offset_bottom = earnings_summary_base_bottom + vertical_shift
 
 
 func _attempt_next_stage() -> void:
@@ -241,6 +242,7 @@ func _create_earnings_summary_label() -> void:
 func _create_stats_row() -> void:
 	stats_row_refs.clear()
 	stats_row_refs.merge(PlayerStatsRow.create({
+		"spread": true,
 		"font": UI_FONT,
 		"font_size": 11,
 		"font_color": Color(0.27, 0.18, 0.10, 1.0),

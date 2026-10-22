@@ -6,6 +6,7 @@ const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tra
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
+const AssetPathMigration := preload("res://scripts/save/asset_path_migration.gd")
 
 
 static func load_from_path(player_state, save_path: String) -> bool:
@@ -23,6 +24,10 @@ static func load_from_path(player_state, save_path: String) -> bool:
 		return false
 
 	var needs_migration_save := saved_version < 4
+	var migrated_data: Dictionary = AssetPathMigration.migrate(save_data)
+	if migrated_data != save_data:
+		save_data = migrated_data
+		needs_migration_save = true
 	player_state._is_loading_save = true
 	player_state._begin_state_batch()
 	player_state.money = int(save_data.get("money", player_state.money))

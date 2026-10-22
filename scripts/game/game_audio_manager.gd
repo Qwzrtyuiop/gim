@@ -1,16 +1,16 @@
 extends Node
 
-const STAGE_BGM_NORMAL_CHILL_A_PATH := "res://assets/stagebgm/chill_normal_day_noon.mp3"
-const STAGE_BGM_NORMAL_CHILL_B_PATH := "res://assets/stagebgm/normalstage1.mp3"
-const STAGE_BGM_NORMAL_CHILL_C_PATH := "res://assets/stagebgm/normalstage2.mp3"
-const STAGE_BGM_NORMAL_CHILL_D_PATH := "res://assets/stagebgm/normal3.mp3"
-const STAGE_BGM_SPEEDER_BUSY_A_PATH := "res://assets/stagebgm/speederbusy.mp3"
-const STAGE_BGM_SPEEDER_BUSY_B_PATH := "res://assets/stagebgm/speederbusy2.mp3"
-const STAGE_BGM_SPEEDER_BUSY_C_PATH := "res://assets/stagebgm/speederbusy3.mp3"
-const STAGE_BGM_SPEEDER_BUSY_D_PATH := "res://assets/stagebgm/speederbusy4.mp3"
-const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/stagebgm/traffic_jam.mp3"
-const STAGE_BGM_RAIN_LOOP_PATH := "res://assets/stagebgm/rainloop.mp3"
-const CRASH_SFX := preload("res://assets/sfx/crash.mp3")
+const STAGE_BGM_NORMAL_CHILL_A_PATH := "res://assets/audio/music/driving/chill_normal_day_noon.mp3"
+const STAGE_BGM_NORMAL_CHILL_B_PATH := "res://assets/audio/music/driving/normalstage1.mp3"
+const STAGE_BGM_NORMAL_CHILL_C_PATH := "res://assets/audio/music/driving/normalstage2.mp3"
+const STAGE_BGM_NORMAL_CHILL_D_PATH := "res://assets/audio/music/driving/normal3.mp3"
+const STAGE_BGM_SPEEDER_BUSY_A_PATH := "res://assets/audio/music/driving/speederbusy.mp3"
+const STAGE_BGM_SPEEDER_BUSY_B_PATH := "res://assets/audio/music/driving/speederbusy2.mp3"
+const STAGE_BGM_SPEEDER_BUSY_C_PATH := "res://assets/audio/music/driving/speederbusy3.mp3"
+const STAGE_BGM_SPEEDER_BUSY_D_PATH := "res://assets/audio/music/driving/speederbusy4.mp3"
+const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/audio/music/driving/traffic_jam.mp3"
+const STAGE_BGM_RAIN_LOOP_PATH := "res://assets/audio/ambience/rain_loop.mp3"
+const CRASH_SFX := preload("res://assets/audio/sfx/driving/crash.mp3")
 
 const STAGE_BGM_NORMAL_CHILL_PATHS := [
 	STAGE_BGM_NORMAL_CHILL_A_PATH,

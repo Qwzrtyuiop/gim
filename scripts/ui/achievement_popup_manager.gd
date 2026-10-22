@@ -1,9 +1,14 @@
 extends CanvasLayer
 
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
+const UI_FRAME_TEXTURE := preload("res://assets/ui/frames/ui_frame.png")
 const POPUP_HOLD_SECONDS := 2.2
 const POPUP_FADE_SECONDS := 0.28
+const TAPAT_TUTORIAL_MESSAGES := [
+	"You have earned your first achievement!",
+	"Each achievement represents a Filipino trait or value.",
+	"Your choices can change the story. Choose wisely.",
+]
 
 var popup_frame: TextureRect
 var heading_label: Label
@@ -20,6 +25,12 @@ var was_paused := false
 var previous_focus: WeakRef
 var detail_ready_at := 0
 var dismissal_pending := false
+var detail_hint: Label
+var tutorial_highlight: Panel
+var tutorial_panel: Panel
+var tutorial_message: Label
+var tutorial_step := -1
+var tapat_is_first_achievement := false
 
 
 func _ready() -> void:
@@ -76,7 +87,44 @@ func _build_detail_ui() -> void:
 	detail_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	detail_body.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	detail_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_make_detail_label(panel, "CLICK / ENTER TO CONTINUE", 11, Vector2(28, 396), Vector2(724, 24))
+	detail_hint = _make_detail_label(panel, "CLICK / ENTER TO CONTINUE", 11, Vector2(28, 396), Vector2(724, 24))
+	tutorial_highlight = Panel.new()
+	tutorial_highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tutorial_highlight.position = Vector2(18, 54)
+	tutorial_highlight.size = Vector2(744, 88)
+	var highlight_style := StyleBoxFlat.new()
+	highlight_style.bg_color = Color(1, 0.78, 0.32, 0.05)
+	highlight_style.border_color = Color(1, 0.78, 0.32)
+	highlight_style.set_border_width_all(2)
+	highlight_style.set_corner_radius_all(6)
+	tutorial_highlight.add_theme_stylebox_override("panel", highlight_style)
+	panel.add_child(tutorial_highlight)
+	tutorial_panel = Panel.new()
+	tutorial_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tutorial_panel.position = Vector2(28, 286)
+	tutorial_panel.size = Vector2(724, 98)
+	var tutorial_style := highlight_style.duplicate() as StyleBoxFlat
+	tutorial_style.bg_color = Color(0.22, 0.17, 0.09, 1)
+	tutorial_panel.add_theme_stylebox_override("panel", tutorial_style)
+	panel.add_child(tutorial_panel)
+	_make_detail_label(tutorial_panel, "ACHIEVEMENTS", 10, Vector2(16, 10), Vector2(692, 18))
+	tutorial_message = _make_detail_label(tutorial_panel, "", 12, Vector2(16, 32), Vector2(692, 54))
+	tutorial_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_set_tutorial_step(-1)
+
+
+func _set_tutorial_step(step: int) -> void:
+	tutorial_step = step
+	tutorial_highlight.visible = step >= 0
+	tutorial_panel.visible = step >= 0
+	if step < 0:
+		detail_hint.text = "CLICK / ENTER TO CONTINUE"
+		return
+	tutorial_message.text = TAPAT_TUTORIAL_MESSAGES[step]
+	if step == 0 and not tapat_is_first_achievement:
+		tutorial_message.text = "You have earned an achievement!"
+	detail_hint.text = "CLICK / ENTER TO CONTINUE - %d/3" % (step + 1)
+	detail_ready_at = Time.get_ticks_msec() + 250
 
 
 func _make_detail_label(parent: Control, text: String, font_size: int, position_value: Vector2, size_value: Vector2) -> Label:
@@ -91,6 +139,7 @@ func _make_detail_label(parent: Control, text: String, font_size: int, position_
 
 
 func _show_next_description() -> void:
+	_set_tutorial_step(-1)
 	if detail_queue.is_empty():
 		active_detail_id = ""
 		detail_overlay.hide()
@@ -112,10 +161,15 @@ func _show_next_description() -> void:
 	detail_ready_at = Time.get_ticks_msec() + 250
 	detail_overlay.show()
 	_show_popup(active_detail_id)
+	if active_detail_id == "tapat":
+		_set_tutorial_step(0)
 
 
 func _dismiss_description() -> void:
 	dismissal_pending = false
+	if tutorial_step >= 0 and tutorial_step < TAPAT_TUTORIAL_MESSAGES.size() - 1:
+		_set_tutorial_step(tutorial_step + 1)
+		return
 	_show_next_description()
 
 
@@ -172,6 +226,8 @@ func _on_achievement_unlocked(achievement_id: String) -> void:
 		return
 	if safe_id == active_detail_id or detail_queue.has(safe_id):
 		return
+	if safe_id == "tapat":
+		tapat_is_first_achievement = PlayerState.get_unlocked_achievement_ids().size() == 1
 	detail_queue.append(safe_id)
 	if not is_description_open():
 		was_paused = get_tree().paused

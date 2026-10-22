@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b4kf2g35q86vt"]
 
 [ext_resource type="Script" uid="uid://2tg5iyn2isvx" path="res://scripts/game.gd" id="1_yc7bn"]
-[ext_resource type="Texture2D" uid="uid://vm4oo5i1uo1v" path="res://assets/background/bg1_loop.png" id="2_ng6ny"]
+[ext_resource type="Texture2D" path="res://assets/story/backgrounds/roads/bg1_loop.png" id="2_ng6ny"]
 [ext_resource type="Texture2D" uid="uid://pxi04docuwat" path="res://assets/vehicles/player_tricycle.png" id="3_nievf"]
 [ext_resource type="Texture2D" uid="uid://b60gv7jlj337l" path="res://assets/vehicles/blue_truck.png" id="4_jf3dk"]
 [ext_resource type="Texture2D" uid="uid://1y06d3qti6eg" path="res://assets/vehicles/jeepney.png" id="5_4yrqb"]

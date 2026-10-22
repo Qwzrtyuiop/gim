@@ -1,7 +1,7 @@
 extends Node
 
-const UI_HOVER_STREAM_PATH := "res://assets/ui/fx/ui_hover.mp3"
-const UI_PRESS_STREAM_PATH := "res://assets/ui/fx/ui_press.mp3"
+const UI_HOVER_STREAM_PATH := "res://assets/audio/sfx/ui/ui_hover.mp3"
+const UI_PRESS_STREAM_PATH := "res://assets/audio/sfx/ui/ui_press.mp3"
 const HOVER_COOLDOWN_SECONDS := 0.05
 
 var hover_player: AudioStreamPlayer

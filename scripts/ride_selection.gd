@@ -13,8 +13,8 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const RIDE_SELECT_DAY_BACKGROUND := preload("res://assets/bg/rideselectbg.png")
-const RIDE_SELECT_NIGHT_BACKGROUND := preload("res://assets/story/backgrounds/station_night.jpeg")
+const RIDE_SELECT_DAY_BACKGROUND := preload("res://assets/story/backgrounds/locations/station.png")
+const RIDE_SELECT_NIGHT_BACKGROUND := preload("res://assets/story/backgrounds/locations/station_night.png")
 const GENERIC_PORTRAIT := preload("res://assets/characters/blankface.png")
 const UNIQUE_CHARACTER_PORTRAITS := {
 	"alma": preload("res://assets/characters/Alma.png"),
@@ -30,7 +30,7 @@ const UNIQUE_CHARACTER_PORTRAITS := {
 }
 const EMPTY_CARD_CHANCE := 0.28
 const LOCKED_DISTANCE_MODULATE := Color(0.45, 0.45, 0.45, 1.0)
-const RIDE_SELECT_BGM_PATH := "res://assets/stagebgm/normalstage1.mp3"
+const RIDE_SELECT_BGM_PATH := "res://assets/audio/music/driving/normalstage1.mp3"
 const RISK_DISTANCE_SCORES := {
 	"short": 1,
 	"medium": 2,
@@ -53,7 +53,6 @@ const RISK_TRAFFIC_SCORES := {
 
 @onready var subtitle_label: Label = $Panel/Subtitle
 @onready var status_label: Label = $Panel/StatusLabel
-@onready var money_label: Label = $Panel/MoneyLabel
 @onready var background: TextureRect = $Background
 @onready var back_button: BaseButton = $Panel/BackButton
 @onready var back_label: Label = $Panel/BackButton/BackLabel
@@ -176,9 +175,7 @@ func _notification(what: int) -> void:
 
 
 func _refresh_header() -> void:
-	var display_day := PlayerState.get_transition_display_day(_transition_mode())
 	_refresh_stats_row()
-	money_label.text = PlayerState.get_debt_status_text(display_day)
 
 
 func _refresh_background() -> void:
@@ -636,14 +633,14 @@ func _build_tutorial() -> void:
 		"targets": [short_button, medium_button, long_button],
 	})
 	var stats_row := stats_row_refs.get("row") as Control
-	var stats_targets := [stats_row] if stats_row != null else [money_label]
+	var stats_targets := [stats_row] if stats_row != null else [status_label]
 	tutorial_steps.append({
 		"text": "Money buys upgrades and items. Energy is spent when starting a ride; if it hits 0 you cannot start. Gas starts at %s%%, drains as you drive, and burns faster while boosting." % String.num(PlayerState.DEFAULT_STARTING_GAS_PERCENT).trim_suffix(".0"),
 		"targets": stats_targets,
 	})
 	tutorial_steps.append({
 		"text": "Your status and trip notes appear here.",
-		"targets": [money_label, status_label],
+		"targets": [status_label],
 	})
 	tutorial_steps.append({
 		"text": "For the opening ride, start with this passenger. It keeps the first trip simple while you learn the road.",

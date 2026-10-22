@@ -1,5 +1,6 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameRandom := preload("res://scripts/game/game_random.gd")
 const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
@@ -80,8 +81,15 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 	if not is_parked:
 		VehicleVisuals.apply_headlight(owner, sprite, owner.VEHICLE_HITBOX_INSET)
 		VehicleWheelAnimation.attach(sprite, vehicle_key)
+	var spawn_x: float
+	if not moves_with_player:
+		# Keep the whole car just offscreen, regardless of its width or transparent padding.
+		var visible_rect := VehicleGeometry.local_hitbox_rect(sprite, Vector4.ZERO, owner)
+		spawn_x = size.x + maxf(0.0, GameTuning.ONCOMING_SPAWN_EDGE_GAP) - visible_rect.position.x * sprite.scale.x
+	else:
+		spawn_x = VehicleSpawnScheduler.vehicle_spawn_x(owner, size, spawn_side)
 	sprite.position = Vector2(
-		VehicleSpawnScheduler.vehicle_spawn_x(owner, size, spawn_side),
+		spawn_x,
 		VehicleGeometry.sprite_y_for_hitbox_bottom(
 			sprite,
 			VehicleGeometry.entity_lane_y(owner, lane_index, size, is_parked),
@@ -91,6 +99,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 	)
 	sprite.z_index = VehicleGeometry.z_for_lane(owner, lane_index, owner.PARKED_VEHICLE_Z_OFFSET if is_parked else 0)
 	if not spawn_hitbox_is_clear(owner, sprite, lane_index, spawn_side, world_speed):
+		sprite.free()
 		return false
 
 	owner.add_child(sprite)
@@ -192,6 +201,13 @@ static func spawn_is_clear_of_player(owner, spawn_rect: Rect2, lane_index: int, 
 	if absi(lane_index - owner.player_lane) > 1:
 		return true
 
+	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
+	if lane_index == 0 and spawn_side == BusyTrafficBehavior.RIGHT_SPAWN_SIDE:
+		# Oncoming cars have an advance warning and spawn just outside the screen.
+		# A lane-change prediction rejects them at high closing speeds even when
+		# the spawn is clear. Check actual overlap here; keep prediction for other traffic.
+		return not spawn_rect.intersects(player_rect)
+
 	var future_rect := spawn_rect
 	var movement_side := BusyTrafficBehavior.LEFT_SPAWN_SIDE if lane_index != 0 or spawn_side == BusyTrafficBehavior.LEFT_SPAWN_SIDE else BusyTrafficBehavior.RIGHT_SPAWN_SIDE
 	var screen_velocity: float = VehicleBehaviors.screen_velocity_for_spawn_side(
@@ -203,7 +219,6 @@ static func spawn_is_clear_of_player(owner, spawn_rect: Rect2, lane_index: int, 
 	)
 	future_rect.position.x += screen_velocity * owner.player_lane_change_prediction_seconds
 	var swept_spawn_rect := spawn_rect.merge(future_rect)
-	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
 	var player_safety_rect := Rect2(
 		player_rect.position - Vector2(owner.player_lane_change_back_padding, owner.player_lane_change_side_padding),
 		player_rect.size + Vector2(

@@ -1,13 +1,14 @@
 extends RefCounted
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
 const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
 
 
-static func collision_detail(owner) -> String:
+static func collision_data(owner) -> Dictionary:
 	if owner.player_hit_invincible_timer > 0.0:
-		return ""
+		return {}
 
 	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
 	for entity in owner.active_entities:
@@ -26,8 +27,12 @@ static func collision_detail(owner) -> String:
 			if VehicleTrafficController.lane_change_fault_is_active(entity):
 				VehicleTrafficController.deflect_lane_change_fault(owner, entity)
 				continue
-			return "Collision in the %s lane." % owner.LANE_NAMES[entity["lane"]]
-	return ""
+			var head_on := not bool(entity.get("is_parked", false)) and not VehicleTrafficController.entity_moves_with_player(entity, int(entity["lane"]))
+			return {
+				"detail": "Collision in the %s lane." % owner.LANE_NAMES[entity["lane"]],
+				"energy_loss": GameTuning.HEAD_ON_CRASH_ENERGY_LOSS if head_on else owner.crash_energy_loss,
+			}
+	return {}
 
 
 static func is_safe_low_speed_passing_contact(owner, entity: Dictionary) -> bool:

@@ -1,7 +1,7 @@
 extends RefCounted
 
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
+const UI_FRAME_TEXTURE := preload("res://assets/ui/frames/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const GAS_ICON := preload("res://assets/ui/icons/gas_pump.svg")
 const SPEEDOMETER_GAUGE := preload("res://scripts/speedometer_gauge.gd")

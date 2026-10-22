@@ -89,7 +89,7 @@ static func weather_text(player_state, weather_value: String) -> String:
 
 
 static func daily_news_text(player_state) -> String:
-	return "TODAY'S NEWS\nGas Price:   %s      %s\nChange:   %s\nToday:   %s\nTomorrow:   %s" % [
+	return "TODAY'S NEWS\nGas Price:   %s      %s\nChange:   %s\n\nWeather forecast\nToday:   %s\nTomorrow:   %s" % [
 		gas_price_text(player_state),
 		gas_price_yesterday_percent_text(player_state),
 		gas_price_change_text(player_state),

@@ -57,6 +57,7 @@ static func current_speed_kmh(owner) -> int:
 static func end_game(owner, title: String, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
+	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()
 	if title == "CRASH":
 		owner.audio_manager.play_crash_sfx()
@@ -80,7 +81,7 @@ static func end_game(owner, title: String, detail: String) -> void:
 		VehicleCollisionController.remove_vehicles_behind_player(owner)
 
 
-static func handle_player_hit(owner, detail: String) -> void:
+static func handle_player_hit(owner, detail: String, damage: int) -> void:
 	if owner.game_state != "playing" or owner.player_hit_invincible_timer > 0.0:
 		return
 
@@ -94,7 +95,7 @@ static func handle_player_hit(owner, detail: String) -> void:
 	owner.player_hit_flicker_timer = owner.crash_flicker_interval
 	owner.player_hit_flicker_visible = false
 
-	var energy_loss := mini(PlayerState.energy, owner.crash_energy_loss)
+	var energy_loss := mini(PlayerState.energy, damage)
 	if energy_loss > 0:
 		PlayerState.spend_energy(energy_loss)
 		PlayerState.save_progress()
@@ -109,6 +110,7 @@ static func send_to_crash_repair(owner, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
 	owner.game_state = "CRASH"
+	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()
 	PlayerState._begin_state_batch()
 	PlayerState.record_stage_failure()
@@ -178,6 +180,7 @@ static func reset_game(owner) -> void:
 	owner.active_entities.clear()
 	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	owner.spawn_timers = [0.4, 0.8, 1.2]
+	VehicleTrafficController.clear_oncoming_warning(owner)
 	owner.player_lane = GameTuning.PLAYER_START_LANE
 	owner.player_speed = owner.player_start_speed
 	owner.distance = 0.0

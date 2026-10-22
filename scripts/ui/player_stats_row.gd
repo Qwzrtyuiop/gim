@@ -22,6 +22,8 @@ static func create(config: Dictionary = {}) -> Dictionary:
 	var icon_size: Vector2 = config.get("icon_size", DEFAULT_ICON_SIZE)
 
 	var money_label := _make_label(label_config)
+	if bool(config.get("spread", false)):
+		money_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var energy_label := _make_label(label_config)
 	var gas_label := _make_label(label_config)
 

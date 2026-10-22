@@ -301,6 +301,7 @@ static func get_entity_lane_warning_label(owner, entity: Dictionary) -> Label:
 
 	warning_label = GameLabelFactory.make_label(42, Color(1.0, 0.94, 0.2, 1.0), 6)
 	warning_label.name = "LaneChangeWarning"
+	warning_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	warning_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	warning_label.text = "!"
@@ -311,6 +312,44 @@ static func get_entity_lane_warning_label(owner, entity: Dictionary) -> Label:
 	sprite.add_child(warning_label)
 	position_entity_lane_warning(owner, entity, warning_label)
 	return warning_label
+
+
+static func update_oncoming_warning(owner, delta: float) -> bool:
+	# Returns true only when the advance warning has finished and spawning may proceed.
+	var interval := maxf(0.05, GameTuning.ONCOMING_WARNING_FLASH_INTERVAL)
+	owner.oncoming_warning_elapsed += delta
+	if owner.oncoming_warning_elapsed >= interval * maxi(1, GameTuning.ONCOMING_WARNING_BEEPS):
+		clear_oncoming_warning(owner)
+		return true
+	if owner.oncoming_warning_label == null:
+		var label := GameLabelFactory.make_label(48, Color.WHITE, 7)
+		label.name = "OncomingLaneWarning"
+		label.text = "!"
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.size = Vector2(90.0, 90.0)
+		label.z_index = owner.HEADLIGHT_Z_INDEX + 10
+		owner.add_child(label)
+		owner.oncoming_warning_label = label
+	var warning_label: Label = owner.oncoming_warning_label
+	var viewport_size: Vector2 = owner.get_viewport_rect().size
+	warning_label.position = Vector2(viewport_size.x - 120.0, VehicleGeometry.lane_y(owner, 0, viewport_size) - 92.0)
+	var pulse := int(owner.oncoming_warning_elapsed / interval)
+	if pulse != owner.oncoming_warning_beep_index:
+		owner.oncoming_warning_beep_index = pulse
+		owner.audio_manager.play_speeder_beep()
+	var phase := fposmod(owner.oncoming_warning_elapsed, interval) / interval
+	warning_label.visible = phase < 0.7
+	warning_label.modulate = Color(1.0, 0.94, 0.2, 1.0) if phase < 0.35 else Color(1.0, 0.24, 0.12, 1.0)
+	return false
+
+
+static func clear_oncoming_warning(owner) -> void:
+	owner.oncoming_warning_elapsed = -1.0
+	owner.oncoming_warning_beep_index = -1
+	if owner.oncoming_warning_label:
+		owner.oncoming_warning_label.hide()
 
 
 static func position_entity_lane_warning(owner, entity: Dictionary, warning_label: Label) -> void:

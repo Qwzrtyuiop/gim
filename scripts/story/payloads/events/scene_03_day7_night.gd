@@ -35,7 +35,7 @@ static func build() -> Dictionary:
 			"actions": [
 				{
 					"type": "play_music",
-					"path": "res://assets/story/music/mind.mp3",
+					"path": "res://assets/audio/music/story/mind.mp3",
 					"loop": true,
 					"fade_in": 0.0,
 					"volume_db": -9.0,

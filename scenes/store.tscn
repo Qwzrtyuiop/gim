@@ -2,9 +2,9 @@
 
 [ext_resource type="Script" path="res://scripts/store.gd" id="1_e3otq"]
 [ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_wih1i"]
-[ext_resource type="Texture2D" path="res://assets/ui/breakbuttons/ride.png" id="3_ipqv7"]
-[ext_resource type="Texture2D" path="res://assets/bg/bgstore.png" id="4_p7h2d"]
-[ext_resource type="Texture2D" path="res://assets/ui/button_generic.png" id="5_h2wdx"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/hub/ride.png" id="3_ipqv7"]
+[ext_resource type="Texture2D" path="res://assets/story/backgrounds/locations/store.png" id="4_p7h2d"]
+[ext_resource type="Texture2D" path="res://assets/ui/buttons/button_generic.png" id="5_h2wdx"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
 font = ExtResource("2_wih1i")

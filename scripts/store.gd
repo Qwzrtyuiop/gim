@@ -10,7 +10,7 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const STORE_BGM_PATH := "res://assets/stagebgm/store.mp3"
+const STORE_BGM_PATH := "res://assets/audio/music/menus/store.mp3"
 const FAIL_FADE_SECONDS := 0.35
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
@@ -66,13 +66,16 @@ func _ready() -> void:
 		call_deferred("_start_tutorial")
 
 
+func _input(event: InputEvent) -> void:
+	if tutorial_active and _is_any_press(event):
+		# The overlay consumes GUI clicks before they reach _unhandled_input.
+		# Consume the press here so the final step cannot also buy or navigate.
+		get_viewport().set_input_as_handled()
+		_advance_tutorial()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if tutorial_active:
-		if event is InputEventMouseButton and event.pressed:
-			_advance_tutorial()
-			return
-		if _is_any_press(event):
-			_advance_tutorial()
 		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
@@ -206,10 +209,9 @@ func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxConta
 
 func _refresh_header() -> void:
 	_refresh_stats_row()
-	money_label.text = "Gas Price: %s / %s%%\n%s" % [
+	money_label.text = "Gas Price: %s / %s%%" % [
 		PlayerState.get_gas_price_text(),
 		String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
-		PlayerState.get_debt_status_text(),
 	]
 
 
@@ -235,7 +237,8 @@ func _ride() -> void:
 
 
 func _go_home() -> void:
-	PlayerState.clear_pending_trip_selection()
+	# Visiting home does not consume the current time slot or reroll its passengers.
+	PlayerState.set_pending_trip_selection(HOME_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(HOME_SCENE)
 
 
@@ -477,7 +480,7 @@ func _advance_tutorial() -> void:
 func _show_tutorial_step(step_index: int) -> void:
 	tutorial_step_index = clampi(step_index, 0, tutorial_steps.size() - 1)
 	var step: Dictionary = tutorial_steps[tutorial_step_index]
-	tutorial_text_label.text = "%s\n\nPress any key to continue" % str(step.get("text", ""))
+	tutorial_text_label.text = "%s\n\nClick or press any key to continue" % str(step.get("text", ""))
 	tutorial_text_label.visible = true
 	_layout_tutorial_for_targets(step.get("targets", []))
 

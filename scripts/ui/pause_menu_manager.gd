@@ -3,8 +3,8 @@ extends CanvasLayer
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const UI_FRAME_TEXTURE := preload("res://assets/ui/ui_frame.png")
-const BUTTON_TEXTURE := preload("res://assets/ui/button_generic.png")
+const UI_FRAME_TEXTURE := preload("res://assets/ui/frames/ui_frame.png")
+const BUTTON_TEXTURE := preload("res://assets/ui/buttons/button_generic.png")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
 

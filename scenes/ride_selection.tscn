@@ -2,8 +2,8 @@
 
 [ext_resource type="Script" uid="uid://c5bh465ilb2xj" path="res://scripts/ride_selection.gd" id="1_ride"]
 [ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
-[ext_resource type="Texture2D" uid="uid://fbv070ai7fu6" path="res://assets/bg/rideselectbg.png" id="3_bg"]
-[ext_resource type="Texture2D" uid="uid://buwkwy70ahfgb" path="res://assets/ui/button_generic.png" id="4_generic"]
+[ext_resource type="Texture2D" path="res://assets/story/backgrounds/locations/station.png" id="3_bg"]
+[ext_resource type="Texture2D" uid="uid://buwkwy70ahfgb" path="res://assets/ui/buttons/button_generic.png" id="4_generic"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.96, 0.93, 0.87, 0.9)
@@ -124,17 +124,6 @@ offset_right = 1084.0
 offset_bottom = 114.0
 label_settings = SubResource("LabelSettings_body_dark")
 horizontal_alignment = 1
-
-[node name="MoneyLabel" type="Label" parent="Panel" unique_id=1698576744]
-layout_mode = 1
-offset_left = 90.0
-offset_top = 144.0
-offset_right = 1064.0
-offset_bottom = 180.0
-label_settings = SubResource("LabelSettings_small")
-horizontal_alignment = 1
-vertical_alignment = 1
-autowrap_mode = 3
 
 [node name="CharacterHeader" type="Label" parent="Panel" unique_id=353152798]
 layout_mode = 1

@@ -1,7 +1,7 @@
 extends RefCounted
 
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const TUTORIAL_IMAGE := preload("res://assets/tutorial/tutorial.png")
+const TUTORIAL_IMAGE := preload("res://assets/ui/tutorial/tutorial.png")
 const GameInput := preload("res://scripts/game/game_input.gd")
 
 var layer: CanvasLayer

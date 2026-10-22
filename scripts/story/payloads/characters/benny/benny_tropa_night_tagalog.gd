@@ -1,7 +1,7 @@
 extends RefCounted
 
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
-const TROPA_CG := "res://assets/specialCG/tropaCg.png"
+const TROPA_CG := "res://assets/story/specialCG/tropaCg.png"
 
 
 static func build() -> Dictionary:
