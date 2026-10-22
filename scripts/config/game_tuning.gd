@@ -5,6 +5,7 @@ const WEEKLY_DEBT_GOALS := [2500, 5000]
 
 # Random ride stories: probability per eligible unnamed-passenger ride (0..1).
 const MALASAKIT_EVENT_CHANCE := 0.10
+const BAYANIHAN_EVENT_CHANCE := 0.10
 const MALASAKIT_EPILOGUE_DELAY_DAYS := 1 # Guaranteed on the next eligible ride from this day onward.
 # Permanent for the current run after waiving the fare; does not stack.
 const MALASAKIT_FARE_BONUS := 0.05
@@ -199,16 +200,25 @@ const MIN_BOOST_FUEL_MULTIPLIER := 0.60
 const GAS_CAN_PERCENT := 10.0
 const DEFAULT_GAS_PRICE := 70
 const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := 30.0
-const YOSI_ENERGY_RESTORE := 2
+const YOSI_ENERGY_RESTORE := 1
 const SMOKER_YOSI_ENERGY_RESTORE := 3
 const SMOKER_YOSI_GOAL := 10 # Purchases in one day to unlock smoker.
 const SMOKER_MAX_ENERGY_PENALTY := 2
 const SMOKER_DANGER_YOSI_TOTAL := 50 # Lifetime purchases causing run failure.
 
+# Optional owner portraits. Use a res:// image path; empty paths leave the
+# reserved portrait panel blank. Each image keeps its proportions.
+const STORE_OWNER_PORTRAITS := {
+	"tricycle": {"path": "res://assets/characters/mechanic_store.png", "flip_h": false},
+	"food": {"path": "res://assets/characters/Karen_lady.png", "flip_h": false},
+}
+
 # Store inventory, in display order.
 # Upgrade price = cost + current_level * cost_step. max_level controls purchase
 # limits and the tier display. Energy and gas descriptions interpolate their
 # values, so changing an amount also changes its displayed effect.
+# Food costs less per energy in larger portions (30, 27.5, 25, 23.75, 22,
+# and about 20.83 PHP). Warlboro is the cheaper, risky recovery option.
 const STORE_ITEMS := [
 	{
 		"id": "engine_tune",
@@ -241,26 +251,58 @@ const STORE_ITEMS := [
 		"id": "yosi",
 		"name": "Warlboro Blue",
 		"description": "Restore energy. May cause negative effects",
-		"cost": 25,
+		"cost": 15,
 		"type": "energy",
 		"energy": YOSI_ENERGY_RESTORE,
 	},
 
 	{
+		"id": "turon",
+		"name": "Turon",
+		"description": "Sweet banana snack. Restore {energy} energy",
+		"cost": 30,
+		"type": "energy",
+		"energy": 1,
+	},
+	{
 		"id": "energy_snack",
 		"name": "Energy Bar",
 		"description": "Restore {energy} energy",
-		"cost": 50,
+		"cost": 55,
 		"type": "energy",
 		"energy": 2,
+	},
+	{
+		"id": "lugaw",
+		"name": "Lugaw",
+		"description": "Warm rice porridge. Restore {energy} energy",
+		"cost": 75,
+		"type": "energy",
+		"energy": 3,
+	},
+	{
+		"id": "pancit",
+		"name": "Pancit",
+		"description": "A plate of stir-fried noodles. Restore {energy} energy",
+		"cost": 95,
+		"type": "energy",
+		"energy": 4,
 	},
 	{
 		"id": "full_meal",
 		"name": "Budget Meal",
 		"description": "Restore {energy} energy",
-		"cost": 120,
+		"cost": 110,
 		"type": "energy",
 		"energy": 5,
+	},
+	{
+		"id": "lomi",
+		"name": "Lomi",
+		"description": "Hearty noodle soup. Restore {energy} energy",
+		"cost": 125,
+		"type": "energy",
+		"energy": 6,
 	},
 	{
 		"id": "gas_can",

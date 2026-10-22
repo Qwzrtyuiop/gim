@@ -2,6 +2,7 @@ extends RefCounted
 
 # Speaker aliases share artwork across both story languages.
 const PORTRAITS := {
+	"driver": "res://assets/characters/placeholder.png",
 	"passenger": "res://assets/characters/placeholder.png",
 	"john": "res://assets/characters/John.png",
 	"john toda": "res://assets/characters/John.png",

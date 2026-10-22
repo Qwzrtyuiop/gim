@@ -29,4 +29,4 @@ static func build() -> Dictionary:
 		{"speaker": "Passenger", "text": "Talaga?"},
 		{"speaker": "John Toda", "text": "Bayaran mo nalang sa susunod kung maalala mo. Isang biyahe lang naman to e."},
 		{"speaker": "Passenger", "text": "Thank you."},
-	], ["Edi gawahan mo nang paraan.", "Palampasin nang walang bayad"])
+	], ["\"Edi gawahan mo nang paraan.\"", "Palampasin nang walang bayad"])

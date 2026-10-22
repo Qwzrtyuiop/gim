@@ -5,6 +5,7 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 const ORDER := [
 	"malasakit",
+	"bayanihan",
 	"mapagsamantala",
 	"tapat",
 	"sinungaling",
@@ -19,6 +20,11 @@ const ORDER := [
 ]
 
 const DEFINITIONS := {
+	"bayanihan": {
+		"title": "Bayanihan",
+		"subtitle": "Community Spirit",
+		"description": "Bayanihan is the Filipino spirit of helping one another and sharing a burden.\n\nJohn stopped to help a stranded driver push his tricycle to the gas station.",
+	},
 	"malasakit": {
 		"title": "Malasakit",
 		"subtitle": "Compassion",

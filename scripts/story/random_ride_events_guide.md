@@ -1,5 +1,28 @@
 # Random ride events
 
+## Bayanihan
+
+Bayanihan uses `BAYANIHAN_EVENT_CHANCE` (default 10%) after a completed
+unnamed-passenger ride, once per run, with the same post-Day-2 gate below.
+The due Malasakit epilogue takes priority. Otherwise, one draw allocates each
+available event its configured chance, so only one event plays per result.
+If configured chances total more than 100%, their weights are normalized.
+
+`payloads/events/bayanihan.gd` contains the supplied English script, also used
+as the Tagalog fallback until a translation is supplied. It uses the shared
+background/music and the placeholder Driver portrait. Helping unlocks Bayanihan
+and records `bayanihan_outcome = help`; declining records `decline`. Neither
+choice changes the ride payout, energy, or gas. Helping skips the phase following
+the completed ride, with a warning on the choice: after a morning ride it skips
+noon, leaving night available; after a noon ride it skips night and the results
+screen leads into overnight sleep. It cannot roll after a night ride. Eligibility
+uses the completed ride's time, since the live clock has already advanced.
+The skip and achievement are saved together and cannot repeat on resume; stale
+passenger selections are cleared. Results keep the completed ride's payout and
+offer the correct rest transition for the new time. Replays do not grant the
+achievement or change the saved outcome. The event is registered in the shared
+catalog, so it appears in Memories automatically.
+
 All random events unlock on Day 3 or later, after either choice has completed
 the Day 2 station-bill event (`day_2_station_bill`). This shared gate covers
 Malasakit, its epilogue, and random story pools. Blocked rides do not roll or

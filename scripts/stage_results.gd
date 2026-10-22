@@ -71,7 +71,9 @@ func _render_results(result: Dictionary) -> void:
 	var time_of_day := str(result.get("time_of_day", "morning"))
 	var total := int(result.get("total", 0))
 	var completed := bool(result.get("completed", true))
-	var is_night_stage := time_of_day == "night"
+	var skipped_phase := str(result.get("bayanihan_skipped_phase", ""))
+	var is_night_stage := time_of_day == "night" or skipped_phase == "night"
+	var sleep_after_event := not skipped_phase.is_empty() and PlayerState.get_current_time_of_day() == "night"
 	var has_pending_night_skip := time_of_day == "noon" and PlayerState.has_pending_night_phase_skip()
 	var stage_special_label := PlayerState.get_stage_special_display_name(str(result.get("stage_special_type", "")))
 	var detail_lines: Array[String] = _stringify_detail_lines(result.get("detail_lines", []))
@@ -85,10 +87,12 @@ func _render_results(result: Dictionary) -> void:
 	var rendered_lines: Array[String] = [header_line, ""]
 	for detail_line_variant in detail_lines:
 		rendered_lines.append(str(detail_line_variant))
+	if not skipped_phase.is_empty():
+		rendered_lines.append("Bayanihan: %s turn spent helping." % skipped_phase.capitalize())
 	results_label.text = "\n".join(rendered_lines)
 	_render_earnings_summary(total)
 
-	var allow_rest := is_night_stage or PlayerState.can_rest_after_stage_result(time_of_day, day_number) or has_pending_night_skip
+	var allow_rest := is_night_stage or sleep_after_event or PlayerState.can_rest_after_stage_result(time_of_day, day_number) or has_pending_night_skip
 	rest_button.visible = allow_rest
 	store_button.visible = not is_night_stage and not has_pending_night_skip
 	ride_button.visible = not is_night_stage and not has_pending_night_skip
@@ -100,7 +104,7 @@ func _render_results(result: Dictionary) -> void:
 		ride_button.grab_focus()
 
 	var rest_note := ""
-	if is_night_stage:
+	if is_night_stage or sleep_after_event:
 		rest_note = "Rest: sleep, recover +3 energy, then choose a morning trip."
 	elif allow_rest:
 		if time_of_day == "morning":
@@ -117,7 +121,7 @@ func _rest_then_next_stage() -> void:
 	var result: Dictionary = PlayerState.get_last_stage_result()
 	var result_time := str(result.get("time_of_day", PlayerState.get_current_time_of_day())).strip_edges().to_lower()
 	var result_day := int(result.get("day", PlayerState.get_current_day()))
-	if result_time == "night":
+	if result_time == "night" or (result.has("bayanihan_skipped_phase") and PlayerState.get_current_time_of_day() == "night"):
 		PlayerState.apply_night_rest_bonus()
 		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
 		return

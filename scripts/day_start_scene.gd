@@ -2,10 +2,19 @@ extends Control
 
 const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
+const STORE_SCENE := "res://scenes/store.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
+const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
+const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const ImageOutline := preload("res://scripts/story/story_portrait_outline.gd")
+const HouseCalendar := preload("res://scripts/ui/house_calendar.gd")
+const HouseRadio := preload("res://scripts/ui/house_radio.gd")
+const RIDE_BUTTON_TEXTURE := preload("res://assets/ui/buttons/hub/ride.png")
+const STORE_BUTTON_TEXTURE := preload("res://assets/ui/buttons/hub/store.png")
+const CALENDAR_TEXTURE := preload("res://assets/ui/frames/calendar.png")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const HOME_BGM_PATH := "res://assets/audio/music/story/peace.mp3"
 const HOME_REST_FADE_SECONDS := 0.28
@@ -14,14 +23,21 @@ const HOME_REST_FADE_SECONDS := 0.28
 @onready var fade_overlay: ColorRect = $FadeOverlay
 
 var header_label: Label
+var status_header: PanelContainer
 var stats_row_refs: Dictionary = {}
 var is_transitioning := false
 var bgm_player: AudioStreamPlayer
 var info_overlay: ColorRect
 var info_panel: PanelContainer
+var info_panel_style: StyleBoxFlat
+var calendar_background: TextureRect
+var calendar_content: Control
+var radio_content: Control
 var info_title: Label
 var info_body: Label
 var info_close: Button
+var rest_confirm: Button
+var outside_buttons: Array[TextureButton] = []
 var info_action := ""
 var tutorial_overlay: Control
 var tutorial_highlight: Panel
@@ -72,21 +88,16 @@ func _on_house_action(action: String) -> void:
 		"radio", "calendar":
 			_show_info(action)
 		"rest":
-			_rest_then_noon()
+			_show_info("rest")
 		"ride":
-			_ride_now()
+			_show_info("outside")
 
 
 func _create_hud() -> void:
-	header_label = _label(16)
-	header_label.name = "DayAndTime"
-	add_child(header_label)
-	stats_row_refs = PlayerStatsRow.create({
-		"font": UI_FONT, "font_size": 11,
-		"font_color": Color(0.98, 0.94, 0.82),
-		"outline_color": Color(0.08, 0.06, 0.04),
-	})
-	add_child(stats_row_refs["row"])
+	status_header = HubStatusHeader.new()
+	add_child(status_header)
+	header_label = status_header.day_label
+	stats_row_refs = status_header.stats_refs
 
 
 func _label(font_size: int) -> Label:
@@ -115,6 +126,16 @@ func _create_info_overlay() -> void:
 			get_viewport().set_input_as_handled()
 			_close_info()
 	)
+	calendar_background = TextureRect.new()
+	calendar_background.name = "CalendarBackground"
+	calendar_background.texture = CALENDAR_TEXTURE
+	calendar_background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	calendar_background.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	calendar_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	calendar_background.rotation_degrees = 90
+	calendar_background.hide()
+	info_overlay.add_child(calendar_background)
+	ImageOutline.apply_to(calendar_background)
 	info_panel = PanelContainer.new()
 	info_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var style := StyleBoxFlat.new()
@@ -126,6 +147,7 @@ func _create_info_overlay() -> void:
 	style.content_margin_right = 24
 	style.content_margin_top = 24
 	style.content_margin_bottom = 24
+	info_panel_style = style
 	info_panel.add_theme_stylebox_override("panel", style)
 	info_overlay.add_child(info_panel)
 	var content := VBoxContainer.new()
@@ -145,20 +167,68 @@ func _create_info_overlay() -> void:
 	info_close.add_theme_font_override("font", UI_FONT)
 	info_close.add_theme_font_size_override("font_size", 14)
 	info_close.pressed.connect(_close_info)
-	content.add_child(info_close)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 16)
+	content.add_child(actions)
+	info_close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	actions.add_child(info_close)
+	rest_confirm = Button.new()
+	rest_confirm.name = "ConfirmRest"
+	rest_confirm.custom_minimum_size.y = 46
+	rest_confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rest_confirm.add_theme_font_override("font", UI_FONT)
+	rest_confirm.add_theme_font_size_override("font_size", 14)
+	rest_confirm.pressed.connect(_confirm_rest)
+	rest_confirm.hide()
+	actions.add_child(rest_confirm)
+	for destination in [["Ride", RIDE_SELECTION_SCENE, RIDE_BUTTON_TEXTURE], ["Shop", STORE_SCENE, STORE_BUTTON_TEXTURE]]:
+		var button := TextureButton.new()
+		button.tooltip_text = destination[0]
+		button.texture_normal = destination[2]
+		button.ignore_texture_size = true
+		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		button.custom_minimum_size.y = 150
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.pressed.connect(_choose_outside_destination.bind(destination[1]))
+		button.hide()
+		actions.add_child(button)
+		ButtonGlow.attach(self, button)
+		outside_buttons.append(button)
+	calendar_content = HouseCalendar.new()
+	calendar_content.hide()
+	info_overlay.add_child(calendar_content)
+	calendar_content.closed.connect(_close_info)
+	radio_content = HouseRadio.new()
+	radio_content.hide()
+	info_overlay.add_child(radio_content)
+	radio_content.closed.connect(_close_info)
 
 
 func _layout_ui() -> void:
 	if header_label == null:
 		return
-	header_label.position = Vector2(20, 16)
-	header_label.size = Vector2(size.x - 40, 32)
-	var stats: Control = stats_row_refs["row"]
-	stats.position = Vector2(20, 52)
-	stats.size = Vector2(size.x - 40, 28)
-	info_body.custom_minimum_size.x = minf(700, size.x - 48) - 48
-	info_panel.size = Vector2(minf(700, size.x - 48), minf(420, size.y - 64))
-	info_panel.position = (size - info_panel.size) * 0.5
+	status_header.layout_in(size)
+	var content_origin := Vector2(0, HubStatusHeader.CONTENT_TOP)
+	var content_size := size - content_origin - Vector2(0, 16)
+	if info_action == "calendar":
+		var aspect := float(CALENDAR_TEXTURE.get_height()) / CALENDAR_TEXTURE.get_width()
+		var height := minf(content_size.y, (size.x - 48) / aspect)
+		var calendar_size := Vector2(height * aspect, height)
+		calendar_background.size = Vector2(calendar_size.y, calendar_size.x)
+		calendar_background.position = content_origin + (content_size - calendar_size) * 0.5 + Vector2(calendar_size.x, 0)
+		calendar_content.position = content_origin + (content_size - calendar_size) * 0.5
+		calendar_content.scale = calendar_size / HouseCalendar.DESIGN_SIZE
+	elif info_action == "radio":
+		var radio_scale := minf(1.15, minf((size.x - 48) / HouseRadio.DESIGN_SIZE.x, content_size.y / HouseRadio.DESIGN_SIZE.y))
+		radio_content.scale = Vector2.ONE * radio_scale
+		radio_content.position = content_origin + (content_size - HouseRadio.DESIGN_SIZE * radio_scale) * 0.5
+	else:
+		info_panel.add_theme_stylebox_override("panel", info_panel_style)
+		info_body.custom_minimum_size.x = minf(700, size.x - 48) - 48
+		info_panel.size = Vector2(minf(700, size.x - 48), minf(380 if info_action == "outside" else 420, content_size.y))
+	info_panel.position = content_origin + (content_size - info_panel.size) * 0.5
 	if tutorial_active:
 		_show_tutorial_step(tutorial_step_index)
 
@@ -166,8 +236,7 @@ func _layout_ui() -> void:
 func _render_day_start() -> void:
 	var current_time := PlayerState.get_current_time_of_day()
 	house.set_night(current_time == "night")
-	PlayerStatsRow.refresh(stats_row_refs)
-	header_label.text = "DAY %d / %s" % [PlayerState.get_current_day(), current_time.capitalize()]
+	status_header.refresh()
 	var rest_note := "Rest: recover +2 energy and move to noon."
 	if current_time == "noon":
 		rest_note = "Rest: recover +2 energy and move to night."
@@ -178,31 +247,80 @@ func _render_day_start() -> void:
 
 func _show_info(action: String) -> void:
 	info_action = action
-	if action == "radio":
-		info_title.text = "RADIO / DAILY NEWS"
-		info_body.text = PlayerState.get_daily_news_text()
-	else:
-		info_title.text = "CALENDAR"
-		info_body.text = "WEEKLY GOAL: PhP %d\n\nDebt remaining: PhP %d\n\n%s" % [PlayerState.get_current_weekly_goal(), PlayerState.get_total_debt_goal(), PlayerState.get_debt_due_text()]
+	calendar_background.visible = action == "calendar"
+	calendar_content.visible = action == "calendar"
+	radio_content.visible = action == "radio"
+	info_panel.visible = action not in ["calendar", "radio"]
+	info_close.visible = action != "outside"
+	for button in outside_buttons:
+		button.visible = action == "outside"
+	rest_confirm.visible = action == "rest"
+	info_close.text = "NO" if action == "rest" else "CLOSE"
+	if action == "outside":
+		info_title.text = "GO OUTSIDE"
+		info_body.text = "Where would you like to go?\n\nPress Esc or click outside to stay home."
+	elif action == "rest":
+		var phase := PlayerState.get_current_time_of_day()
+		info_title.text = "SLEEP UNTIL MORNING?" if phase == "night" else "REST NOW?"
+		rest_confirm.text = "YES, SLEEP" if phase == "night" else "YES, REST"
+		if phase == "night":
+			info_body.text = "Recover up to 3 energy and advance to Day %d, morning." % (PlayerState.get_current_day() + 1)
+		else:
+			info_body.text = "Recover up to 2 energy and advance to %s." % ("noon" if phase == "morning" else "night")
+	elif action == "radio":
+		radio_content.refresh()
+	elif action == "calendar":
+		calendar_content.refresh()
 	house.set_enabled(false)
 	info_overlay.show()
 	_layout_ui()
-	info_close.grab_focus()
+	if action == "calendar":
+		calendar_content.close_button.grab_focus()
+	elif action == "radio":
+		radio_content.close_button.grab_focus()
+	elif action == "outside":
+		outside_buttons[0].grab_focus()
+	else:
+		info_close.grab_focus()
 
 
 func _close_info() -> void:
 	info_overlay.hide()
+	calendar_content.close_button.release_focus()
+	radio_content.close_button.release_focus()
 	info_close.release_focus()
+	rest_confirm.release_focus()
+	for button in outside_buttons:
+		button.release_focus()
+	info_action = ""
 	house.set_enabled(not is_transitioning and not tutorial_active)
 
 
+func _confirm_rest() -> void:
+	if is_transitioning or not info_overlay.visible or info_action != "rest":
+		return
+	_close_info()
+	_rest_then_noon()
+
+
 func _ride_now() -> void:
+	_leave_home(RIDE_SELECTION_SCENE)
+
+
+func _choose_outside_destination(scene_path: String) -> void:
+	if is_transitioning or not info_overlay.visible or info_action != "outside":
+		return
+	_close_info()
+	_leave_home(scene_path)
+
+
+func _leave_home(scene_path: String) -> void:
 	if is_transitioning:
 		return
 	is_transitioning = true
 	house.set_enabled(false)
 	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
-	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
+	get_tree().change_scene_to_file(scene_path)
 
 
 func _rest_then_noon() -> void:
@@ -314,7 +432,7 @@ func _build_tutorial() -> void:
 		{"text": "Click the radio for today's news, gas prices and weather forecast.", "targets": [house.buttons["radio"]]},
 		{"text": "Click the calendar to check your weekly goal, remaining debt and due date.", "targets": [house.buttons["calendar"]]},
 		{"text": "Click the curtained sleeping area to rest. Hover over it to see the energy recovery and time change.", "targets": [house.buttons["rest"]]},
-		{"text": "Click the bottom-right exit to leave the house.", "targets": [house.buttons["ride"]]},
+		{"text": "Click the bottom-right exit, then choose Ride or Shop.", "targets": [house.buttons["ride"]]},
 	]
 
 

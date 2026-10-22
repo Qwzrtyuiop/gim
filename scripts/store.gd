@@ -7,7 +7,7 @@ const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
-const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
+const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const STORE_BGM_PATH := "res://assets/audio/music/menus/store.mp3"
@@ -24,6 +24,7 @@ const BUY_BUTTON_PRESSED_BG := Color(0.36, 0.53, 0.30, 0.98)
 const BUY_BUTTON_DISABLED_BG := Color(0.42, 0.37, 0.32, 0.86)
 const BUY_BUTTON_BORDER := Color(0.20, 0.12, 0.07, 0.96)
 const StoreItemCatalog := preload("res://scripts/store/store_item_catalog.gd")
+const StoreStreetView := preload("res://scripts/ui/store_street_view.gd")
 
 @onready var money_label: Label = $MoneyLabel
 @onready var status_label: Label = $StatusLabel
@@ -35,6 +36,7 @@ const StoreItemCatalog := preload("res://scripts/store/store_item_catalog.gd")
 
 var ride_confirm_dialog: ConfirmationDialog
 var stats_row_refs: Dictionary = {}
+var status_header: PanelContainer
 var bgm_player: AudioStreamPlayer
 var store_item_rows: Array[Control] = []
 var store_buy_buttons: Array[BaseButton] = []
@@ -46,22 +48,28 @@ var tutorial_step_index := 0
 var tutorial_steps: Array[Dictionary] = []
 var tutorial_active := false
 var tutorial_disabled_controls: Dictionary = {}
+var street: Control
+var shop_overlay: ColorRect
+var owner_panel: Panel
+var owner_portrait: TextureRect
+var active_category := ""
+var is_transitioning := false
 
 
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/store.tscn")
 	PlayerState.ensure_daily_conditions_for_current_day()
 	_create_stats_row()
-	_configure_home_button()
-	back_button.pressed.connect(_go_home)
-	ride_button.pressed.connect(_attempt_ride)
+	_create_street()
+	back_button.pressed.connect(_close_shop)
 	ButtonGlow.attach(self, back_button)
-	ButtonGlow.attach(self, ride_button)
 	_start_store_bgm()
 	_create_dialogs()
 	_build_items()
 	_refresh_header()
 	_build_tutorial()
+	resized.connect(_layout_store)
+	_layout_store()
 	if not PlayerState.has_store_tutorial_shown():
 		call_deferred("_start_tutorial")
 
@@ -72,20 +80,137 @@ func _input(event: InputEvent) -> void:
 		# Consume the press here so the final step cannot also buy or navigate.
 		get_viewport().set_input_as_handled()
 		_advance_tutorial()
+	elif shop_overlay.visible and event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_close_shop()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if tutorial_active:
+	if tutorial_active or is_transitioning:
 		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
-	if event.is_action_pressed("ui_accept"):
-		if back_button.visible and back_button.has_focus():
-			_go_home()
-		elif ride_button.has_focus():
-			_attempt_ride()
-	elif event.is_action_pressed("ui_cancel") and back_button.visible:
-		_go_home()
+
+
+func _create_street() -> void:
+	$Background.hide()
+	$Shade.hide()
+	ride_button.hide()
+	street = StoreStreetView.new()
+	add_child(street)
+	move_child(street, 0)
+	street.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	street.action_pressed.connect(_on_street_action)
+	shop_overlay = ColorRect.new()
+	shop_overlay.name = "ShopOverlay"
+	shop_overlay.color = Color(0, 0, 0, 0.55)
+	shop_overlay.z_index = 10
+	add_child(shop_overlay)
+	shop_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shop_overlay.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			get_viewport().set_input_as_handled()
+			_close_shop()
+	)
+	for node in [$Panel, $Title, money_label, $ItemScroll, status_label, back_button]:
+		node.reparent(shop_overlay, false)
+	shop_overlay.get_node("Panel").mouse_filter = Control.MOUSE_FILTER_STOP
+	owner_panel = Panel.new()
+	owner_panel.name = "OwnerPanel"
+	owner_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	owner_panel.clip_contents = true
+	owner_panel.add_theme_stylebox_override("panel", shop_overlay.get_node("Panel").get_theme_stylebox("panel").duplicate())
+	shop_overlay.add_child(owner_panel)
+	owner_portrait = TextureRect.new()
+	owner_portrait.name = "OwnerPortrait"
+	owner_portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	owner_portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	owner_portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	owner_portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owner_panel.add_child(owner_portrait)
+	back_label.text = "CLOSE"
+	back_button.tooltip_text = "Return to the street"
+	back_button.custom_minimum_size = Vector2.ZERO
+	money_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	shop_overlay.hide()
+	fade_overlay.z_index = 300
+
+
+func _layout_store() -> void:
+	status_header.layout_in(size)
+	var margin := size.x * 0.04
+	var gap := size.x * 0.025
+	var available_width := size.x - margin * 2 - gap
+	var owner_width := available_width * 0.28
+	owner_panel.position = Vector2(margin, HubStatusHeader.CONTENT_TOP)
+	owner_panel.size = Vector2(owner_width, size.y - HubStatusHeader.CONTENT_TOP - 32)
+	owner_portrait.position = Vector2(12, 12)
+	owner_portrait.size = owner_panel.size - Vector2(24, 24)
+	var panel_rect := Rect2(margin + owner_width + gap, HubStatusHeader.CONTENT_TOP, available_width - owner_width, size.y - HubStatusHeader.CONTENT_TOP - 32)
+	var title := shop_overlay.get_node("Title") as Label
+	title.label_settings.font_size = 16 if size.x >= 1100 else 12
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.label_settings.font_size = 11
+	money_label.label_settings.font_size = 11
+	var placements := {
+		"Panel": panel_rect,
+		"Title": Rect2(panel_rect.position + Vector2(132, 14), Vector2(panel_rect.size.x - 264, 42)),
+		"MoneyLabel": Rect2(panel_rect.position + Vector2(24, 62), Vector2(panel_rect.size.x - 48, 36)),
+		"ItemScroll": Rect2(panel_rect.position + Vector2(24, 110), panel_rect.size - Vector2(48, 166)),
+		"StatusLabel": Rect2(panel_rect.position + Vector2(24, panel_rect.size.y - 50), Vector2(panel_rect.size.x - 48, 44)),
+		"BackButton": Rect2(panel_rect.position + Vector2(panel_rect.size.x - 132, 0), Vector2(120, 74)),
+	}
+	for node_name: String in placements:
+		var control := shop_overlay.get_node(node_name) as Control
+		control.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		control.position = placements[node_name].position
+		control.size = placements[node_name].size
+	if tutorial_active:
+		_show_tutorial_step(tutorial_step_index)
+
+
+func _on_street_action(action: String) -> void:
+	if tutorial_active or shop_overlay.visible or is_transitioning:
+		return
+	match action:
+		"home": _go_home()
+		"station": _ride()
+		"tricycle", "food": _open_shop(action)
+
+
+func _open_shop(category: String) -> void:
+	active_category = category
+	for index in range(store_item_rows.size()):
+		var item: Dictionary = StoreItemCatalog.ITEMS[index]
+		store_item_rows[index].visible = (item["type"] in ["upgrade", "gas"]) if category == "tricycle" else item["type"] == "energy"
+	shop_overlay.get_node("Title").text = "LITO'S AUTO SUPPLY" if category == "tricycle" else "MANG EDDIE'S"
+	_refresh_owner_portrait()
+	(shop_overlay.get_node("ItemScroll") as ScrollContainer).scroll_vertical = 0
+	status_label.text = "Choose an item."
+	_refresh_header()
+	street.set_enabled(false)
+	shop_overlay.show()
+	_layout_store()
+	back_button.grab_focus()
+
+
+func _refresh_owner_portrait() -> void:
+	owner_portrait.texture = null
+	var config: Dictionary = GameTuning.STORE_OWNER_PORTRAITS.get(active_category, {})
+	owner_portrait.flip_h = bool(config.get("flip_h", false))
+	var path := str(config.get("path", "")).strip_edges()
+	if not path.is_empty() and ResourceLoader.exists(path):
+		owner_portrait.texture = load(path) as Texture2D
+	owner_portrait.visible = owner_portrait.texture != null
+
+
+func _close_shop() -> void:
+	shop_overlay.hide()
+	back_button.release_focus()
+	for button in store_buy_buttons:
+		button.release_focus()
+	active_category = ""
+	street.set_enabled(not tutorial_active and not is_transitioning)
 
 
 func _build_items() -> void:
@@ -105,8 +230,8 @@ func _build_items() -> void:
 		row_margin.add_theme_constant_override("margin_bottom", 12)
 		row_frame.add_child(row_margin)
 
-		var row := HBoxContainer.new()
-		row.add_theme_constant_override("separation", 14)
+		var row := VBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
 		row_margin.add_child(row)
 
 		var label := RichTextLabel.new()
@@ -115,9 +240,9 @@ func _build_items() -> void:
 		label.fit_content = true
 		label.scroll_active = false
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.custom_minimum_size = Vector2(0.0, 74.0)
+		label.custom_minimum_size = Vector2(0.0, 48.0)
 		label.add_theme_font_override("normal_font", UI_FONT)
-		label.add_theme_font_size_override("normal_font_size", 14)
+		label.add_theme_font_size_override("normal_font_size", 12)
 		label.add_theme_color_override("default_color", Color(0.24, 0.16, 0.10, 1.0))
 		label.add_theme_color_override("font_outline_color", Color(0.95, 0.92, 0.84, 0.92))
 		label.add_theme_constant_override("outline_size", 1)
@@ -125,17 +250,22 @@ func _build_items() -> void:
 		label.text = _item_text(item)
 		row.add_child(label)
 
+		var actions := HBoxContainer.new()
+		row.add_child(actions)
 		var tier_container := _make_tier_bars(item)
-		row.add_child(tier_container)
+		actions.add_child(tier_container)
+		var spacer := Control.new()
+		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		actions.add_child(spacer)
 
 		var button := Button.new()
-		button.custom_minimum_size = Vector2(145.0, 48.0)
+		button.custom_minimum_size = Vector2(120.0, 40.0)
 		button.text = "BUY"
 		_apply_button_font(button)
 		_apply_store_buy_button_style(button)
 		UIAudioManager.attach_button(button)
 		button.pressed.connect(_buy_item.bind(item, label, tier_container, button))
-		row.add_child(button)
+		actions.add_child(button)
 		store_item_rows.append(row_frame)
 		store_buy_buttons.append(button)
 
@@ -165,6 +295,8 @@ func _item_text(item: Dictionary) -> String:
 
 
 func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
+	if tutorial_active or not shop_overlay.visible or is_transitioning:
+		return
 	if item["type"] == "upgrade":
 		var current_level := PlayerState.get_upgrade_level(item["id"])
 		if current_level >= int(item["max_level"]):
@@ -213,6 +345,8 @@ func _refresh_header() -> void:
 		PlayerState.get_gas_price_text(),
 		String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
 	]
+	if active_category == "food":
+		money_label.text = "Food and energy"
 
 
 func _start_store_bgm() -> void:
@@ -227,6 +361,10 @@ func _start_store_bgm() -> void:
 
 
 func _ride() -> void:
+	if is_transitioning:
+		return
+	is_transitioning = true
+	street.set_enabled(false)
 	if PlayerState.has_locked_pending_trip_selection():
 		PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
 		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
@@ -237,6 +375,10 @@ func _ride() -> void:
 
 
 func _go_home() -> void:
+	if is_transitioning:
+		return
+	is_transitioning = true
+	street.set_enabled(false)
 	# Visiting home does not consume the current time slot or reroll its passengers.
 	PlayerState.set_pending_trip_selection(HOME_SCENE, PlayerState.get_home_ride_transition_mode())
 	get_tree().change_scene_to_file(HOME_SCENE)
@@ -339,21 +481,9 @@ func _make_label_settings(font_size: int, color: Color) -> LabelSettings:
 
 
 func _create_stats_row() -> void:
-	stats_row_refs = PlayerStatsRow.create({
-		"font": UI_FONT,
-		"font_size": 12,
-		"font_color": Color(0.24, 0.16, 0.10, 1.0),
-		"outline_color": Color(0.95, 0.92, 0.84, 0.92),
-	})
-	var stats_row := stats_row_refs["row"] as HBoxContainer
-	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_row.layout_mode = 1
-	stats_row.anchors_preset = 10
-	stats_row.anchor_right = 1.0
-	stats_row.offset_top = 118.0
-	stats_row.offset_bottom = 146.0
-	stats_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	add_child(stats_row)
+	status_header = HubStatusHeader.new()
+	add_child(status_header)
+	stats_row_refs = status_header.stats_refs
 
 
 func _configure_home_button() -> void:
@@ -374,7 +504,7 @@ func _refresh_stats_row() -> void:
 	if stats_row_refs.is_empty():
 		return
 
-	PlayerStatsRow.refresh(stats_row_refs)
+	status_header.refresh()
 
 
 func _build_tutorial() -> void:
@@ -434,26 +564,20 @@ func _build_tutorial() -> void:
 		"targets": stats_targets,
 	})
 	tutorial_steps.append({
-		"text": "This is the store list. Upgrades improve the vehicle, food restores energy, and gas adds %s%%." % String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
-		"targets": [item_list],
+		"text": "Click Lito's counter for tricycle upgrades and gas. Each item shows its price and effect; press BUY to purchase it.",
+		"targets": [street.buttons["tricycle"]],
 	})
-	if not store_item_rows.is_empty():
-		tutorial_steps.append({
-			"text": "Each row shows the item name, price, effect, and upgrade level when it has one.",
-			"targets": [store_item_rows[0]],
-		})
-	if not store_buy_buttons.is_empty():
-		tutorial_steps.append({
-			"text": "Press BUY to spend money on that item. Disabled buttons mean the item is maxed or already full.",
-			"targets": [store_buy_buttons[0]],
-		})
 	tutorial_steps.append({
 		"text": "Gas price changes by day. One gas can always fills %s%% of the tank." % String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
-		"targets": [money_label],
+		"targets": [street.buttons["tricycle"]],
 	})
 	tutorial_steps.append({
-		"text": "HOME returns to the house screen. RIDE opens passenger selection.",
-		"targets": [ride_button, back_button],
+		"text": "Click Mang Eddie's counter for food and energy items. Close either shop to return to this street.",
+		"targets": [street.buttons["food"]],
+	})
+	tutorial_steps.append({
+		"text": "Go left to return home, or right to the station to choose a passenger. Walking between them does not use a turn.",
+		"targets": [street.buttons["home"], street.buttons["station"]],
 	})
 
 
@@ -499,6 +623,7 @@ func _set_tutorial_active(is_active: bool) -> void:
 	controls.append_array(store_buy_buttons)
 	TutorialOverlayHelper.set_overlay_visible(is_active, tutorial_overlay, tutorial_text_panel, tutorial_text_label)
 	TutorialOverlayHelper.set_buttons_disabled(is_active, controls, tutorial_disabled_controls)
+	street.set_enabled(not is_active and not shop_overlay.visible and not is_transitioning)
 
 
 func _end_tutorial() -> void:

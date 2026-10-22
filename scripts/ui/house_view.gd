@@ -18,7 +18,7 @@ const TOOLTIPS := {
 	"radio": "Radio: news and weather forecast",
 	"calendar": "Calendar: weekly goal, debt and due date",
 	"rest": "Rest",
-	"ride": "Go out: choose a passenger",
+	"ride": "Go outside: Ride or Shop",
 }
 
 class HotspotButton:

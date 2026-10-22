@@ -8,6 +8,8 @@ const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 static func run(owner, action_data: Dictionary) -> void:
 	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
 	match action_type:
+		"resolve_bayanihan":
+			RandomRideEventService.resolve_bayanihan(PlayerState, owner.story_payload, str(action_data.get("outcome", "")))
 		"show_weekly_debt_transition":
 			await owner._show_weekly_debt_transition()
 		"hide_weekly_debt_transition":

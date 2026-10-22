@@ -3,6 +3,7 @@ extends RefCounted
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
 const CONSUMED_KEY := "random_ride:malasakit"
+const BAYANIHAN_CONSUMED_KEY := "random_ride:bayanihan"
 const EPILOGUE_CONSUMED_KEY := "random_ride:malasakit_epilogue"
 const WAIVED_EARNINGS_KEY := "malasakit_waived_earnings"
 const REPAID_KEY := "malasakit_repaid"
@@ -28,13 +29,17 @@ static func prepare(state) -> Dictionary:
 		return {}
 	var character: Dictionary = state.get_character_by_id(str(result.get("character_id", "")))
 	var is_generic := bool(character.get("is_generic", false))
-	var eligible := is_generic and not bool(state.consumed_story_triggers.get(CONSUMED_KEY, false))
 	var payload: Dictionary = {}
+	var selected_id := ""
+	# One draw gives each available event its configured probability, while
+	# guaranteeing at most one story per ride. The due epilogue has priority.
+	if is_generic and not epilogue_is_due(state):
+		selected_id = select_random_event(state, state.rng.randf())
 	if is_generic and epilogue_is_due(state):
 		payload = StoryPayloadCatalog.build("malasakit_epilogue")
 		payload["original_ride_earnings"] = state.event_values[WAIVED_EARNINGS_KEY].duplicate(true)
 		state.consumed_story_triggers[EPILOGUE_CONSUMED_KEY] = true
-	elif eligible and state.rng.randf() < clampf(GameTuning.MALASAKIT_EVENT_CHANCE, 0.0, 1.0):
+	elif selected_id == "malasakit":
 		payload = StoryPayloadCatalog.build("malasakit")
 		# Keep the exact post-modifier/penalty payout, even across save/resume.
 		result["original_ride_earnings"] = {
@@ -45,6 +50,9 @@ static func prepare(state) -> Dictionary:
 		result["random_ride_event"] = "malasakit"
 		payload["original_ride_earnings"] = result["original_ride_earnings"].duplicate(true)
 		state.consumed_story_triggers[CONSUMED_KEY] = true
+	elif selected_id == "bayanihan":
+		payload = StoryPayloadCatalog.build("bayanihan")
+		state.consumed_story_triggers[BAYANIHAN_CONSUMED_KEY] = true
 	if not payload.is_empty():
 		result["random_story_id"] = payload["story_id"]
 		payload["return_scene"] = RESULTS_SCENE
@@ -53,6 +61,47 @@ static func prepare(state) -> Dictionary:
 	state.save_progress()
 	state._end_state_batch()
 	return payload
+
+
+static func select_random_event(state, roll: float) -> String:
+	# Events belong to the ride that just ended. The live clock has already
+	# advanced, so a noon ride is eligible even though the next phase is night.
+	var completed_phase: String = str(state.last_stage_result.get("time_of_day", state.get_current_time_of_day()))
+	var chances := {
+		"malasakit": 0.0 if state.consumed_story_triggers.get(CONSUMED_KEY, false) else clampf(GameTuning.MALASAKIT_EVENT_CHANCE, 0.0, 1.0),
+		"bayanihan": 0.0 if state.consumed_story_triggers.get(BAYANIHAN_CONSUMED_KEY, false) or completed_phase == "night" else clampf(GameTuning.BAYANIHAN_EVENT_CHANCE, 0.0, 1.0),
+	}
+	# If edited chances exceed 100% together, normalize their relative weights.
+	var total: float = chances["malasakit"] + chances["bayanihan"]
+	var threshold := 0.0
+	for story_id: String in chances:
+		threshold += float(chances[story_id]) / maxf(1.0, total)
+		if roll < threshold:
+			return story_id
+	return ""
+
+
+static func resolve_bayanihan(state, story_payload: Dictionary, outcome: String) -> void:
+	if bool(story_payload.get("replay", story_payload.get("memory_replay", false))):
+		return
+	if story_payload.get("story_id", "") != "bayanihan" or outcome not in ["help", "decline"]:
+		return
+	if state.event_values.has("bayanihan_outcome"):
+		return
+	state._begin_state_batch()
+	state.set_event_value("bayanihan_outcome", outcome)
+	if outcome == "help":
+		var phase: String = state.get_current_time_of_day()
+		# The completed ride already advanced the clock. Spend the next phase:
+		# morning ride -> skip noon; noon ride -> skip night and finish the day
+		# through the existing results/sleep flow.
+		state.last_stage_result["bayanihan_skipped_phase"] = phase
+		if phase != "night":
+			state.set_current_stage_time("noon" if phase == "morning" else "night")
+		state.clear_pending_trip_selection()
+		state.unlock_achievement("bayanihan")
+	state.save_progress()
+	state._end_state_batch()
 
 
 static func resolve_fare(state, story_payload: Dictionary, outcome: String) -> void:
