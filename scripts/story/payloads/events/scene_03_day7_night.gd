@@ -94,7 +94,7 @@ static func build() -> Dictionary:
 			"text": "Nice place. Easy to find, too.",
 		},
 		{
-			"text": "He glances past my shoulder, taking in the room like he already owns a part of it.",
+			"text": "He glances past my shoulder, looking around the room like he already owns a part of it.",
 		},
 		{
 			"speaker": "Collector",
@@ -114,7 +114,7 @@ static func build() -> Dictionary:
 			"text": "I leave them at the door and go back inside.",
 		},
 		{
-			"text": "My wallet waits on the table like it knows exactly how light it is.",
+			"text": "My wallet waits on the table.",
 		},
 	]
 
@@ -136,12 +136,12 @@ static func build() -> Dictionary:
 			"text": "I think about every passenger who told me to hurry, every meter of gas, every peso that left faster than it came in.",
 		},
 		{
-			"text": "The bill I returned on my second day comes back to me for a moment.",
+			"text": "I remember yhe bill I returned on my second day.",
 			"required_achievements": ["tapat"],
 		},
 		{
 			"speaker": "John Toda",
-			"text": "Doing the right thing still has a cost.",
+			"text": "I guess even doing the right thing still has a cost.",
 			"required_achievements": ["tapat"],
 		},
 		{
@@ -150,13 +150,13 @@ static func build() -> Dictionary:
 		},
 		{
 			"speaker": "John Toda",
-			"text": "Even the easy money didn't feel easy for long.",
+			"text": "This is Karma, I guess.",
 			"required_achievements": ["mapagsamantala"],
 		},
 		{
 			"background": StoryConstants.BACKGROUND_INHOUSE_NIGHT,
 			"background_fade": 0.22,
-			"text": "I put the payment in his hand.",
+			"text": "I put the payment in his hand. Bills first, then the coins.",
 			"actions": [
 				{
 					"type": "collect_debt",
@@ -239,7 +239,7 @@ static func build() -> Dictionary:
 		{
 			"background": StoryConstants.BACKGROUND_LOWANGLE_HOUSE,
 			"background_fade": 0.18,
-			"text": "The floor hits my shoulder before I understand I have fallen.",
+			"text": "I fall to the floor with a painful thud.",
 		},
 	])
 	var no_interest_end_index: int = composition.size() - 1
@@ -286,7 +286,7 @@ static func build() -> Dictionary:
 		{
 			"background": StoryConstants.BACKGROUND_LOWANGLE_HOUSE,
 			"background_fade": 0.18,
-			"text": "The floor hits back in a raw thud.",
+			"text": "I fall to the floor with a painful thud.",
 		},
 	])
 	var not_enough_end_index: int = composition.size() - 1
@@ -325,7 +325,7 @@ static func build() -> Dictionary:
 			"text": "I'm okay.",
 		},
 		{
-			"text": "No one is there to believe me.",
+			"text": "...",
 		},
 		{
 			"text": "I wipe the blood from my mouth with the back of my hand.",
@@ -340,7 +340,7 @@ static func build() -> Dictionary:
 
 	var finish_index: int = composition.size()
 	composition.append({
-		"text": "The television is still talking inside.",
+		"text": "The sound of the television drowns whatever was on my mind.",
 		"pause_after": 0.8,
 		"actions": [
 			{
