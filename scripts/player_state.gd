@@ -149,6 +149,7 @@ var pending_skip_night_phase := false
 var current_mock_character_id := ""
 var seen_mock_characters: Dictionary = {}
 var unique_character_progress: Dictionary = {}
+var character_completed_rides: Dictionary = {}
 var locked_unique_character_stories: Dictionary = {}
 var consumed_unique_session_dialogue: Dictionary = {}
 var seeded_rider_rules: Array[Dictionary] = []
@@ -948,6 +949,14 @@ func get_character_by_id(character_id: String) -> Dictionary:
 	return StoryCatalog.get_character_by_id(self, character_id)
 
 
+func get_character_display_name(character_id: String) -> String:
+	return StoryCatalog.get_character_display_name(self, character_id)
+
+
+func get_speaker_display_name(speaker: String) -> String:
+	return StoryCatalog.get_speaker_display_name(self, speaker)
+
+
 func get_generic_passengers() -> Array:
 	return StoryCatalog.get_generic_passengers()
 
@@ -1087,6 +1096,7 @@ func record_store_purchase(item_type: String) -> void:
 
 func record_stage_completion() -> void:
 	if is_unique_character(current_mock_character_id):
+		character_completed_rides[current_mock_character_id] = maxi(0, int(character_completed_rides.get(current_mock_character_id, 0))) + 1
 		increment_unique_character_progress(current_mock_character_id)
 	AchievementService.record_stage_completion(self)
 

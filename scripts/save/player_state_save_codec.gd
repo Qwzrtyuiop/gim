@@ -86,6 +86,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	player_state.current_mock_character_id = str(save_data.get("current_mock_character_id", player_state.current_mock_character_id))
 	player_state.seen_mock_characters = Dictionary(save_data.get("seen_mock_characters", {})).duplicate(true)
 	player_state.unique_character_progress = Dictionary(save_data.get("unique_character_progress", {})).duplicate(true)
+	# Older saves tracked completed rides through story progress only.
+	player_state.character_completed_rides = Dictionary(save_data.get("character_completed_rides", player_state.unique_character_progress)).duplicate(true)
 	player_state.locked_unique_character_stories = Dictionary(save_data.get("locked_unique_character_stories", {})).duplicate(true)
 	player_state.consumed_unique_session_dialogue = Dictionary(save_data.get("consumed_unique_session_dialogue", {})).duplicate(true)
 	player_state.seeded_rider_rules.clear()
@@ -199,6 +201,7 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"current_mock_character_id": player_state.current_mock_character_id,
 		"seen_mock_characters": player_state.seen_mock_characters.duplicate(true),
 		"unique_character_progress": player_state.unique_character_progress.duplicate(true),
+		"character_completed_rides": player_state.character_completed_rides.duplicate(true),
 		"locked_unique_character_stories": player_state.locked_unique_character_stories.duplicate(true),
 		"consumed_unique_session_dialogue": player_state.consumed_unique_session_dialogue.duplicate(true),
 		"seeded_rider_rules": player_state.seeded_rider_rules.duplicate(true),

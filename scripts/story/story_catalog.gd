@@ -2,6 +2,27 @@ extends RefCounted
 class_name StoryCatalog
 
 const StoryCatalogData := preload("res://scripts/story/story_catalog_data.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
+
+static func get_character_display_name(player_state, character_id: String) -> String:
+	var character: Dictionary = get_character_by_id(player_state, character_id)
+	if character.is_empty():
+		return "???"
+	var safe_id: String = str(character.get("id", ""))
+	var name_unlock_event: String = str(character.get("name_unlock_event", ""))
+	if not name_unlock_event.is_empty():
+		return str(character.get("name", "???")) if bool(player_state.event_values.get(name_unlock_event, false)) else "???"
+	if is_unique_character(safe_id) and int(player_state.character_completed_rides.get(safe_id, 0)) < GameTuning.CHARACTER_NAME_UNLOCK_RIDES:
+		return "???"
+	return str(character.get("name", "???"))
+
+
+static func get_speaker_display_name(player_state, speaker: String) -> String:
+	for character: Dictionary in StoryCatalogData.MOCK_CHARACTERS:
+		if str(character.get("name", "")).to_lower() == speaker.strip_edges().to_lower():
+			return get_character_display_name(player_state, str(character["id"]))
+	return speaker
 
 static func get_generic_passengers() -> Array:
 	return StoryCatalogData.GENERIC_PASSENGERS.duplicate(true)

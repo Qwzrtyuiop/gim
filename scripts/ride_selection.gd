@@ -256,7 +256,7 @@ func _refresh_character_cards() -> void:
 		var stage_special_display := _card_special_badge_text(str(character.get("stage_special_type", "")))
 		panel.modulate = Color.WHITE
 		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d\nGas Est: ~%.1f%%\nRisk: %s" % [
-			str(character["name"]).to_upper(),
+			PlayerState.get_character_display_name(str(character.get("id", ""))).to_upper(),
 			preview_stage_type,
 			PlayerState.estimate_stage_earnings(preview_stage_type, str(character.get("id", ""))),
 			PlayerState.estimate_stage_gas_usage(preview_stage_type),

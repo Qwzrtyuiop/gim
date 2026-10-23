@@ -1,6 +1,7 @@
 extends RefCounted
 
 const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
+const JessaFareEvent := preload("res://scripts/story/jessa_fare_event.gd")
 const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 const BACKGROUND_INHOUSE := "res://assets/story/backgrounds/locations/inhouse.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/locations/station.png"
@@ -91,6 +92,7 @@ static func build_memory_payload(memory_id: String, return_scene: String) -> Dic
 	payload["next_scene"] = return_scene
 	payload["replay"] = true
 	payload["memory_replay"] = true
+	JessaFareEvent.apply_saved_fare(PlayerState, payload)
 	payload.erase("prepare_stage_start")
 	payload.erase("stage_descriptor")
 	return payload

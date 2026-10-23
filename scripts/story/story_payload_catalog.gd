@@ -18,6 +18,16 @@ const STORIES := {
 		"tagalog": preload("res://scripts/story/payloads/characters/benny/benny_class_clown_tagalog.gd"),
 		"title": "Class Clown", "subtitle": "Benny asks John what happened in the city.",
 	},
+	"elena_old_acquaintance": {
+		"english": preload("res://scripts/story/payloads/characters/elena/elena_old_acquaintance.gd"),
+		"tagalog": preload("res://scripts/story/payloads/characters/elena/elena_old_acquaintance_tagalog.gd"),
+		"title": "An Old Acquaintance", "subtitle": "An old acquaintance asks John about his father.",
+	},
+	"jessa_runaway_fare": {
+		"english": preload("res://scripts/story/payloads/characters/jessa/jessa_runaway_fare.gd"),
+		"tagalog": preload("res://scripts/story/payloads/characters/jessa/jessa_runaway_fare_tagalog.gd"),
+		"title": "Runaway Fare", "subtitle": "A passenger leaves without paying.",
+	},
 	"benny_tropa_night": {
 		"english": preload("res://scripts/story/payloads/characters/benny/benny_tropa_night.gd"),
 		"tagalog": preload("res://scripts/story/payloads/characters/benny/benny_tropa_night_tagalog.gd"),

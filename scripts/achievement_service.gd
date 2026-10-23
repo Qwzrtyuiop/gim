@@ -38,12 +38,12 @@ const DEFINITIONS := {
 	"tapat": {
 		"title": "Tapat",
 		"subtitle": "Honesty",
-		"description": "Tapat is the Filipino virtue of staying honest even when hardship makes the wrong choice feel easier.\n\nJohn gave the money back, even when he badly needed it himself.",
+		"description": "Tapat is the Filipino virtue of staying honest even when hardship makes the wrong choice feel easier.\n\nJohn chose honesty, even when it was difficult.",
 	},
 	"sinungaling": {
 		"title": "Sinungaling",
 		"subtitle": "Liar",
-		"description": "Sometimes a lie is less about fooling someone else and more about hiding from what you became.\n\nJohn smiled, made something up, and let Benny believe it.",
+		"description": "Sometimes a lie is less about fooling someone else and more about hiding from what you became.\n\nJohn hid the truth and let someone believe a different story.",
 	},
 	"tropa": {
 		"title": "Tropa",

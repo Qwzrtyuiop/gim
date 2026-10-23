@@ -331,6 +331,7 @@ const MOCK_CHARACTERS := [
 	{
 		"id": "jessa",
 		"name": "Jessa",
+		"name_unlock_event": "jessa_name_revealed",
 		"blurb": "Runaway youth hiding from her family.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": .99},
 		"first_distance": "short",

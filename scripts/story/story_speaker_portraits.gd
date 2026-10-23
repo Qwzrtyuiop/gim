@@ -7,6 +7,8 @@ const PORTRAITS := {
 	"john": "res://assets/characters/John.png",
 	"john toda": "res://assets/characters/John.png",
 	"benny": "res://assets/characters/Benny.png",
+	"elena": "res://assets/characters/Elena.png",
+	"jessa": "res://assets/characters/Jessa.png",
 	"ben": "res://assets/characters/Benny.png",
 	"collector": "res://assets/characters/placeholder.png",
 	"man outside": "res://assets/characters/placeholder.png",

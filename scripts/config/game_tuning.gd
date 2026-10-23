@@ -3,6 +3,9 @@ extends RefCounted
 # First collection, then the weekly base payment. Unpaid first-week debt carries over.
 const WEEKLY_DEBT_GOALS := [2500, 5000]
 
+# Completed rides with each named passenger before revealing their name.
+const CHARACTER_NAME_UNLOCK_RIDES := 2
+
 # Random ride stories: probability per eligible unnamed-passenger ride (0..1).
 const MALASAKIT_EVENT_CHANCE := 0.10
 const BAYANIHAN_EVENT_CHANCE := 0.10

@@ -94,6 +94,10 @@ func _ready() -> void:
 		if resume_index < 0 or resume_index >= story_lines.size():
 			resume_index = 0
 	await _restore_story_music_state(resume_index)
+	# Ambient sound belongs to the SFX channel and restarts on save/resume.
+	var ambient_sfx: Variant = story_payload.get("ambient_sfx", {})
+	if ambient_sfx is Dictionary and not ambient_sfx.is_empty():
+		_play_sfx_action(ambient_sfx)
 	await _show_line(resume_index)
 
 
@@ -274,6 +278,10 @@ func _apply_line_text(line: Dictionary) -> void:
 	var body_text := str(line.get("text", ""))
 	var continue_text := str(line.get("continue_hint", DEFAULT_CONTINUE_HINT))
 	_set_dialogue_content(speaker, body_text, continue_text, true)
+	# Authored introductions can control the label without changing the speaker
+	# identity used for portraits or saved passenger progress.
+	if line.has("speaker_display_name"):
+		speaker_label.text = str(line["speaker_display_name"]).to_upper()
 
 
 func _run_line_actions(line: Dictionary) -> void:
@@ -943,7 +951,10 @@ func _play_music_action(action_data: Dictionary) -> void:
 		await _fade_audio_player_volume(bgm_player, fade_out_duration, bgm_player.volume_db, AudioSettingsManager.SILENCE_DB)
 		bgm_player.stop()
 
-	bgm_player.stream = configured_stream
+	# Reassigning even the same track stops AudioStreamPlayer. Preserve playback
+	# when a branch restates its music with restart=false.
+	if should_swap_stream:
+		bgm_player.stream = configured_stream
 	bgm_player.set_meta("music_ref", next_music_ref)
 	bgm_player.set_meta("loop_enabled", loop_enabled)
 	AudioSettingsManager.set_player_base_db(bgm_player, target_volume_db)
@@ -980,7 +991,7 @@ func _play_sfx_action(action_data: Dictionary) -> void:
 	var stream_ref = action_data.get("stream", action_data.get("path", action_data.get("sfx", null)))
 	var stream := _resolve_audio_stream(stream_ref)
 	if stream != null:
-		sfx_player.stream = stream
+		sfx_player.stream = _configure_audio_stream_loop(stream, bool(action_data["loop"])) if action_data.has("loop") else stream
 		AudioSettingsManager.set_player_base_db(sfx_player, float(action_data.get("volume_db", 0.0)))
 		sfx_player.play()
 		return
@@ -1194,7 +1205,7 @@ func _save_portrait_state() -> void:
 func _set_dialogue_content(speaker: String, body_text: String, continue_text: String, is_visible: bool) -> void:
 	dialogue_panel.visible = is_visible
 	speaker_label.visible = not speaker.is_empty()
-	speaker_label.text = speaker.to_upper()
+	speaker_label.text = PlayerState.get_speaker_display_name(speaker).to_upper()
 	body_label.text = body_text
 	continue_label.text = continue_text if not continue_text.is_empty() else DEFAULT_CONTINUE_HINT
 

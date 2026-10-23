@@ -2,6 +2,7 @@ extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
+const JessaFareEvent := preload("res://scripts/story/jessa_fare_event.gd")
 
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
@@ -158,6 +159,9 @@ static func stage_complete_story_payload(stage_type: String, stage_difficulty: S
 
 	story_payload["return_scene"] = STAGE_RESULTS_SCENE
 	story_payload["next_scene"] = STAGE_RESULTS_SCENE
+	PlayerState._begin_state_batch()
+	JessaFareEvent.prepare(PlayerState, story_payload)
 	PlayerState.set_pending_story(story_payload)
 	PlayerState.consume_story_trigger(stage_story_trigger)
+	PlayerState._end_state_batch()
 	return story_payload

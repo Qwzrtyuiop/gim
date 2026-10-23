@@ -5,6 +5,7 @@ const BACKGROUND_INHOUSE_NIGHT := "res://assets/story/backgrounds/locations/inho
 const BACKGROUND_BAR := "res://assets/story/backgrounds/locations/bar.jpeg"
 const BACKGROUND_GARAGE_NORMAL := "res://assets/story/backgrounds/locations/garagenormal.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/locations/station.png"
+const BACKGROUND_ALLEY := "res://assets/story/backgrounds/locations/Alley.png"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/locations/city.png"
 const BACKGROUND_STORYDOOR := "res://assets/story/backgrounds/locations/storydoor.png"
 const BACKGROUND_STORYDOOR_ZOOM := "res://assets/story/backgrounds/locations/storydoorzoom.png"

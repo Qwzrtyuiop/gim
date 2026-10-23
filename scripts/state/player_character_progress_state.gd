@@ -93,5 +93,6 @@ static func reset_character_progress_state(player_state) -> void:
 	player_state.current_mock_character_id = ""
 	player_state.seen_mock_characters.clear()
 	player_state.unique_character_progress.clear()
+	player_state.character_completed_rides.clear()
 	player_state.locked_unique_character_stories.clear()
 	player_state.consumed_unique_session_dialogue.clear()
