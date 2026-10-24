@@ -2,6 +2,29 @@ extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
+static func set_last_stage_result(player_state, result: Dictionary) -> void:
+	player_state.last_stage_result = result.duplicate(true)
+	player_state.last_stage_result["paid_out"] = false
+	player_state.save_progress()
+
+
+static func get_last_stage_result(player_state) -> Dictionary:
+	return player_state.last_stage_result.duplicate(true)
+
+
+static func claim_last_stage_total(player_state) -> int:
+	if player_state.last_stage_result.is_empty() or bool(player_state.last_stage_result.get("paid_out", false)):
+		return 0
+	if not str(player_state.last_stage_result.get("random_ride_event", "")).is_empty() and str(player_state.last_stage_result.get("random_ride_outcome", "")).is_empty():
+		return 0
+
+	var total: int = int(player_state.last_stage_result.get("total", 0))
+	player_state._begin_state_batch()
+	player_state.add_money(total)
+	player_state.last_stage_result["paid_out"] = true
+	player_state.save_progress()
+	player_state._end_state_batch()
+	return total
 
 static func normalize_stage_special_type(player_state, stage_special_type: String) -> String:
 	var safe_special_type: String = str(stage_special_type).strip_edges().to_lower()

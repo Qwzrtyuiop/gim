@@ -12,6 +12,32 @@ const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animati
 const BOOST_GAS_SAVE_INTERVAL := 0.75
 
 
+static func update_hit_state(owner, delta: float) -> void:
+	owner.player_hit_recovery_timer = maxf(0.0, owner.player_hit_recovery_timer - delta)
+	if owner.player_hit_invincible_timer <= 0.0:
+		owner.player_hit_flicker_timer = 0.0
+		owner.player_hit_flicker_visible = true
+		return
+
+	owner.player_hit_invincible_timer = maxf(0.0, owner.player_hit_invincible_timer - delta)
+	owner.player_hit_flicker_timer -= delta
+	if owner.player_hit_flicker_timer <= 0.0:
+		owner.player_hit_flicker_timer = owner.crash_flicker_interval
+		owner.player_hit_flicker_visible = not owner.player_hit_flicker_visible
+
+
+static func apply_hit_visuals(owner) -> void:
+	if owner.player == null:
+		return
+
+	if owner.game_state != "playing" or owner.player_hit_invincible_timer <= 0.0:
+		owner.player.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		return
+
+	var flicker_alpha: float = 1.0 if owner.player_hit_flicker_visible else owner.crash_flicker_alpha
+	owner.player.modulate = Color(1.0, 1.0, 1.0, flicker_alpha)
+
+
 static func create_player(owner) -> void:
 	owner.player = Sprite2D.new()
 	owner.player.texture = owner.PLAYER_TEXTURE

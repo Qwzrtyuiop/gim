@@ -7,6 +7,18 @@ const PlayerVehicleController := preload("res://scripts/game/player_vehicle_cont
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 
 
+static func pick_stage_background(owner) -> Texture2D:
+	var pool_tag: String = background_pool_tag(owner)
+	var background_pool: Array = owner.STAGE_BACKGROUND_POOLS.get(pool_tag, owner.STAGE_BACKGROUND_POOLS.get(owner.DEFAULT_BACKGROUND_POOL_TAG, []))
+	if background_pool.is_empty():
+		return null
+	return background_pool[owner.rng.randi_range(0, background_pool.size() - 1)] as Texture2D
+
+
+static func background_pool_tag(owner) -> String:
+	return str(owner.BACKGROUND_POOL_TAGS_BY_TYPE.get(owner.background_type, owner.DEFAULT_BACKGROUND_POOL_TAG))
+
+
 static func hide_editor_preview(owner) -> void:
 	var editor_preview: CanvasItem = owner.get_node_or_null("EditorPreview") as CanvasItem
 	if editor_preview:
@@ -15,6 +27,7 @@ static func hide_editor_preview(owner) -> void:
 
 static func create_audio_manager(owner) -> void:
 	owner.audio_manager = GameAudioManager.new()
+	owner.add_child(owner.audio_manager)
 	owner.audio_manager.setup(owner)
 
 

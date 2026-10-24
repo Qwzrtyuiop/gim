@@ -1,7 +1,7 @@
 extends Control
 
-# Ride selection bridges hub flow and gameplay.
-# It previews the next stage, locks the chosen rider, then commits the stage into PlayerState.
+# Coordinates ride-selection setup, input, and the stage transition.
+# Passenger generation, presentation, and tutorial behavior live in scripts/ride_selection/.
 
 const NEXT_STAGE_SCENE := "res://scenes/main.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
@@ -9,47 +9,9 @@ const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
-const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
-const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
-const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const RIDE_SELECT_DAY_BACKGROUND := preload("res://assets/story/backgrounds/locations/station.png")
-const RIDE_SELECT_NIGHT_BACKGROUND := preload("res://assets/story/backgrounds/locations/station_night.png")
-const GENERIC_PORTRAIT := preload("res://assets/characters/blankface.png")
-const UNIQUE_CHARACTER_PORTRAITS := {
-	"alma": preload("res://assets/characters/Alma.png"),
-	"benny": preload("res://assets/characters/Benny.png"),
-	"cel": preload("res://assets/characters/Celina.png"),
-	"dante": preload("res://assets/characters/Dante.png"),
-	"ely": preload("res://assets/characters/Elena.png"),
-	"faye": preload("res://assets/characters/Magda.png"),
-	"gardo": preload("res://assets/characters/Gardo.png"),
-	"hana": preload("res://assets/characters/Hana.png"),
-	"ito": preload("res://assets/characters/Isidro.png"),
-	"jessa": preload("res://assets/characters/Jessa.png"),
-}
-const EMPTY_CARD_CHANCE := 0.28
-const LOCKED_DISTANCE_MODULATE := Color(0.45, 0.45, 0.45, 1.0)
-const RIDE_SELECT_BGM_PATH := "res://assets/audio/music/driving/normalstage1.mp3"
-const RISK_DISTANCE_SCORES := {
-	"short": 1,
-	"medium": 2,
-	"long": 3,
-}
-const RISK_TIME_SCORES := {
-	"morning": 1,
-	"noon": 2,
-	"night": 3,
-}
-const RISK_TRAFFIC_SCORES := {
-	"chill": 1,
-	"normal": 2,
-	"traffic-jam": 2,
-	"trafficjam": 2,
-	"speeders": 3,
-	"speeder": 3,
-	"busy": 4,
-}
+const PassengerPool := preload("res://scripts/ride_selection/passenger_pool.gd")
+const SelectionView := preload("res://scripts/ride_selection/selection_view.gd")
+const SelectionTutorial := preload("res://scripts/ride_selection/selection_tutorial.gd")
 
 @onready var subtitle_label: Label = $Panel/Subtitle
 @onready var status_label: Label = $Panel/StatusLabel
@@ -70,29 +32,19 @@ const RISK_TRAFFIC_SCORES := {
 @onready var portrait_c_panel: Panel = $Panel/CardC/PortraitC
 
 var pending_trip_selection: Dictionary = {}
-var rng := RandomNumberGenerator.new()
 var selected_distance := "short"
 var locked_character_pools: Dictionary = {}
 var displayed_characters: Array[Dictionary] = []
-var stats_row_refs: Dictionary = {}
-var portrait_images: Array[TextureRect] = []
-var tutorial_overlay: Control
-var tutorial_highlight: Panel
-var tutorial_text_panel: Panel
-var tutorial_text_label: Label
-var tutorial_step_index := 0
-var tutorial_steps: Array[Dictionary] = []
-var tutorial_active := false
-var tutorial_disabled_buttons: Dictionary = {}
-var tutorial_card_filters: Dictionary = {}
-var bgm_player: AudioStreamPlayer
-var card_special_labels: Array[Label] = []
-var store_button: TextureButton
+var passenger_pool: PassengerPool
+var view: SelectionView
+var tutorial: SelectionTutorial
 
 
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/ride_selection.tscn")
-	rng.randomize()
+	passenger_pool = PassengerPool.new(self)
+	view = SelectionView.new(self)
+	tutorial = SelectionTutorial.new(self)
 	pending_trip_selection = PlayerState.get_pending_trip_selection()
 	selected_distance = PlayerState.get_locked_pending_trip_distance()
 	if selected_distance.is_empty():
@@ -100,11 +52,11 @@ func _ready() -> void:
 	if _is_forced_first_day_ride():
 		selected_distance = "short"
 	back_button.visible = _allow_back()
-	_refresh_background()
-	_create_stats_row()
+	view.refresh_background()
+	view.create_stats_row()
 
 	back_button.pressed.connect(_handle_back_button_pressed)
-	_create_store_button()
+	view.create_store_button()
 	short_button.pressed.connect(_set_distance.bind("short"))
 	medium_button.pressed.connect(_set_distance.bind("medium"))
 	long_button.pressed.connect(_set_distance.bind("long"))
@@ -112,33 +64,22 @@ func _ready() -> void:
 	card_b.gui_input.connect(_on_card_gui_input.bind(1))
 	card_c.gui_input.connect(_on_card_gui_input.bind(2))
 
-	for label in [card_a_label, card_b_label, card_c_label]:
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	view.prepare_controls()
 
-	for button in [back_button, short_button, medium_button, long_button]:
-		if _is_forced_first_day_ride() and button in [medium_button, long_button]:
-			ButtonGlow.attach(self, button, LOCKED_DISTANCE_MODULATE, LOCKED_DISTANCE_MODULATE)
-		else:
-			ButtonGlow.attach(self, button)
-	for button in [short_button, medium_button, long_button]:
-		for child in button.get_children():
-			if child is Label:
-				child.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	_create_card_special_labels()
-	_create_portrait_images()
-	_start_ride_select_bgm()
+	view.create_card_special_labels()
+	view.create_portrait_images()
+	view.start_ride_select_bgm()
 
 	locked_character_pools = PlayerState.get_locked_pending_trip_character_pools()
 	if locked_character_pools.is_empty():
-		locked_character_pools = _roll_character_pools()
+		locked_character_pools = passenger_pool.roll()
 		PlayerState.lock_pending_trip_selection(locked_character_pools, selected_distance)
 
-	_refresh_header()
-	_refresh_action_button()
+	view.refresh_stats_row()
+	view.refresh_action_button()
 	_set_distance(selected_distance)
 	if _needs_refuel():
-		store_button.grab_focus()
+		view.store_button.grab_focus()
 	else:
 		match selected_distance:
 			"medium":
@@ -148,22 +89,22 @@ func _ready() -> void:
 			_:
 				short_button.grab_focus()
 
-	_build_tutorial()
+	tutorial.build()
 	if not PlayerState.has_ride_select_tutorial_shown():
-		call_deferred("_start_tutorial")
+		tutorial.call_deferred("start")
 
 
 func _input(event: InputEvent) -> void:
-	if tutorial_active and event is InputEventMouseButton and event.pressed:
+	if tutorial != null and tutorial.active and event is InputEventMouseButton and event.pressed:
 		# Handle the click before the tutorial overlay consumes GUI input.
 		get_viewport().set_input_as_handled()
-		_advance_tutorial()
+		tutorial.advance()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if tutorial_active:
-		if _is_any_press(event):
-			_advance_tutorial()
+	if tutorial != null and tutorial.active:
+		if tutorial.is_any_press(event):
+			tutorial.advance()
 		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
@@ -172,654 +113,26 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED:
-		_layout_card_special_labels()
-
-
-func _refresh_header() -> void:
-	_refresh_stats_row()
-
-
-func _refresh_background() -> void:
-	var next_time := PlayerState.get_next_stage_time(_transition_mode())
-	background.texture = RIDE_SELECT_NIGHT_BACKGROUND if next_time == "night" else RIDE_SELECT_DAY_BACKGROUND
-
-
-func _refresh_subtitle() -> void:
-	var transition_mode := _transition_mode()
-	var energy_bonus := PlayerState.get_transition_energy_bonus(transition_mode)
-	var next_time := PlayerState.get_next_stage_time(transition_mode).capitalize()
-	var bonus_text := " Recovery: +%d energy." % energy_bonus if energy_bonus > 0 else ""
-	var route_phrase := "Choose a %s route for the %s trip.%s" if transition_mode == PlayerState.TRANSITION_CURRENT_STAGE else "Choose a %s route for the next %s trip.%s"
-	subtitle_label.text = route_phrase % [
-		selected_distance.capitalize(),
-		next_time,
-		bonus_text,
-	]
+	if what == NOTIFICATION_RESIZED and view != null:
+		view.layout_card_special_labels()
 
 
 func _set_distance(difficulty: String) -> void:
 	selected_distance = "short" if _is_forced_first_day_ride() else difficulty
-	displayed_characters = _get_pool_for_distance(selected_distance)
+	displayed_characters = passenger_pool.for_distance(selected_distance)
 	PlayerState.lock_pending_trip_selection(locked_character_pools, selected_distance)
-	_refresh_subtitle()
-	_refresh_distance_buttons()
-	_refresh_character_cards()
+	view.refresh_subtitle()
+	view.refresh_distance_buttons()
+	view.refresh_character_cards()
 	if _needs_refuel():
 		status_label.text = "Not enough gas. Visit the store to refuel before Day %d begins." % _display_day()
 	else:
 		status_label.text = "Choose a passenger for a %s trip." % difficulty.capitalize()
 
 
-func _refresh_distance_buttons() -> void:
-	for button_data in [
-		{"button": short_button, "id": "short"},
-		{"button": medium_button, "id": "medium"},
-		{"button": long_button, "id": "long"},
-	]:
-		var button := button_data["button"] as BaseButton
-		var button_id: String = str(button_data["id"])
-		var is_selected: bool = button_id == selected_distance
-		var is_locked: bool = _is_forced_first_day_ride() and button_id != "short"
-		button.disabled = is_selected or is_locked
-		button.tooltip_text = "Please select a short ride." if is_locked else ""
-		if is_locked:
-			ButtonGlow.set_state(self, button, false, LOCKED_DISTANCE_MODULATE, LOCKED_DISTANCE_MODULATE)
-		else:
-			ButtonGlow.set_state(self, button, is_selected)
-
-
-func _refresh_character_cards() -> void:
-	var card_nodes := [
-		{"panel": card_a, "label": card_a_label, "portrait": portrait_images[0], "special_label": card_special_labels[0]},
-		{"panel": card_b, "label": card_b_label, "portrait": portrait_images[1], "special_label": card_special_labels[1]},
-		{"panel": card_c, "label": card_c_label, "portrait": portrait_images[2], "special_label": card_special_labels[2]},
-	]
-
-	for index in range(card_nodes.size()):
-		var character: Dictionary = displayed_characters[index]
-		var panel := card_nodes[index]["panel"] as Panel
-		var label := card_nodes[index]["label"] as Label
-		var portrait := card_nodes[index]["portrait"] as TextureRect
-		var special_label := card_nodes[index]["special_label"] as Label
-		if character.is_empty():
-			panel.modulate = Color(0.92, 0.92, 0.92, 0.52)
-			label.text = "EMPTY SLOT\nNo one available yet."
-			if special_label != null:
-				special_label.visible = false
-			if portrait != null:
-				portrait.visible = false
-			panel.mouse_default_cursor_shape = Control.CURSOR_ARROW
-			continue
-
-		var preview_stage_type: String = _preview_stage_type(character)
-		var stage_special_display := _card_special_badge_text(str(character.get("stage_special_type", "")))
-		panel.modulate = Color.WHITE
-		label.text = "%s\nStage Information:\n%s\nEstimated Earnings:\nPhP %d\nGas Est: ~%.1f%%\nRisk: %s" % [
-			PlayerState.get_character_display_name(str(character.get("id", ""))).to_upper(),
-			preview_stage_type,
-			PlayerState.estimate_stage_earnings(preview_stage_type, str(character.get("id", ""))),
-			PlayerState.estimate_stage_gas_usage(preview_stage_type),
-			_risk_label_for_stage_type(preview_stage_type),
-		]
-		if special_label != null:
-			special_label.text = stage_special_display
-			special_label.visible = not stage_special_display.is_empty()
-		if portrait != null:
-			portrait.texture = _portrait_for_character(character)
-			portrait.visible = true
-		panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-
-	_layout_card_special_labels()
-
-
-func _roll_character_pools() -> Dictionary:
-	for _attempt in range(24):
-		var seeded_setup := PlayerState.get_seeded_rider_pool_setup(_build_seed_selection_context())
-		var rolled_pools := _roll_character_pools_once(false, seeded_setup)
-		if _has_distance_coverage(rolled_pools):
-			PlayerState.consume_seeded_rider_rules(seeded_setup.get("rule_ids", []))
-			return rolled_pools
-
-	var fallback_seeded_setup := PlayerState.get_seeded_rider_pool_setup(_build_seed_selection_context())
-	var fallback_pools := _roll_character_pools_once(true, fallback_seeded_setup)
-	PlayerState.consume_seeded_rider_rules(fallback_seeded_setup.get("rule_ids", []))
-	return fallback_pools
-
-
-func _roll_character_pools_once(force_first_appearance_unlocks: bool, seeded_setup: Dictionary = {}) -> Dictionary:
-	var character_pools: Dictionary = {}
-	var used_ids: Dictionary = {}
-	var first_appearance_rolls := _build_first_appearance_rolls(force_first_appearance_unlocks)
-	var seeded_distance_slots: Dictionary = Dictionary(seeded_setup.get("distance_slots", {}))
-
-	for distance_variant in _ordered_distances_for_generation():
-		var distance := str(distance_variant)
-		character_pools[distance] = _build_distance_pool(
-			distance,
-			used_ids,
-			first_appearance_rolls,
-			force_first_appearance_unlocks,
-			Array(seeded_distance_slots.get(distance, []))
-		)
-
-	return character_pools
-
-
-func _build_distance_pool(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool, seeded_assignments: Array = []) -> Array[Dictionary]:
-	var card_results: Array[Dictionary] = [{}, {}, {}]
-	var has_seeded_character := false
-
-	for assignment_variant in seeded_assignments:
-		if not assignment_variant is Dictionary:
-			continue
-		var assignment: Dictionary = assignment_variant
-		var seeded_character: Dictionary = assignment.get("character", {})
-		var character_id := str(seeded_character.get("id", ""))
-		var slot_index := int(assignment.get("slot", -1))
-		if slot_index < 0 or slot_index >= card_results.size():
-			continue
-		if seeded_character.is_empty() or character_id.is_empty() or used_ids.has(character_id):
-			continue
-		used_ids[character_id] = true
-		has_seeded_character = true
-		card_results[slot_index] = _lock_character_for_selection(
-			seeded_character,
-			distance,
-			str(assignment.get("forced_traffic", ""))
-		)
-
-	if not has_seeded_character:
-		var guaranteed_character := _pick_character_for_distance(
-			distance,
-			used_ids,
-			first_appearance_rolls,
-			force_first_appearance_unlocks
-		)
-		if not guaranteed_character.is_empty():
-			used_ids[str(guaranteed_character["id"])] = true
-			var first_open_slot := _find_first_empty_card_slot(card_results)
-			if first_open_slot >= 0:
-				card_results[first_open_slot] = _lock_character_for_selection(guaranteed_character, distance)
-
-	for slot_index in range(card_results.size()):
-		if not (card_results[slot_index] as Dictionary).is_empty():
-			continue
-		if slot_index > 0 and rng.randf() < EMPTY_CARD_CHANCE:
-			continue
-
-		var filler := _pick_character_for_distance(
-			distance,
-			used_ids,
-			first_appearance_rolls,
-			force_first_appearance_unlocks
-		)
-		if filler.is_empty():
-			continue
-
-		used_ids[str(filler["id"])] = true
-		card_results[slot_index] = _lock_character_for_selection(filler, distance)
-
-	return card_results
-
-
-func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool) -> Dictionary:
-	var unseen_candidates: Array[Dictionary] = []
-	var seen_candidates: Array[Dictionary] = []
-
-	for character_data in PlayerState.get_mock_characters():
-		var character: Dictionary = character_data
-		var character_id := str(character.get("id", ""))
-		if used_ids.has(character_id):
-			continue
-
-		var is_seen := PlayerState.has_seen_mock_character(character_id)
-		if is_seen:
-			if _supports_selection_availability(character, distance, false):
-				seen_candidates.append(character)
-			continue
-
-		if not _supports_selection_availability(character, distance, true):
-			continue
-		if not force_first_appearance_unlocks and not bool(first_appearance_rolls.get(character_id, false)):
-			continue
-		unseen_candidates.append(character)
-
-	if not unseen_candidates.is_empty():
-		unseen_candidates.shuffle()
-		return unseen_candidates[0]
-	if not seen_candidates.is_empty():
-		seen_candidates.shuffle()
-		return seen_candidates[0]
-	return {}
-
-
-func _build_first_appearance_rolls(force_first_appearance_unlocks: bool) -> Dictionary:
-	var first_appearance_rolls: Dictionary = {}
-	for character_data in PlayerState.get_mock_characters():
-		var character: Dictionary = character_data
-		var character_id := str(character.get("id", ""))
-		if PlayerState.has_seen_mock_character(character_id):
-			continue
-		first_appearance_rolls[character_id] = force_first_appearance_unlocks or rng.randf() <= float(character.get("first_appearance_chance", 1.0))
-	return first_appearance_rolls
-
-
-func _ordered_distances_for_generation() -> Array[String]:
-	var ordered_distances: Array[String] = []
-	if PlayerState.gas <= 40.0:
-		ordered_distances.append("short")
-	if not ordered_distances.has(selected_distance):
-		ordered_distances.append(selected_distance)
-	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
-		var difficulty := str(difficulty_variant)
-		if not ordered_distances.has(difficulty):
-			ordered_distances.append(difficulty)
-	return ordered_distances
-
-
-func _has_distance_coverage(character_pools: Dictionary) -> bool:
-	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
-		var difficulty := str(difficulty_variant)
-		if _count_non_empty_cards(character_pools.get(difficulty, [])) <= 0:
-			return false
-	return true
-
-
-func _count_non_empty_cards(card_results: Array) -> int:
-	var count := 0
-	for card_variant in card_results:
-		var card: Dictionary = card_variant as Dictionary
-		if not card.is_empty():
-			count += 1
-	return count
-
-
-func _supports_selection_availability(character: Dictionary, distance: String, is_first_appearance: bool) -> bool:
-	if not _supports_time_in_selection(character):
-		return false
-	return _supports_distance_in_selection(character, distance, is_first_appearance)
-
-
-func _supports_distance_in_selection(character: Dictionary, distance: String, is_first_appearance: bool) -> bool:
-	if is_first_appearance:
-		return str(character.get("first_distance", "")) == distance
-
-	var eligible_distances: Array = character.get("eligible_distances", [])
-	return eligible_distances.has(distance)
-
-
-func _supports_time_in_selection(character: Dictionary) -> bool:
-	var next_time_of_day: String = PlayerState.get_next_stage_time(_transition_mode())
-	var eligible_times: Array = character.get("eligible_times", [])
-	if eligible_times.is_empty():
-		return true
-	return eligible_times.has(next_time_of_day)
-
-
-func _lock_character_for_selection(picked_character: Dictionary, active_distance: String, forced_traffic: String = "") -> Dictionary:
-	var was_seen_before_roll := PlayerState.has_seen_mock_character(str(picked_character["id"]))
-	PlayerState.mark_mock_character_seen(str(picked_character["id"]))
-	var locked_character: Dictionary = picked_character.duplicate(true)
-	locked_character["active_distance"] = active_distance
-	var selected_traffic := forced_traffic.strip_edges().to_lower()
-	if _is_forced_first_day_ride():
-		selected_traffic = "chill"
-	if not PlayerState.STAGE_TRAFFIC_TYPES.has(selected_traffic):
-		selected_traffic = PlayerState.get_random_stage_traffic_type()
-	locked_character["stage_traffic"] = selected_traffic
-	locked_character["stage_special_type"] = _roll_stage_special_type(active_distance, selected_traffic)
-	locked_character["special_stage_id"] = ""
-	locked_character["is_first_appearance"] = not was_seen_before_roll
-	return locked_character
-
-
-func _roll_stage_special_type(active_distance: String, selected_traffic: String) -> String:
-	if _is_forced_first_day_ride():
-		return PlayerState.STAGE_SPECIAL_TYPE_NONE
-
-	var urgent_weight := 0.14
-	var careful_weight := 0.12
-	match selected_traffic:
-		"traffic-jam":
-			urgent_weight += 0.06
-		"busy":
-			urgent_weight += 0.08
-			careful_weight += 0.05
-		"speeders":
-			urgent_weight += 0.04
-			careful_weight += 0.12
-
-	match active_distance:
-		"medium":
-			urgent_weight += 0.03
-			careful_weight += 0.02
-		"long":
-			urgent_weight += 0.05
-			careful_weight += 0.04
-
-	var roll := rng.randf()
-	if roll < urgent_weight:
-		return PlayerState.STAGE_SPECIAL_TYPE_URGENT
-	if roll < urgent_weight + careful_weight:
-		return PlayerState.STAGE_SPECIAL_TYPE_CAREFUL
-	return PlayerState.STAGE_SPECIAL_TYPE_NONE
-
-
-func _find_first_empty_card_slot(card_results: Array[Dictionary]) -> int:
-	for slot_index in range(card_results.size()):
-		if (card_results[slot_index] as Dictionary).is_empty():
-			return slot_index
-	return -1
-
-
-func _create_card_special_labels() -> void:
-	card_special_labels.clear()
-	for card_panel in [card_a, card_b, card_c]:
-		var special_label := Label.new()
-		special_label.visible = false
-		special_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		special_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		special_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		special_label.size = Vector2(120.0, 24.0)
-		special_label.add_theme_font_override("font", UI_FONT)
-		special_label.add_theme_font_size_override("font_size", 10)
-		special_label.add_theme_color_override("font_color", Color(0.99, 0.95, 0.84, 1.0))
-		special_label.add_theme_color_override("font_outline_color", Color(0.24, 0.08, 0.02, 0.95))
-		special_label.add_theme_constant_override("outline_size", 2)
-		special_label.z_index = 3
-		$Panel.add_child(special_label)
-		card_special_labels.append(special_label)
-	_layout_card_special_labels()
-
-
-func _layout_card_special_labels() -> void:
-	if card_special_labels.size() < 3:
-		return
-	var card_panels: Array[Panel] = [card_a, card_b, card_c]
-	for index in range(card_panels.size()):
-		var card_panel: Panel = card_panels[index]
-		var special_label: Label = card_special_labels[index]
-		if card_panel == null or special_label == null:
-			continue
-		special_label.position = Vector2(
-			card_panel.position.x + (card_panel.size.x - special_label.size.x) * 0.5,
-			card_panel.position.y - special_label.size.y - 6.0
-		)
-
-
-func _card_special_badge_text(stage_special_type: String) -> String:
-	match PlayerState.normalize_stage_special_type(stage_special_type):
-		PlayerState.STAGE_SPECIAL_TYPE_URGENT:
-			return "RUSH"
-		PlayerState.STAGE_SPECIAL_TYPE_CAREFUL:
-			return "CAREFUL"
-		PlayerState.STAGE_SPECIAL_TYPE_SPECIAL:
-			return "SPECIAL"
-	return ""
-
-
-func _build_seed_selection_context() -> Dictionary:
-	var next_time_of_day := PlayerState.get_next_stage_time(_transition_mode())
-	var current_time_of_day := PlayerState.get_current_time_of_day()
-	return {
-		"day": PlayerState.get_transition_display_day(_transition_mode()),
-		"time_of_day": next_time_of_day,
-		"phase_of_day": next_time_of_day,
-		"current_day": PlayerState.get_current_day(),
-		"current_time_of_day": current_time_of_day,
-		"current_phase": current_time_of_day,
-		"current_stage_type": PlayerState.get_current_stage_type(),
-	}
-
-
-func _build_tutorial() -> void:
-	tutorial_steps.clear()
-	tutorial_step_index = 0
-
-	tutorial_overlay = Control.new()
-	tutorial_overlay.anchor_right = 1.0
-	tutorial_overlay.anchor_bottom = 1.0
-	tutorial_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	tutorial_overlay.focus_mode = Control.FOCUS_ALL
-	tutorial_overlay.visible = false
-	add_child(tutorial_overlay)
-
-	var backdrop := ColorRect.new()
-	backdrop.anchor_right = 1.0
-	backdrop.anchor_bottom = 1.0
-	backdrop.color = Color(0.0, 0.0, 0.0, 0.55)
-	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	tutorial_overlay.add_child(backdrop)
-
-	tutorial_highlight = Panel.new()
-	tutorial_highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tutorial_highlight.z_index = 1
-	var highlight_style := StyleBoxFlat.new()
-	highlight_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
-	highlight_style.border_color = Color(0.98, 0.92, 0.68, 0.95)
-	highlight_style.set_border_width_all(3)
-	highlight_style.set_corner_radius_all(8)
-	tutorial_highlight.add_theme_stylebox_override("panel", highlight_style)
-	tutorial_overlay.add_child(tutorial_highlight)
-
-	tutorial_text_panel = Panel.new()
-	tutorial_text_panel.z_index = 2
-	var panel_style := StyleBoxFlat.new()
-	panel_style.bg_color = Color(0.10, 0.08, 0.06, 0.92)
-	panel_style.border_color = Color(0.82, 0.66, 0.40, 0.95)
-	panel_style.set_border_width_all(2)
-	panel_style.set_corner_radius_all(8)
-	tutorial_text_panel.add_theme_stylebox_override("panel", panel_style)
-	tutorial_overlay.add_child(tutorial_text_panel)
-
-	tutorial_text_label = _make_tutorial_label()
-	tutorial_text_label.anchor_right = 1.0
-	tutorial_text_label.anchor_bottom = 1.0
-	tutorial_text_label.offset_left = 12.0
-	tutorial_text_label.offset_top = 10.0
-	tutorial_text_label.offset_right = -12.0
-	tutorial_text_label.offset_bottom = -10.0
-	tutorial_text_panel.add_child(tutorial_text_label)
-
-	tutorial_steps.append({
-		"text": "These are your passengers. Each card is a possible rider.",
-		"targets": [card_a, card_b, card_c],
-	})
-	tutorial_steps.append({
-		"text": "Below are the stage information and estimated earnings for the trip.",
-		"targets": [card_a_label, card_b_label, card_c_label],
-	})
-	tutorial_steps.append({
-		"text": "Choose the trip distance here.",
-		"targets": [short_button, medium_button, long_button],
-	})
-	var stats_row := stats_row_refs.get("row") as Control
-	var stats_targets := [stats_row] if stats_row != null else [status_label]
-	tutorial_steps.append({
-		"text": "Money buys upgrades and items. Energy is spent when starting a ride; if it hits 0 you cannot start. Gas starts at %s%%, drains as you drive, and burns faster while boosting." % String.num(PlayerState.DEFAULT_STARTING_GAS_PERCENT).trim_suffix(".0"),
-		"targets": stats_targets,
-	})
-	tutorial_steps.append({
-		"text": "Your status and trip notes appear here.",
-		"targets": [status_label],
-	})
-	tutorial_steps.append({
-		"text": "For the opening ride, start with this passenger. It keeps the first trip simple while you learn the road.",
-		"targets": [card_a],
-	})
-	tutorial_steps.append({
-		"text": "Stage information is written as distance, time, then modifier. In short-morning-chill, Short means the ride distance.",
-		"targets": [card_a_label],
-	})
-	tutorial_steps.append({
-		"text": "Morning tells you the time of day for this ride.",
-		"targets": [card_a_label],
-	})
-	tutorial_steps.append({
-		"text": "Chill is the modifier. It means this route should have lighter traffic and a calmer pace.",
-		"targets": [card_a_label],
-	})
-
-
-func _start_tutorial() -> void:
-	if tutorial_overlay == null or tutorial_steps.is_empty():
-		return
-	if PlayerState.has_ride_select_tutorial_shown():
-		return
-	PlayerState.mark_ride_select_tutorial_shown()
-	_set_tutorial_active(true)
-	_show_tutorial_step(0)
-
-
-func _advance_tutorial() -> void:
-	if not tutorial_active:
-		return
-	var next_index := tutorial_step_index + 1
-	if next_index >= tutorial_steps.size():
-		_end_tutorial()
-		return
-	_show_tutorial_step(next_index)
-
-
-func _show_tutorial_step(step_index: int) -> void:
-	tutorial_step_index = clampi(step_index, 0, tutorial_steps.size() - 1)
-	var step: Dictionary = tutorial_steps[tutorial_step_index]
-	tutorial_text_label.text = "%s\n\nPress any key or click to continue" % str(step.get("text", ""))
-	tutorial_text_label.visible = true
-	_layout_tutorial_for_targets(step.get("targets", []))
-
-
-func _layout_tutorial_for_targets(targets: Array) -> void:
-	TutorialOverlayHelper.layout_for_targets(self, tutorial_highlight, tutorial_text_panel, tutorial_text_label, targets, false)
-
-
-func _union_global_rect(targets: Array) -> Rect2:
-	return TutorialOverlayHelper.union_global_rect(targets, false)
-
-
-func _set_tutorial_active(is_active: bool) -> void:
-	tutorial_active = is_active
-	var buttons := [back_button, store_button, short_button, medium_button, long_button]
-	TutorialOverlayHelper.set_overlay_visible(is_active, tutorial_overlay, tutorial_text_panel, tutorial_text_label)
-	TutorialOverlayHelper.set_buttons_disabled(is_active, buttons, tutorial_disabled_buttons)
-	TutorialOverlayHelper.set_mouse_filter(is_active, [card_a, card_b, card_c], tutorial_card_filters, Control.MOUSE_FILTER_IGNORE)
-
-
-func _end_tutorial() -> void:
-	_set_tutorial_active(false)
-
-
-func _make_tutorial_label() -> Label:
-	return TutorialOverlayHelper.make_label(UI_FONT)
-
-
-func _start_ride_select_bgm() -> void:
-	if bgm_player != null and is_instance_valid(bgm_player):
-		return
-	bgm_player = AudioStreamPlayer.new()
-	bgm_player.name = "RideSelectBGMPlayer"
-	bgm_player.stream = load(RIDE_SELECT_BGM_PATH)
-	bgm_player.autoplay = false
-	bgm_player.bus = &"Master"
-	add_child(bgm_player)
-	AudioSettingsManager.register_player(bgm_player, "music")
-	bgm_player.play()
-
-
-func _is_any_press(event: InputEvent) -> bool:
-	return TutorialOverlayHelper.is_any_press(event)
-
-
-func _create_portrait_images() -> void:
-	portrait_images = []
-	for panel in [portrait_a_panel, portrait_b_panel, portrait_c_panel]:
-		portrait_images.append(_ensure_portrait_image(panel))
-
-
-func _ensure_portrait_image(panel: Panel) -> TextureRect:
-	if panel == null:
-		return null
-
-	panel.clip_contents = true
-
-	var portrait := panel.get_node_or_null("PortraitImage") as TextureRect
-	if portrait == null:
-		portrait = TextureRect.new()
-		portrait.name = "PortraitImage"
-		portrait.anchor_right = 1.0
-		portrait.anchor_bottom = 1.0
-		portrait.offset_left = 0.0
-		portrait.offset_top = 0.0
-		portrait.offset_right = 0.0
-		portrait.offset_bottom = 0.0
-		portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(portrait)
-
-	portrait.texture = GENERIC_PORTRAIT
-	return portrait
-
-
-func _portrait_for_character(character: Dictionary) -> Texture2D:
-	var character_id: String = str(character.get("id", "")).strip_edges().to_lower()
-	return UNIQUE_CHARACTER_PORTRAITS.get(character_id, GENERIC_PORTRAIT)
-
-
-func _get_pool_for_distance(distance: String) -> Array[Dictionary]:
-	var locked_pool: Array = locked_character_pools.get(distance, [])
-	var card_results: Array[Dictionary] = []
-	for card_variant in locked_pool:
-		var card := card_variant as Dictionary
-		card_results.append(card)
-	while card_results.size() < 3:
-		card_results.append({})
-	return card_results
-
-
 func _on_card_gui_input(event: InputEvent, card_index: int) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_choose_character(card_index)
-
-
-func _preview_stage_type(character: Dictionary) -> String:
-	if _is_forced_first_day_ride():
-		return PlayerState.FIRST_STAGE_TYPE
-	return PlayerState.build_stage_type(
-		str(character.get("active_distance", selected_distance)),
-		PlayerState.get_next_stage_time(_transition_mode()),
-		str(character.get("stage_traffic", "chill"))
-	)
-
-
-func _risk_label_for_stage_type(stage_type: String) -> String:
-	var score: int = _risk_score_for_stage_type(stage_type)
-	if score <= 5:
-		return "LOW"
-	if score <= 7:
-		return "MODERATE"
-	return "HIGH"
-
-
-func _risk_score_for_stage_type(stage_type: String) -> int:
-	var parts: PackedStringArray = stage_type.split("-")
-	if parts.size() < 3:
-		return 3
-
-	var difficulty: String = str(parts[0]).strip_edges().to_lower()
-	var time_of_day: String = str(parts[1]).strip_edges().to_lower()
-	var traffic: String = ""
-	for index in range(2, parts.size()):
-		if not traffic.is_empty():
-			traffic += "-"
-		traffic += str(parts[index]).strip_edges().to_lower()
-
-	return (
-		int(RISK_DISTANCE_SCORES.get(difficulty, 1))
-		+ int(RISK_TIME_SCORES.get(time_of_day, 1))
-		+ int(RISK_TRAFFIC_SCORES.get(traffic, 2))
-	)
 
 
 func _choose_character(card_index: int) -> void:
@@ -870,22 +183,6 @@ func _go_back() -> void:
 	get_tree().change_scene_to_file(return_scene if not return_scene.is_empty() else FALLBACK_SCENE)
 
 
-func _create_store_button() -> void:
-	# Keep shopping available now that home navigation uses room objects.
-	store_button = back_button.duplicate(0) as TextureButton
-	store_button.name = "StoreButton"
-	store_button.visible = true
-	store_button.tooltip_text = "Store: upgrades, energy and gas"
-	(store_button.get_node("BackLabel") as Label).text = "STORE"
-	$Panel.add_child(store_button)
-	back_button.offset_left = 330.0
-	back_button.offset_right = 550.0
-	store_button.offset_left = 608.0
-	store_button.offset_right = 828.0
-	store_button.pressed.connect(_open_store)
-	ButtonGlow.attach(self, store_button)
-
-
 func _open_store() -> void:
 	get_tree().change_scene_to_file(STORE_SCENE)
 
@@ -922,32 +219,3 @@ func _display_day() -> int:
 
 func _needs_refuel() -> bool:
 	return PlayerState.gas <= 0.0
-
-
-func _refresh_action_button() -> void:
-	back_button.visible = _allow_back()
-	back_label.text = "BACK"
-
-
-func _create_stats_row() -> void:
-	stats_row_refs = PlayerStatsRow.create({
-		"font": UI_FONT,
-		"font_size": 10,
-		"font_color": Color(0.30, 0.19, 0.10, 1.0),
-		"outline_color": Color(0.98, 0.94, 0.83, 0.86),
-	})
-	var stats_row := stats_row_refs["row"] as HBoxContainer
-	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_row.layout_mode = 1
-	stats_row.offset_left = 90.0
-	stats_row.offset_top = 118.0
-	stats_row.offset_right = 1064.0
-	stats_row.offset_bottom = 144.0
-	$Panel.add_child(stats_row)
-
-
-func _refresh_stats_row() -> void:
-	if stats_row_refs.is_empty():
-		return
-
-	PlayerStatsRow.refresh(stats_row_refs)

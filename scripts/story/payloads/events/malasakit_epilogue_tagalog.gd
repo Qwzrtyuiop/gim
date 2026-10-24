@@ -1,21 +1,65 @@
 extends RefCounted
 
-const RandomEventPayload := preload("res://scripts/story/payloads/events/random_event_payload.gd")
+const StoryPayload := preload("res://scripts/story/story_payload.gd")
+const StoryConstants := preload("res://scripts/story/story_constants.gd")
 
 
 static func build() -> Dictionary:
-	return RandomEventPayload.build_scene("malasakit_epilogue", "Malasakit — Epilogue", [
-		{"text": "Isang araw, habang ako ay nagpapahinga sa biyahe."},
-		{"speaker": "Passenger", "text": "Kamusta na kayo kuya?"},
-		{"text": "Lumapit saakin ang isang pamilyar na pasahero."},
-		{"speaker": "John Toda", "text": "Kamusta. Naiwan mo ulit wallet mo?"},
-		{"text": "Sinabi ko nang pabiro."},
-		{"speaker": "Passenger", "text": "Hahaha, hindi ngayon kuya."},
-		{"text": "Naglabas ng pera ang pasahero."},
-		{"speaker": "Passenger", "text": "Eto, yung bayad para sa nakaraan."},
-		{"text": "Tinanggap ko ang kanyang bayad."},
-		{
-			"text": "Nagpasalamat muli ang pasahero bago siya umalis.",
-			"actions": [{"type": "repay_malasakit_fare"}],
-		},
-	])
+	return StoryPayload.normalize({
+		"story_id": "malasakit_epilogue",
+		"chapter_title": "Malasakit — Epilogue",
+		"speaker_portraits": true,
+		"background": StoryConstants.BACKGROUND_STATION,
+		"music": StoryConstants.STATION_MUSIC,
+		"composition": [
+			# 0
+			{
+				"text": "Isang araw, habang ako ay nagpapahinga sa biyahe.",
+			},
+			# 1
+			{
+				"speaker": "Passenger",
+				"text": "Kamusta na kayo kuya?",
+			},
+			# 2
+			{
+				"text": "Lumapit saakin ang isang pamilyar na pasahero.",
+			},
+			# 3
+			{
+				"speaker": "John Toda",
+				"text": "Kamusta. Naiwan mo ulit wallet mo?",
+			},
+			# 4
+			{
+				"text": "Sinabi ko nang pabiro.",
+			},
+			# 5
+			{
+				"speaker": "Passenger",
+				"text": "Hahaha, hindi ngayon kuya.",
+			},
+			# 6
+			{
+				"text": "Naglabas ng pera ang pasahero.",
+			},
+			# 7
+			{
+				"speaker": "Passenger",
+				"text": "Eto, yung bayad para sa nakaraan.",
+			},
+			# 8
+			{
+				"text": "Tinanggap ko ang kanyang bayad.",
+			},
+			# 9
+			{
+				"text": "Nagpasalamat muli ang pasahero bago siya umalis.",
+				"actions": [
+					{
+						"type": "repay_malasakit_fare",
+					},
+				],
+			},
+		],
+	})

@@ -40,9 +40,10 @@ of the player's choice. Existing saves need no reset; newly completed rides
 record the passenger ID needed for eligibility.
 
 The English and Tagalog dialogue live in `payloads/events/malasakit.gd` and
-`payloads/events/malasakit_tagalog.gd`. Both use `random_event_payload.gd`
-for the shared station background and city ambience, matching Day 2. Use that
-shared presentation for future random ride events too. Passenger dialogue uses
+`payloads/events/malasakit_tagalog.gd`. Both use the standard payload format from
+`story_payloads_guide.md`, with `StoryConstants.BACKGROUND_STATION` and
+`StoryConstants.STATION_MUSIC` for the shared presentation matching Day 2. Use
+those defaults for future random ride events too. Passenger dialogue uses
 `assets/characters/placeholder.png` through the speaker portrait mapping.
 
 Register both language scripts in `story_payload_catalog.gd` and build events

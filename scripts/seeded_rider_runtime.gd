@@ -2,6 +2,49 @@ extends RefCounted
 class_name SeededRiderRuntime
 
 
+static func add_rule(player_state, rule_data: Dictionary) -> void:
+	if rule_data.is_empty():
+		return
+
+	var normalized_rule: Dictionary = normalize_rule(player_state, rule_data)
+	if normalized_rule.is_empty():
+		return
+
+	player_state.seeded_rider_rules.append(normalized_rule)
+	player_state.save_progress()
+
+
+static func seed_rider_for_stage(player_state, character_id: String, day: int, time_of_day := "", distance := "", slot := -1, forced_traffic := "", repeatable := false) -> void:
+	var rule_data: Dictionary = {
+		"character_id": character_id,
+		"day": max(1, day),
+		"repeatable": bool(repeatable),
+	}
+	if not str(time_of_day).strip_edges().is_empty():
+		rule_data["time_of_day"] = time_of_day
+	if not str(distance).strip_edges().is_empty():
+		rule_data["distance"] = distance
+	if int(slot) >= 0:
+		rule_data["slot"] = int(slot)
+	if not str(forced_traffic).strip_edges().is_empty():
+		rule_data["forced_traffic"] = forced_traffic
+	add_rule(player_state, rule_data)
+
+
+static func clear_rules(player_state) -> void:
+	player_state._reset_seeded_rider_state()
+	player_state.save_progress()
+
+
+static func get_rules(player_state) -> Array:
+	return player_state.seeded_rider_rules.duplicate(true)
+
+
+static func consume_player_rules(player_state, rule_ids: Array) -> void:
+	if consume_rules(player_state.consumed_seeded_rider_rules, rule_ids):
+		player_state.save_progress()
+
+
 static func normalize_rule(player_state, rule_data: Dictionary) -> Dictionary:
 	var explicit_rule_id := str(rule_data.get("id", "")).strip_edges()
 	var character_id := str(rule_data.get("character_id", rule_data.get("passenger_id", ""))).strip_edges().to_lower()

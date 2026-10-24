@@ -1,21 +1,65 @@
 extends RefCounted
 
-const RandomEventPayload := preload("res://scripts/story/payloads/events/random_event_payload.gd")
+const StoryPayload := preload("res://scripts/story/story_payload.gd")
+const StoryConstants := preload("res://scripts/story/story_constants.gd")
 
 
 static func build() -> Dictionary:
-	return RandomEventPayload.build_scene("malasakit_epilogue", "Malasakit — Epilogue", [
-		{"text": "One day, while I was taking a break."},
-		{"speaker": "Passenger", "text": "Hello there."},
-		{"text": "A familiar passenger walked toward me."},
-		{"speaker": "John Toda", "text": "Hey there, did you forget your wallet today too?"},
-		{"text": "I said jokingly."},
-		{"speaker": "Passenger", "text": "Fortunately, not today."},
-		{"text": "The passenger brought out money."},
-		{"speaker": "Passenger", "text": "Here, payment for the last time."},
-		{"text": "I take the payment from the passenger."},
-		{
-			"text": "They thanked me once more before they left.",
-			"actions": [{"type": "repay_malasakit_fare"}],
-		},
-	])
+	return StoryPayload.normalize({
+		"story_id": "malasakit_epilogue",
+		"chapter_title": "Malasakit — Epilogue",
+		"speaker_portraits": true,
+		"background": StoryConstants.BACKGROUND_STATION,
+		"music": StoryConstants.STATION_MUSIC,
+		"composition": [
+			# 0
+			{
+				"text": "One day, while I was taking a break.",
+			},
+			# 1
+			{
+				"speaker": "Passenger",
+				"text": "Hello there.",
+			},
+			# 2
+			{
+				"text": "A familiar passenger walked toward me.",
+			},
+			# 3
+			{
+				"speaker": "John Toda",
+				"text": "Hey there, did you forget your wallet today too?",
+			},
+			# 4
+			{
+				"text": "I said jokingly.",
+			},
+			# 5
+			{
+				"speaker": "Passenger",
+				"text": "Fortunately, not today.",
+			},
+			# 6
+			{
+				"text": "The passenger brought out money.",
+			},
+			# 7
+			{
+				"speaker": "Passenger",
+				"text": "Here, payment for the last time.",
+			},
+			# 8
+			{
+				"text": "I take the payment from the passenger.",
+			},
+			# 9
+			{
+				"text": "They thanked me once more before they left.",
+				"actions": [
+					{
+						"type": "repay_malasakit_fare",
+					},
+				],
+			},
+		],
+	})

@@ -132,12 +132,14 @@ static func prepare_stage_start(player_state, stage_descriptor: String = "") -> 
 	if not stage_start_error(player_state, stage_descriptor).is_empty():
 		return false
 
+	player_state._begin_state_batch()
 	spend_energy(player_state, GameTuning.TRIP_ENERGY_COST)
 	player_state.current_trip_had_crash = false
 	player_state.current_trip_low_energy = player_state.energy <= AchievementService.LOW_ENERGY_THRESHOLD
 	player_state.current_trip_low_gas = is_low_gas(player_state)
 	player_state.pending_stage_energy_cost = true
 	player_state.save_progress()
+	player_state._end_state_batch()
 	return true
 
 
@@ -148,8 +150,11 @@ static func prepare_stage_start_after_transition(player_state, stage_descriptor:
 	if not stage_start_error_after_transition(player_state, stage_descriptor, transition_mode).is_empty():
 		return false
 
+	player_state._begin_state_batch()
 	apply_transition_energy_bonus(player_state, transition_mode)
-	return prepare_stage_start(player_state, stage_descriptor)
+	var prepared: bool = prepare_stage_start(player_state, stage_descriptor)
+	player_state._end_state_batch()
+	return prepared
 
 
 static func confirm_stage_started(player_state) -> void:

@@ -1,14 +1,15 @@
 extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
-const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
+const VehicleTrafficSignals := preload("res://scripts/game/vehicle_traffic_signals.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const VehicleSpawner := preload("res://scripts/game/vehicle_spawner.gd")
+const VehicleSpawnRules := preload("res://scripts/game/vehicle_spawn_rules.gd")
 
 
 static func update_spawns(owner, delta: float) -> void:
 	if owner.game_state != "playing":
-		VehicleTrafficController.clear_oncoming_warning(owner)
+		VehicleTrafficSignals.clear_oncoming_warning(owner)
 		return
 	var progress: float = clampf(owner.distance / maxf(1.0, owner.target_distance), 0.0, 1.0)
 	for lane_index in range(3):
@@ -17,11 +18,11 @@ static func update_spawns(owner, delta: float) -> void:
 			var spawn_side: String = vehicle_spawn_side(owner, lane_index)
 			if lane_index == 0 and GameTuning.ONCOMING_WARNING_ENABLED:
 				if owner.oncoming_warning_elapsed >= 0.0:
-					if not VehicleTrafficController.update_oncoming_warning(owner, delta):
+					if not VehicleTrafficSignals.update_oncoming_warning(owner, delta):
 						continue
 				elif lane_has_spawn_room(owner, lane_index, spawn_side):
 					owner.oncoming_warning_elapsed = 0.0
-					VehicleTrafficController.update_oncoming_warning(owner, 0.0)
+					VehicleTrafficSignals.update_oncoming_warning(owner, 0.0)
 					continue
 			if lane_has_spawn_room(owner, lane_index, spawn_side) and VehicleSpawner.spawn_traffic(owner, lane_index, spawn_side):
 				owner.spawn_timers[lane_index] = next_spawn_delay(owner, lane_index, progress)
@@ -87,37 +88,24 @@ static func lane_has_spawn_room(owner, lane_index: int, spawn_side := BusyTraffi
 
 
 static func next_vehicle_speed_change_delay(owner) -> float:
-	return owner.rng.randf_range(
-		minf(owner.vehicle_speed_change_min_delay, owner.vehicle_speed_change_max_delay),
-		maxf(owner.vehicle_speed_change_min_delay, owner.vehicle_speed_change_max_delay)
-	)
+	return VehicleSpawnRules.next_vehicle_speed_change_delay(owner)
 
 
 static func vehicle_spawn_x(owner, size: Vector2, spawn_side: String) -> float:
-	if owner.stage_traffic == "busy":
-		return BusyTrafficBehavior.spawn_x(size, spawn_side, owner.rng, owner.player_speed, owner.player_max_speed)
-
-	return size.x + owner.rng.randf_range(owner.SPAWN_MIN_OFFSET, owner.SPAWN_MAX_OFFSET)
+	return VehicleSpawnRules.vehicle_spawn_x(owner, size, spawn_side)
 
 
 static func player_speed_ratio(owner) -> float:
-	return clampf(owner.player_speed / maxf(1.0, owner.player_max_speed), 0.0, 1.0)
+	return VehicleSpawnRules.player_speed_ratio(owner)
 
 
 static func vehicle_speed_range_for_spawn_side(owner, min_speed: float, max_speed: float, spawn_side: String) -> Vector2:
-	if owner.stage_traffic == "busy":
-		return BusyTrafficBehavior.speed_range_for_spawn_side(min_speed, max_speed, spawn_side, owner.player_speed)
-	return Vector2(min_speed, max_speed)
+	return VehicleSpawnRules.vehicle_speed_range_for_spawn_side(owner, min_speed, max_speed, spawn_side)
 
 
 static func is_post_day_seven_traffic_ramp(owner) -> bool:
-	return owner.use_player_state_stage_sequence and PlayerState.get_current_day() > 7
+	return VehicleSpawnRules.is_post_day_seven_traffic_ramp(owner)
 
 
 static func get_post_day_busy_car_chance(owner, lane_index: int) -> float:
-	match lane_index:
-		1:
-			return owner.POST_DAY_SEVEN_BUSY_CAR_CHANCE_MAIN
-		2:
-			return owner.POST_DAY_SEVEN_BUSY_CAR_CHANCE_SHOULDER
-	return 0.0
+	return VehicleSpawnRules.get_post_day_busy_car_chance(owner, lane_index)

@@ -197,6 +197,9 @@ var _suppress_auto_save := false
 var _has_deferred_save := false
 var _state_batch_depth := 0
 
+# Gallery playback is transient; it must never replace the saved live story.
+var pending_memory_replay: Dictionary = {}
+
 var money := 0:
 	set(value):
 		money = max(0, value)
@@ -704,28 +707,15 @@ func add_karma(amount: int) -> void:
 
 
 func set_last_stage_result(result: Dictionary) -> void:
-	last_stage_result = result.duplicate(true)
-	last_stage_result["paid_out"] = false
-	save_progress()
+	PlayerStageState.set_last_stage_result(self, result)
 
 
 func get_last_stage_result() -> Dictionary:
-	return last_stage_result.duplicate(true)
+	return PlayerStageState.get_last_stage_result(self)
 
 
 func claim_last_stage_total() -> int:
-	if last_stage_result.is_empty() or bool(last_stage_result.get("paid_out", false)):
-		return 0
-	if not str(last_stage_result.get("random_ride_event", "")).is_empty() and str(last_stage_result.get("random_ride_outcome", "")).is_empty():
-		return 0
-
-	var total: int = int(last_stage_result.get("total", 0))
-	_begin_state_batch()
-	add_money(total)
-	last_stage_result["paid_out"] = true
-	save_progress()
-	_end_state_batch()
-	return total
+	return PlayerStageState.claim_last_stage_total(self)
 
 
 func is_run_failed() -> bool:
@@ -771,47 +761,23 @@ func clear_pending_trip_selection() -> void:
 
 # Seeded rider runtime
 func add_seeded_rider_rule(rule_data: Dictionary) -> void:
-	if rule_data.is_empty():
-		return
-
-	var normalized_rule: Dictionary = SeededRiderRuntime.normalize_rule(self, rule_data)
-	if normalized_rule.is_empty():
-		return
-
-	seeded_rider_rules.append(normalized_rule)
-	save_progress()
+	SeededRiderRuntime.add_rule(self, rule_data)
 
 
 func seed_rider_for_stage(character_id: String, day: int, time_of_day := "", distance := "", slot := -1, forced_traffic := "", repeatable := false) -> void:
-	var rule_data: Dictionary = {
-		"character_id": character_id,
-		"day": max(1, day),
-		"repeatable": bool(repeatable),
-	}
-	if not str(time_of_day).strip_edges().is_empty():
-		rule_data["time_of_day"] = time_of_day
-	if not str(distance).strip_edges().is_empty():
-		rule_data["distance"] = distance
-	if int(slot) >= 0:
-		rule_data["slot"] = int(slot)
-	if not str(forced_traffic).strip_edges().is_empty():
-		rule_data["forced_traffic"] = forced_traffic
-	add_seeded_rider_rule(rule_data)
+	SeededRiderRuntime.seed_rider_for_stage(self, character_id, day, time_of_day, distance, slot, forced_traffic, repeatable)
 
 
 func clear_seeded_rider_rules() -> void:
-	_reset_seeded_rider_state()
-	save_progress()
+	SeededRiderRuntime.clear_rules(self)
 
 
 func get_seeded_rider_rules() -> Array:
-	return seeded_rider_rules.duplicate(true)
+	return SeededRiderRuntime.get_rules(self)
 
 
 func consume_seeded_rider_rules(rule_ids: Array) -> void:
-	var consumed_any: bool = SeededRiderRuntime.consume_rules(consumed_seeded_rider_rules, rule_ids)
-	if consumed_any:
-		save_progress()
+	SeededRiderRuntime.consume_player_rules(self, rule_ids)
 
 
 func get_seeded_rider_pool_setup(selection_context: Dictionary) -> Dictionary:
@@ -829,6 +795,18 @@ func get_pending_story() -> Dictionary:
 
 func clear_pending_story() -> void:
 	PlayerPendingState.clear_pending_story(self)
+
+
+func set_pending_memory_replay(story_payload: Dictionary) -> void:
+	PlayerPendingState.set_pending_memory_replay(self, story_payload)
+
+
+func get_pending_memory_replay() -> Dictionary:
+	return PlayerPendingState.get_pending_memory_replay(self)
+
+
+func clear_pending_memory_replay() -> void:
+	PlayerPendingState.clear_pending_memory_replay(self)
 
 
 func set_pending_sleep_transition_state(state: Dictionary) -> void:

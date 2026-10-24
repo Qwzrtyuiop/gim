@@ -1,6 +1,60 @@
 extends RefCounted
 
 
+static func create(owner: Control, font: Font, overlay_z_index := 0) -> Dictionary:
+	var overlay := Control.new()
+	overlay.anchor_right = 1.0
+	overlay.anchor_bottom = 1.0
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.focus_mode = Control.FOCUS_ALL
+	overlay.z_index = overlay_z_index
+	overlay.visible = false
+	owner.add_child(overlay)
+
+	var backdrop := ColorRect.new()
+	backdrop.anchor_right = 1.0
+	backdrop.anchor_bottom = 1.0
+	backdrop.color = Color(0.0, 0.0, 0.0, 0.55)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	overlay.add_child(backdrop)
+
+	var highlight := Panel.new()
+	highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	highlight.z_index = 1
+	var highlight_style := StyleBoxFlat.new()
+	highlight_style.bg_color = Color(0.0, 0.0, 0.0, 0.0)
+	highlight_style.border_color = Color(0.98, 0.92, 0.68, 0.95)
+	highlight_style.set_border_width_all(3)
+	highlight_style.set_corner_radius_all(8)
+	highlight.add_theme_stylebox_override("panel", highlight_style)
+	overlay.add_child(highlight)
+
+	var text_panel := Panel.new()
+	text_panel.z_index = 2
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.10, 0.08, 0.06, 0.92)
+	panel_style.border_color = Color(0.82, 0.66, 0.40, 0.95)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(8)
+	text_panel.add_theme_stylebox_override("panel", panel_style)
+	overlay.add_child(text_panel)
+
+	var text_label := make_label(font)
+	text_label.anchor_right = 1.0
+	text_label.anchor_bottom = 1.0
+	text_label.offset_left = 12.0
+	text_label.offset_top = 10.0
+	text_label.offset_right = -12.0
+	text_label.offset_bottom = -10.0
+	text_panel.add_child(text_label)
+	return {
+		"overlay": overlay,
+		"highlight": highlight,
+		"text_panel": text_panel,
+		"text_label": text_label,
+	}
+
+
 static func make_label(font: Font, font_size := 12) -> Label:
 	var label := Label.new()
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

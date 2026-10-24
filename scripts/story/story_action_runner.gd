@@ -2,7 +2,11 @@ extends RefCounted
 class_name StoryActionRunner
 
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
+const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
+const StoryAudioRuntime := preload("res://scripts/story/story_audio_runtime.gd")
+const StoryPresentation := preload("res://scripts/story/story_presentation.gd")
+const StoryInterface := preload("res://scripts/story/story_interface.gd")
 
 
 static func run(owner, action_data: Dictionary) -> void:
@@ -11,9 +15,9 @@ static func run(owner, action_data: Dictionary) -> void:
 		"resolve_bayanihan":
 			RandomRideEventService.resolve_bayanihan(PlayerState, owner.story_payload, str(action_data.get("outcome", "")))
 		"show_weekly_debt_transition":
-			await owner._show_weekly_debt_transition()
+			await StoryInterface.show_weekly_debt_transition(owner)
 		"hide_weekly_debt_transition":
-			owner._hide_weekly_debt_transition()
+			StoryInterface.hide_weekly_debt_transition(owner)
 		"collect_first_week_interest":
 			PlayerDebtState.collect_first_week_interest(PlayerState, int(action_data.get("amount", 500)))
 		"repay_malasakit_fare":
@@ -25,26 +29,27 @@ static func run(owner, action_data: Dictionary) -> void:
 			owner.story_payload["queued_special_stage_id"] = str(action_data.get("id", action_data.get("special_stage_id", "")))
 			PlayerState.set_pending_story(owner.story_payload)
 		"pause", "wait":
-			await owner._pause_for_seconds(float(action_data.get("duration", action_data.get("time", 0.0))))
+			await StoryPresentation.pause_for_seconds(owner, float(action_data.get("duration", action_data.get("time", 0.0))))
 		"fade_to_black", "screen_fade_out":
-			await owner._fade_background_overlay(1.0, float(action_data.get("duration", owner.DEFAULT_SCREEN_FADE_SECONDS)))
+			await StoryPresentation.fade_background_overlay(owner, 1.0, float(action_data.get("duration", StoryPresentation.DEFAULT_SCREEN_FADE_SECONDS)))
 		"fade_from_black", "screen_fade_in":
-			await owner._fade_background_overlay(0.0, float(action_data.get("duration", owner.DEFAULT_SCREEN_FADE_SECONDS)))
+			await StoryPresentation.fade_background_overlay(owner, 0.0, float(action_data.get("duration", StoryPresentation.DEFAULT_SCREEN_FADE_SECONDS)))
 		"fade_screen":
-			await owner._fade_background_overlay(
+			await StoryPresentation.fade_background_overlay(
+				owner,
 				clampf(float(action_data.get("alpha", action_data.get("target_alpha", owner.background_fade_overlay.color.a))), 0.0, 1.0),
-				float(action_data.get("duration", owner.DEFAULT_SCREEN_FADE_SECONDS))
+				float(action_data.get("duration", StoryPresentation.DEFAULT_SCREEN_FADE_SECONDS))
 			)
 		"play_music", "music_play":
-			await owner._play_music_action(action_data)
+			await StoryAudioRuntime.play_music_action(owner, action_data)
 		"stop_music", "music_stop":
-			await owner._stop_music_action(action_data)
+			await StoryAudioRuntime.stop_music_action(owner, action_data)
 		"unlock_achievement", "achievement_unlock":
 			PlayerState.unlock_achievement(str(action_data.get("id", action_data.get("achievement_id", ""))))
 		"set_event_value", "story_event", "event_value":
-			owner._apply_set_event_value_action(action_data)
+			apply_set_event_value_action(action_data)
 		"set_event_values", "story_events", "event_values":
-			owner._apply_set_event_values_action(action_data)
+			apply_set_event_values_action(action_data)
 		"clear_event_value", "erase_event_value":
 			PlayerState.clear_event_value(str(action_data.get("id", action_data.get("event_id", action_data.get("key", "")))))
 		"clear_event_values", "erase_event_values":
@@ -71,59 +76,60 @@ static func run(owner, action_data: Dictionary) -> void:
 		"add_karma", "change_karma":
 			PlayerState.add_karma(int(action_data.get("amount", 0)))
 		"add_character_progress", "increase_character_progress", "character_progress":
-			owner._apply_character_progress_action(action_data)
+			apply_character_progress_action(action_data)
 		"set_character_progress", "character_progress_set":
-			owner._apply_set_character_progress_action(action_data)
+			apply_set_character_progress_action(action_data)
 		"set_character_story_lock", "character_story_lock":
-			owner._apply_character_story_lock_action(action_data)
+			apply_character_story_lock_action(action_data)
 		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
 			PlayerState.set_pending_night_phase_skip(bool(action_data.get("enabled", action_data.get("value", true))))
 		"clear_pending_night_skip":
 			PlayerState.clear_pending_night_phase_skip()
 		"play_sfx", "sfx_play", "cue_phone_sound", "phone_sound":
-			owner._play_sfx_action(action_data)
+			StoryAudioRuntime.play_sfx_action(owner, action_data)
 		"stop_sfx", "sfx_stop":
-			owner.sfx_player.stop()
+			StoryAudioRuntime.stop_sfx_action(owner)
 		"set_portrait", "change_portrait":
-			owner._apply_portrait_action(action_data)
+			StoryPresentation.apply_portrait_action(owner, action_data)
 		"set_portraits":
-			owner._replace_portraits(action_data.get("portraits", []))
+			StoryPresentation.replace_portraits(owner, action_data.get("portraits", []))
 		"clear_portraits":
-			owner._replace_portraits([])
+			StoryPresentation.replace_portraits(owner, [])
 		"clear_portrait":
-			owner._clear_portrait_action(action_data)
+			StoryPresentation.clear_portrait_action(owner, action_data)
 		"portrait_switch", "focus_portrait":
-			owner._apply_portrait_focus_from_side(str(action_data.get("side", action_data.get("focus", "none"))))
+			StoryPresentation.apply_portrait_focus_from_side(owner, str(action_data.get("side", action_data.get("focus", "none"))))
 		"set_dialogue", "dialogue":
-			owner._set_dialogue_content(
+			StoryInterface.set_dialogue_content(
+				owner,
 				str(action_data.get("speaker", owner.speaker_label.text)),
 				str(action_data.get("text", owner.body_label.text)),
-				str(action_data.get("continue_hint", owner.continue_label.text if not owner.continue_label.text.is_empty() else owner.DEFAULT_CONTINUE_HINT)),
+				str(action_data.get("continue_hint", owner.continue_label.text if not owner.continue_label.text.is_empty() else StoryInterface.DEFAULT_CONTINUE_HINT)),
 				bool(action_data.get("visible", true))
 			)
 		"background_camera", "bg_camera", "camera":
-			owner._apply_background_camera_action(action_data)
+			StoryPresentation.apply_background_camera_action(owner, action_data)
 		"zoom_background", "bg_zoom":
-			owner._apply_background_camera_action({
+			StoryPresentation.apply_background_camera_action(owner, {
 				"zoom": action_data.get("zoom", action_data.get("value", action_data.get("amount", owner.background_zoom))),
-				"duration": action_data.get("duration", owner.DEFAULT_BG_CAMERA_DURATION),
+				"duration": action_data.get("duration", StoryPresentation.DEFAULT_BG_CAMERA_DURATION),
 			})
 		"pan_background", "bg_pan":
-			owner._apply_background_camera_action({
+			StoryPresentation.apply_background_camera_action(owner, {
 				"pan": action_data.get("pan", action_data.get("value", action_data.get("offset", action_data.get("focus", null)))),
-				"duration": action_data.get("duration", owner.DEFAULT_BG_CAMERA_DURATION),
+				"duration": action_data.get("duration", StoryPresentation.DEFAULT_BG_CAMERA_DURATION),
 			})
 		"reset_background_camera", "bg_reset":
-			owner._set_background_camera(1.0, Vector2.ZERO, float(action_data.get("duration", owner.DEFAULT_BG_CAMERA_DURATION)))
+			StoryPresentation.set_background_camera(owner, 1.0, Vector2.ZERO, float(action_data.get("duration", StoryPresentation.DEFAULT_BG_CAMERA_DURATION)))
 		"hide_dialogue":
 			owner.dialogue_panel.visible = false
 		"show_dialogue":
 			owner.dialogue_panel.visible = true
 		"set_background":
 			owner.current_background_ref = action_data.get("texture", action_data.get("background", action_data.get("path", null)))
-			owner._set_background_texture(owner.current_background_ref, not bool(action_data.get("preserve_camera", false)))
-			if owner._has_background_camera_data(action_data):
-				owner._apply_background_camera_action(action_data)
+			StoryPresentation.set_background_texture(owner, owner.current_background_ref, not bool(action_data.get("preserve_camera", false)))
+			if StoryPresentation.has_background_camera_data(action_data):
+				StoryPresentation.apply_background_camera_action(owner, action_data)
 
 
 static func _add_story_trigger_from_action(action_data: Dictionary) -> void:
@@ -153,3 +159,102 @@ static func _extract_payload_dictionary(action_data: Dictionary, keys: Array[Str
 static func _strip_action_keys(data: Dictionary) -> void:
 	data.erase("type")
 	data.erase("action")
+
+
+static func is_persistent_story_action(action_data: Dictionary) -> bool:
+	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
+	match action_type:
+		"resolve_random_ride_fare", "repay_malasakit_fare", "resolve_bayanihan":
+			return true
+		"start_special_stage":
+			return true
+		"unlock_achievement", "achievement_unlock":
+			return true
+		"set_event_value", "story_event", "event_value":
+			return true
+		"set_event_values", "story_events", "event_values":
+			return true
+		"clear_event_value", "erase_event_value":
+			return true
+		"clear_event_values", "erase_event_values":
+			return true
+		"add_story_trigger", "insert_story_trigger", "queue_story_trigger":
+			return true
+		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
+			return true
+		"add_money", "gain_money":
+			return true
+		"spend_money", "pay_money":
+			return true
+		"spend_all_money", "take_all_money":
+			return true
+		"collect_debt", "pay_debt_goal", "collect_first_week_interest":
+			return true
+		"add_energy", "gain_energy":
+			return true
+		"add_max_energy", "gain_max_energy":
+			return true
+		"add_karma", "change_karma":
+			return true
+		"add_character_progress", "increase_character_progress", "character_progress":
+			return true
+		"set_character_progress", "character_progress_set":
+			return true
+		"set_character_story_lock", "character_story_lock":
+			return true
+		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
+			return true
+		"clear_pending_night_skip":
+			return true
+	return false
+
+
+static func apply_character_progress_action(action_data: Dictionary) -> void:
+	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
+	var amount := int(action_data.get("amount", action_data.get("value", 1)))
+	PlayerState.increment_unique_character_progress(character_id, amount)
+
+
+static func apply_set_character_progress_action(action_data: Dictionary) -> void:
+	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
+	var value := int(action_data.get("value", action_data.get("amount", 0)))
+	PlayerState.set_unique_character_progress(character_id, value)
+
+
+static func apply_character_story_lock_action(action_data: Dictionary) -> void:
+	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
+	PlayerState.set_unique_character_story_locked(
+		character_id,
+		bool(action_data.get("locked", action_data.get("value", true)))
+	)
+
+
+static func apply_choice_event_values(choice_data: Dictionary) -> void:
+	if choice_data.has("event_values"):
+		PlayerState.set_event_values(choice_data.get("event_values", {}))
+	elif choice_data.has("event_id") or choice_data.has("event_value") or choice_data.has("key"):
+		PlayerState.set_event_values(
+			StoryEventHandler.build_single_event_values(
+				str(choice_data.get("event_id", choice_data.get("key", ""))),
+				choice_data.get("event_value", choice_data.get("value", 1))
+			)
+		)
+
+
+static func apply_set_event_value_action(action_data: Dictionary) -> void:
+	var event_id := str(action_data.get("id", action_data.get("event_id", action_data.get("key", ""))))
+	if event_id.is_empty():
+		return
+	PlayerState.set_event_values(
+		StoryEventHandler.build_single_event_values(
+			event_id,
+			action_data.get("value", action_data.get("amount", 1))
+		)
+	)
+
+
+static func apply_set_event_values_action(action_data: Dictionary) -> void:
+	var values: Variant = action_data.get("values", action_data.get("events", {}))
+	if not values is Dictionary:
+		return
+	PlayerState.set_event_values((values as Dictionary).duplicate(true))

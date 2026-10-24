@@ -4,9 +4,26 @@ class_name StoryCatalog
 const StoryCatalogData := preload("res://scripts/story/story_catalog_data.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
+static var _characters_by_id: Dictionary = {}
+static var _unique_ids: Dictionary = {}
+static var _speaker_ids: Dictionary = {}
+
+
+static func _ensure_index() -> void:
+	if not _characters_by_id.is_empty():
+		return
+	for character: Dictionary in StoryCatalogData.GENERIC_PASSENGERS:
+		_characters_by_id[str(character.id)] = character
+	for character: Dictionary in StoryCatalogData.MOCK_CHARACTERS:
+		var id: String = str(character.id)
+		_characters_by_id[id] = character
+		_unique_ids[id] = true
+		_speaker_ids[str(character.name).to_lower()] = id
+
 
 static func get_character_display_name(player_state, character_id: String) -> String:
-	var character: Dictionary = get_character_by_id(player_state, character_id)
+	_ensure_index()
+	var character: Dictionary = _characters_by_id.get(character_id.strip_edges().to_lower(), {})
 	if character.is_empty():
 		return "???"
 	var safe_id: String = str(character.get("id", ""))
@@ -19,9 +36,10 @@ static func get_character_display_name(player_state, character_id: String) -> St
 
 
 static func get_speaker_display_name(player_state, speaker: String) -> String:
-	for character: Dictionary in StoryCatalogData.MOCK_CHARACTERS:
-		if str(character.get("name", "")).to_lower() == speaker.strip_edges().to_lower():
-			return get_character_display_name(player_state, str(character["id"]))
+	_ensure_index()
+	var id: String = str(_speaker_ids.get(speaker.strip_edges().to_lower(), ""))
+	if not id.is_empty():
+		return get_character_display_name(player_state, id)
 	return speaker
 
 static func get_generic_passengers() -> Array:
@@ -32,7 +50,7 @@ static func get_unique_passengers(player_state) -> Array:
 	var unique_passengers: Array = []
 	for character_data in StoryCatalogData.MOCK_CHARACTERS:
 		if character_data is Dictionary:
-			unique_passengers.append(_character_with_progress(player_state, (character_data as Dictionary).duplicate(true)))
+			unique_passengers.append(_character_with_progress(player_state, character_data))
 	return unique_passengers
 
 
@@ -44,26 +62,17 @@ static func get_mock_characters(player_state) -> Array:
 
 
 static func get_character_by_id(player_state, character_id: String) -> Dictionary:
+	_ensure_index()
 	var safe_id: String = str(character_id).strip_edges().to_lower()
-	if safe_id.is_empty():
+	if not _characters_by_id.has(safe_id):
 		return {}
-	for character_data in get_mock_characters(player_state):
-		if not character_data is Dictionary:
-			continue
-		var character: Dictionary = character_data
-		if str(character.get("id", "")).strip_edges().to_lower() == safe_id:
-			return character.duplicate(true)
-	return {}
+	var character: Dictionary = _characters_by_id[safe_id]
+	return _character_with_progress(player_state, character) if _unique_ids.has(safe_id) else character.duplicate(true)
 
 
 static func is_unique_character(character_id: String) -> bool:
-	var safe_id: String = str(character_id).strip_edges().to_lower()
-	for character_data in StoryCatalogData.MOCK_CHARACTERS:
-		if not character_data is Dictionary:
-			continue
-		if str((character_data as Dictionary).get("id", "")).strip_edges().to_lower() == safe_id:
-			return true
-	return false
+	_ensure_index()
+	return _unique_ids.has(character_id.strip_edges().to_lower())
 
 
 static func get_unique_character_story_state(player_state, character_id: String, context: Dictionary = {}) -> Dictionary:
@@ -163,13 +172,7 @@ static func _character_with_progress(player_state, character_data: Dictionary) -
 
 static func _get_unique_character_base_data(character_id: String) -> Dictionary:
 	var safe_id: String = str(character_id).strip_edges().to_lower()
-	for character_data in StoryCatalogData.MOCK_CHARACTERS:
-		if not character_data is Dictionary:
-			continue
-		var candidate: Dictionary = character_data
-		if str(candidate.get("id", "")).strip_edges().to_lower() == safe_id:
-			return candidate.duplicate(true)
-	return {}
+	return Dictionary(_characters_by_id[safe_id]).duplicate(true) if is_unique_character(safe_id) else {}
 
 
 static func _resolve_story_stages(player_state, character_data: Dictionary, context: Dictionary = {}) -> Array:

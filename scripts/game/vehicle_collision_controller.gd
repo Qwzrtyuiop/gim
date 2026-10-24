@@ -1,6 +1,7 @@
 extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
 const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
@@ -11,7 +12,7 @@ static func collision_data(owner) -> Dictionary:
 		return {}
 
 	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)
-	for entity in owner.active_entities:
+	for entity in TrafficIndex.in_lane(owner, owner.player_lane):
 		if VehicleTrafficController.entity_collision_disabled(entity):
 			continue
 		if entity["lane"] != owner.player_lane:

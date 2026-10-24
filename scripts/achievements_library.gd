@@ -2,7 +2,7 @@ extends Control
 
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const LibraryTheme := preload("res://scripts/library/library_theme.gd")
 
 @onready var list_container: VBoxContainer = $Panel/ScrollContainer/ListContainer
 @onready var empty_label: Label = $Panel/EmptyLabel
@@ -21,9 +21,9 @@ func _ready() -> void:
 	back_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ButtonGlow.attach(self, back_button)
 	UIAudioManager.attach_button(close_button)
-	_apply_button_theme(close_button)
-	_apply_panel_theme(main_panel, Color(0.10, 0.09, 0.08, 0.92))
-	_apply_panel_theme(detail_panel, Color(0.11, 0.10, 0.08, 0.96))
+	LibraryTheme.apply_achievement_button(close_button)
+	LibraryTheme.apply_panel(main_panel, Color(0.10, 0.09, 0.08, 0.92), 12)
+	LibraryTheme.apply_panel(detail_panel, Color(0.11, 0.10, 0.08, 0.96), 12)
 	back_button.pressed.connect(_go_back)
 	close_button.pressed.connect(_hide_details)
 	detail_overlay.visible = false
@@ -59,7 +59,7 @@ func _populate_achievement_list() -> void:
 			str(achievement_data.get("title", "")).to_upper(),
 			str(achievement_data.get("subtitle", "")),
 		]
-		_apply_button_theme(button)
+		LibraryTheme.apply_achievement_button(button)
 		button.pressed.connect(_show_details.bind(achievement_data))
 		list_container.add_child(button)
 		ButtonGlow.attach(self, button)
@@ -68,50 +68,6 @@ func _populate_achievement_list() -> void:
 		var first_button := list_container.get_child(0)
 		if first_button is Button:
 			(first_button as Button).grab_focus()
-
-
-func _apply_button_theme(button: BaseButton) -> void:
-	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 12)
-	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(0.18, 0.10, 0.06, 1.0))
-	button.add_theme_color_override("font_pressed_color", Color(0.18, 0.10, 0.06, 1.0))
-	button.add_theme_color_override("font_focus_color", Color(0.18, 0.10, 0.06, 1.0))
-	button.add_theme_color_override("font_outline_color", Color(0.04, 0.02, 0.01, 1.0))
-	button.add_theme_constant_override("outline_size", 1)
-
-	var normal_style := StyleBoxFlat.new()
-	normal_style.bg_color = Color(0.25, 0.17, 0.12, 0.94)
-	normal_style.border_color = Color(0.60, 0.45, 0.26, 1.0)
-	normal_style.set_border_width_all(3)
-	normal_style.set_corner_radius_all(8)
-	normal_style.content_margin_left = 18.0
-	normal_style.content_margin_right = 18.0
-	normal_style.content_margin_top = 14.0
-	normal_style.content_margin_bottom = 14.0
-
-	var hover_style := normal_style.duplicate()
-	hover_style.bg_color = Color(0.83, 0.63, 0.33, 0.98)
-
-	var pressed_style := normal_style.duplicate()
-	pressed_style.bg_color = Color(0.35, 0.48, 0.31, 0.98)
-
-	button.add_theme_stylebox_override("normal", normal_style)
-	button.add_theme_stylebox_override("hover", hover_style)
-	button.add_theme_stylebox_override("focus", hover_style)
-	button.add_theme_stylebox_override("pressed", pressed_style)
-
-
-func _apply_panel_theme(panel: Panel, bg_color: Color) -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_color = Color(0.71, 0.56, 0.31, 1.0)
-	style.set_border_width_all(4)
-	style.set_corner_radius_all(12)
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.24)
-	style.shadow_size = 6
-	style.shadow_offset = Vector2(0, 3)
-	panel.add_theme_stylebox_override("panel", style)
 
 
 func _show_details(achievement_data: Dictionary) -> void:

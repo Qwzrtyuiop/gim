@@ -5,3 +5,6 @@ export_presets.cfg
 
 # Local Godot editor installation path.
 /.vscode/settings.json
+
+# Python validation caches.
+__pycache__/

@@ -99,7 +99,8 @@ func play_speeder_beep() -> void:
 	if playback == null:
 		return
 
-	playback.clear_buffer()
+	# play() creates a fresh generator playback. Clearing it after starting
+	# is rejected by Godot because the playback is already active.
 	var sample_rate := 22050.0
 	var frequency := 880.0
 	var frames := int(sample_rate * 0.08)

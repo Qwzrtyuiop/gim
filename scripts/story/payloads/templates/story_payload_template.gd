@@ -1,48 +1,56 @@
 extends RefCounted
 
-# Copy this file when creating a new story payload.
-# build() returns the Dictionary consumed by story_scene.gd.
-
+const StoryPayload := preload("res://scripts/story/story_payload.gd")
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
+
+# Zero-based section targets. Keep these aligned with the composition below.
+const AGREE := 6
+const DECLINE := 7
+const FINISH := 8
+
+# Copy this file for a new story. See ../../story_payloads_guide.md.
 
 
 static func build() -> Dictionary:
-	return {
+	return StoryPayload.normalize({
 		"story_id": "template_story_id",
-		"speaker_portraits": true,
 		"chapter_title": "Template Story",
-
-		# Optional scene defaults.
+		"speaker_portraits": true,
 		"background": StoryConstants.BACKGROUND_INHOUSE,
-		"music": {
-			"type": "play_music",
-			"path": StoryConstants.MUSIC_CITY_AMBIENCE,
-			"loop": true,
-			"fade_in": 0.55,
-			"volume_db": -9.0,
-		},
-
-		# StoryScene reads composition first, then sections, then lines.
+		"music": StoryConstants.STATION_MUSIC,
 		"composition": [
+			# 0
+			# Narration with a background transition.
 			{
-				# Basic narration line with a background transition.
+				"text": "Narration line goes here.",
 				"background": StoryConstants.BACKGROUND_INHOUSE,
 				"background_fade": 0.28,
 				"pause_before": 0.16,
-				"text": "Narration line goes here.",
 			},
+			# 1
+			# Explicit portraits persist until replaced; [] clears them. Special CGs hide portraits.
 			{
-				# Multiple borderless sprites sit directly above the dialogue box.
-				# Omit portraits on later lines to keep them; [] removes them all.
 				"speaker": "John Toda",
 				"text": "Dialogue line goes here.",
 				"portraits": [
-					{"id": "john", "texture": "res://assets/characters/John.png", "position": "left", "height": 300},
-					{"id": "benny", "texture": "res://assets/characters/Benny.png", "position": "right", "height": 300, "flip_h": true},
+					{
+						"id": "john",
+						"texture": "res://assets/characters/John.png",
+						"position": "left",
+						"height": 300,
+					},
+					{
+						"id": "benny",
+						"texture": "res://assets/characters/Benny.png",
+						"position": "right",
+						"height": 300,
+						"flip_h": true,
+					},
 				],
 			},
+			# 2
+			# Optional camera movement.
 			{
-				# Optional background camera motion.
 				"text": "You can add camera motion to a line.",
 				"camera": {
 					"zoom": 1.05,
@@ -50,8 +58,9 @@ static func build() -> Dictionary:
 					"duration": 0.4,
 				},
 			},
+			# 3
+			# Actions run in order.
 			{
-				# Actions must be an Array of Dictionaries.
 				"text": "...",
 				"actions": [
 					{
@@ -69,27 +78,30 @@ static func build() -> Dictionary:
 					},
 				],
 			},
+			# 4
+			# Choices jump to the named sections above.
 			{
-				# choices must also be an Array of Dictionaries.
 				"text": "What should John do?",
 				"choices": [
 					{
 						"text": "Agree",
-						"next_index": 6,
+						"next_index": AGREE,
 					},
 					{
 						"text": "Refuse",
-						"next_index": 7,
+						"next_index": DECLINE,
 					},
 				],
 			},
+			# 5
+			# Unused filler retained so saved section indices stay stable.
 			{
-				# Placeholder line so the sample next_index values above resolve cleanly.
 				"text": "Unused filler line. Replace this while wiring your own branches.",
-				"next_index": 8,
+				"next_index": FINISH,
 			},
+			# 6 — AGREE
+			# Agree branch; its final jump skips the decline branch.
 			{
-				# Branch A.
 				"speaker": "John Toda",
 				"text": "Alright, I'll go.",
 				"actions": [
@@ -99,10 +111,11 @@ static func build() -> Dictionary:
 						"value": "agree",
 					},
 				],
-				"next_index": 8,
+				"next_index": FINISH,
 			},
+			# 7 — DECLINE
+			# Decline branch.
 			{
-				# Branch B.
 				"speaker": "John Toda",
 				"text": "Not tonight.",
 				"actions": [
@@ -112,16 +125,12 @@ static func build() -> Dictionary:
 						"value": "refuse",
 					},
 				],
-				"next_index": 8,
+				"next_index": FINISH,
 			},
+			# 8 — FINISH
+			# The scene finishes naturally after the final line.
 			{
-				# End line. If you omit next_index here, StoryScene finishes naturally.
 				"text": "The scene ends here.",
 			},
 		],
-
-		# Optional testing hooks.
-		# Usually return_scene / next_scene are injected by trigger code instead.
-		# "return_scene": "res://scenes/stage_results.tscn",
-		# "next_scene": "res://scenes/stage_results.tscn",
-	}
+	})

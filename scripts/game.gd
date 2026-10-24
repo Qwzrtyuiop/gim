@@ -452,15 +452,11 @@ func _notification(what: int) -> void:
 
 
 func _pick_stage_background() -> Texture2D:
-	var pool_tag := _background_pool_tag()
-	var background_pool: Array = STAGE_BACKGROUND_POOLS.get(pool_tag, STAGE_BACKGROUND_POOLS.get(DEFAULT_BACKGROUND_POOL_TAG, []))
-	if background_pool.is_empty():
-		return null
-	return background_pool[rng.randi_range(0, background_pool.size() - 1)] as Texture2D
+	return GameEnvironmentController.pick_stage_background(self)
 
 
 func _background_pool_tag() -> String:
-	return str(BACKGROUND_POOL_TAGS_BY_TYPE.get(background_type, DEFAULT_BACKGROUND_POOL_TAG))
+	return GameEnvironmentController.background_pool_tag(self)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -570,26 +566,8 @@ func _draw() -> void:
 
 
 func _update_player_hit_state(delta: float) -> void:
-	player_hit_recovery_timer = maxf(0.0, player_hit_recovery_timer - delta)
-	if player_hit_invincible_timer <= 0.0:
-		player_hit_flicker_timer = 0.0
-		player_hit_flicker_visible = true
-		return
-
-	player_hit_invincible_timer = maxf(0.0, player_hit_invincible_timer - delta)
-	player_hit_flicker_timer -= delta
-	if player_hit_flicker_timer <= 0.0:
-		player_hit_flicker_timer = crash_flicker_interval
-		player_hit_flicker_visible = not player_hit_flicker_visible
+	PlayerVehicleController.update_hit_state(self, delta)
 
 
 func _apply_player_hit_visuals() -> void:
-	if player == null:
-		return
-
-	if game_state != "playing" or player_hit_invincible_timer <= 0.0:
-		player.modulate = Color(1.0, 1.0, 1.0, 1.0)
-		return
-
-	var flicker_alpha := 1.0 if player_hit_flicker_visible else crash_flicker_alpha
-	player.modulate = Color(1.0, 1.0, 1.0, flicker_alpha)
+	PlayerVehicleController.apply_hit_visuals(self)

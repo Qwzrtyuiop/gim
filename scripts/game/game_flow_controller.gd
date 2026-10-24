@@ -1,6 +1,7 @@
 extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
 
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
@@ -178,6 +179,7 @@ static func reset_game(owner) -> void:
 		if entity.has("sprite") and entity["sprite"] != null and is_instance_valid(entity["sprite"]):
 			entity["sprite"].queue_free()
 	owner.active_entities.clear()
+	TrafficIndex.invalidate(owner)
 	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	owner.spawn_timers = [0.4, 0.8, 1.2]
 	VehicleTrafficController.clear_oncoming_warning(owner)

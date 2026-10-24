@@ -19,8 +19,18 @@ const VEHICLE_REFERENCE_PATHS := {
 
 
 static func collision_rect(sprite: Sprite2D, inset: Vector4, owner) -> Rect2:
+	# Cache by geometry inputs, not merely frame: overlap resolution can move a
+	# vehicle several times in the same frame, and lane changes alter its scale.
+	var cache: Dictionary = sprite.get_meta(&"collision_rect_cache", {})
+	var signature: Array = [sprite.texture, sprite.texture.get_size(), sprite.flip_h, sprite.flip_v, sprite.global_position, sprite.scale]
+	var entry: Dictionary = cache.get(inset, {})
+	if entry.get("signature", []) == signature:
+		return entry.rect
 	var local_rect: Rect2 = local_hitbox_rect(sprite, inset, owner)
-	return collision_rect_for_transform(sprite, sprite.global_position, sprite.scale, local_rect)
+	var rect := collision_rect_for_transform(sprite, sprite.global_position, sprite.scale, local_rect)
+	cache[inset] = {"signature": signature, "rect": rect}
+	sprite.set_meta(&"collision_rect_cache", cache)
+	return rect
 
 
 static func collision_rect_for_transform(sprite: Sprite2D, global_position: Vector2, scale: Vector2, local_rect: Rect2) -> Rect2:
@@ -71,7 +81,9 @@ static func local_hitbox_rect(sprite: Sprite2D, inset: Vector4, owner) -> Rect2:
 
 
 static func visible_texture_rect(texture: Texture2D, owner) -> Rect2:
-	var cache_key := texture.resource_path
+	# Runtime textures and resource duplicates may have the same (or empty)
+	# path while using different transparent bounds.
+	var cache_key := texture.get_instance_id()
 	if owner.texture_hitbox_cache.has(cache_key):
 		return owner.texture_hitbox_cache[cache_key]
 

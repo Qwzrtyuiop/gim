@@ -1,11 +1,12 @@
 extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameRandom := preload("res://scripts/game/game_random.gd")
 const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
-const VehicleSpawnScheduler := preload("res://scripts/game/vehicle_spawn_scheduler.gd")
+const VehicleSpawnRules := preload("res://scripts/game/vehicle_spawn_rules.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
 const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
 
@@ -61,13 +62,13 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 				fallback_height = 90.0
 
 	if not is_parked:
-		var speed_range: Vector2 = VehicleSpawnScheduler.vehicle_speed_range_for_spawn_side(owner, min_world_speed, max_world_speed, spawn_side)
+		var speed_range: Vector2 = VehicleSpawnRules.vehicle_speed_range_for_spawn_side(owner, min_world_speed, max_world_speed, spawn_side)
 		min_world_speed = speed_range.x
 		max_world_speed = speed_range.y
 		world_speed = owner.rng.randf_range(min_world_speed, max_world_speed)
 
 	if world_speed > 0.0 and lane_index in [1, 2]:
-		is_busy_car = VehicleSpawnScheduler.is_post_day_seven_traffic_ramp(owner) and owner.rng.randf() < VehicleSpawnScheduler.get_post_day_busy_car_chance(owner, lane_index)
+		is_busy_car = VehicleSpawnRules.is_post_day_seven_traffic_ramp(owner) and owner.rng.randf() < VehicleSpawnRules.get_post_day_busy_car_chance(owner, lane_index)
 
 	sprite.texture = owner.VEHICLE_TEXTURES[vehicle_key]
 	sprite.centered = true
@@ -87,7 +88,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 		var visible_rect := VehicleGeometry.local_hitbox_rect(sprite, Vector4.ZERO, owner)
 		spawn_x = size.x + maxf(0.0, GameTuning.ONCOMING_SPAWN_EDGE_GAP) - visible_rect.position.x * sprite.scale.x
 	else:
-		spawn_x = VehicleSpawnScheduler.vehicle_spawn_x(owner, size, spawn_side)
+		spawn_x = VehicleSpawnRules.vehicle_spawn_x(owner, size, spawn_side)
 	sprite.position = Vector2(
 		spawn_x,
 		VehicleGeometry.sprite_y_for_hitbox_bottom(
@@ -104,6 +105,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 
 	owner.add_child(sprite)
 
+	TrafficIndex.invalidate(owner)
 	owner.active_entities.append({
 		"sprite": sprite,
 		"lane": lane_index,
@@ -117,7 +119,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 		"world_speed": world_speed,
 		"min_world_speed": min_world_speed,
 		"max_world_speed": max_world_speed,
-		"speed_change_timer": VehicleSpawnScheduler.next_vehicle_speed_change_delay(owner),
+		"speed_change_timer": VehicleSpawnRules.next_vehicle_speed_change_delay(owner),
 		"is_parked": is_parked,
 		"is_busy_car": is_busy_car,
 		"overtake_speed_timer": 0.0,
@@ -159,6 +161,7 @@ static func spawn_speeder(owner) -> void:
 	sprite.z_index = VehicleGeometry.z_for_lane(owner, lane_index, 2)
 	owner.add_child(sprite)
 
+	TrafficIndex.invalidate(owner)
 	owner.active_entities.append({
 		"sprite": sprite,
 		"lane": lane_index,
@@ -171,7 +174,7 @@ static func spawn_speeder(owner) -> void:
 		"world_speed": world_speed,
 		"min_world_speed": min_world_speed,
 		"max_world_speed": max_world_speed,
-		"speed_change_timer": VehicleSpawnScheduler.next_vehicle_speed_change_delay(owner),
+		"speed_change_timer": VehicleSpawnRules.next_vehicle_speed_change_delay(owner),
 		"lane_change_cooldown": 0.0,
 	})
 

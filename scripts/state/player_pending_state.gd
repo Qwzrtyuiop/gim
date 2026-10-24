@@ -97,6 +97,18 @@ static func clear_pending_story(player_state) -> void:
 	player_state.save_progress()
 
 
+static func set_pending_memory_replay(player_state, story_payload: Dictionary) -> void:
+	player_state.pending_memory_replay = story_payload.duplicate(true)
+
+
+static func get_pending_memory_replay(player_state) -> Dictionary:
+	return player_state.pending_memory_replay.duplicate(true)
+
+
+static func clear_pending_memory_replay(player_state) -> void:
+	player_state.pending_memory_replay.clear()
+
+
 static func set_pending_sleep_transition_state(player_state, state: Dictionary) -> void:
 	player_state.pending_sleep_transition_state = state.duplicate(true)
 	player_state.save_progress()
@@ -172,6 +184,7 @@ static func reset_pending_runtime_state(player_state) -> void:
 	player_state.pending_stage_energy_cost = false
 	player_state.pending_trip_selection.clear()
 	player_state.pending_story.clear()
+	player_state.pending_memory_replay.clear()
 	player_state.pending_sleep_transition_state.clear()
 	player_state.pending_gameplay_entry_fade_duration = 0.0
 	player_state.pending_crash_repair.clear()

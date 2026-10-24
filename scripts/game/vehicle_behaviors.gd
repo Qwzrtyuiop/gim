@@ -201,15 +201,19 @@ static func update_npc_following(
 	vehicle_hitbox_inset: Vector4,
 	collision_rect_provider: Callable
 ) -> void:
+	var lanes: Array = [[], [], []]
 	for entity in active_entities:
 		if not entity_sprite_is_valid(entity):
 			continue
+		var lane := int(entity.get("lane", -1))
+		if lane >= 0 and lane < 3:
+			lanes[lane].append(entity)
 		if not entity.has("desired_world_speed"):
 			entity["desired_world_speed"] = entity["world_speed"]
 
 	for lane_index in [0, 1, 2]:
 		update_npc_following_for_direction(
-			active_entities,
+			lanes[lane_index],
 			lane_index,
 			true,
 			npc_follow_gap,
@@ -218,7 +222,7 @@ static func update_npc_following(
 			collision_rect_provider
 		)
 		update_npc_following_for_direction(
-			active_entities,
+			lanes[lane_index],
 			lane_index,
 			false,
 			npc_follow_gap,

@@ -13,7 +13,8 @@ static func load_from_path(player_state, save_path: String) -> bool:
 	if not FileAccess.file_exists(save_path):
 		return false
 
-	var loaded_resource := ResourceLoader.load(save_path)
+	# Saves are mutable files; a held Resource must not turn a reload into an old snapshot.
+	var loaded_resource := ResourceLoader.load(save_path, "", ResourceLoader.CACHE_MODE_IGNORE)
 	if not loaded_resource is GameSaveResource:
 		return false
 
@@ -245,4 +246,21 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"store_tutorial_shown": player_state.store_tutorial_shown,
 		"home_tutorial_shown": player_state.home_tutorial_shown,
 	}
-	ResourceSaver.save(save_resource, save_path)
+	var error := write_snapshot(save_resource, save_path)
+	if error != OK:
+		push_error("Could not save progress to %s: %s" % [save_path, error_string(error)])
+
+
+static func write_snapshot(save_resource: Resource, save_path: String) -> Error:
+	# Write beside the destination so replacement stays on the same filesystem.
+	# A failed write or rename leaves the last completed save intact.
+	var temporary_path := "%s.tmp.%s" % [save_path.get_basename(), save_path.get_extension()]
+	var error := ResourceSaver.save(save_resource, temporary_path)
+	if error == OK:
+		error = DirAccess.rename_absolute(
+			ProjectSettings.globalize_path(temporary_path),
+			ProjectSettings.globalize_path(save_path)
+		)
+	if error != OK and FileAccess.file_exists(temporary_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(temporary_path))
+	return error

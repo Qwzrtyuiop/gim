@@ -1,58 +1,58 @@
 extends RefCounted
 
-const RETURN_SCENE := "res://scenes/main_menu.tscn"
+const StoryPayload := preload("res://scripts/story/story_payload.gd")
 const StoryConstants := preload("res://scripts/story/story_constants.gd")
 
 
 static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
-	return {
+	return StoryPayload.normalize({
 		"story_id": "scene_01_intro",
-		"speaker_portraits": true,
 		"chapter_title": "Prologue",
-		"return_scene": RETURN_SCENE,
+		"speaker_portraits": true,
+		"return_scene": "res://scenes/main_menu.tscn",
 		"next_scene": next_scene,
 		"prepare_stage_start": true,
 		"stage_descriptor": stage_descriptor,
 		"background": StoryConstants.BACKGROUND_INHOUSE,
+		"music": {},
 		"composition": [
+			# 0
 			{
-				"background": StoryConstants.BACKGROUND_INHOUSE,
-				"pause_before": 0.16,
-				"background_fade": 0.26,
 				"text": "Nagsisimula nanaman ang panibagong araw.",
+				"background": StoryConstants.BACKGROUND_INHOUSE,
+				"background_fade": 0.26,
+				"pause_before": 0.16,
 				"camera": {
 					"zoom": 1.0,
 					"focus": "left",
 					"duration": 0.55,
 				},
-				"actions": [
-					{
-						"type": "play_music",
-						"path": StoryConstants.MUSIC_CITY_AMBIENCE,
-						"loop": true,
-						"fade_in": 0.55,
-						"volume_db": -9.0,
-					}
-				],
+				"actions": [StoryConstants.STATION_MUSIC],
 			},
+			# 1
 			{
 				"text": "Pumasok ang liwanag ng umaga mula sa bukas na bintana.",
 			},
+			# 2
 			{
+				"text": "",
 				"actions": [
 					{
 						"type": "play_sfx",
 						"path": StoryConstants.MUSIC_WIND_BREEZE_SFX,
 						"volume_db": -7.0,
-					}
+					},
 				],
 			},
+			# 3
 			{
 				"text": "Hinila ko pataas ang aking kumot para iwasan ang malamig na hangin.",
 			},
+			# 4
 			{
 				"text": "...",
 			},
+			# 5
 			{
 				"text": "....",
 				"actions": [
@@ -60,15 +60,18 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 						"type": "play_sfx",
 						"path": StoryConstants.MUSIC_ALARM_SFX,
 						"volume_db": -3.0,
-					}
+					},
 				],
 			},
+			# 6
 			{
 				"text": "Anak nang-",
 			},
+			# 7
 			{
 				"text": "Napatalon ako mula sa aking sopa dahil sa tunog ng sarili kong alarm.",
 			},
+			# 8
 			{
 				"text": "Hindi ko na binasa ang nakasulat sa aking cellphone. Dinampot ko ito sa aking tabi at tumakbo ako palabas sa pinto.",
 				"actions": [
@@ -80,25 +83,29 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 					{
 						"type": "fade_to_black",
 						"duration": 0.22,
-					}
+					},
 				],
 			},
+			# 9
 			{
 				"text": "....",
 			},
+			# 10
 			{
 				"speaker": "John Toda",
 				"text": "Bakit nga ba ako nagmamadali?",
 			},
+			# 11
 			{
 				"speaker": "John Toda",
 				"text": "Nagmamadali ako dahil-",
 			},
+			# 12
 			{
 				"speaker": "John Toda",
-				"pause_before": 0.16,
 				"text": "Ngayon ang aking unang araw ng trabaho bilang isang Tricycle Driver.",
 				"background": StoryConstants.BACKGROUND_GARAGE_NORMAL,
+				"pause_before": 0.16,
 				"camera": {
 					"zoom": 1.0,
 					"focus": "right",
@@ -112,4 +119,4 @@ static func build(next_scene: String, stage_descriptor: String) -> Dictionary:
 				],
 			},
 		],
-	}
+	})

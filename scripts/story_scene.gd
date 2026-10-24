@@ -1,39 +1,18 @@
 extends Control
 
-# Generic story runtime.
-# Payload files provide data only; this scene interprets lines, actions, choices, and scene returns.
+# Coordinates story progression, actions, checkpoints, and scene returns.
+# Focused helpers own presentation, interface controls, conditions, and audio.
+
+const StoryAudioRuntime := preload("res://scripts/story/story_audio_runtime.gd")
+const StoryConditions := preload("res://scripts/story/story_conditions.gd")
+const StoryPresentation := preload("res://scripts/story/story_presentation.gd")
+const StoryInterface := preload("res://scripts/story/story_interface.gd")
 
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
-const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
-const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
+const StoryPayload := preload("res://scripts/story/story_payload.gd")
+const StoryCheckpoint := preload("res://scripts/story/story_checkpoint.gd")
 const StoryPortraitLayer := preload("res://scripts/story/story_portrait_layer.gd")
-const StoryPortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
-const StorySpeakerPortraits := preload("res://scripts/story/story_speaker_portraits.gd")
-const StoryDebtTransition := preload("res://scripts/story/story_debt_transition.gd")
-const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
-const INTRO_FADE_SECONDS := 0.35
-const OUTRO_FADE_SECONDS := 0.35
-const DEFAULT_SCREEN_FADE_SECONDS := 0.24
-const DEFAULT_MUSIC_FADE_SECONDS := 0.35
-const DEFAULT_CONTINUE_HINT := "ENTER / CLICK"
-const DEFAULT_BG_CAMERA_DURATION := 0.0
-const DEFAULT_BG_FADE_SECONDS := 0.24
-const MIN_BG_ZOOM := 0.7
-const DEFAULT_BG_FIT_SCALE := 0.94
-
-const DIALOGUE_PANEL_COLOR := Color(0.09, 0.08, 0.07, 0.92)
-const DIALOGUE_PANEL_BORDER := Color(0.71, 0.58, 0.39, 0.95)
-const PORTRAIT_PANEL_COLOR := Color(0.12, 0.10, 0.09, 0.82)
-const PORTRAIT_PANEL_BORDER := Color(0.60, 0.48, 0.33, 0.95)
-const ACTIVE_PORTRAIT_MODULATE := Color(1.0, 1.0, 1.0, 1.0)
-const INACTIVE_PORTRAIT_MODULATE := Color(0.56, 0.56, 0.60, 0.82)
-const CHOICE_BUTTON_BG := Color(0.42, 0.27, 0.17, 0.96)
-const CHOICE_BUTTON_HOVER_BG := Color(0.78, 0.59, 0.29, 0.98)
-const CHOICE_BUTTON_PRESSED_BG := Color(0.28, 0.45, 0.28, 0.98)
-const CHOICE_BUTTON_BORDER := Color(0.13, 0.09, 0.06, 0.98)
 
 @onready var background: TextureRect = $Background
 @onready var background_fade_overlay: ColorRect = $BackgroundFadeOverlay
@@ -75,36 +54,48 @@ var shown_gallery_images: Dictionary = {}
 var is_finishing_story := false
 var portrait_layer: Control
 var weekly_debt_transition: Panel
+var checkpoint_batch_depth := 0
+var active_music_action: Dictionary = {}
+var active_loop_sfx_action: Dictionary = {}
+var checkpoint_continuation: Dictionary = {}
 
+
+# Scene lifecycle.
 
 func _ready() -> void:
-	_apply_theme()
+	StoryInterface.apply_theme(self)
+	StoryAudioRuntime.setup(self)
 	portrait_layer = StoryPortraitLayer.new()
 	add_child(portrait_layer)
 	move_child(portrait_layer, chapter_label.get_index())
-	portrait_layer.setup(dialogue_panel, _resolve_texture)
+	portrait_layer.setup(dialogue_panel, StoryPresentation.resolve_texture)
 	_load_story_payload()
 	if not _is_replay_mode():
 		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
-	_refresh_background_transform()
-	await _play_intro_fade()
+	StoryPresentation.refresh_background_transform(self)
+	await StoryPresentation.play_intro_fade(self)
 	var resume_index: int = 0
 	if not _is_replay_mode():
 		resume_index = PlayerState.get_last_seen_story_section(story_id)
 		if resume_index < 0 or resume_index >= story_lines.size():
 			resume_index = 0
-	await _restore_story_music_state(resume_index)
+	var checkpoint: Dictionary = story_payload.get("_checkpoint", {})
+	if not _is_replay_mode() and int(checkpoint.get("line_index", -1)) == resume_index:
+		await StoryCheckpoint.restore(self, checkpoint)
+		await _resume_checkpoint_continuation(checkpoint.get("continuation", {}))
+		return
+	await StoryAudioRuntime.restore_story_music_state(self, resume_index)
 	# Ambient sound belongs to the SFX channel and restarts on save/resume.
 	var ambient_sfx: Variant = story_payload.get("ambient_sfx", {})
 	if ambient_sfx is Dictionary and not ambient_sfx.is_empty():
-		_play_sfx_action(ambient_sfx)
+		StoryAudioRuntime.play_sfx_action(self, ambient_sfx)
 	await _show_line(resume_index)
 
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
-	if is_input_locked or _has_active_choices():
+	if is_input_locked or StoryInterface.has_active_choices(self):
 		return
 
 	if event.is_action_pressed("ui_accept"):
@@ -117,26 +108,37 @@ func _input(event: InputEvent) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
-		_refresh_background_transform()
+		StoryPresentation.refresh_background_transform(self)
 
+
+func _exit_tree() -> void:
+	if _is_replay_mode():
+		PlayerState.clear_pending_memory_replay()
+	# A pause-menu exit may interrupt a visual wait between persistent actions.
+	# Save the next action cursor with the partial presentation so completed
+	# rewards cannot repeat and later actions still run when the story resumes.
+	if checkpoint_batch_depth > 0 and PlayerState.pending_story.get("story_id", "") == story_id:
+		_save_checkpoint()
+	# Never leave the global save batch suppressed if a scene is interrupted.
+	while checkpoint_batch_depth > 0:
+		_end_checkpoint_batch()
+
+
+# Story progression and branch dispatch.
 
 func _load_story_payload() -> void:
-	var pending_story := PlayerState.get_pending_story()
+	var pending_story := PlayerState.get_pending_memory_replay()
+	if pending_story.is_empty():
+		pending_story = PlayerState.get_pending_story()
 	if pending_story.is_empty():
 		story_payload = _preview_story_payload()
 	else:
 		story_payload = pending_story
+	story_payload = StoryPayload.normalize(story_payload)
 
 	shown_gallery_images.clear()
 	story_lines.clear()
-	var raw_lines: Array = []
-	if story_payload.has("composition"):
-		raw_lines = story_payload.get("composition", [])
-	elif story_payload.has("sections"):
-		raw_lines = story_payload.get("sections", [])
-	else:
-		raw_lines = story_payload.get("lines", [])
-	for line_data in raw_lines:
+	for line_data in story_payload.get("composition", []):
 		if line_data is Dictionary:
 			story_lines.append((line_data as Dictionary).duplicate(true))
 
@@ -154,215 +156,104 @@ func _load_story_payload() -> void:
 	current_right_portrait_ref = portrait_state.get("right", current_right_portrait_ref)
 	portrait_layer.replace_portraits(portrait_state.get("portraits", story_payload.get("portraits", [])))
 	current_background_ref = portrait_state.get("background", current_background_ref)
-	_set_background_texture(current_background_ref, true)
-	_remember_gallery_image(current_background_ref)
-
-
-func _restore_story_music_state(resume_index: int) -> void:
-	var last_music_action: Dictionary = {}
-	var should_stop_music := false
-
-	var payload_music_action := _build_payload_music_action()
-	if not payload_music_action.is_empty():
-		last_music_action = payload_music_action
-
-	var capped_index := clampi(resume_index, 0, story_lines.size())
-	for line_index in range(capped_index):
-		var line_data: Dictionary = story_lines[line_index]
-		if not _matches_story_conditions(line_data):
-			continue
-		var raw_actions: Array = line_data.get("actions", line_data.get("triggers", []))
-		for action_data_variant in raw_actions:
-			if not action_data_variant is Dictionary:
-				continue
-			var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
-			if not _matches_story_conditions(action_data):
-				continue
-			var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
-			match action_type:
-				"play_music", "music_play":
-					last_music_action = action_data
-					should_stop_music = false
-				"stop_music", "music_stop":
-					last_music_action.clear()
-					should_stop_music = true
-
-	if should_stop_music:
-		bgm_player.stop()
-		return
-
-	if not last_music_action.is_empty():
-		var restore_action := last_music_action.duplicate(true)
-		restore_action["fade_in"] = 0.0
-		restore_action["fade_out"] = 0.0
-		restore_action["restart"] = true
-		await _play_music_action(restore_action)
-
-
-func _build_payload_music_action() -> Dictionary:
-	var payload_bgm = story_payload.get("bgm", story_payload.get("music", null))
-	if payload_bgm == null:
-		return {}
-	if payload_bgm is Dictionary:
-		return (payload_bgm as Dictionary).duplicate(true)
-
-	var path := str(payload_bgm).strip_edges()
-	if path.is_empty():
-		return {}
-	return {
-		"type": "play_music",
-		"path": path,
-		"loop": bool(story_payload.get("music_loop", story_payload.get("bgm_loop", true))),
-		"fade_in": float(story_payload.get("music_fade_in", story_payload.get("bgm_fade_in", DEFAULT_MUSIC_FADE_SECONDS))),
-		"volume_db": float(story_payload.get("music_volume_db", story_payload.get("bgm_volume_db", 0.0))),
-	}
+	StoryPresentation.set_background_texture(self, current_background_ref, true)
+	StoryPresentation.remember_gallery_image(self, current_background_ref)
 
 
 func _show_line(index: int) -> void:
-	var resolved_index: int = _resolve_visible_story_index(index)
+	var resolved_index: int = StoryConditions.resolve_visible_story_index(story_lines, index)
 	if story_lines.is_empty() or resolved_index < 0 or resolved_index >= story_lines.size():
-		_finish_story()
+		await _finish_story()
 		return
 
 	is_input_locked = true
+	_begin_checkpoint_batch()
 	current_line_index = resolved_index
+	checkpoint_continuation = {"kind": "line_start"}
 	if not _is_replay_mode():
 		PlayerState.set_last_seen_story_section(story_id, resolved_index)
 	var line := story_lines[resolved_index]
 	continue_label.visible = false
-	await _pause_for_seconds(float(line.get("pause_before", 0.0)))
-	await _apply_line_visuals(line)
-	_apply_line_text(line)
+	await StoryPresentation.pause_for_seconds(self, float(line.get("pause_before", 0.0)))
+	await StoryPresentation.apply_line_visuals(self, line)
+	StoryInterface.apply_line_text(self, line)
 	await _run_line_actions(line)
-	_render_choices(line)
-	await _pause_for_seconds(float(line.get("pause_after", 0.0)))
+	StoryInterface.render_choices(self, line)
+	checkpoint_continuation = {"kind": "line_end"}
+	await StoryPresentation.pause_for_seconds(self, float(line.get("pause_after", 0.0)))
+	checkpoint_continuation.clear()
+	_save_checkpoint()
+	_end_checkpoint_batch()
 	is_input_locked = false
 
 
-func _apply_line_visuals(line: Dictionary) -> void:
-	if line.has("portraits"):
-		portrait_layer.replace_portraits(line["portraits"])
-	var background_changed := false
-	var next_background_ref = current_background_ref
-	if line.has("background"):
-		next_background_ref = line.get("background", null)
-		background_changed = next_background_ref != current_background_ref
-	if line.has("left_portrait"):
-		current_left_portrait_ref = line.get("left_portrait", null)
-	if line.has("right_portrait"):
-		current_right_portrait_ref = line.get("right_portrait", null)
-
-	var background_fade_duration := float(line.get("background_fade", line.get("bg_fade", 0.0)))
-	if line.has("background") and background_fade_duration > 0.0:
-		await _transition_background_with_fade(next_background_ref, background_changed, line, background_fade_duration)
-	else:
-		if line.has("background"):
-			current_background_ref = next_background_ref
-			_set_background_texture(current_background_ref, background_changed)
-		_apply_line_background_camera(line)
-	if line.has("show_debt_overlay"):
-		await _show_debt_overlay(line.get("show_debt_overlay", {}))
-	if line.has("hide_debt_overlay"):
-		await _hide_debt_overlay(line.get("hide_debt_overlay", {}))
-	_set_portrait(left_portrait_frame, left_portrait, current_left_portrait_ref)
-	_set_portrait(right_portrait_frame, right_portrait, current_right_portrait_ref)
-	_apply_portrait_focus_from_side(str(line.get("focus", line.get("speaker_side", "none"))))
-	_save_portrait_state()
+func _current_line() -> Dictionary:
+	if current_line_index < 0 or current_line_index >= story_lines.size():
+		return {}
+	return story_lines[current_line_index]
 
 
-func _apply_line_text(line: Dictionary) -> void:
-	var speaker := str(line.get("speaker", ""))
-	if bool(line.get("speaker_portraits", story_payload.get("speaker_portraits", false))) and not line.has("portraits"):
-		portrait_layer.replace_portraits(StorySpeakerPortraits.for_speaker(speaker))
-		_save_portrait_state()
-	var body_text := str(line.get("text", ""))
-	var continue_text := str(line.get("continue_hint", DEFAULT_CONTINUE_HINT))
-	_set_dialogue_content(speaker, body_text, continue_text, true)
-	# Authored introductions can control the label without changing the speaker
-	# identity used for portraits or saved passenger progress.
-	if line.has("speaker_display_name"):
-		speaker_label.text = str(line["speaker_display_name"]).to_upper()
-
-
-func _run_line_actions(line: Dictionary) -> void:
-	var raw_actions: Array = line.get("actions", line.get("triggers", []))
-	for action_data_variant in raw_actions:
-		if not action_data_variant is Dictionary:
-			continue
-		var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
-		if not _matches_story_conditions(action_data):
-			continue
-		await _run_story_action(action_data)
-
-
-func _render_choices(line: Dictionary) -> void:
-	_clear_choice_buttons()
-	var raw_choices: Array = line.get("choices", [])
-	if raw_choices.is_empty():
-		choice_container.visible = false
-		continue_label.visible = true
+func _advance_story() -> void:
+	if StoryInterface.has_active_choices(self):
 		return
 
-	continue_label.visible = false
-	choice_container.visible = true
-
-	for choice_data_variant in raw_choices:
-		if not choice_data_variant is Dictionary:
-			continue
-
-		var choice_data: Dictionary = (choice_data_variant as Dictionary).duplicate(true)
-		if not _matches_story_conditions(choice_data):
-			continue
-		var button := Button.new()
-		button.custom_minimum_size = Vector2(420.0, 54.0)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.text = str(choice_data.get("text", "CONTINUE"))
-		var is_disabled := bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
-		button.disabled = is_disabled
-		button.focus_mode = Control.FOCUS_NONE
-		_apply_choice_button_theme(button)
-		if not is_disabled:
-			button.pressed.connect(_choose_branch.bind(choice_data))
-		choice_container.add_child(button)
-		choice_buttons.append(button)
-		if not is_disabled:
-			ButtonGlow.attach(self, button)
-
-	if choice_buttons.is_empty():
-		choice_container.visible = false
-		continue_label.visible = true
-
-
-func _run_choice_actions(choice_data: Dictionary) -> void:
-	if _is_replay_mode():
-		var replay_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
-		for replay_action_variant in replay_actions:
-			if not replay_action_variant is Dictionary:
-				continue
-			var replay_action: Dictionary = (replay_action_variant as Dictionary).duplicate(true)
-			if not _matches_story_conditions(replay_action):
-				continue
-			await _run_story_action(replay_action)
+	var line := _current_line()
+	if line.is_empty():
+		_finish_story()
 		return
 
-	if choice_data.has("event_values"):
-		PlayerState.set_event_values(choice_data.get("event_values", {}))
-	elif choice_data.has("event_id") or choice_data.has("event_value") or choice_data.has("key"):
-		PlayerState.set_event_values(
-			StoryEventHandler.build_single_event_values(
-				str(choice_data.get("event_id", choice_data.get("key", ""))),
-				choice_data.get("event_value", choice_data.get("value", 1))
-			)
-		)
+	var explicit_next_scene := str(line.get("next_scene", ""))
+	if not explicit_next_scene.is_empty():
+		complete_scene_path = explicit_next_scene
+		_finish_story()
+		return
 
-	var raw_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
-	for action_data_variant in raw_actions:
-		if not action_data_variant is Dictionary:
-			continue
-		var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
-		if not _matches_story_conditions(action_data):
-			continue
-		await _run_story_action(action_data)
+	var next_index := current_line_index + 1
+	if line.has("next_index"):
+		next_index = int(line.get("next_index", next_index))
+
+	_show_line(next_index)
+
+
+func _choose_branch(choice_data: Dictionary) -> void:
+	if is_input_locked or is_finishing_story:
+		return
+	is_input_locked = true
+	_begin_checkpoint_batch()
+	await _run_choice_actions(choice_data)
+	await _dispatch_choice(choice_data)
+	_end_checkpoint_batch()
+
+
+func _dispatch_choice(choice_data: Dictionary) -> void:
+	checkpoint_continuation = {"kind": "dispatch_choice", "choice": choice_data.duplicate(true)}
+	var explicit_next_scene := str(choice_data.get("next_scene", ""))
+	var default_next_index := current_line_index + 1
+	if bool(_current_line().get("_runtime_choice_response", false)):
+		default_next_index = int(_current_line().get("next_index", default_next_index))
+		if not choice_data.has("next_scene") and not choice_data.has("next_index"):
+			explicit_next_scene = str(_current_line().get("next_scene", ""))
+	var next_index := int(choice_data.get("next_index", default_next_index))
+	var response_line := _build_choice_response_line(choice_data, explicit_next_scene, next_index)
+	if not response_line.is_empty():
+		# Runtime responses must not move authored sections or their numeric jumps.
+		# Keep the original end target as a terminator before appended responses.
+		if not story_payload.has("_response_end_index"):
+			story_payload["_response_end_index"] = story_lines.size()
+			story_lines.append({"_runtime_story_end": true})
+		response_line["_runtime_choice_response"] = true
+		var response_index := story_lines.size()
+		story_lines.append(response_line)
+		story_payload["composition"] = story_lines.duplicate(true)
+		await _show_line(response_index)
+		return
+
+	if not explicit_next_scene.is_empty():
+		complete_scene_path = explicit_next_scene
+		await _finish_story()
+		return
+
+	await _show_line(next_index)
 
 
 func _build_choice_response_line(choice_data: Dictionary, explicit_next_scene: String, next_index: int) -> Dictionary:
@@ -406,51 +297,13 @@ func _build_choice_response_line(choice_data: Dictionary, explicit_next_scene: S
 	return response_line
 
 
-func _advance_story() -> void:
-	if _has_active_choices():
-		return
-
-	var line := _current_line()
-	if line.is_empty():
-		_finish_story()
-		return
-
-	var explicit_next_scene := str(line.get("next_scene", ""))
-	if not explicit_next_scene.is_empty():
-		complete_scene_path = explicit_next_scene
-		_finish_story()
-		return
-
-	var next_index := current_line_index + 1
-	if line.has("next_index"):
-		next_index = int(line.get("next_index", next_index))
-
-	_show_line(next_index)
-
-
-func _choose_branch(choice_data: Dictionary) -> void:
-	await _run_choice_actions(choice_data)
-	var explicit_next_scene := str(choice_data.get("next_scene", ""))
-	var next_index := int(choice_data.get("next_index", current_line_index + 1))
-	var response_line := _build_choice_response_line(choice_data, explicit_next_scene, next_index)
-	if not response_line.is_empty():
-		story_lines.insert(current_line_index + 1, response_line)
-		_show_line(current_line_index + 1)
-		return
-
-	if not explicit_next_scene.is_empty():
-		complete_scene_path = explicit_next_scene
-		_finish_story()
-		return
-
-	_show_line(next_index)
-
-
 func _finish_story() -> void:
 	if is_finishing_story:
 		return
 	is_finishing_story = true
 	is_input_locked = true
+	_begin_checkpoint_batch()
+	checkpoint_continuation = {"kind": "finish_story"}
 	var target_scene := complete_scene_path
 	if target_scene.is_empty():
 		target_scene = return_scene_path
@@ -459,274 +312,23 @@ func _finish_story() -> void:
 
 	var special_stage_id := "" if _is_replay_mode() else str(story_payload.get("queued_special_stage_id", ""))
 	if not _is_replay_mode():
-		StoryGalleryUnlocker.unlock_gallery_images(PlayerState, _shown_gallery_image_paths())
+		StoryPresentation.unlock_gallery_images(self)
 
-	await _play_outro_fade()
+	await StoryPresentation.play_outro_fade(self)
 	if not special_stage_id.is_empty() and PlayerState.begin_event_special_stage(special_stage_id, target_scene):
+		_end_checkpoint_batch()
 		get_tree().change_scene_to_file("res://scenes/game_over.tscn" if PlayerState.is_run_failed() else "res://scenes/main.tscn")
 		return
 	if not _is_replay_mode() and bool(story_payload.get("prepare_stage_start", false)):
 		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
 		if not PlayerState.prepare_stage_start(stage_descriptor):
 			target_scene = return_scene_path if not return_scene_path.is_empty() else FALLBACK_SCENE
-	PlayerState.clear_pending_story()
+	if _is_replay_mode():
+		PlayerState.clear_pending_memory_replay()
+	else:
+		PlayerState.clear_pending_story()
+	_end_checkpoint_batch()
 	get_tree().change_scene_to_file(target_scene)
-
-
-func _apply_portrait_focus_from_side(focus_side: String) -> void:
-	current_focus_side = str(focus_side).to_lower()
-	var left_visible := left_portrait_frame.visible
-	var right_visible := right_portrait_frame.visible
-
-	if current_focus_side.is_empty() or current_focus_side == "none":
-		if left_visible and not right_visible:
-			current_focus_side = "left"
-		elif right_visible and not left_visible:
-			current_focus_side = "right"
-
-	if left_visible:
-		left_portrait_frame.modulate = ACTIVE_PORTRAIT_MODULATE if current_focus_side == "left" else INACTIVE_PORTRAIT_MODULATE
-	if right_visible:
-		right_portrait_frame.modulate = ACTIVE_PORTRAIT_MODULATE if current_focus_side == "right" else INACTIVE_PORTRAIT_MODULATE
-
-
-func _set_portrait(frame: Panel, portrait_rect: TextureRect, texture_ref) -> void:
-	var options: Dictionary = texture_ref if texture_ref is Dictionary else {}
-	if texture_ref is Dictionary:
-		texture_ref = options.get("texture", options.get("path", null))
-	var portrait_texture := _resolve_texture(texture_ref)
-	portrait_rect.flip_h = bool(options.get("flip_h", false))
-	portrait_rect.flip_v = bool(options.get("flip_v", false))
-	frame.visible = portrait_texture != null
-	portrait_rect.texture = portrait_texture
-	StoryPortraitOutline.apply_to(portrait_rect)
-	if frame.visible:
-		frame.modulate = INACTIVE_PORTRAIT_MODULATE
-		# Legacy left/right portraits also sit above the dialogue box.
-		frame.position.y = maxf(0.0, dialogue_panel.position.y - 350.0)
-		frame.size.y = dialogue_panel.position.y - frame.position.y
-	_refresh_portrait_visibility()
-
-
-func _set_background_texture(texture_ref, reset_camera := false) -> void:
-	current_background_ref = texture_ref
-	var resolved_texture := _resolve_texture(texture_ref)
-	background.texture = resolved_texture
-	background.visible = resolved_texture != null
-	if resolved_texture != null:
-		_remember_gallery_image(texture_ref)
-	if reset_camera:
-		background_zoom = 1.0
-		background_pan = Vector2.ZERO
-	_refresh_background_transform()
-	_refresh_portrait_visibility()
-	_save_portrait_state()
-
-
-func _refresh_portrait_visibility() -> void:
-	var path := ""
-	if background.texture != null:
-		path = background.texture.resource_path
-	if path.is_empty() and current_background_ref is String:
-		path = current_background_ref
-	var hide_portraits := "/specialcg/" in path.replace("\\", "/").to_lower()
-	if is_instance_valid(portrait_layer):
-		portrait_layer.visible = not hide_portraits
-	left_portrait_frame.visible = left_portrait.texture != null and not hide_portraits
-	right_portrait_frame.visible = right_portrait.texture != null and not hide_portraits
-
-
-func _remember_gallery_image(texture_ref) -> void:
-	var image_path: String = StoryGalleryUnlocker.normalize_image_path(texture_ref)
-	if image_path.is_empty():
-		return
-	shown_gallery_images[image_path] = true
-
-
-func _shown_gallery_image_paths() -> Array:
-	var image_paths: Array = []
-	for image_path_variant in shown_gallery_images.keys():
-		var image_path: String = str(image_path_variant)
-		if image_path.is_empty():
-			continue
-		image_paths.append(image_path)
-	return image_paths
-
-
-func _resolve_texture(texture_ref) -> Texture2D:
-	if texture_ref is Texture2D:
-		return texture_ref as Texture2D
-
-	var texture_path := str(texture_ref)
-	if texture_path.is_empty():
-		return null
-	if not ResourceLoader.exists(texture_path):
-		return null
-
-	var resource := load(texture_path)
-	if resource is Texture2D:
-		return resource as Texture2D
-	return null
-
-
-func _resolve_audio_stream(stream_ref) -> AudioStream:
-	if stream_ref is AudioStream:
-		return stream_ref as AudioStream
-
-	var stream_path := str(stream_ref)
-	if stream_path.is_empty():
-		return null
-	if not ResourceLoader.exists(stream_path):
-		return null
-
-	var resource := load(stream_path)
-	if resource is AudioStream:
-		return resource as AudioStream
-	return null
-
-
-func _has_active_choices() -> bool:
-	return choice_container.visible and not choice_buttons.is_empty()
-
-
-func _clear_choice_buttons() -> void:
-	for button in choice_buttons:
-		if is_instance_valid(button):
-			button.queue_free()
-	choice_buttons.clear()
-
-
-func _current_line() -> Dictionary:
-	if current_line_index < 0 or current_line_index >= story_lines.size():
-		return {}
-	return story_lines[current_line_index]
-
-
-func _resolve_visible_story_index(index: int) -> int:
-	var candidate_index: int = index
-	var safety_limit: int = story_lines.size() + 1
-	while candidate_index >= 0 and candidate_index < story_lines.size() and safety_limit > 0:
-		var line: Dictionary = story_lines[candidate_index]
-		if _matches_story_conditions(line):
-			return candidate_index
-		candidate_index = _next_story_index_from_hidden_line(line, candidate_index)
-		safety_limit -= 1
-	return -1
-
-
-func _next_story_index_from_hidden_line(line: Dictionary, fallback_index: int) -> int:
-	var skip_index: int = int(line.get("skip_index", line.get("next_index_if_skipped", -1)))
-	if skip_index >= 0:
-		return skip_index
-	return _next_story_index_from_line(line, fallback_index)
-
-
-func _next_story_index_from_line(line: Dictionary, fallback_index: int) -> int:
-	var next_index: int = int(line.get("next_index", fallback_index + 1))
-	if next_index == fallback_index:
-		return fallback_index + 1
-	return next_index
-
-
-func _matches_story_conditions(data: Dictionary) -> bool:
-	if data.is_empty():
-		return true
-
-	var condition_source: Dictionary = data
-	var nested_conditions: Variant = data.get("conditions", null)
-	if nested_conditions is Dictionary:
-		condition_source = (nested_conditions as Dictionary).duplicate(true)
-		for key_variant in data.keys():
-			var key: String = str(key_variant)
-			if key == "conditions":
-				continue
-			if key.begins_with("required_") or key.begins_with("forbidden_"):
-				condition_source[key] = data[key_variant]
-
-	var event_values: Dictionary = PlayerState.get_event_values()
-	if not _matches_required_achievements(condition_source):
-		return false
-	if not _matches_forbidden_achievements(condition_source):
-		return false
-	if not StoryEventHandler.matches_required_events(event_values, _condition_array(condition_source, "required_events", "required_event")):
-		return false
-	if not StoryEventHandler.matches_forbidden_events(event_values, _condition_array(condition_source, "forbidden_events", "forbidden_event")):
-		return false
-	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "required_event_values", "required_event_value"), true):
-		return false
-	if not StoryEventHandler.matches_event_values(event_values, _condition_dictionary(condition_source, "forbidden_event_values", "forbidden_event_value"), false):
-		return false
-	if not _matches_money_conditions(condition_source):
-		return false
-	return true
-
-
-func _matches_required_achievements(condition_source: Dictionary) -> bool:
-	for achievement_id_variant in _condition_array(condition_source, "required_achievements", "required_achievement"):
-		if not PlayerState.has_achievement(str(achievement_id_variant)):
-			return false
-	return true
-
-
-func _matches_forbidden_achievements(condition_source: Dictionary) -> bool:
-	for achievement_id_variant in _condition_array(condition_source, "forbidden_achievements", "forbidden_achievement"):
-		if PlayerState.has_achievement(str(achievement_id_variant)):
-			return false
-	return true
-
-
-func _condition_array(condition_source: Dictionary, plural_key: String, singular_key: String) -> Array:
-	var values: Array = []
-	var plural_variant: Variant = condition_source.get(plural_key, [])
-	if plural_variant is Array:
-		values.append_array(plural_variant as Array)
-	var singular_variant: Variant = condition_source.get(singular_key, null)
-	if singular_variant != null:
-		values.append(singular_variant)
-	return values
-
-
-func _condition_dictionary(condition_source: Dictionary, plural_key: String, singular_key: String) -> Dictionary:
-	var values: Dictionary = {}
-	var plural_variant: Variant = condition_source.get(plural_key, {})
-	if plural_variant is Dictionary:
-		values.merge((plural_variant as Dictionary).duplicate(true), true)
-	var singular_variant: Variant = condition_source.get(singular_key, null)
-	if singular_variant is Dictionary:
-		values.merge((singular_variant as Dictionary).duplicate(true), true)
-	return values
-
-
-func _matches_money_conditions(condition_source: Dictionary) -> bool:
-	var current_money: int = int(PlayerState.money)
-	var exact_money = _first_condition_value(condition_source, ["money", "money_equals", "required_money"])
-	if exact_money != null and current_money != int(exact_money):
-		return false
-
-	var min_money = _first_condition_value(condition_source, ["min_money", "money_at_least", "required_min_money", "required_money_at_least"])
-	if min_money != null and current_money < int(min_money):
-		return false
-
-	var max_money = _first_condition_value(condition_source, ["max_money", "money_at_most", "required_max_money", "required_money_at_most"])
-	if max_money != null and current_money > int(max_money):
-		return false
-
-	var money_less_than = _first_condition_value(condition_source, ["money_less_than", "required_money_less_than"])
-	if money_less_than != null and current_money >= int(money_less_than):
-		return false
-
-	var money_more_than = _first_condition_value(condition_source, ["money_more_than", "required_money_more_than"])
-	if money_more_than != null and current_money <= int(money_more_than):
-		return false
-
-	return true
-
-
-func _first_condition_value(condition_source: Dictionary, keys: Array[String]):
-	for key in keys:
-		if condition_source.has(key):
-			return condition_source[key]
-	return null
 
 
 func _preview_story_payload() -> Dictionary:
@@ -762,116 +364,43 @@ func _preview_story_payload() -> Dictionary:
 	}
 
 
-func _apply_theme() -> void:
-	clip_contents = true
-	background.anchor_left = 0.0
-	background.anchor_top = 0.0
-	background.anchor_right = 0.0
-	background.anchor_bottom = 0.0
-	background.offset_left = 0.0
-	background.offset_top = 0.0
-	background.offset_right = 0.0
-	background.offset_bottom = 0.0
-	background.position = Vector2.ZERO
-	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	background_fade_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	chapter_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	debt_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	left_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dialogue_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	body_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	continue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_apply_label_theme(chapter_label, 12, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 2)
-	_apply_label_theme(debt_remaining_label, 11, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 2)
-	_apply_label_theme(debt_due_label, 10, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
-	_apply_label_theme(speaker_label, 16, Color(0.96, 0.84, 0.56, 1.0), Color.BLACK, 2)
-	_apply_label_theme(body_label, 13, Color(0.98, 0.96, 0.90, 1.0), Color.BLACK, 2)
-	_apply_label_theme(continue_label, 10, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
-	left_portrait_frame.visible = false
-	right_portrait_frame.visible = false
-	dialogue_panel.visible = false
-	debt_overlay.visible = false
-	debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	speaker_label.visible = false
-	body_label.text = ""
-	continue_label.visible = false
-	choice_container.visible = false
+# Ordered action execution and save/resume cursors.
 
-	debt_overlay.add_theme_stylebox_override("panel", _make_panel_style(Color(0.12, 0.10, 0.09, 0.86), DIALOGUE_PANEL_BORDER, 10))
-	dialogue_panel.add_theme_stylebox_override("panel", _make_panel_style(DIALOGUE_PANEL_COLOR, DIALOGUE_PANEL_BORDER, 10))
-	left_portrait_frame.add_theme_stylebox_override("panel", _make_panel_style(PORTRAIT_PANEL_COLOR, PORTRAIT_PANEL_BORDER, 10))
-	right_portrait_frame.add_theme_stylebox_override("panel", _make_panel_style(PORTRAIT_PANEL_COLOR, PORTRAIT_PANEL_BORDER, 10))
-	fade_overlay.color = Color(0.0, 0.0, 0.0, 1.0)
-	background_fade_overlay.color = Color(0.0, 0.0, 0.0, 0.0)
-	bgm_player.autoplay = false
-	bgm_player.bus = &"Master"
-	sfx_player.autoplay = false
-	sfx_player.bus = &"Master"
-	AudioSettingsManager.register_player(bgm_player, "music")
-	AudioSettingsManager.register_player(sfx_player, "sfx")
+func _run_line_actions(line: Dictionary, start_action := 0) -> void:
+	var raw_actions: Array = line.get("actions", line.get("triggers", []))
+	for action_index in range(start_action, raw_actions.size()):
+		checkpoint_continuation = {"kind": "line_actions", "action_index": action_index}
+		var action_data_variant = raw_actions[action_index]
+		if not action_data_variant is Dictionary:
+			continue
+		var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
+		if not StoryConditions.matches_story_conditions(action_data):
+			continue
+		await _run_story_action(action_data)
+		checkpoint_continuation["action_index"] = action_index + 1
 
 
-func _apply_label_theme(label: Label, font_size: int, font_color: Color, outline_color: Color, outline_size: int) -> void:
-	label.add_theme_font_override("font", UI_FONT)
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", font_color)
-	label.add_theme_color_override("font_outline_color", outline_color)
-	label.add_theme_constant_override("outline_size", outline_size)
+func _run_choice_actions(choice_data: Dictionary, start_action := 0) -> void:
+	# Choice metadata precedes its actions. A resumed cursor must not overwrite
+	# event values already changed by the completed actions.
+	if not _is_replay_mode() and start_action == 0:
+		StoryActionRunner.apply_choice_event_values(choice_data)
 
-
-func _apply_choice_button_theme(button: Button) -> void:
-	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 12)
-	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88, 1.0))
-	button.add_theme_color_override("font_hover_color", Color(0.16, 0.10, 0.06, 1.0))
-	button.add_theme_color_override("font_pressed_color", Color(0.10, 0.08, 0.05, 1.0))
-	button.add_theme_color_override("font_focus_color", Color(0.16, 0.10, 0.06, 1.0))
-	button.add_theme_color_override("font_disabled_color", Color(0.62, 0.56, 0.50, 0.9))
-	button.add_theme_color_override("font_outline_color", Color.BLACK)
-	button.add_theme_constant_override("outline_size", 1)
-	button.add_theme_stylebox_override("normal", _make_panel_style(CHOICE_BUTTON_BG, CHOICE_BUTTON_BORDER, 7))
-	button.add_theme_stylebox_override("hover", _make_panel_style(CHOICE_BUTTON_HOVER_BG, CHOICE_BUTTON_BORDER, 7))
-	button.add_theme_stylebox_override("pressed", _make_panel_style(CHOICE_BUTTON_PRESSED_BG, CHOICE_BUTTON_BORDER, 7))
-	button.add_theme_stylebox_override("focus", _make_panel_style(CHOICE_BUTTON_HOVER_BG, CHOICE_BUTTON_BORDER, 7))
-	button.add_theme_stylebox_override("disabled", _make_panel_style(Color(0.18, 0.13, 0.10, 0.9), Color(0.10, 0.08, 0.06, 0.9), 7))
-
-
-func _make_panel_style(bg_color: Color, border_color: Color, radius: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg_color
-	style.border_width_left = 3
-	style.border_width_top = 3
-	style.border_width_right = 3
-	style.border_width_bottom = 3
-	style.border_color = border_color
-	style.corner_radius_top_left = radius
-	style.corner_radius_top_right = radius
-	style.corner_radius_bottom_right = radius
-	style.corner_radius_bottom_left = radius
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.22)
-	style.shadow_size = 4
-	style.shadow_offset = Vector2(0, 2)
-	return style
-
-
-func _play_intro_fade() -> void:
-	var tween := create_tween()
-	tween.tween_property(fade_overlay, "color:a", 0.0, INTRO_FADE_SECONDS)
-	await tween.finished
-
-
-func _play_outro_fade() -> void:
-	var tween := create_tween()
-	tween.tween_property(fade_overlay, "color:a", 1.0, OUTRO_FADE_SECONDS)
-	await tween.finished
+	var raw_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
+	for action_index in range(start_action, raw_actions.size()):
+		checkpoint_continuation = {"kind": "choice_actions", "choice": choice_data.duplicate(true), "action_index": action_index}
+		var action_data_variant = raw_actions[action_index]
+		if not action_data_variant is Dictionary:
+			continue
+		var action_data: Dictionary = (action_data_variant as Dictionary).duplicate(true)
+		if not StoryConditions.matches_story_conditions(action_data):
+			continue
+		await _run_story_action(action_data)
+		checkpoint_continuation["action_index"] = action_index + 1
 
 
 func _run_story_action(action_data: Dictionary) -> void:
-	if _is_replay_mode() and _is_persistent_story_action(action_data):
+	if _is_replay_mode() and StoryActionRunner.is_persistent_story_action(action_data):
 		return
 	await StoryActionRunner.run(self, action_data)
 
@@ -880,523 +409,51 @@ func _is_replay_mode() -> bool:
 	return bool(story_payload.get("replay", story_payload.get("memory_replay", false)))
 
 
-func _is_persistent_story_action(action_data: Dictionary) -> bool:
-	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
-	match action_type:
-		"resolve_random_ride_fare", "repay_malasakit_fare", "resolve_bayanihan":
-			return true
-		"start_special_stage":
-			return true
-		"unlock_achievement", "achievement_unlock":
-			return true
-		"set_event_value", "story_event", "event_value":
-			return true
-		"set_event_values", "story_events", "event_values":
-			return true
-		"clear_event_value", "erase_event_value":
-			return true
-		"clear_event_values", "erase_event_values":
-			return true
-		"add_story_trigger", "insert_story_trigger", "queue_story_trigger":
-			return true
-		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
-			return true
-		"add_money", "gain_money":
-			return true
-		"spend_money", "pay_money":
-			return true
-		"spend_all_money", "take_all_money":
-			return true
-		"collect_debt", "pay_debt_goal", "collect_first_week_interest":
-			return true
-		"add_energy", "gain_energy":
-			return true
-		"add_max_energy", "gain_max_energy":
-			return true
-		"add_karma", "change_karma":
-			return true
-		"add_character_progress", "increase_character_progress", "character_progress":
-			return true
-		"set_character_progress", "character_progress_set":
-			return true
-		"set_character_story_lock", "character_story_lock":
-			return true
-		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
-			return true
-		"clear_pending_night_skip":
-			return true
-	return false
-
-
-func _play_music_action(action_data: Dictionary) -> void:
-	var stream_ref = action_data.get("stream", action_data.get("path", action_data.get("music", null)))
-	var stream := _resolve_audio_stream(stream_ref)
-	if stream == null:
-		return
-
-	var loop_enabled := bool(action_data.get("loop", action_data.get("loops", true)))
-	var fade_in_duration := _music_fade_in_duration(action_data)
-	var fade_out_duration := float(action_data.get("fade_out", action_data.get("out_fade", fade_in_duration)))
-	var target_volume_db := float(action_data.get("volume_db", 0.0))
-	var effective_target_volume_db := AudioSettingsManager.resolve_effective_volume_db("music", target_volume_db)
-	var restart := bool(action_data.get("restart", true))
-	var configured_stream = _configure_audio_stream_loop(stream, loop_enabled)
-	var current_music_ref := str(bgm_player.get_meta("music_ref", ""))
-	var next_music_ref := _music_ref_key(stream_ref, configured_stream)
-	var current_loop_enabled := bool(bgm_player.get_meta("loop_enabled", true))
-	var should_swap_stream := current_music_ref != next_music_ref or current_loop_enabled != loop_enabled or bgm_player.stream == null
-	var should_restart := restart or should_swap_stream or not bgm_player.playing
-
-	if bgm_player.playing and should_swap_stream and fade_out_duration > 0.0:
-		await _fade_audio_player_volume(bgm_player, fade_out_duration, bgm_player.volume_db, AudioSettingsManager.SILENCE_DB)
-		bgm_player.stop()
-
-	# Reassigning even the same track stops AudioStreamPlayer. Preserve playback
-	# when a branch restates its music with restart=false.
-	if should_swap_stream:
-		bgm_player.stream = configured_stream
-	bgm_player.set_meta("music_ref", next_music_ref)
-	bgm_player.set_meta("loop_enabled", loop_enabled)
-	AudioSettingsManager.set_player_base_db(bgm_player, target_volume_db)
-	if should_restart:
-		bgm_player.volume_db = AudioSettingsManager.SILENCE_DB if fade_in_duration > 0.0 else effective_target_volume_db
-		bgm_player.play()
-	if fade_in_duration > 0.0:
-		await _fade_audio_player_volume(bgm_player, fade_in_duration, bgm_player.volume_db, effective_target_volume_db)
-	else:
-		AudioSettingsManager.apply_player_volume(bgm_player)
-
-
-func _music_fade_in_duration(action_data: Dictionary) -> float:
-	if action_data.has("fade_in"):
-		return float(action_data["fade_in"])
-	if action_data.has("fade"):
-		return float(action_data["fade"])
-	if action_data.has("fade_out") or action_data.has("out_fade"):
-		return 0.0
-	return DEFAULT_MUSIC_FADE_SECONDS
-
-
-func _stop_music_action(action_data: Dictionary) -> void:
-	if not bgm_player.playing:
-		return
-
-	var fade_out_duration := float(action_data.get("fade_out", action_data.get("fade", DEFAULT_MUSIC_FADE_SECONDS)))
-	if fade_out_duration > 0.0:
-		await _fade_audio_player_volume(bgm_player, fade_out_duration, bgm_player.volume_db, AudioSettingsManager.SILENCE_DB)
-	bgm_player.stop()
-
-
-func _play_sfx_action(action_data: Dictionary) -> void:
-	var stream_ref = action_data.get("stream", action_data.get("path", action_data.get("sfx", null)))
-	var stream := _resolve_audio_stream(stream_ref)
-	if stream != null:
-		sfx_player.stream = _configure_audio_stream_loop(stream, bool(action_data["loop"])) if action_data.has("loop") else stream
-		AudioSettingsManager.set_player_base_db(sfx_player, float(action_data.get("volume_db", 0.0)))
-		sfx_player.play()
-		return
-
-	if bool(action_data.get("fallback_beep", true)):
-		DisplayServer.beep()
-
-
-func _apply_character_progress_action(action_data: Dictionary) -> void:
-	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
-	var amount := int(action_data.get("amount", action_data.get("value", 1)))
-	PlayerState.increment_unique_character_progress(character_id, amount)
-
-
-func _apply_set_character_progress_action(action_data: Dictionary) -> void:
-	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
-	var value := int(action_data.get("value", action_data.get("amount", 0)))
-	PlayerState.set_unique_character_progress(character_id, value)
-
-
-func _apply_character_story_lock_action(action_data: Dictionary) -> void:
-	var character_id := str(action_data.get("character_id", action_data.get("id", PlayerState.get_current_mock_character_id())))
-	PlayerState.set_unique_character_story_locked(
-		character_id,
-		bool(action_data.get("locked", action_data.get("value", true)))
-	)
-
-
-func _apply_set_event_value_action(action_data: Dictionary) -> void:
-	var event_id := str(action_data.get("id", action_data.get("event_id", action_data.get("key", ""))))
-	if event_id.is_empty():
-		return
-	PlayerState.set_event_values(
-		StoryEventHandler.build_single_event_values(
-			event_id,
-			action_data.get("value", action_data.get("amount", 1))
-		)
-	)
-
-
-func _apply_set_event_values_action(action_data: Dictionary) -> void:
-	var values: Variant = action_data.get("values", action_data.get("events", {}))
-	if not values is Dictionary:
-		return
-	PlayerState.set_event_values((values as Dictionary).duplicate(true))
-
-
-func _configure_audio_stream_loop(stream: AudioStream, loop_enabled: bool) -> AudioStream:
-	if stream == null:
-		return null
-
-	var configured_stream := stream.duplicate(true)
-	if configured_stream == null:
-		configured_stream = stream
-
-	if configured_stream != null:
-		var property_names: Dictionary = {}
-		for property_info in configured_stream.get_property_list():
-			property_names[str(property_info.get("name", ""))] = true
-		for property_name in ["loop", "loop_enabled"]:
-			if property_names.has(property_name):
-				configured_stream.set(property_name, loop_enabled)
-				break
-
-	return configured_stream
-
-
-func _music_ref_key(stream_ref, stream: AudioStream) -> String:
-	if stream_ref is String:
-		return str(stream_ref)
-	if stream != null and not str(stream.resource_path).is_empty():
-		return str(stream.resource_path)
-	return str(stream_ref)
-
-
-func _fade_audio_player_volume(player: AudioStreamPlayer, duration: float, from_db: float, to_db: float) -> void:
-	if player == null:
-		return
-	if bgm_fade_tween:
-		bgm_fade_tween.kill()
-	player.volume_db = from_db
-	bgm_fade_tween = create_tween()
-	bgm_fade_tween.tween_property(player, "volume_db", to_db, duration)
-	await bgm_fade_tween.finished
-	bgm_fade_tween = null
-
-
-func _show_weekly_debt_transition() -> void:
-	_hide_weekly_debt_transition()
-	weekly_debt_transition = StoryDebtTransition.new()
-	add_child(weekly_debt_transition)
-	weekly_debt_transition.setup(PlayerDebtState.first_week_transition_report(PlayerState))
-	dialogue_panel.visible = false
-	await weekly_debt_transition.play()
-
-
-func _hide_weekly_debt_transition() -> void:
-	if is_instance_valid(weekly_debt_transition):
-		remove_child(weekly_debt_transition)
-		weekly_debt_transition.queue_free()
-	weekly_debt_transition = null
-
-
-func _show_debt_overlay(overlay_data) -> void:
-	var config: Dictionary = {}
-	if overlay_data is Dictionary:
-		config = (overlay_data as Dictionary).duplicate(true)
-	var display_day := int(config.get("day", PlayerState.get_current_day()))
-	debt_remaining_label.text = str(config.get(
-		"remaining_text",
-		"Debt Remaining: PhP %d" % PlayerState.get_total_debt_goal()
-	))
-	debt_due_label.text = str(config.get(
-		"due_text",
-		PlayerState.get_debt_due_text(display_day)
-	))
-	var fade_duration := float(config.get("fade_in", config.get("duration", 0.24)))
-	if debt_overlay_tween:
-		debt_overlay_tween.kill()
-	debt_overlay.visible = true
-	debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	if fade_duration <= 0.0:
-		debt_overlay.modulate = Color.WHITE
-		return
-	debt_overlay_tween = create_tween()
-	debt_overlay_tween.tween_property(debt_overlay, "modulate:a", 1.0, fade_duration)
-	await debt_overlay_tween.finished
-	debt_overlay_tween = null
-
-
-func _hide_debt_overlay(overlay_data) -> void:
-	var fade_duration := 0.2
-	if overlay_data is Dictionary:
-		fade_duration = float((overlay_data as Dictionary).get("fade_out", (overlay_data as Dictionary).get("duration", fade_duration)))
-	elif overlay_data != null:
-		fade_duration = float(overlay_data)
-	if not debt_overlay.visible:
-		return
-	if debt_overlay_tween:
-		debt_overlay_tween.kill()
-	if fade_duration <= 0.0:
-		debt_overlay.visible = false
-		debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
-		return
-	debt_overlay_tween = create_tween()
-	debt_overlay_tween.tween_property(debt_overlay, "modulate:a", 0.0, fade_duration)
-	await debt_overlay_tween.finished
-	debt_overlay.visible = false
-	debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
-	debt_overlay_tween = null
-
-
-func _apply_portrait_action(action_data: Dictionary) -> void:
-	if action_data.has("id"):
-		portrait_layer.set_portrait(action_data)
-		_save_portrait_state()
-		return
-	var side := str(action_data.get("side", "left")).to_lower()
-	var texture_ref = action_data.get("texture", action_data.get("portrait", action_data.get("path", null)))
-	if action_data.has("flip_h") or action_data.has("flip_v"):
-		texture_ref = {"texture": texture_ref, "flip_h": action_data.get("flip_h", false), "flip_v": action_data.get("flip_v", false)}
-	match side:
-		"right":
-			current_right_portrait_ref = texture_ref
-		_:
-			current_left_portrait_ref = texture_ref
-	_refresh_portrait_state()
-
-
-func _clear_portrait_action(action_data: Dictionary) -> void:
-	if action_data.has("id"):
-		portrait_layer.remove_portrait(str(action_data["id"]))
-		_save_portrait_state()
-		return
-	var side := str(action_data.get("side", "left")).to_lower()
-	match side:
-		"right":
-			current_right_portrait_ref = null
-		_:
-			current_left_portrait_ref = null
-	_refresh_portrait_state()
-
-
-func _refresh_portrait_state() -> void:
-	_set_portrait(left_portrait_frame, left_portrait, current_left_portrait_ref)
-	_set_portrait(right_portrait_frame, right_portrait, current_right_portrait_ref)
-	_apply_portrait_focus_from_side(current_focus_side)
-	_save_portrait_state()
-
-
-func _replace_portraits(entries: Array) -> void:
-	portrait_layer.replace_portraits(entries)
-	_save_portrait_state()
-
-
-func _save_portrait_state() -> void:
+func _begin_checkpoint_batch() -> void:
 	if _is_replay_mode():
 		return
-	var state := {
-		"portraits": portrait_layer.entries.duplicate(true),
-		"left": current_left_portrait_ref,
-		"right": current_right_portrait_ref,
-		"background": current_background_ref,
-	}
-	if state == story_payload.get("_portrait_state", {"portraits": [], "left": null, "right": null}):
+	checkpoint_batch_depth += 1
+	PlayerState._begin_state_batch()
+
+
+func _end_checkpoint_batch() -> void:
+	if checkpoint_batch_depth <= 0:
 		return
-	story_payload["_portrait_state"] = state
+	checkpoint_batch_depth -= 1
+	PlayerState._end_state_batch()
+
+
+func _save_checkpoint() -> void:
+	if _is_replay_mode():
+		return
+	story_payload["_checkpoint"] = StoryCheckpoint.capture(self)
 	PlayerState.set_pending_story(story_payload)
 
 
-func _set_dialogue_content(speaker: String, body_text: String, continue_text: String, is_visible: bool) -> void:
-	dialogue_panel.visible = is_visible
-	speaker_label.visible = not speaker.is_empty()
-	speaker_label.text = PlayerState.get_speaker_display_name(speaker).to_upper()
-	body_label.text = body_text
-	continue_label.text = continue_text if not continue_text.is_empty() else DEFAULT_CONTINUE_HINT
-
-
-func _apply_line_background_camera(line: Dictionary) -> void:
-	if not _has_background_camera_data(line):
+func _resume_checkpoint_continuation(continuation: Dictionary) -> void:
+	if continuation.is_empty():
 		return
-	_apply_background_camera_action(line)
-
-
-func _transition_background_with_fade(next_background_ref, background_changed: bool, line: Dictionary, duration: float) -> void:
-	var fade_duration := maxf(0.0, duration)
-	if fade_duration <= 0.0:
-		current_background_ref = next_background_ref
-		_set_background_texture(current_background_ref, background_changed)
-		_apply_line_background_camera(line)
+	checkpoint_continuation = continuation.duplicate(true)
+	var kind := str(continuation.get("kind", ""))
+	if kind == "line_start":
+		await _show_line(current_line_index)
 		return
-
-	var half_duration := fade_duration * 0.5
-	await _fade_background_overlay(1.0, half_duration)
-	current_background_ref = next_background_ref
-	_set_background_texture(current_background_ref, background_changed)
-	_apply_line_background_camera(line)
-	await _fade_background_overlay(0.0, half_duration)
-
-
-func _has_background_camera_data(data: Dictionary) -> bool:
-	return data.has("camera") or data.has("zoom") or data.has("bg_zoom") or data.has("pan") or data.has("bg_pan") or data.has("focus")
-
-
-func _apply_background_camera_action(action_data: Dictionary) -> void:
-	var camera_data: Variant = action_data.get("camera", action_data)
-	var zoom := background_zoom
-	var pan := background_pan
-	var duration := float(action_data.get("duration", DEFAULT_BG_CAMERA_DURATION))
-
-	if camera_data is Dictionary:
-		var camera_dict := camera_data as Dictionary
-		if camera_dict.has("zoom"):
-			zoom = maxf(MIN_BG_ZOOM, float(camera_dict.get("zoom", background_zoom)))
-		elif camera_dict.has("bg_zoom"):
-			zoom = maxf(MIN_BG_ZOOM, float(camera_dict.get("bg_zoom", background_zoom)))
-
-		if camera_dict.has("pan"):
-			pan = _parse_background_pan(camera_dict.get("pan", background_pan))
-		elif camera_dict.has("bg_pan"):
-			pan = _parse_background_pan(camera_dict.get("bg_pan", background_pan))
-		elif camera_dict.has("focus"):
-			pan = _parse_background_pan(camera_dict.get("focus", background_pan))
-
-		if camera_dict.has("duration"):
-			duration = float(camera_dict.get("duration", duration))
+	if kind == "finish_story":
+		await _finish_story()
+		return
+	is_input_locked = true
+	_begin_checkpoint_batch()
+	if kind in ["choice_actions", "dispatch_choice"]:
+		var choice: Dictionary = continuation.get("choice", {})
+		if kind == "choice_actions":
+			await _run_choice_actions(choice, int(continuation.get("action_index", 0)))
+		await _dispatch_choice(choice)
 	else:
-		pan = _parse_background_pan(camera_data)
-
-	_set_background_camera(zoom, pan, duration)
-
-
-func _set_background_camera(zoom: float, pan: Vector2, duration := DEFAULT_BG_CAMERA_DURATION) -> void:
-	background_zoom = maxf(MIN_BG_ZOOM, zoom)
-	background_pan = Vector2(
-		clampf(pan.x, -1.0, 1.0),
-		clampf(pan.y, -1.0, 1.0)
-	)
-	_refresh_background_transform(duration)
-
-
-func _parse_background_pan(pan_data) -> Vector2:
-	if pan_data is Vector2:
-		return pan_data as Vector2
-	if pan_data is Array:
-		var pan_array := pan_data as Array
-		if pan_array.size() >= 2:
-			return Vector2(float(pan_array[0]), float(pan_array[1]))
-	if pan_data is Dictionary:
-		var pan_dict := pan_data as Dictionary
-		return Vector2(
-			float(pan_dict.get("x", 0.0)),
-			float(pan_dict.get("y", 0.0))
-		)
-
-	var pan_preset := str(pan_data).to_lower().strip_edges()
-	match pan_preset:
-		"left":
-			return Vector2(-1.0, 0.0)
-		"right":
-			return Vector2(1.0, 0.0)
-		"top", "up":
-			return Vector2(0.0, -1.0)
-		"bottom", "down":
-			return Vector2(0.0, 1.0)
-		"top_left", "left_top":
-			return Vector2(-1.0, -1.0)
-		"top_right", "right_top":
-			return Vector2(1.0, -1.0)
-		"bottom_left", "left_bottom":
-			return Vector2(-1.0, 1.0)
-		"bottom_right", "right_bottom":
-			return Vector2(1.0, 1.0)
-		"center", "middle", "":
-			return Vector2.ZERO
-	return background_pan
-
-
-func _refresh_background_transform(duration := 0.0) -> void:
-	if background == null or not is_instance_valid(background):
-		return
-
-	if background_motion_tween != null:
-		background_motion_tween.kill()
-		background_motion_tween = null
-
-	if background.texture == null:
-		background.visible = false
-		return
-
-	background.visible = true
-	var viewport_size := size
-	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
-		viewport_size = get_viewport_rect().size
-
-	var texture_size := background.texture.get_size()
-	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
-		background.position = Vector2.ZERO
-		background.size = viewport_size
-		return
-
-	var fit_scale := minf(viewport_size.x / texture_size.x, viewport_size.y / texture_size.y)
-	var target_size := texture_size * fit_scale * DEFAULT_BG_FIT_SCALE * background_zoom
-	var should_use_centered_fit := target_size.x <= viewport_size.x and target_size.y <= viewport_size.y
-
-	if should_use_centered_fit:
-		background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if duration <= 0.0:
-			background.position = Vector2.ZERO
-			background.size = viewport_size
-			return
-
-		background_motion_tween = create_tween()
-		background_motion_tween.set_parallel(true)
-		background_motion_tween.tween_property(background, "position", Vector2.ZERO, duration)
-		background_motion_tween.tween_property(background, "size", viewport_size, duration)
-		return
-
-	background.stretch_mode = TextureRect.STRETCH_SCALE
-	var target_position := Vector2.ZERO
-	var x_space := viewport_size.x - target_size.x
-	var y_space := viewport_size.y - target_size.y
-
-	if target_size.x <= viewport_size.x:
-		target_position.x = x_space * 0.5
-	else:
-		target_position.x = -(target_size.x - viewport_size.x) * ((background_pan.x + 1.0) * 0.5)
-
-	if target_size.y <= viewport_size.y:
-		target_position.y = y_space * 0.5
-	else:
-		target_position.y = -(target_size.y - viewport_size.y) * ((background_pan.y + 1.0) * 0.5)
-
-	if duration <= 0.0:
-		background.position = target_position
-		background.size = target_size
-		return
-
-	background_motion_tween = create_tween()
-	background_motion_tween.set_parallel(true)
-	background_motion_tween.tween_property(background, "position", target_position, duration)
-	background_motion_tween.tween_property(background, "size", target_size, duration)
-
-
-func _pause_for_seconds(duration: float) -> void:
-	if duration <= 0.0:
-		return
-	await get_tree().create_timer(duration).timeout
-
-
-func _fade_background_overlay(target_alpha: float, duration: float) -> void:
-	if duration <= 0.0:
-		background_fade_overlay.color.a = target_alpha
-		return
-
-	var tween := create_tween()
-	tween.tween_property(background_fade_overlay, "color:a", target_alpha, duration)
-	await tween.finished
-
-
-func _fade_screen_overlay(target_alpha: float, duration: float) -> void:
-	if duration <= 0.0:
-		fade_overlay.color.a = target_alpha
-		return
-
-	var tween := create_tween()
-	tween.tween_property(fade_overlay, "color:a", target_alpha, duration)
-	await tween.finished
+		var line: Dictionary = story_lines[current_line_index]
+		if kind == "line_actions":
+			await _run_line_actions(line, int(continuation.get("action_index", 0)))
+		StoryInterface.render_choices(self, line)
+		checkpoint_continuation.clear()
+		_save_checkpoint()
+		is_input_locked = false
+	_end_checkpoint_batch()

@@ -53,11 +53,13 @@ static func advance_to_next_stage(player_state, transition_mode: String = "", se
 	var next_time: String = player_state.get_next_stage_time(safe_transition_mode)
 	var current_day_before_advance: int = player_state.get_current_day()
 	var next_day: int = current_day_before_advance
+	var advances_day: bool = player_state.will_advance_day(safe_transition_mode)
 
+	player_state._begin_state_batch()
 	if safe_transition_mode == player_state.TRANSITION_REST_TO_NIGHT or safe_transition_mode == player_state.TRANSITION_REST_TO_NEXT_DAY:
 		player_state.last_rest_day = player_state.get_current_day()
 
-	if player_state.will_advance_day(safe_transition_mode):
+	if advances_day:
 		next_day += 1
 
 	var next_stage: String = player_state._random_stage_type_for_time(next_time, selected_difficulty, forced_traffic)
@@ -68,11 +70,12 @@ static func advance_to_next_stage(player_state, transition_mode: String = "", se
 	if player_state.current_day != current_day_before_advance:
 		player_state._reset_daily_consumable_counters(player_state.current_day)
 		player_state._roll_daily_conditions_for_day(player_state.current_day)
-	if player_state.will_advance_day(safe_transition_mode):
+	if advances_day:
 		player_state._resolve_debt_collection_for_day(player_state.current_day)
 	if player_state.pending_skip_night_phase and current_time_before_advance != "night" and next_time == "morning" and player_state.current_day > current_day_before_advance:
 		player_state.pending_skip_night_phase = false
 	player_state.save_progress()
+	player_state._end_state_batch()
 	return player_state.current_stage_type
 
 
@@ -88,6 +91,7 @@ static func prepare_day_start(player_state, target_day: int) -> void:
 	if player_state.get_current_day() == safe_target_day and player_state.get_current_time_of_day() == "morning":
 		return
 
+	player_state._begin_state_batch()
 	player_state.current_day = safe_target_day
 	player_state.current_phase = "morning"
 	player_state.current_stage_type = player_state.build_stage_type("short", "morning", "chill")
@@ -98,6 +102,7 @@ static func prepare_day_start(player_state, target_day: int) -> void:
 	player_state._roll_daily_conditions_for_day(player_state.current_day)
 	player_state._resolve_debt_collection_for_day(player_state.current_day)
 	player_state.save_progress()
+	player_state._end_state_batch()
 
 
 static func set_current_stage_time(player_state, day_time: String) -> void:
