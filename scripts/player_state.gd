@@ -17,6 +17,7 @@ const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
 const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
 const PlayerRunState := preload("res://scripts/state/player_run_state.gd")
+const PlayerStoryTimeState := preload("res://scripts/state/player_story_time_state.gd")
 const PlayerStageState := preload("res://scripts/state/player_stage_state.gd")
 const PlayerStoryState := preload("res://scripts/state/player_story_state.gd")
 const PlayerUpgradeState := preload("res://scripts/state/player_upgrade_state.gd")
@@ -668,6 +669,10 @@ func advance_phase_after_stage_result(stage_time_of_day: String) -> bool:
 
 func prepare_day_start(target_day: int) -> void:
 	PlayerRunState.prepare_day_start(self, target_day)
+
+
+func advance_story_time(options: Dictionary) -> bool:
+	return PlayerStoryTimeState.advance(self, options)
 
 
 func set_current_stage_time(day_time: String) -> void:

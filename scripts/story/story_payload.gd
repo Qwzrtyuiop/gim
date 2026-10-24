@@ -3,6 +3,7 @@ extends RefCounted
 # Single contract for authored payloads and legacy save adapters. Never changes
 # section ordering: existing numeric jumps and saved section indices stay valid.
 const VERSION := 1
+const StoryActionCatalog := preload("res://scripts/story/story_action_catalog.gd")
 
 
 static func normalize(source: Dictionary) -> Dictionary:
@@ -64,6 +65,6 @@ static func validate(payload: Dictionary) -> PackedStringArray:
 				if target.has(key) and (int(target[key]) < 0 or int(target[key]) > lines.size()):
 					errors.append("Section %d: invalid %s" % [i, key])
 			for action: Dictionary in target.get("actions", []):
-				if str(action.get("type", "")).is_empty():
-					errors.append("Section %d: missing action type" % i)
+				for error: String in StoryActionCatalog.validate_action(action):
+					errors.append("Section %d: %s" % [i, error])
 	return errors

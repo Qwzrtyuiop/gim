@@ -45,7 +45,8 @@ def main():
     marker = "static func save_to_path(player_state, save_path: String, save_version: int) -> void:"
     codec.write_text(codec.read_text(encoding="utf-8").replace(marker, marker + '\n\tplayer_state.set_meta("test_save_count", int(player_state.get_meta("test_save_count", 0)) + 1)'), encoding="utf-8")
     config = (root / "project.godot").read_text(encoding="utf-8")
-    config += "\n[testing]\nisolated=true\n"
+    # Existing behavior checks run instant text; dedicated playback checks turn it on.
+    config += "\n[testing]\nisolated=true\ninstant_story_text=true\n"
     (fixture / "project.godot").write_text(config, encoding="utf-8")
     result = subprocess.run(
         [args.godot, "--headless", "--rendering-method", "gl_compatibility", "--path", str(fixture), "res://tests/refactor_regression.tscn", "--quit-after", "6000", "--log-file", str(fixture / "checks.log")],

@@ -7,10 +7,27 @@ const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const StoryAudioRuntime := preload("res://scripts/story/story_audio_runtime.gd")
 const StoryPresentation := preload("res://scripts/story/story_presentation.gd")
 const StoryInterface := preload("res://scripts/story/story_interface.gd")
+const StoryActionCatalog := preload("res://scripts/story/story_action_catalog.gd")
+const StoryGameFlow := preload("res://scripts/story/story_game_flow.gd")
+const StoryGameEffects := preload("res://scripts/story/story_game_effects.gd")
 
 
 static func run(owner, action_data: Dictionary) -> void:
-	var action_type := str(action_data.get("type", action_data.get("action", ""))).to_lower()
+	var errors := StoryActionCatalog.validate_action(action_data)
+	if not errors.is_empty():
+		push_warning("Story action rejected: %s" % "; ".join(errors))
+		return
+	var action_type := StoryActionCatalog.canonical_type(str(action_data.get("type", action_data.get("action", ""))))
+	if StoryActionCatalog.is_persistent(action_type) and bool(owner.story_payload.get("replay", owner.story_payload.get("memory_replay", false))):
+		return
+	action_data = action_data.duplicate(true)
+	action_data["type"] = action_type
+	if StoryGameFlow.supports(action_type):
+		StoryGameFlow.run(owner, action_data)
+		return
+	if StoryGameEffects.supports(action_type):
+		StoryGameEffects.run(owner, action_data)
+		return
 	match action_type:
 		"resolve_bayanihan":
 			RandomRideEventService.resolve_bayanihan(PlayerState, owner.story_payload, str(action_data.get("outcome", "")))
@@ -107,6 +124,11 @@ static func run(owner, action_data: Dictionary) -> void:
 				str(action_data.get("continue_hint", owner.continue_label.text if not owner.continue_label.text.is_empty() else StoryInterface.DEFAULT_CONTINUE_HINT)),
 				bool(action_data.get("visible", true))
 			)
+			if bool(action_data.get("visible", true)) and is_instance_valid(owner.get("dialogue_playback")):
+				var reveal_line: Dictionary = owner._current_line().duplicate(true)
+				if action_data.has("typewriter"):
+					reveal_line["typewriter"] = action_data.typewriter
+				owner.dialogue_playback.start(owner.story_payload, reveal_line, str(action_data.get("speaker", owner._current_line().get("speaker", ""))))
 		"background_camera", "bg_camera", "camera":
 			StoryPresentation.apply_background_camera_action(owner, action_data)
 		"zoom_background", "bg_zoom":
@@ -122,6 +144,8 @@ static func run(owner, action_data: Dictionary) -> void:
 		"reset_background_camera", "bg_reset":
 			StoryPresentation.set_background_camera(owner, 1.0, Vector2.ZERO, float(action_data.get("duration", StoryPresentation.DEFAULT_BG_CAMERA_DURATION)))
 		"hide_dialogue":
+			if is_instance_valid(owner.get("dialogue_playback")):
+				owner.dialogue_playback.finish_now()
 			owner.dialogue_panel.visible = false
 		"show_dialogue":
 			owner.dialogue_panel.visible = true
@@ -162,51 +186,7 @@ static func _strip_action_keys(data: Dictionary) -> void:
 
 
 static func is_persistent_story_action(action_data: Dictionary) -> bool:
-	var action_type: String = str(action_data.get("type", action_data.get("action", ""))).to_lower()
-	match action_type:
-		"resolve_random_ride_fare", "repay_malasakit_fare", "resolve_bayanihan":
-			return true
-		"start_special_stage":
-			return true
-		"unlock_achievement", "achievement_unlock":
-			return true
-		"set_event_value", "story_event", "event_value":
-			return true
-		"set_event_values", "story_events", "event_values":
-			return true
-		"clear_event_value", "erase_event_value":
-			return true
-		"clear_event_values", "erase_event_values":
-			return true
-		"add_story_trigger", "insert_story_trigger", "queue_story_trigger":
-			return true
-		"add_seeded_rider_rule", "insert_seeded_rider", "seed_rider":
-			return true
-		"add_money", "gain_money":
-			return true
-		"spend_money", "pay_money":
-			return true
-		"spend_all_money", "take_all_money":
-			return true
-		"collect_debt", "pay_debt_goal", "collect_first_week_interest":
-			return true
-		"add_energy", "gain_energy":
-			return true
-		"add_max_energy", "gain_max_energy":
-			return true
-		"add_karma", "change_karma":
-			return true
-		"add_character_progress", "increase_character_progress", "character_progress":
-			return true
-		"set_character_progress", "character_progress_set":
-			return true
-		"set_character_story_lock", "character_story_lock":
-			return true
-		"set_pending_night_skip", "pending_night_skip", "skip_night_phase":
-			return true
-		"clear_pending_night_skip":
-			return true
-	return false
+	return StoryActionCatalog.is_persistent(str(action_data.get("type", action_data.get("action", ""))))
 
 
 static func apply_character_progress_action(action_data: Dictionary) -> void:

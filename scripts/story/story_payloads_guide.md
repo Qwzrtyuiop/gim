@@ -1,5 +1,15 @@
 # Story payload contract
 
+For gameplay-changing events, see [story game controls](story_game_controls_guide.md)
+and [the gameplay event template](payloads/templates/gameplay_event_template.gd).
+These add time skips, resources/upgrades/debt/weather effects, gameplay conditions,
+locked choices, story chaining, and post-dialogue destinations.
+
+For gradual text and talking blips, see [dialogue playback](story_dialogue_playback_guide.md).
+Text reveals by default. Payload/line `typewriter` settings control speed, sound
+and pitch; `typewriter: false` keeps a line instant. Checkpoints restore reached
+dialogue fully and silently while preserving the action cursor.
+
 Start with `payloads/templates/story_payload_template.gd`. Every authored story
 uses a single `build()` returning `StoryPayload.normalize({...})`, with the full
 composition written directly in that file. Intro builders also accept the next

@@ -13,6 +13,8 @@ const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
 const StoryPayload := preload("res://scripts/story/story_payload.gd")
 const StoryCheckpoint := preload("res://scripts/story/story_checkpoint.gd")
 const StoryPortraitLayer := preload("res://scripts/story/story_portrait_layer.gd")
+const StoryGameFlow := preload("res://scripts/story/story_game_flow.gd")
+const StoryDialoguePlayback := preload("res://scripts/story/story_dialogue_playback.gd")
 
 @onready var background: TextureRect = $Background
 @onready var background_fade_overlay: ColorRect = $BackgroundFadeOverlay
@@ -58,13 +60,19 @@ var checkpoint_batch_depth := 0
 var active_music_action: Dictionary = {}
 var active_loop_sfx_action: Dictionary = {}
 var checkpoint_continuation: Dictionary = {}
+var dialogue_playback: Node
 
 
 # Scene lifecycle.
 
 func _ready() -> void:
+	is_input_locked = true
 	StoryInterface.apply_theme(self)
 	StoryAudioRuntime.setup(self)
+	dialogue_playback = StoryDialoguePlayback.new()
+	dialogue_playback.name = "DialoguePlayback"
+	add_child(dialogue_playback)
+	dialogue_playback.setup(body_label)
 	portrait_layer = StoryPortraitLayer.new()
 	add_child(portrait_layer)
 	move_child(portrait_layer, chapter_label.get_index())
@@ -95,6 +103,13 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
+	var continue_pressed := event.is_action_pressed("ui_accept") and not event.is_echo()
+	continue_pressed = continue_pressed or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
+	if continue_pressed and is_instance_valid(dialogue_playback) and dialogue_playback.active:
+		# Consume the press before finishing; that may synchronously create choices.
+		get_viewport().set_input_as_handled()
+		dialogue_playback.finish_now()
+		return
 	if is_input_locked or StoryInterface.has_active_choices(self):
 		return
 
@@ -112,6 +127,8 @@ func _notification(what: int) -> void:
 
 
 func _exit_tree() -> void:
+	if is_instance_valid(dialogue_playback):
+		dialogue_playback.cancel()
 	if _is_replay_mode():
 		PlayerState.clear_pending_memory_replay()
 	# A pause-menu exit may interrupt a visual wait between persistent actions.
@@ -169,6 +186,8 @@ func _show_line(index: int) -> void:
 	is_input_locked = true
 	_begin_checkpoint_batch()
 	current_line_index = resolved_index
+	StoryInterface.clear_choice_buttons(self)
+	choice_container.visible = false
 	checkpoint_continuation = {"kind": "line_start"}
 	if not _is_replay_mode():
 		PlayerState.set_last_seen_story_section(story_id, resolved_index)
@@ -178,9 +197,10 @@ func _show_line(index: int) -> void:
 	await StoryPresentation.apply_line_visuals(self, line)
 	StoryInterface.apply_line_text(self, line)
 	await _run_line_actions(line)
-	StoryInterface.render_choices(self, line)
 	checkpoint_continuation = {"kind": "line_end"}
+	await dialogue_playback.wait_until_finished()
 	await StoryPresentation.pause_for_seconds(self, float(line.get("pause_after", 0.0)))
+	StoryInterface.render_choices(self, line)
 	checkpoint_continuation.clear()
 	_save_checkpoint()
 	_end_checkpoint_batch()
@@ -194,6 +214,10 @@ func _current_line() -> Dictionary:
 
 
 func _advance_story() -> void:
+	if is_instance_valid(dialogue_playback) and dialogue_playback.finish_now():
+		return
+	if is_input_locked:
+		return
 	if StoryInterface.has_active_choices(self):
 		return
 
@@ -302,6 +326,8 @@ func _finish_story() -> void:
 		return
 	is_finishing_story = true
 	is_input_locked = true
+	if is_instance_valid(dialogue_playback):
+		dialogue_playback.cancel()
 	_begin_checkpoint_batch()
 	checkpoint_continuation = {"kind": "finish_story"}
 	var target_scene := complete_scene_path
@@ -309,8 +335,9 @@ func _finish_story() -> void:
 		target_scene = return_scene_path
 	if target_scene.is_empty():
 		target_scene = FALLBACK_SCENE
+	target_scene = StoryGameFlow.destination(self, target_scene)
 
-	var special_stage_id := "" if _is_replay_mode() else str(story_payload.get("queued_special_stage_id", ""))
+	var special_stage_id := "" if _is_replay_mode() or PlayerState.is_run_failed() else str(story_payload.get("queued_special_stage_id", ""))
 	if not _is_replay_mode():
 		StoryPresentation.unlock_gallery_images(self)
 
@@ -319,7 +346,17 @@ func _finish_story() -> void:
 		_end_checkpoint_batch()
 		get_tree().change_scene_to_file("res://scenes/game_over.tscn" if PlayerState.is_run_failed() else "res://scenes/main.tscn")
 		return
-	if not _is_replay_mode() and bool(story_payload.get("prepare_stage_start", false)):
+	if not _is_replay_mode():
+		StoryGameFlow.prepare_destination(self, target_scene)
+	var queued_story := StoryGameFlow.queued_story(self, target_scene)
+	if not queued_story.is_empty():
+		PlayerState.set_last_seen_story_section(str(queued_story.get("story_id", "")), 0)
+		PlayerState.set_pending_story(queued_story)
+		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
+		_end_checkpoint_batch()
+		get_tree().change_scene_to_file("res://scenes/story_scene.tscn")
+		return
+	if not _is_replay_mode() and not PlayerState.is_run_failed() and not story_payload.has("_story_destination") and bool(story_payload.get("prepare_stage_start", false)):
 		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
 		if not PlayerState.prepare_stage_start(stage_descriptor):
 			target_scene = return_scene_path if not return_scene_path.is_empty() else FALLBACK_SCENE
@@ -327,6 +364,7 @@ func _finish_story() -> void:
 		PlayerState.clear_pending_memory_replay()
 	else:
 		PlayerState.clear_pending_story()
+		PlayerState.set_resume_scene(StoryGameFlow.resume_destination(target_scene))
 	_end_checkpoint_batch()
 	get_tree().change_scene_to_file(target_scene)
 
@@ -452,6 +490,8 @@ func _resume_checkpoint_continuation(continuation: Dictionary) -> void:
 		var line: Dictionary = story_lines[current_line_index]
 		if kind == "line_actions":
 			await _run_line_actions(line, int(continuation.get("action_index", 0)))
+			checkpoint_continuation = {"kind": "line_end"}
+			await dialogue_playback.wait_until_finished()
 		StoryInterface.render_choices(self, line)
 		checkpoint_continuation.clear()
 		_save_checkpoint()

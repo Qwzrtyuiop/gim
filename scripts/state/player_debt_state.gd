@@ -1,6 +1,28 @@
 extends RefCounted
 
 
+static func pay_story_principal(player_state, amount: int) -> int:
+	# Voluntary payments reduce principal, not the calendar collection history.
+	var paid: int = mini(maxi(0, amount), mini(maxi(0, player_state.money), maxi(0, player_state.remaining_debt)))
+	if paid <= 0:
+		return 0
+	player_state._begin_state_batch()
+	player_state.spend_money(paid)
+	player_state.remaining_debt -= paid
+	player_state.save_progress()
+	player_state._end_state_batch()
+	return paid
+
+
+static func forgive_story_principal(player_state, amount: int) -> int:
+	var forgiven: int = mini(maxi(0, amount), maxi(0, player_state.remaining_debt))
+	if forgiven <= 0:
+		return 0
+	player_state.remaining_debt -= forgiven
+	player_state.save_progress()
+	return forgiven
+
+
 static func current_weekly_goal(player_state) -> int:
 	if player_state.remaining_debt <= 0:
 		return 0

@@ -42,6 +42,12 @@ func _ready() -> void:
 	await _test_choice_event_resume()
 	await _test_authored_resume()
 	await load("res://tests/story_bug_checks.gd").run(self)
+	load("res://tests/story_time_controls_checks.gd").run()
+	load("res://tests/story_game_effects_checks.gd").run(self)
+	load("res://tests/story_branch_tools_checks.gd").run(self)
+	await load("res://tests/story_game_flow_checks.gd").run(self)
+	load("res://tests/story_dialogue_voice_checks.gd").run(self)
+	await load("res://tests/story_dialogue_playback_checks.gd").run(self)
 	print("PASS: all refactor regression checks")
 	get_tree().quit()
 

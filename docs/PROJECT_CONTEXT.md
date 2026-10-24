@@ -50,6 +50,40 @@ The next request was to clean up code and put related functions in their respect
 
 ## Function ownership after cleanup
 
+Story text now reveals gradually with original retro talking blips by default.
+`scripts/story/story_dialogue_playback.gd` owns Label reveal/skip timing;
+`story_dialogue_voice.gd` owns a dedicated SFX player; defaults and speaker pitches
+live in `scripts/config/story_dialogue_settings.gd`. See
+[dialogue playback authoring](../scripts/story/story_dialogue_playback_guide.md).
+The first Continue press finishes text, the next advances; choices wait until
+reveal/actions finish. Narration is silent, pause freezes playback, and reached
+checkpoint text reloads fully without replaying effects or voice.
+The final isolated suite passed with dedicated real-timing playback and audio
+checks, including partial Unicode reveal, first/second Continue, choice gating,
+pause, silent reload, voice cadence/mute and custom clip isolation. Existing
+behavior tests explicitly opt into instant text in their disposable fixture;
+production text remains animated. Three runner tests and source/UID/link checks
+also passed; the existing certificate-store and exit-leak diagnostics remain.
+
+The VN system now also exposes opt-in gameplay commands. See
+[`scripts/story/story_game_controls_guide.md`](../scripts/story/story_game_controls_guide.md)
+for authoring and the unregistered gameplay event template. `story_action_catalog.gd`
+owns supported-command metadata/validation, `story_game_effects.gd` owns resource,
+upgrade, debt, counter and weather effects, `story_game_flow.gd` owns queued handoffs,
+and `state/player_story_time_state.gd` owns calendar advancement through normal debt
+and daily rules. Conditions support gameplay values and boolean groups; choices
+can display unmet requirements. Existing stories and driving tuning are unchanged.
+
+VN upgrade verification: the full isolated Godot suite passed after adding
+`story_time_controls_checks.gd`, `story_game_effects_checks.gd`,
+`story_branch_tools_checks.gd`, and `story_game_flow_checks.gd`. Tests include real
+reader/save/resume, interruption during a time skip, chained scenes, home/game-over
+handoffs, replay suppression, cross-date collections, invalid conditions/effects,
+and example-template validation. Three runner safety tests and source/link/UID
+checks also passed. Invalid-input tests intentionally emit rejection warnings;
+the existing certificate-store and ObjectDB exit diagnostics remain. No GUI
+playtest or export was performed for this upgrade.
+
 Scene scripts coordinate lifecycle, input, signals, and scene transitions. Domain helpers hold related implementations and call the owning helper directly. Story progression and scene signal callbacks remain available; unused story/menu/home/store forwarding methods were removed in a second pass. The traffic facade preserves the static API used by other controllers.
 
 | Responsibility | Implementation owner |

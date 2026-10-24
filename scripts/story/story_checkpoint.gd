@@ -64,5 +64,12 @@ static func restore(reader, state: Dictionary) -> void:
 		StoryAudioRuntime.play_sfx_action(reader, state.loop_sfx)
 	if bool(state.weekly_debt_visible):
 		await StoryInterface.show_weekly_debt_transition(reader)
-	StoryInterface.render_choices(reader, reader.story_lines[reader.current_line_index])
-	reader.is_input_locked = false
+	var continuation: Dictionary = state.get("continuation", {})
+	if continuation.is_empty():
+		StoryInterface.render_choices(reader, reader.story_lines[reader.current_line_index])
+		reader.is_input_locked = false
+	else:
+		# A partial step must finish its remaining actions before choices are usable.
+		StoryInterface.clear_choice_buttons(reader)
+		reader.choice_container.visible = false
+		reader.continue_label.visible = false

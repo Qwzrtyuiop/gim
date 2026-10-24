@@ -5,6 +5,22 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const AchievementService := preload("res://scripts/achievement_service.gd")
 
 
+static func set_story_resource(player_state, resource: String, value) -> bool:
+	# Narrative controls use a fixed list rather than arbitrary state properties.
+	match resource:
+		"money":
+			player_state.money = int(value)
+		"energy":
+			player_state.energy = int(value)
+		"gas":
+			player_state.gas = float(value)
+		"karma":
+			player_state.karma = int(value)
+		_:
+			return false
+	return true
+
+
 static func distance_gas_cost(player_state, distance_units: float) -> float:
 	return maxf(0.0, distance_units) / 1000.0 * player_state.GAS_DRAIN_PERCENT_PER_1000_UNITS * player_state.get_distance_gas_consumption_multiplier()
 

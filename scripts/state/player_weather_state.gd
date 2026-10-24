@@ -1,6 +1,17 @@
 extends RefCounted
 
 
+static func set_story_weather(player_state, weather: String) -> bool:
+	var safe_weather := weather.strip_edges().to_lower().replace("-", " ").replace("_", " ")
+	if not player_state.WEATHER_TYPES.has(safe_weather):
+		return false
+	var phase_key := weather_phase_key(player_state.get_current_day(), player_state.get_current_time_of_day())
+	player_state.weather_phase_cache[phase_key] = safe_weather
+	player_state.current_weather = safe_weather
+	player_state.save_progress()
+	return true
+
+
 static func gas_price(player_state) -> int:
 	return max(0, player_state.gas_price)
 
@@ -61,14 +72,14 @@ static func weather_forecast_for_day(player_state, day_number: int) -> String:
 
 static func stage_weather(player_state, day_time: String = "") -> String:
 	var safe_day: int = player_state.get_current_day()
-	if safe_day < player_state.WEATHER_SYSTEM_START_DAY:
-		return player_state.DEFAULT_WEATHER
-
-	ensure_weather_forecast_for_day(player_state, safe_day)
 	var safe_time: String = str(day_time).strip_edges().to_lower()
 	if not player_state.STAGE_TIMES.has(safe_time):
 		safe_time = player_state.get_current_time_of_day()
 	var phase_key: String = weather_phase_key(safe_day, safe_time)
+	if safe_day < player_state.WEATHER_SYSTEM_START_DAY and not player_state.weather_phase_cache.has(phase_key):
+		return player_state.DEFAULT_WEATHER
+
+	ensure_weather_forecast_for_day(player_state, safe_day)
 	if not player_state.weather_phase_cache.has(phase_key):
 		player_state.weather_phase_cache[phase_key] = roll_weather_for_phase(player_state, weather_forecast_for_day(player_state, safe_day), safe_time)
 		player_state.save_progress()

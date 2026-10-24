@@ -23,6 +23,8 @@ static func apply_line_text(owner, line: Dictionary) -> void:
 	var body_text := str(line.get("text", ""))
 	var continue_text := str(line.get("continue_hint", DEFAULT_CONTINUE_HINT))
 	set_dialogue_content(owner, speaker, body_text, continue_text, true)
+	if is_instance_valid(owner.get("dialogue_playback")):
+		owner.dialogue_playback.start(owner.story_payload, line, speaker)
 	# Authored introductions can control the label without changing the speaker
 	# identity used for portraits or saved passenger progress.
 	if line.has("speaker_display_name"):
@@ -45,13 +47,17 @@ static func render_choices(owner, line: Dictionary) -> void:
 			continue
 
 		var choice_data: Dictionary = (choice_data_variant as Dictionary).duplicate(true)
-		if not StoryConditions.matches_story_conditions(choice_data):
+		var is_available := StoryConditions.matches_story_conditions(choice_data)
+		if not is_available and not bool(choice_data.get("show_locked", false)):
 			continue
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(420.0, 54.0)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.text = str(choice_data.get("text", "CONTINUE"))
-		var is_disabled := bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
+		if not is_available:
+			button.text = str(choice_data.get("locked_text", button.text))
+			button.tooltip_text = str(choice_data.get("locked_reason", "Requirements not met."))
+		var is_disabled := not is_available or bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
 		button.disabled = is_disabled
 		button.focus_mode = Control.FOCUS_NONE
 		apply_choice_button_theme(button)
@@ -65,15 +71,26 @@ static func render_choices(owner, line: Dictionary) -> void:
 	if owner.choice_buttons.is_empty():
 		owner.choice_container.visible = false
 		owner.continue_label.visible = true
+	elif not has_active_choices(owner):
+		# Keep requirements visible, but let the author's normal line route continue.
+		owner.continue_label.visible = true
 
 
 static func has_active_choices(owner) -> bool:
-	return owner.choice_container.visible and not owner.choice_buttons.is_empty()
+	if not owner.choice_container.visible:
+		return false
+	for button in owner.choice_buttons:
+		if is_instance_valid(button) and not button.disabled:
+			return true
+	return false
 
 
 static func clear_choice_buttons(owner) -> void:
 	for button in owner.choice_buttons:
 		if is_instance_valid(button):
+			button.disabled = true
+			if button.get_parent() != null:
+				button.get_parent().remove_child(button)
 			button.queue_free()
 	owner.choice_buttons.clear()
 
@@ -234,8 +251,12 @@ static func hide_debt_overlay(owner, overlay_data) -> void:
 
 
 static func set_dialogue_content(owner, speaker: String, body_text: String, continue_text: String, is_visible: bool) -> void:
+	# Checkpoint restoration uses this immediate path and never replays voice blips.
+	if is_instance_valid(owner.get("dialogue_playback")):
+		owner.dialogue_playback.cancel()
 	owner.dialogue_panel.visible = is_visible
 	owner.speaker_label.visible = not speaker.is_empty()
 	owner.speaker_label.text = PlayerState.get_speaker_display_name(speaker).to_upper()
 	owner.body_label.text = body_text
+	owner.body_label.visible_characters = -1
 	owner.continue_label.text = continue_text if not continue_text.is_empty() else DEFAULT_CONTINUE_HINT
