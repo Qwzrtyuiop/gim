@@ -10,6 +10,8 @@ const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 static func start(character: Dictionary, distance: String, transition_mode: String, return_scene := "") -> Dictionary:
 	if PlayerState.is_run_failed():
 		return {"scene": GAME_OVER_SCENE, "error": ""}
+	if not PlayerState.are_passengers_available():
+		return {"scene": "", "error": "No more passengers tonight. Head home and sleep until morning."}
 	if character.is_empty() or str(character.get("id", "")).is_empty():
 		return {"scene": "", "error": "That slot is empty."}
 	PlayerState._begin_state_batch()

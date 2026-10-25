@@ -3,6 +3,8 @@ extends RefCounted
 # Builds terminal presentation from existing locked passenger pools.
 const RIDE_SELECT_BGM_PATH := "res://assets/audio/music/driving/normalstage1.mp3"
 const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
+const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
+const MidnightEncounters := preload("res://scripts/ride_selection/midnight_encounters.gd")
 const RISK_DISTANCE_SCORES := {"short": 1, "medium": 2, "long": 3}
 const RISK_TIME_SCORES := {"morning": 1, "noon": 2, "night": 3}
 const RISK_TRAFFIC_SCORES := {"chill": 1, "normal": 2, "traffic-jam": 2, "trafficjam": 2, "speeders": 3, "speeder": 3, "busy": 4}
@@ -17,6 +19,8 @@ func _init(selection_screen) -> void:
 
 func offers() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
+	if not PlayerState.are_passengers_available():
+		return MidnightEncounters.offers(PlayerState)
 	var seen: Dictionary = {}
 	var phase: String = PlayerState.get_next_stage_time(screen._transition_mode())
 	for distance: String in PlayerState.STAGE_DIFFICULTIES:
@@ -84,10 +88,15 @@ func details(character: Dictionary, distance: String) -> String:
 
 
 func refresh_terminal() -> void:
+	refresh_bgm()
 	screen.terminal_view.set_offers(screen.terminal_offers, PlayerState.get_next_stage_time(screen._transition_mode()) == "night")
 	if screen.passenger_overlay.visible:
 		screen.status_header.set_display_time(screen._display_day(), PlayerState.get_next_stage_time(screen._transition_mode()))
-	if screen._needs_refuel():
+	if not PlayerState.are_passengers_available():
+		screen.status_label.text = "It's midnight. No passengers are waiting. Head home and sleep until morning." if PlayerState.is_midnight() else "No more trips tonight. Head home to continue your evening plans."
+		if not screen.terminal_offers.is_empty():
+			screen.status_label.text = "It's midnight. Someone is still here. Click them to interact."
+	elif screen._needs_refuel():
 		screen.status_label.text = "Not enough gas. Visit the store to refuel."
 	elif screen.terminal_offers.is_empty():
 		screen.status_label.text = "No passengers are waiting for this trip."
@@ -104,4 +113,14 @@ func start_ride_select_bgm() -> void:
 	bgm_player.bus = &"Master"
 	screen.add_child(bgm_player)
 	AudioSettingsManager.register_player(bgm_player, "music")
-	bgm_player.play()
+	refresh_bgm()
+
+
+func refresh_bgm() -> void:
+	if bgm_player == null or not is_instance_valid(bgm_player):
+		return
+	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
+	if PlayerState.is_midnight() or (screen.idle_music != null and screen.idle_music.active):
+		bgm_player.stop()
+	elif not bgm_player.playing:
+		bgm_player.play()

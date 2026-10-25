@@ -9,6 +9,8 @@ const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 
 
 static func begin(character: Dictionary, distance: String, transition_mode: String, forced_first := false) -> bool:
+	if not PlayerState.are_passengers_available():
+		return false
 	if PlayerState.is_run_failed() or not PlayerState.get_pending_story().is_empty():
 		return false
 	var traffic := "chill" if forced_first else str(character.get("stage_traffic", ""))

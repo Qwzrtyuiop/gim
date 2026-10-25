@@ -16,6 +16,8 @@ func _init(selection_screen) -> void:
 
 
 func roll() -> Dictionary:
+	if not PlayerState.are_passengers_available():
+		return {"short": [], "medium": [], "long": []}
 	for _attempt in range(24):
 		var seeded_setup := PlayerState.get_seeded_rider_pool_setup(_build_seed_selection_context())
 		var rolled_pools := _roll_once(false, seeded_setup)
@@ -270,6 +272,8 @@ func _build_seed_selection_context() -> Dictionary:
 
 
 func for_distance(distance: String) -> Array[Dictionary]:
+	if not PlayerState.are_passengers_available():
+		return [{}, {}, {}]
 	var locked_pool: Array = screen.locked_character_pools.get(distance, [])
 	var card_results: Array[Dictionary] = []
 	for card_variant in locked_pool:

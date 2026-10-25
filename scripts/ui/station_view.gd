@@ -7,6 +7,8 @@ const DAY := preload("res://assets/story/backgrounds/locations/Updated_day.png")
 const NIGHT := preload("res://assets/story/backgrounds/locations/Updated_night.png")
 const DAY_SELECTED := preload("res://assets/story/backgrounds/locations/Updated_day_select.png")
 const NIGHT_SELECTED := preload("res://assets/story/backgrounds/locations/Updated_night_select.png")
+const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
+const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/stationrain.png")
 const ART_SIZE := Vector2(1672, 941)
 const HIGHLIGHT_MARGIN_PIXELS := 12.0
 const TOOLTIPS := {
@@ -55,6 +57,8 @@ var hovered_action := ""
 var focused_action := ""
 var enabled := true
 var is_night := false
+var weather := "clear"
+var weather_effects: HubWeatherEffects
 var highlight_mode := InputHighlightMode.new()
 
 
@@ -98,6 +102,11 @@ func _ready() -> void:
 		buttons[action] = button
 	resized.connect(_layout)
 	visibility_changed.connect(_on_visibility_changed)
+	weather_effects = HubWeatherEffects.new()
+	weather_effects.configure(RAIN_MARKER)
+	add_child(weather_effects)
+	move_child(weather_effects, 0)
+	weather_effects.set_weather(weather)
 	_layout()
 
 
@@ -132,6 +141,13 @@ func _on_visibility_changed() -> void:
 func set_night(value: bool) -> void:
 	is_night = value
 	_layout()
+
+
+func set_weather(value: String) -> void:
+	weather = value
+	if weather_effects != null:
+		weather_effects.set_weather(value)
+	queue_redraw()
 
 
 func set_enabled(value: bool) -> void:
@@ -176,13 +192,15 @@ func _layout() -> void:
 		button.polygon.clear()
 		for point in polygon_for(action):
 			button.polygon.append((point - bounds.position) * image_rect.size)
+	if weather_effects != null:
+		weather_effects.set_art_rect(image_rect)
 	queue_redraw()
 
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("17110b"))
 	var texture: Texture2D = NIGHT if is_night else DAY
-	draw_texture_rect(texture, image_rect, false)
+	draw_texture_rect(texture, image_rect, false, weather_effects.background_tint())
 	var action := active_action()
 	if not enabled or not buttons.has(action):
 		return
@@ -191,7 +209,7 @@ func _draw() -> void:
 		var destination := PackedVector2Array()
 		for point in polygon:
 			destination.append(image_rect.position + point * image_rect.size)
-		draw_polygon(destination, PackedColorArray([Color.WHITE]), polygon, selected)
+		draw_polygon(destination, PackedColorArray([weather_effects.background_tint()]), polygon, selected)
 
 
 func _highlight_polygons(action: String) -> Array[PackedVector2Array]:

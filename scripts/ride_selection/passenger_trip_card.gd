@@ -14,6 +14,8 @@ var fare_label: Label
 var fuel_label: Label
 var risk_label: Label
 var _badge_panel: PanelContainer
+var _metrics: HBoxContainer
+var _divider: HSeparator
 var _built := false
 
 
@@ -36,6 +38,12 @@ func set_summary(summary: Dictionary) -> void:
 	traffic_label.text = "Traffic: " + traffic.capitalize() if not traffic.is_empty() else ""
 	badge_label.text = str(summary.get("badge", "")).to_upper()
 	_badge_panel.visible = not badge_label.text.is_empty()
+	var encounter := str(summary.get("kind", "")) == "encounter"
+	_metrics.visible = not encounter
+	_divider.visible = not encounter
+	traffic_label.visible = not encounter
+	if encounter:
+		route_label.text = phase.capitalize() + " / " + str(summary.get("description", ""))
 	fare_label.text = str(summary.get("fare", ""))
 	fuel_label.text = str(summary.get("fuel", ""))
 	risk_label.text = str(summary.get("risk", "")).to_upper()
@@ -109,6 +117,7 @@ func _build() -> void:
 	traffic_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	route.add_child(traffic_label)
 	var divider := HSeparator.new()
+	_divider = divider
 	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var line := StyleBoxLine.new()
 	line.color = Color(0.65, 0.54, 0.37, 0.45)
@@ -116,6 +125,7 @@ func _build() -> void:
 	divider.add_theme_stylebox_override("separator", line)
 	content.add_child(divider)
 	var metrics := HBoxContainer.new()
+	_metrics = metrics
 	metrics.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	metrics.add_theme_constant_override("separation", 24)
 	content.add_child(metrics)

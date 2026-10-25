@@ -482,6 +482,18 @@ func get_current_time_of_day() -> String:
 	return PlayerDayPhaseTracker.get_current_phase(self)
 
 
+func is_midnight() -> bool:
+	return PlayerDayPhaseTracker.is_midnight(self)
+
+
+func are_passengers_available() -> bool:
+	return PlayerDayPhaseTracker.passengers_available(self)
+
+
+func get_hub_time_name(day := -1, phase := "") -> String:
+	return PlayerDayPhaseTracker.hub_time_name(self, day, phase)
+
+
 func normalize_transition_mode(transition_mode: String) -> String:
 	return PlayerRunState.normalize_transition_mode(self, transition_mode)
 

@@ -38,6 +38,8 @@ static func build_tutorial(owner) -> void:
 
 
 static func start_tutorial(owner) -> void:
+	if PlayerState.is_midnight():
+		return
 	if owner.tutorial_overlay == null or owner.tutorial_steps.is_empty():
 		return
 	if PlayerState.has_store_tutorial_shown():

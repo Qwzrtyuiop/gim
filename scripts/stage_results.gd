@@ -131,15 +131,13 @@ func _create_dialogs() -> void:
 
 func _start_carried_result_music() -> void:
 	var music_state: Dictionary = PlayerState.consume_pending_result_music()
-	if music_state.is_empty():
-		return
-
-	_play_carried_music(music_state, "stage", "StageResultsBGMPlayer")
-	_play_carried_music(music_state, "rain", "StageResultsRainLoopPlayer")
+	AmbientAudioManager.enter_results(music_state)
+	if not PlayerState.is_midnight():
+		_play_carried_stage_music(music_state)
 
 
-func _play_carried_music(music_state: Dictionary, prefix: String, player_name: String) -> void:
-	var path := str(music_state.get("%s_path" % prefix, "")).strip_edges()
+func _play_carried_stage_music(music_state: Dictionary) -> void:
+	var path := str(music_state.get("stage_path", "")).strip_edges()
 	if path.is_empty():
 		return
 
@@ -148,12 +146,12 @@ func _play_carried_music(music_state: Dictionary, prefix: String, player_name: S
 		return
 
 	var player := AudioStreamPlayer.new()
-	player.name = player_name
+	player.name = "StageResultsBGMPlayer"
 	player.bus = "Master"
 	player.stream = stream
 	add_child(player)
-	AudioSettingsManager.register_player(player, "music", float(music_state.get("%s_base_db" % prefix, 0.0)))
-	player.play(maxf(0.0, float(music_state.get("%s_position" % prefix, 0.0))))
+	AudioSettingsManager.register_player(player, "music", float(music_state.get("stage_base_db", 0.0)))
+	player.play(maxf(0.0, float(music_state.get("stage_position", 0.0))))
 	carried_music_players.append(player)
 
 

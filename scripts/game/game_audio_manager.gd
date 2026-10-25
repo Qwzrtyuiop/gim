@@ -1,5 +1,7 @@
 extends Node
 
+const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
+
 const STAGE_BGM_NORMAL_CHILL_A_PATH := "res://assets/audio/music/driving/chill_normal_day_noon.mp3"
 const STAGE_BGM_NORMAL_CHILL_B_PATH := "res://assets/audio/music/driving/normalstage1.mp3"
 const STAGE_BGM_NORMAL_CHILL_C_PATH := "res://assets/audio/music/driving/normalstage2.mp3"
@@ -9,7 +11,6 @@ const STAGE_BGM_SPEEDER_BUSY_B_PATH := "res://assets/audio/music/driving/speeder
 const STAGE_BGM_SPEEDER_BUSY_C_PATH := "res://assets/audio/music/driving/speederbusy3.mp3"
 const STAGE_BGM_SPEEDER_BUSY_D_PATH := "res://assets/audio/music/driving/speederbusy4.mp3"
 const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/audio/music/driving/traffic_jam.mp3"
-const STAGE_BGM_RAIN_LOOP_PATH := "res://assets/audio/ambience/rain_loop.mp3"
 const CRASH_SFX := preload("res://assets/audio/sfx/driving/crash.mp3")
 const HORN_SFX := preload("res://assets/audio/sfx/driving/hold_horn.wav")
 
@@ -32,6 +33,8 @@ var horn_player: AudioStreamPlayer
 var stage_bgm_player: AudioStreamPlayer
 var rain_loop_bgm_player: AudioStreamPlayer
 var current_stage_bgm_path := ""
+var current_rain_path := ""
+var current_stage_time_of_day := "morning"
 
 
 func setup(parent: Node) -> void:
@@ -69,15 +72,11 @@ func setup(parent: Node) -> void:
 	parent.add_child(stage_bgm_player)
 	AudioSettingsManager.register_player(stage_bgm_player, "music")
 
-	rain_loop_bgm_player = AudioStreamPlayer.new()
-	rain_loop_bgm_player.name = "RainLoopBGMPlayer"
-	rain_loop_bgm_player.bus = "Master"
-	rain_loop_bgm_player.stream = _load_audio_stream(STAGE_BGM_RAIN_LOOP_PATH)
-	parent.add_child(rain_loop_bgm_player)
-	AudioSettingsManager.register_player(rain_loop_bgm_player, "music", -8.0)
+	rain_loop_bgm_player = AmbientAudioManager.rain_player
 
 
 func start_stage_bgm(stage_time_of_day: String, stage_traffic: String, rng: RandomNumberGenerator) -> void:
+	current_stage_time_of_day = stage_time_of_day
 	if stage_bgm_player == null:
 		return
 
@@ -91,18 +90,12 @@ func start_stage_bgm(stage_time_of_day: String, stage_traffic: String, rng: Rand
 
 
 func start_rain_loop_bgm(stage_weather: String) -> void:
-	if rain_loop_bgm_player == null:
-		return
-
-	if stage_weather != "rain" and stage_weather != "heavy rain":
-		rain_loop_bgm_player.stop()
-		return
-
-	var base_db := -5.0 if stage_weather == "heavy rain" else -8.0
-	AudioSettingsManager.set_player_base_db(rain_loop_bgm_player, base_db)
-	if rain_loop_bgm_player.playing:
-		return
-	rain_loop_bgm_player.play()
+	# Stage music has a 0 dB baseline; apply the current weather's offset
+	# directly so refreshes never accumulate ducking or change user settings.
+	if is_instance_valid(stage_bgm_player):
+		AudioSettingsManager.set_player_base_db(stage_bgm_player, RainAudioProfile.music_duck_db(stage_weather))
+	AmbientAudioManager.enter_drive(stage_weather, current_stage_time_of_day)
+	current_rain_path = RainAudioProfile.path_for(stage_weather)
 
 
 func play_speeder_beep() -> void:
@@ -161,8 +154,8 @@ func get_result_music_carry_state() -> Dictionary:
 		state["stage_base_db"] = AudioSettingsManager.get_player_base_db(stage_bgm_player)
 
 	var rain_music_is_playing := rain_loop_bgm_player != null and is_instance_valid(rain_loop_bgm_player) and rain_loop_bgm_player.playing
-	if rain_music_is_playing:
-		state["rain_path"] = STAGE_BGM_RAIN_LOOP_PATH
+	if rain_music_is_playing and not current_rain_path.is_empty():
+		state["rain_path"] = current_rain_path
 		state["rain_position"] = rain_loop_bgm_player.get_playback_position()
 		state["rain_base_db"] = AudioSettingsManager.get_player_base_db(rain_loop_bgm_player)
 

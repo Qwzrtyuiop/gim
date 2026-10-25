@@ -79,7 +79,7 @@ func refresh() -> void:
 	var interval: int = maxi(1, PlayerState.DEBT_COLLECTION_INTERVAL_DAYS)
 	current_slot = (day - 1) % interval
 	day_label.text = "DAY %d" % day
-	phase_label.text = PlayerState.get_current_time_of_day().capitalize()
+	phase_label.text = PlayerState.get_hub_time_name()
 	week_label.text = "WEEK %d" % PlayerState.get_week_number()
 	for index in range(day_numbers.size()):
 		day_numbers[index].text = str(day - current_slot + index)

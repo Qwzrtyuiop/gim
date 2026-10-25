@@ -1,5 +1,7 @@
 extends Control
 
+signal midnight_encounter_selected(encounter_id: String, character_id: String)
+
 # Coordinates station navigation, locked passenger offers, and ride/story entry.
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
@@ -12,6 +14,9 @@ const RideDeparture := preload("res://scripts/ride_selection/ride_departure.gd")
 const StationInterface := preload("res://scripts/ride_selection/station_interface.gd")
 const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
+const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
+const StationIdleMusic := preload("res://scripts/ui/station_idle_music.gd")
+const MidnightEncounters := preload("res://scripts/ride_selection/midnight_encounters.gd")
 const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 
 var pending_trip_selection: Dictionary = {}
@@ -35,6 +40,8 @@ var confirmation: Control
 var _confirmation_offer: Dictionary = {}
 var _confirmation_input := InputHighlightMode.new()
 var hub_dialogue: HubDialogue
+var night_ambience: HubNightAmbience
+var idle_music: StationIdleMusic
 
 
 func _ready() -> void:
@@ -53,7 +60,7 @@ func _ready() -> void:
 		locked_character_pools[selected_distance] = legacy.duplicate(true)
 	if locked_character_pools.is_empty():
 		locked_character_pools = passenger_pool.roll()
-	elif view.offers().is_empty():
+	elif PlayerState.are_passengers_available() and view.offers().is_empty():
 		# A legacy locked pool can predate a character's current schedule. Repair
 		# only a wholly unusable selection, so the player always has a way forward.
 		locked_character_pools = passenger_pool.roll()
@@ -61,7 +68,14 @@ func _ready() -> void:
 	station_ui = StationInterface.new(self)
 	station_ui.setup()
 	_create_hub_dialogue()
+	night_ambience = AmbientAudioManager
+	AmbientAudioManager.enter_hub(true)
 	view.start_ride_select_bgm()
+	idle_music = StationIdleMusic.new()
+	idle_music.can_play = func() -> bool: return not is_departing
+	idle_music.active_changed.connect(_on_idle_music_changed)
+	add_child(idle_music)
+	MidnightEncounters.prepare(PlayerState)
 	_refresh_terminal()
 	var story_error := PlayerState.take_pending_trip_selection_error()
 	if not story_error.is_empty():
@@ -109,6 +123,15 @@ func _set_distance(difficulty: String) -> void:
 func _refresh_terminal() -> void:
 	terminal_offers = view.offers()
 	view.refresh_terminal()
+	var weather := PlayerState.get_current_weather()
+	idle_music.set_weather(weather)
+	station.set_weather(weather)
+	terminal_view.set_weather(weather)
+	night_ambience.refresh()
+
+
+func _on_idle_music_changed(_active: bool) -> void:
+	view.refresh_bgm()
 
 
 func _focus_offer(distance: String, slot: int) -> void:
@@ -128,6 +151,9 @@ func _choose_offer(distance: String, slot: int) -> void:
 		return
 	for offer in terminal_offers:
 		if offer.distance == distance and int(offer.slot) == slot:
+			if str(offer.get("kind", "")) == "encounter":
+				_interact_midnight_encounter(offer)
+				return
 			_confirmation_offer = offer.duplicate(true)
 			_confirmation_offer["day"] = PlayerState.get_current_day()
 			_confirmation_offer["phase"] = PlayerState.get_current_time_of_day()
@@ -136,6 +162,25 @@ func _choose_offer(distance: String, slot: int) -> void:
 			terminal_view.set_enabled(false)
 			confirmation.present(offer.summary)
 			return
+
+
+func _interact_midnight_encounter(offer: Dictionary) -> void:
+	if not MidnightEncounters.is_available(PlayerState, offer):
+		_refresh_terminal()
+		return
+	var interaction := MidnightEncounters.interact(PlayerState, offer)
+	if interaction.is_empty():
+		return
+	if bool(interaction.get("start_event", false)):
+		hub_dialogue.clear()
+		# The future authored event starts here, after the four floating lines.
+		midnight_encounter_selected.emit(str(offer.encounter_id), str(offer.character.id))
+		return
+	show_message(str(interaction.text), {
+		"target": "gardo",
+		"character_id": "gardo",
+		"typewriter": false,
+	})
 
 
 func _cancel_passenger() -> void:
@@ -183,6 +228,13 @@ func _restore_passenger_controls(character_id: String) -> void:
 
 
 func _depart_with_offer(offer: Dictionary) -> void:
+	if str(offer.get("kind", "")) == "encounter":
+		return
+	if not PlayerState.are_passengers_available():
+		is_departing = false
+		_refresh_terminal()
+		_restore_passenger_controls("")
+		return
 	hub_dialogue.clear()
 	var character: Dictionary = Dictionary(offer.character).duplicate(true)
 	_set_distance(str(offer.distance))
@@ -256,6 +308,8 @@ func _close_passengers() -> void:
 
 
 func _transition_mode() -> String:
+	if not PlayerState.are_passengers_available():
+		return PlayerState.TRANSITION_CURRENT_STAGE
 	var transition_mode := str(pending_trip_selection.get("transition_mode", ""))
 	if transition_mode.is_empty():
 		if bool(pending_trip_selection.get("skip_to_night", false)):

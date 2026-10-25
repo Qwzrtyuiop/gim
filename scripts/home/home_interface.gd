@@ -5,6 +5,7 @@ const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const ImageOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const HouseCalendar := preload("res://scripts/ui/house_calendar.gd")
 const HouseRadio := preload("res://scripts/ui/house_radio.gd")
+const HouseRest := preload("res://scripts/ui/house_rest.gd")
 const RIDE_BUTTON_TEXTURE := preload("res://assets/ui/buttons/hub/ride.png")
 const STORE_BUTTON_TEXTURE := preload("res://assets/ui/buttons/hub/store.png")
 const CALENDAR_TEXTURE := preload("res://assets/ui/frames/calendar.png")
@@ -91,15 +92,6 @@ static func create_info_overlay(owner) -> void:
 	content.add_child(actions)
 	owner.info_close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	actions.add_child(owner.info_close)
-	owner.rest_confirm = Button.new()
-	owner.rest_confirm.name = "ConfirmRest"
-	owner.rest_confirm.custom_minimum_size.y = 46
-	owner.rest_confirm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	owner.rest_confirm.add_theme_font_override("font", owner.UI_FONT)
-	owner.rest_confirm.add_theme_font_size_override("font_size", 14)
-	owner.rest_confirm.pressed.connect(owner._confirm_rest)
-	owner.rest_confirm.hide()
-	actions.add_child(owner.rest_confirm)
 	for destination in [["Ride", owner.RIDE_SELECTION_SCENE, RIDE_BUTTON_TEXTURE], ["Shop", owner.STORE_SCENE, STORE_BUTTON_TEXTURE]]:
 		var button = TextureButton.new()
 		button.tooltip_text = destination[0]
@@ -123,6 +115,12 @@ static func create_info_overlay(owner) -> void:
 	owner.radio_content.hide()
 	owner.info_overlay.add_child(owner.radio_content)
 	owner.radio_content.closed.connect(owner._close_info)
+	owner.rest_content = HouseRest.new()
+	owner.rest_content.hide()
+	owner.info_overlay.add_child(owner.rest_content)
+	owner.rest_content.closed.connect(owner._close_info)
+	owner.rest_content.confirmed.connect(owner._confirm_rest)
+	owner.rest_confirm = owner.rest_content.confirm_button
 
 
 static func layout_ui(owner) -> void:
@@ -143,11 +141,19 @@ static func layout_ui(owner) -> void:
 		var radio_scale = minf(1.15, minf((owner.size.x - 48) / HouseRadio.DESIGN_SIZE.x, content_size.y / HouseRadio.DESIGN_SIZE.y))
 		owner.radio_content.scale = Vector2.ONE * radio_scale
 		owner.radio_content.position = content_origin + (content_size - HouseRadio.DESIGN_SIZE * radio_scale) * 0.5
+	elif owner.info_action == "rest":
+		var rest_scale = minf(1.0, minf((owner.size.x - 48) / HouseRest.DESIGN_SIZE.x, content_size.y / HouseRest.DESIGN_SIZE.y))
+		owner.rest_content.scale = Vector2.ONE * rest_scale
+		owner.rest_content.position = content_origin + (content_size - HouseRest.DESIGN_SIZE * rest_scale) * 0.5
 	else:
 		owner.info_panel.add_theme_stylebox_override("panel", owner.info_panel_style)
 		owner.info_body.custom_minimum_size.x = minf(700, owner.size.x - 48) - 48
 		owner.info_panel.size = Vector2(minf(700, owner.size.x - 48), minf(380 if owner.info_action == "outside" else 420, content_size.y))
-	owner.info_panel.position = content_origin + (content_size - owner.info_panel.size) * 0.5
+		# Destination artwork has a minimum height; fit the complete popup below
+		# the dashboard when a short viewport cannot accommodate that minimum.
+		var panel_scale = minf(1.0, content_size.y / maxf(1.0, owner.info_panel.size.y))
+		owner.info_panel.scale = Vector2.ONE * panel_scale
+	owner.info_panel.position = content_origin + (content_size - owner.info_panel.size * owner.info_panel.scale) * 0.5
 	if owner.tutorial_active:
 		owner._show_tutorial_step(owner.tutorial_step_index)
 
@@ -169,7 +175,8 @@ static func show_info(owner, action: String) -> void:
 	owner.calendar_background.visible = action == "calendar"
 	owner.calendar_content.visible = action == "calendar"
 	owner.radio_content.visible = action == "radio"
-	owner.info_panel.visible = action not in ["calendar", "radio"]
+	owner.rest_content.visible = action == "rest"
+	owner.info_panel.visible = action not in ["calendar", "radio", "rest"]
 	owner.info_close.visible = action != "outside"
 	for button in owner.outside_buttons:
 		button.visible = action == "outside"
@@ -179,13 +186,7 @@ static func show_info(owner, action: String) -> void:
 		owner.info_title.text = "GO OUTSIDE"
 		owner.info_body.text = "Where would you like to go?\n\nPress Esc or click outside to stay home."
 	elif action == "rest":
-		var phase = PlayerState.get_current_time_of_day()
-		owner.info_title.text = "SLEEP UNTIL MORNING?" if phase == "night" else "REST NOW?"
-		owner.rest_confirm.text = "YES, SLEEP" if phase == "night" else "YES, REST"
-		if phase == "night":
-			owner.info_body.text = "Recover up to 3 energy and advance to Day %d, morning." % (PlayerState.get_current_day() + 1)
-		else:
-			owner.info_body.text = "Recover up to 2 energy and advance to %s." % ("noon" if phase == "morning" else "night")
+		owner.rest_content.refresh()
 	elif action == "radio":
 		owner.radio_content.refresh()
 	elif action == "calendar":
@@ -199,6 +200,8 @@ static func show_info(owner, action: String) -> void:
 		owner.radio_content.close_button.grab_focus()
 	elif action == "outside":
 		owner.outside_buttons[0].grab_focus()
+	elif action == "rest":
+		owner.rest_content.cancel_button.grab_focus()
 	else:
 		owner.info_close.grab_focus()
 
@@ -209,6 +212,7 @@ static func close_info(owner) -> void:
 	owner.radio_content.close_button.release_focus()
 	owner.info_close.release_focus()
 	owner.rest_confirm.release_focus()
+	owner.rest_content.cancel_button.release_focus()
 	for button in owner.outside_buttons:
 		button.release_focus()
 	owner.info_action = ""

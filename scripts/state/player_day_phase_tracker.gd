@@ -28,6 +28,32 @@ static func get_current_day(player_state) -> int:
 	return maxi(1, int(player_state.current_day))
 
 
+static func is_midnight(player_state) -> bool:
+	# Midnight is the spent night slot, not another drivable phase. The dated
+	# saved result also applies this rule to existing saves without a new field.
+	if get_current_phase(player_state) != "night":
+		return false
+	var result: Dictionary = player_state.last_stage_result
+	if int(result.get("day", 0)) != get_current_day(player_state):
+		return false
+	return str(result.get("time_of_day", "")) == "night" or str(result.get("bayanihan_skipped_phase", "")) == "night"
+
+
+static func passengers_available(player_state) -> bool:
+	if is_midnight(player_state):
+		return false
+	# Walking through home cannot bypass an evening already reserved by a story.
+	return not (get_current_phase(player_state) == "night" and player_state.pending_skip_night_phase)
+
+
+static func hub_time_name(player_state, day := -1, phase := "") -> String:
+	var display_day: int = get_current_day(player_state) if day < 1 else day
+	var display_phase: String = get_current_phase(player_state) if phase.is_empty() else phase
+	if display_day == get_current_day(player_state) and display_phase == "night" and is_midnight(player_state):
+		return "Midnight"
+	return display_phase.capitalize()
+
+
 static func stage_type_for_phase(player_state, stage_type: String, phase: String) -> String:
 	var stage_parts: Dictionary = player_state._parse_stage_type(stage_type)
 	return player_state.build_stage_type(

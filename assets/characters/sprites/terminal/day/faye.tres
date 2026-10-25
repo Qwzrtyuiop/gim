@@ -1,0 +1,8 @@
+[gd_resource type="AtlasTexture" format=3 uid="uid://b7khd4r2apn6m"]
+
+[ext_resource type="Texture2D" path="res://assets/story/backgrounds/locations/terminalspawns/magda_dayspawn.png" id="1"]
+
+[resource]
+atlas = ExtResource("1")
+region = Rect2(41, 277, 139, 345)
+filter_clip = true

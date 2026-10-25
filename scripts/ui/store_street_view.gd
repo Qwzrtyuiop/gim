@@ -5,12 +5,15 @@ signal action_pressed(action: String)
 const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const BACKGROUND := preload("res://assets/story/backgrounds/locations/store.png")
 const NIGHT := preload("res://assets/story/backgrounds/locations/storenight.png")
+const MIDNIGHT := preload("res://assets/story/backgrounds/locations/storemidnight.png")
+const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
+const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/storerain.png")
 const SELECTED := preload("res://assets/story/backgrounds/locations/store_select.png")
 const ART_SIZE := Vector2(1698, 926)
 const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 # The supplied sheet marks rectangular interaction areas. Their full interiors
 # are clickable, including the transparent space inside each drawn border.
-# One layout serves both background phases; no alpha scan is needed for input.
+# One layout serves every background phase; no alpha scan is needed for input.
 const REGIONS := {
 	"tricycle": Rect2(203.0 / 1698.0, 352.0 / 926.0, 653.0 / 1698.0, 470.0 / 926.0),
 	"food": Rect2(1089.0 / 1698.0, 409.0 / 926.0, 448.0 / 1698.0, 236.0 / 926.0),
@@ -31,6 +34,9 @@ var hovered_action := ""
 var focused_action := ""
 var enabled := true
 var is_night := false
+var is_midnight := false
+var weather := "clear"
+var weather_effects: HubWeatherEffects
 var highlight_mode := InputHighlightMode.new()
 
 
@@ -70,6 +76,12 @@ func _ready() -> void:
 		buttons[action] = button
 	resized.connect(_layout)
 	visibility_changed.connect(_on_visibility_changed)
+	weather_effects = HubWeatherEffects.new()
+	weather_effects.configure(RAIN_MARKER)
+	add_child(weather_effects)
+	move_child(weather_effects, 0)
+	weather_effects.set_weather(weather)
+	_refresh_buttons()
 	_layout()
 
 
@@ -79,7 +91,8 @@ func _input(event: InputEvent) -> void:
 
 
 func active_action() -> String:
-	return highlight_mode.active(hovered_action, focused_action) if enabled else ""
+	var action := highlight_mode.active(hovered_action, focused_action)
+	return action if _action_enabled(action) else ""
 
 
 func set_night(value: bool) -> void:
@@ -87,13 +100,50 @@ func set_night(value: bool) -> void:
 	queue_redraw()
 
 
+func set_midnight(value: bool) -> void:
+	is_midnight = value
+	_refresh_buttons()
+	queue_redraw()
+
+
+func set_weather(value: String) -> void:
+	weather = value
+	if weather_effects != null:
+		weather_effects.set_weather(value)
+	queue_redraw()
+
+
+func get_background_texture() -> Texture2D:
+	return MIDNIGHT if is_midnight else (NIGHT if is_night else BACKGROUND)
+
+
 func set_enabled(value: bool) -> void:
 	enabled = value
-	for button: Button in buttons.values():
-		button.disabled = not value
+	_refresh_buttons()
 	if not value:
 		_clear_focus()
 	queue_redraw()
+
+
+func _action_enabled(action: String) -> bool:
+	return enabled and REGIONS.has(action) and (not is_midnight or action in ["home", "station"])
+
+
+func _refresh_buttons() -> void:
+	for action: String in buttons:
+		var button: Button = buttons[action]
+		var available := _action_enabled(action)
+		button.disabled = not available
+		button.focus_mode = Control.FOCUS_ALL if available else Control.FOCUS_NONE
+		button.mouse_filter = Control.MOUSE_FILTER_STOP if available else Control.MOUSE_FILTER_IGNORE
+		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
+		button.tooltip_text = TOOLTIPS[action] if available else ""
+		if not available:
+			button.release_focus()
+			if hovered_action == action:
+				hovered_action = ""
+			if focused_action == action:
+				focused_action = ""
 
 
 func _layout() -> void:
@@ -107,12 +157,14 @@ func _layout() -> void:
 		var sign_region := Rect2(0.0 if action == "home" else 0.82, 0.90, 0.18, 0.10)
 		exit_labels[action].position = image_rect.position + sign_region.position * image_rect.size
 		exit_labels[action].size = sign_region.size * image_rect.size
+	if weather_effects != null:
+		weather_effects.set_art_rect(image_rect)
 	queue_redraw()
 
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("17110b"))
-	draw_texture_rect(NIGHT if is_night else BACKGROUND, image_rect, false)
+	draw_texture_rect(get_background_texture(), image_rect, false, weather_effects.background_tint())
 	var action := active_action()
 	for exit_action: String in exit_labels:
 		exit_labels[exit_action].add_theme_color_override("font_color", Color("ffdf52") if action == exit_action else Color("f5dfac"))
@@ -126,7 +178,7 @@ func _draw() -> void:
 
 
 func _on_hovered(action: String) -> void:
-	if enabled:
+	if _action_enabled(action):
 		hovered_action = action
 		queue_redraw()
 
@@ -138,7 +190,7 @@ func _on_unhovered(action: String) -> void:
 
 
 func _on_focused(action: String) -> void:
-	if enabled:
+	if _action_enabled(action):
 		focused_action = action
 		queue_redraw()
 
@@ -150,7 +202,7 @@ func _on_unfocused(action: String) -> void:
 
 
 func _on_action_pressed(action: String) -> void:
-	if enabled and is_visible_in_tree():
+	if _action_enabled(action) and is_visible_in_tree():
 		action_pressed.emit(action)
 
 

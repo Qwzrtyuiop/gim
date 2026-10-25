@@ -42,6 +42,10 @@ const SPRITES := {
 	"jessa": preload("res://assets/characters/sprites/jessasprite.png"),
 }
 const DAY_ENTRIES := {
+	"faye": {
+		"region": Rect2(41, 277, 139, 345),
+		"texture": preload("res://assets/characters/sprites/terminal/day/faye.tres"),
+	},
 	"ely": {
 		"region": Rect2(249, 301, 107, 276),
 		"texture": preload("res://assets/characters/sprites/terminal/day/ely.png"),
@@ -107,6 +111,14 @@ const NIGHT_ENTRIES := {
 }
 
 
+const MIDNIGHT_ENTRIES := {
+	"gardo": {
+		"region": Rect2(214, 396, 133, 161),
+		"texture": preload("res://assets/characters/sprites/terminal/midnight/gardo.tres"),
+	},
+}
+
+
 const GENERIC_ENTRIES := [
 	{
 		"region": Rect2(259, 301, 67, 280),
@@ -153,3 +165,8 @@ static func generic_entry(slot: int) -> Dictionary:
 	if slot < 0 or slot >= GENERIC_ENTRIES.size():
 		return {}
 	return GENERIC_ENTRIES[slot].duplicate()
+
+
+static func midnight_entry(character_id: String) -> Dictionary:
+	var data: Dictionary = MIDNIGHT_ENTRIES.get(character_id, {})
+	return data.duplicate()

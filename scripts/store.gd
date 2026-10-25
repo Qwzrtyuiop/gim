@@ -3,6 +3,8 @@ extends Control
 const StoreItems := preload("res://scripts/store/store_items.gd")
 const StoreTutorial := preload("res://scripts/store/store_tutorial.gd")
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
+const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
+const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
 const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
@@ -31,6 +33,7 @@ const StoreStreetView := preload("res://scripts/ui/store_street_view.gd")
 var stats_row_refs: Dictionary = {}
 var status_header: PanelContainer
 var bgm_player: AudioStreamPlayer
+var night_ambience: HubNightAmbience
 var store_item_rows: Array[Control] = []
 var store_buy_buttons: Array[BaseButton] = []
 var tutorial_overlay: Control
@@ -56,6 +59,8 @@ func _ready() -> void:
 	_create_stats_row()
 	_create_street()
 	_create_hub_dialogue()
+	night_ambience = AmbientAudioManager
+	AmbientAudioManager.enter_hub()
 	back_button.pressed.connect(_close_shop)
 	ButtonGlow.attach(self, back_button)
 	_start_store_bgm()
@@ -175,7 +180,7 @@ func _on_street_action(action: String) -> void:
 
 
 func _open_shop(category: String) -> void:
-	if _speech_is_blocking():
+	if PlayerState.is_midnight() or _speech_is_blocking():
 		return
 	hub_dialogue.clear()
 	active_category = category
@@ -221,7 +226,7 @@ func _build_items() -> void:
 
 
 func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
-	if tutorial_active or not shop_overlay.visible or is_transitioning or _speech_is_blocking():
+	if PlayerState.is_midnight() or tutorial_active or not shop_overlay.visible or is_transitioning or _speech_is_blocking():
 		return
 	await StoreItems.buy_item(self, item, label, tier_container, button)
 	if not is_transitioning and shop_overlay.visible and not PlayerState.is_run_failed():
@@ -231,6 +236,16 @@ func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxConta
 func _refresh_header() -> void:
 	_refresh_stats_row()
 	street.set_night(PlayerState.get_current_time_of_day() == "night")
+	street.set_midnight(PlayerState.is_midnight())
+	street.set_weather(PlayerState.get_current_weather())
+	if PlayerState.is_midnight():
+		if tutorial_active:
+			StoreTutorial.end_tutorial(self)
+		if shop_overlay.visible:
+			hub_dialogue.clear()
+			_close_shop()
+	night_ambience.refresh()
+	_refresh_store_bgm()
 	money_label.text = "Gas Price: %s / %s%%" % [
 		PlayerState.get_gas_price_text(),
 		String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
@@ -247,7 +262,15 @@ func _start_store_bgm() -> void:
 	bgm_player.autoplay = false
 	add_child(bgm_player)
 	AudioSettingsManager.register_player(bgm_player, "music")
-	bgm_player.play()
+	_refresh_store_bgm()
+
+
+func _refresh_store_bgm() -> void:
+	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
+	if PlayerState.is_midnight():
+		bgm_player.stop()
+	elif not bgm_player.playing:
+		bgm_player.play()
 
 
 func _ride() -> void:

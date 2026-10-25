@@ -5,7 +5,7 @@ const StationView := preload("res://scripts/ui/station_view.gd")
 const TerminalView := preload("res://scripts/ride_selection/terminal_passenger_view.gd")
 const PassengerConfirmation := preload("res://scripts/ride_selection/passenger_confirmation.gd")
 const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 
 var screen
 
@@ -26,9 +26,7 @@ func setup() -> void:
 	screen.station_back_button = Button.new()
 	screen.station_back_button.name = "StationBack"
 	screen.station_back_button.text = "BACK"
-	screen.station_back_button.add_theme_font_override("font", FONT)
-	screen.station_back_button.add_theme_font_size_override("font_size", 12)
-	screen.station_back_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	DashboardTheme.apply_button(screen.station_back_button)
 	screen.station_back_button.visible = screen._allow_back()
 	screen.station_back_button.pressed.connect(screen._go_back)
 	screen.add_child(screen.station_back_button)
@@ -75,7 +73,7 @@ func show_passengers() -> void:
 	screen.status_header.set_display_time(screen._display_day(), PlayerState.get_next_stage_time(screen._transition_mode()))
 	screen.status_header.show()
 	PlayerState.set_pending_passengers_open(true)
-	if not PlayerState.has_ride_select_tutorial_shown():
+	if PlayerState.are_passengers_available() and not PlayerState.has_ride_select_tutorial_shown() and not screen.terminal_offers.is_empty():
 		screen.tutorial.start()
 	else:
 		focus_passenger_controls()
@@ -98,7 +96,9 @@ func hide_passengers() -> void:
 
 
 func focus_passenger_controls() -> void:
-	if screen._needs_refuel():
+	if screen.terminal_offers.is_empty():
+		screen.terminal_view.close_button.grab_focus()
+	elif PlayerState.are_passengers_available() and screen._needs_refuel():
 		screen.terminal_view.store_button.grab_focus()
 	else:
 		screen.terminal_view.focus_first_offer()
@@ -109,6 +109,6 @@ func layout() -> void:
 		return
 	screen.status_header.layout_in(screen.size)
 	screen.station_back_button.position = Vector2(24, screen.size.y - 66)
-	screen.station_back_button.size = Vector2(160, 42)
+	screen.station_back_button.size = DashboardTheme.BUTTON_SIZE
 	if screen.tutorial != null and screen.tutorial.active:
 		screen.tutorial._layout_for_targets(screen.tutorial.steps[screen.tutorial.step_index].get("targets", []))

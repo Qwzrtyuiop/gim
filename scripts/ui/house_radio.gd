@@ -92,7 +92,7 @@ func _rule(rect: Rect2) -> void:
 
 
 func refresh() -> void:
-	day_label.text = "DAY %d / %s" % [PlayerState.get_current_day(), PlayerState.get_current_time_of_day().to_upper()]
+	day_label.text = "DAY %d / %s" % [PlayerState.get_current_day(), PlayerState.get_hub_time_name().to_upper()]
 	price_label.text = PlayerState.get_gas_price_text()
 	change_label.text = "%s  (%s)" % [PlayerState.get_gas_price_change_text(), PlayerState.get_gas_price_yesterday_percent_text()]
 	today_label.text = PlayerState.weather_text(PlayerState.get_today_weather_forecast())

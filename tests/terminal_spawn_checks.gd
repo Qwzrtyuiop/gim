@@ -24,7 +24,7 @@ static func _test_catalog() -> void:
 	assert(SpawnCatalog.SPRITES.ely.resource_path.ends_with("elenasprite.png"))
 	assert(SpawnCatalog.SPRITES.faye.resource_path.ends_with("magdasprite.png"))
 	assert(SpawnCatalog.SPRITES.ito.resource_path.ends_with("isidrosprite.png"))
-	var day_ids := ["ely", "gardo", "ito", "cel", "hana", "benny", "jessa", "alma"]
+	var day_ids := ["faye", "ely", "gardo", "ito", "cel", "hana", "benny", "jessa", "alma"]
 	var night_ids := ["dante", "gardo", "cel", "hana", "jessa", "alma", "faye"]
 	for night in [false, true]:
 		var ids: Array = night_ids if night else day_ids

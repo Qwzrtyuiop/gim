@@ -97,6 +97,8 @@ static func consume_rules(consumed_seeded_rider_rules: Dictionary, rule_ids: Arr
 
 
 static func get_pool_setup(player_state, selection_context: Dictionary) -> Dictionary:
+	if not player_state.are_passengers_available():
+		return {"distance_slots": {"short": [], "medium": [], "long": []}, "rule_ids": []}
 	var context: Dictionary = normalize_selection_context(player_state, selection_context)
 	var distance_slots: Dictionary = {
 		"short": [],

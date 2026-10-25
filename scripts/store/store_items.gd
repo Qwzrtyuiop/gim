@@ -95,7 +95,7 @@ static func item_text(owner, item: Dictionary) -> String:
 
 
 static func buy_item(owner, item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
-	if owner.tutorial_active or not owner.shop_overlay.visible or owner.is_transitioning:
+	if PlayerState.is_midnight() or owner.tutorial_active or not owner.shop_overlay.visible or owner.is_transitioning:
 		return
 	if item["type"] == "upgrade":
 		var current_level = PlayerState.get_upgrade_level(item["id"])

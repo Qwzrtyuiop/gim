@@ -273,6 +273,9 @@ const MOCK_CHARACTERS := [
 			"first_appearance_chance": 0.80,
 			"eligible_distances": ["short", "medium","long"],
 			"eligible_times": ["night"],
+			"additional_eligible_times": ["morning", "noon"],
+			"additional_times_min_progress": 2,
+			"additional_times_min_rides": 2,
 			"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 			"story_stage_overrides": {
 				"introduction": {"title": "Salon Chatter"},

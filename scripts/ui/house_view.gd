@@ -6,6 +6,8 @@ const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const Selectables := preload("res://scripts/ui/house_selectable_catalog.gd")
 const DAY := preload("res://assets/story/backgrounds/locations/inhouse.png")
 const NIGHT := preload("res://assets/story/backgrounds/locations/inhouse_night.png")
+const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
+const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/houserain.png")
 const REGIONS := Selectables.REGIONS
 const HOVER_SCALE := 1.06
 const TOOLTIPS := {
@@ -49,6 +51,8 @@ class HotspotButton:
 
 var buttons: Dictionary = {}
 var is_night := false
+var weather := "clear"
+var weather_effects: HubWeatherEffects
 var image_rect := Rect2()
 var hovered_action := ""
 var focused_action := ""
@@ -79,6 +83,11 @@ func _ready() -> void:
 		buttons[action] = button
 	resized.connect(_layout)
 	visibility_changed.connect(_on_visibility_changed)
+	weather_effects = HubWeatherEffects.new()
+	weather_effects.configure(RAIN_MARKER, true)
+	add_child(weather_effects)
+	move_child(weather_effects, 0)
+	weather_effects.set_weather(weather)
 	_layout()
 
 
@@ -104,6 +113,13 @@ func set_night(value: bool) -> void:
 	is_night = value
 	# Lighting changes the background and selected art only. Positions and cached
 	# alpha masks remain the same; there is no second set of hitbox calculations.
+	queue_redraw()
+
+
+func set_weather(value: String) -> void:
+	weather = value
+	if weather_effects != null:
+		weather_effects.set_weather(value)
 	queue_redraw()
 
 
@@ -135,12 +151,14 @@ func _layout() -> void:
 		var rect := sprite_rect_for(action)
 		buttons[action].position = rect.position
 		buttons[action].size = rect.size
+	if weather_effects != null:
+		weather_effects.set_art_rect(image_rect)
 	queue_redraw()
 
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color(0.025, 0.02, 0.015))
-	draw_texture_rect(NIGHT if is_night else DAY, image_rect, false)
+	draw_texture_rect(NIGHT if is_night else DAY, image_rect, false, weather_effects.background_tint())
 	var action := active_action()
 	if not REGIONS.has(action):
 		return
@@ -149,7 +167,7 @@ func _draw() -> void:
 		return
 	# Draw the selected object last, once, above the room artwork. Hit testing
 	# keeps its resting mask so enlarged edges cannot toggle hover repeatedly.
-	draw_texture_rect(Selectables.texture_for(action, is_night), sprite_rect_for(action, true), false)
+	draw_texture_rect(Selectables.texture_for(action, is_night), sprite_rect_for(action, true), false, weather_effects.background_tint())
 
 
 func _draw_exit_highlight() -> void:

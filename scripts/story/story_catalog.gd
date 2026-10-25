@@ -169,6 +169,16 @@ static func _character_with_progress(player_state, character_data: Dictionary) -
 			if first_day is int and first_day > 0:
 				character_copy["unavailable_day"] = first_day
 	character_copy["progress"] = player_state.get_unique_character_progress(character_id)
+	var required_progress := int(character_copy.get("additional_times_min_progress", -1))
+	var required_rides := int(character_copy.get("additional_times_min_rides", -1))
+	var progress_unlocked := required_progress >= 0 and int(character_copy.progress) >= required_progress
+	var rides_unlocked := required_rides >= 0 and int(player_state.character_completed_rides.get(character_id, 0)) >= required_rides
+	if progress_unlocked or rides_unlocked:
+		var times: Array = character_copy.get("eligible_times", []).duplicate()
+		for phase in character_copy.get("additional_eligible_times", []):
+			if not times.has(phase):
+				times.append(phase)
+		character_copy["eligible_times"] = times
 	var story_state: Dictionary = get_unique_character_story_state(player_state, character_id)
 	if not story_state.is_empty():
 		character_copy["story_stage_id"] = str(story_state.get("stage_id", ""))

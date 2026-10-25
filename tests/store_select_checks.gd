@@ -14,9 +14,11 @@ static func run(host: Node) -> void:
 	assert(ProjectSettings.get_setting("testing/isolated", false))
 	await _test_shared_rectangles(host)
 	await _test_store_actions(host)
+	await _test_midnight_rectangles(host)
+	await _test_midnight_store(host)
 	_test_archived_sources()
 	PlayerState.reset()
-	print("PASS: store day/night shared rectangles and transparent interiors, responsive hover/focus isolation, real shop actions/purchases/tutorial gating and archived-image save paths")
+	print("PASS: store day/night/midnight art and shared rectangles, closed midnight shops/purchase guards, free exits without tutorial traps, responsive hover/focus isolation and archived-image save paths")
 
 
 static func _test_shared_rectangles(host: Node) -> void:
@@ -118,6 +120,127 @@ static func _test_store_actions(host: Node) -> void:
 			assert(store.hub_dialogue.is_active())
 			break
 		store.free()
+
+
+static func _test_midnight_rectangles(host: Node) -> void:
+	var street := StreetView.new()
+	host.get_tree().root.add_child(street)
+	street.size = Vector2(1280, 720)
+	street.set_night(true)
+	await _settle(host)
+	var night_rect := street.image_rect
+	var button_rects: Dictionary = {}
+	for action: String in street.buttons:
+		button_rects[action] = street.buttons[action].get_rect()
+	var pressed: Array[String] = []
+	street.action_pressed.connect(func(action: String) -> void: pressed.append(action))
+	street.set_midnight(true)
+	await _settle(host)
+	assert(street.get_background_texture() == StreetView.MIDNIGHT)
+	assert(street.image_rect == night_rect, "The slightly different midnight source resolution fits the same authored layout")
+	for action: String in street.buttons:
+		assert(street.buttons[action].get_rect() == button_rects[action])
+	for category in ["tricycle", "food"]:
+		var button: Button = street.buttons[category]
+		assert(button.disabled and button.focus_mode == Control.FOCUS_NONE and button.mouse_filter == Control.MOUSE_FILTER_IGNORE)
+		assert(button.tooltip_text.is_empty())
+		await _click(host, button.get_global_rect().get_center())
+		button.pressed.emit()
+		button.mouse_entered.emit()
+		button.focus_entered.emit()
+		assert(pressed.is_empty() and street.active_action().is_empty(), "Closed shops cannot emit actions or acquire hover/focus outlines")
+	street.set_enabled(false)
+	street.set_enabled(true)
+	assert(street.buttons.tricycle.disabled and street.buttons.food.disabled, "Modal re-enabling cannot unlock midnight shops")
+	for action in ["home", "station"]:
+		var button: Button = street.buttons[action]
+		assert(not button.disabled and button.focus_mode != Control.FOCUS_NONE and button.mouse_filter != Control.MOUSE_FILTER_IGNORE)
+		await _click(host, button.get_global_rect().get_center())
+		assert(pressed.back() == action)
+	street.set_midnight(false)
+	assert(street.get_background_texture() == StreetView.NIGHT)
+	assert(not street.buttons.tricycle.disabled and not street.buttons.food.disabled)
+	street.set_night(false)
+	assert(street.get_background_texture() == StreetView.BACKGROUND)
+	street.free()
+
+
+static func _setup_midnight_store(midnight := true) -> void:
+	PlayerState.reset()
+	PlayerState.current_day = 3
+	PlayerState.set_current_stage_time("night")
+	PlayerState.stage_round = 3
+	PlayerState.money = 5000
+	PlayerState.energy = 4
+	PlayerState.gas = 30
+	PlayerState.home_tutorial_shown = true
+	PlayerState.ride_select_tutorial_shown = true
+	PlayerState.store_tutorial_shown = not midnight
+	PlayerState.clear_story_triggers()
+	PlayerState.ensure_daily_conditions_for_current_day()
+	PlayerState.set_pending_trip_selection("res://scenes/day_start_scene.tscn", PlayerState.TRANSITION_CURRENT_STAGE)
+	if midnight:
+		PlayerState.set_last_stage_result({"day": 3, "time_of_day": "night", "completed": true})
+
+
+static func _test_midnight_store(host: Node) -> void:
+	for exit_action in ["home", "station"]:
+		_setup_midnight_store()
+		var store = load("res://scenes/store.tscn").instantiate()
+		host.get_tree().root.add_child(store)
+		await _settle(host)
+		assert(store.street.is_midnight and store.street.get_background_texture() == StreetView.MIDNIGHT)
+		assert(not store.tutorial_active and not PlayerState.has_store_tutorial_shown(), "An unseen store tutorial cannot trap midnight navigation or consume its first-visit flag")
+		var original := _snapshot()
+		for category in ["tricycle", "food"]:
+			await _click(host, store.street.buttons[category].get_global_rect().get_center())
+			store.street.buttons[category].pressed.emit()
+			store.street.action_pressed.emit(category)
+			store._open_shop(category)
+			assert(not store.shop_overlay.visible and store.active_category.is_empty())
+		assert(_snapshot() == original, "Closed shop entry attempts do not change state or save")
+		var resources := _travel_resources()
+		await _click(host, store.street.buttons[exit_action].get_global_rect().get_center())
+		if host.get_tree().current_scene == null:
+			await host.get_tree().scene_changed
+		var destination = host.get_tree().current_scene
+		var expected := "res://scenes/day_start_scene.tscn" if exit_action == "home" else "res://scenes/ride_selection.tscn"
+		assert(destination.scene_file_path == expected and _travel_resources() == resources)
+		assert(PlayerState.is_midnight() and not PlayerState.has_store_tutorial_shown())
+		store.free()
+		host.get_tree().current_scene = null
+		destination.free()
+	# A shop may already be open when an external event finishes the night.
+	_setup_midnight_store(false)
+	var live_store = load("res://scenes/store.tscn").instantiate()
+	host.get_tree().root.add_child(live_store)
+	await _settle(host)
+	live_store._open_shop("tricycle")
+	assert(live_store.shop_overlay.visible)
+	var purchase_args: Array = []
+	for index in range(live_store.StoreItemCatalog.ITEMS.size()):
+		if live_store.StoreItemCatalog.ITEMS[index].type != "gas":
+			continue
+		for connection: Dictionary in live_store.store_buy_buttons[index].get_signal_connection_list("pressed"):
+			var callback: Callable = connection.callable
+			if callback.get_method() == "_buy_item":
+				purchase_args = callback.get_bound_arguments()
+		break
+	assert(purchase_args.size() == 4)
+	PlayerState.set_last_stage_result({"day": 3, "time_of_day": "night", "completed": true})
+	live_store._refresh_header()
+	assert(not live_store.shop_overlay.visible and live_store.active_category.is_empty() and live_store.street.enabled)
+	assert(live_store.street.is_midnight and not live_store.street.buttons.home.disabled and not live_store.street.buttons.station.disabled)
+	var before_purchase := _snapshot()
+	var buy_button: Button = purchase_args[3]
+	buy_button.pressed.emit()
+	await live_store.StoreItems.buy_item(live_store, purchase_args[0], purchase_args[1], purchase_args[2], buy_button)
+	assert(_snapshot() == before_purchase, "Both stale purchase signals and direct purchase helper calls reject midnight")
+	live_store.free()
+
+
+static func _travel_resources() -> Dictionary:
+	return {"money": PlayerState.money, "energy": PlayerState.energy, "gas": PlayerState.gas, "day": PlayerState.current_day, "phase": PlayerState.current_phase, "round": PlayerState.stage_round}
 
 
 static func _snapshot() -> Dictionary:

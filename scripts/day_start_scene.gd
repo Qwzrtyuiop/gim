@@ -3,6 +3,8 @@ extends Control
 const HomeInterface := preload("res://scripts/home/home_interface.gd")
 const HomeTutorial := preload("res://scripts/home/home_tutorial.gd")
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
+const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
+const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
 const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 
 const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
@@ -23,12 +25,14 @@ var status_header: PanelContainer
 var stats_row_refs: Dictionary = {}
 var is_transitioning := false
 var bgm_player: AudioStreamPlayer
+var night_ambience: HubNightAmbience
 var info_overlay: ColorRect
 var info_panel: PanelContainer
 var info_panel_style: StyleBoxFlat
 var calendar_background: TextureRect
 var calendar_content: Control
 var radio_content: Control
+var rest_content: Control
 var info_title: Label
 var info_body: Label
 var info_close: Button
@@ -60,6 +64,8 @@ func _ready() -> void:
 	_create_hud()
 	_create_info_overlay()
 	_create_hub_dialogue()
+	night_ambience = AmbientAudioManager
+	AmbientAudioManager.enter_hub()
 	house.action_pressed.connect(_on_house_action)
 	resized.connect(_layout_ui)
 	_start_home_bgm()
@@ -111,6 +117,9 @@ func _layout_ui() -> void:
 
 func _render_day_start() -> void:
 	HomeInterface.render_day_start(self)
+	house.set_weather(PlayerState.get_current_weather())
+	night_ambience.refresh()
+	_refresh_home_bgm()
 
 
 func _show_info(action: String) -> void:
@@ -198,7 +207,15 @@ func _start_home_bgm() -> void:
 	bgm_player.stream = _load_looping_audio_stream(HOME_BGM_PATH)
 	add_child(bgm_player)
 	AudioSettingsManager.register_player(bgm_player, "music")
-	bgm_player.play()
+	_refresh_home_bgm()
+
+
+func _refresh_home_bgm() -> void:
+	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
+	if PlayerState.is_midnight():
+		bgm_player.stop()
+	elif not bgm_player.playing:
+		bgm_player.play()
 
 
 func _load_looping_audio_stream(path: String):

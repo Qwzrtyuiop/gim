@@ -9,7 +9,7 @@ Gulong is a single-player, Philippine-set 2D side-scrolling driving game. John T
 - Engine: Godot 4.6; installed editor/console: 4.6.2.
 - Rendering: Forward Plus, Windows D3D12; viewport 1280x720, `canvas_items` stretch.
 - Entry: `res://scenes/main_menu.tscn` in [project.godot](../project.godot).
-- Autoload order: AudioSettingsManager, StoryLanguageManager, PlayerState, AchievementPopupManager, PauseMenuManager, UIAudioManager.
+- Autoload order: AudioSettingsManager, StoryLanguageManager, PlayerState, AmbientAudioManager, AchievementPopupManager, PauseMenuManager, UIAudioManager.
 - Saves: `user://progress_save.tres`, explicit version-4 resource/codec. Language and audio preferences use separate files. Live driving is restarted rather than restored as an exact traffic/RNG snapshot.
 - Controls: W/Up and S/Down change lanes, D/Right accelerates, A/Left brakes, Shift boosts, Q holds the horn (repeat taps can persuade bottom-lane traffic), Escape pauses in supported scenes. Main-menu hold-R resets progress.
 
@@ -50,12 +50,64 @@ The next request was to clean up code and put related functions in their respect
 
 ## Function ownership after cleanup
 
+After a night trip ends, the hubs display **Midnight** and the terminal has no
+passengers until the next day. Home's Ride action still opens the station street;
+walking between home, station and store does not advance time or recover energy.
+`state/player_day_phase_tracker.gd` derives closure from the existing result's
+day/time (including failed trips and skipped nights), so saved version-4 runs
+also respect it. The underlying phase remains `night` for sleep, weather and
+story triggers. A reserved story night also blocks passenger selection.
+Random, seeded, cached and scripted passenger departures share this gate, and
+closed-terminal visits preserve existing locked pools. Actual sleep starts the
+new day and reopens passenger selection.
+`audio/ambient_audio_manager.gd` keeps shared ambience alive across locations,
+using `ui/hub_night_ambience.gd` for the layered mix: the existing
+`ambience/night.mp3` bed at -12 dB, a 25% dog-bark chance every five seconds at
+home/store/station, and a looping `cars.mp3` layer at the station/terminal only.
+These layers run during night and midnight. Dogs use eight quiet-boundary excerpts
+from the original `night_dogs.mp3`, lasting 2-2.95 seconds at -28 dB; cars use
+-22 dB. The helper's constants own this mix and cadence. Its private RNG does not
+affect passenger or driving rolls, and barks cannot overlap. All layers register
+as SFX. At midnight, home/station/store music stops; night results also discard
+the carried driving track but retain rain ambience. Earlier phases keep their
+music. Home rest refreshes ambience when the clock reaches night. Home, store
+and station reuse the same rain/night players and dog timers, retaining playback
+through scene handoffs. Traffic is enabled only at the station/terminal. Rides
+and results also reuse shared rain/night loops, without hub dogs or traffic;
+result rain resumes its saved offset only after a cold start. Music remains owned
+by each screen. Pause suspends ambience; weather/phase changes adjust only the
+affected layers. Menus, sleep and authored story scenes stop the shared mix so
+their own audio can take over. Startup does not roll weather or save progress.
+`tests/ambient_continuity_checks.gd` covers real travel handoffs and cleanup.
+`tests/hub_ambience_checks.gd` covers layering,
+seeded dog checks, cadence, pause, ownership and gameplay-RNG isolation.
+`ui/station_idle_music.gd` adds music after spending 60 seconds on the
+station/terminal screen. A private RNG chooses `music/story/jazz.mp3` or `midnight.mp3`
+and loops that track until leaving the station, replacing normal station music while
+leaving ambience running. Jazz's base volume is -14 dB and midnight's is 0 dB
+to balance their different source levels; both use the Music category. This
+idle track is an intentional exception to midnight's usual music silence.
+Mouse, keyboard, touch and controller interaction do not reset the visit timer
+or stop the track. Pause freezes playback
+and the timer. Departure prevents a new idle track, and leaving the scene frees
+the player/timer. Overlay and header refreshes preserve the idle session. No idle
+music runs at home or the store. `tests/station_idle_music_checks.gd` covers
+selection, interaction-independent timing/playback, pause, ownership and state isolation.
+`tests/midnight_checks.gd` covers save/reload,
+stale confirmation and entry guards, empty terminal navigation, sleep reopening,
+midnight music and ambience ownership/pause. The full isolated regression suite and source/diff
+checks passed. Headless checks do not establish audible mix quality.
+
 The store street now uses aligned 1698x926 `store.png` / `storenight.png` art and
 the transparent `store_select.png` rectangle borders. Four shared full rectangles
 select Lito's, the food counter, Home and Station, including their transparent
 interiors; there are no separate night hit areas or alpha scans for store input.
 `ui/store_street_view.gd` uses the shared pointer/keyboard mode and lighting from
-the current clock. See [store selection artwork](STORE_SELECTIONS.md).
+the current clock. Midnight uses the shuttered `storemidnight.png` image in the
+same fitted canvas. Shop rectangles, focus, hover and stale purchase/entry callbacks
+are disabled then; Home and Station exits remain available without spending a
+turn. Unseen shop tutorials wait for reopening. See
+[store selection artwork](STORE_SELECTIONS.md).
 Seven unused sources (five older station images, the garage spotlight and the
 duplicate house selector) moved to `locations/check/unused/` with their image
 bytes and import UIDs retained. Previous station path migrations still point

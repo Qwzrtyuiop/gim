@@ -9,6 +9,7 @@ const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const SLEEP_MESSAGE_SECONDS := 1.0
 const LABEL_FADE_SECONDS := 0.45
 const DAY_CARD_HOLD_SECONDS := 0.7
+const DAY_CHANGE_SOUND := preload("res://assets/audio/sfx/story/ding.mp3")
 const RESUME_AFTER_DAY_END_STORY := "after_day_end_story"
 const RESUME_AFTER_SLEEP_MIDPOINT_STORY := "after_sleep_midpoint_story"
 const RESUME_AFTER_DAY_START_STORY := "after_day_start_story"
@@ -16,8 +17,17 @@ const RESUME_AFTER_DAY_START_STORY := "after_day_start_story"
 @onready var message_label: Label = $MessageLabel
 @onready var day_label: Label = $DayLabel
 
+var day_change_player: AudioStreamPlayer
+
 
 func _ready() -> void:
+	day_change_player = AudioStreamPlayer.new()
+	day_change_player.name = "DayChangeSFX"
+	var sound := DAY_CHANGE_SOUND.duplicate() as AudioStreamMP3
+	sound.loop = false
+	day_change_player.stream = sound
+	add_child(day_change_player)
+	AudioSettingsManager.register_player(day_change_player, "sfx")
 	PlayerState.set_resume_scene("res://scenes/sleep_transition.tscn")
 	message_label.text = "SLEEPING..."
 	var repair := PlayerState.get_pending_crash_repair()
@@ -104,6 +114,7 @@ func _show_day_card() -> void:
 	day_label.text = "DAY %d" % _target_day_number()
 	day_label.visible = true
 	day_label.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	day_change_player.play()
 	await _fade_label(day_label, 1.0, LABEL_FADE_SECONDS)
 	await get_tree().create_timer(DAY_CARD_HOLD_SECONDS).timeout
 	await _fade_label(day_label, 0.0, LABEL_FADE_SECONDS)

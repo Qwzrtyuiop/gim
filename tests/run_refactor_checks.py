@@ -49,7 +49,7 @@ def main():
     config += "\n[testing]\nisolated=true\ninstant_story_text=true\n"
     (fixture / "project.godot").write_text(config, encoding="utf-8")
     result = subprocess.run(
-        [args.godot, "--headless", "--rendering-method", "gl_compatibility", "--path", str(fixture), "res://tests/refactor_regression.tscn", "--quit-after", "12000", "--log-file", str(fixture / "checks.log")],
+        [args.godot, "--headless", "--rendering-method", "gl_compatibility", "--path", str(fixture), "res://tests/refactor_regression.tscn", "--quit-after", "24000", "--log-file", str(fixture / "checks.log")],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
     )
     output = result.stdout + result.stderr
