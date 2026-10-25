@@ -1,29 +1,8 @@
 extends RefCounted
 
-# Speaker aliases share artwork across both story languages.
-const PORTRAITS := {
-	"driver": "res://assets/characters/placeholder.png",
-	"passenger": "res://assets/characters/placeholder.png",
-	"john": "res://assets/characters/John.png",
-	"john toda": "res://assets/characters/John.png",
-	"benny": "res://assets/characters/Benny.png",
-	"elena": "res://assets/characters/Elena.png",
-	"jessa": "res://assets/characters/Jessa.png",
-	"ben": "res://assets/characters/Benny.png",
-	"collector": "res://assets/characters/placeholder.png",
-	"man outside": "res://assets/characters/placeholder.png",
-}
-# Arvin and Dylan intentionally have no sprites.
+# Keep the speaker API while sharing character identity and sprite variants.
+const CharacterSprites := preload("res://scripts/story/story_character_sprites.gd")
 
 
-static func for_speaker(speaker: String) -> Array:
-	var key := speaker.strip_edges().to_lower()
-	var texture := str(PORTRAITS.get(key, ""))
-	if texture.is_empty():
-		return []
-	return [{
-		"id": "speaker",
-		"texture": texture,
-		"position": "left",
-		"height": 300,
-	}]
+static func for_speaker(speaker: String, sprite := "default") -> Array:
+	return CharacterSprites.for_speaker(speaker, sprite)

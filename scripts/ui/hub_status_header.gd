@@ -6,6 +6,8 @@ const CONTENT_TOP := 96.0
 
 var day_label: Label
 var stats_refs: Dictionary = {}
+var display_day := 0
+var display_phase := ""
 
 
 func _ready() -> void:
@@ -48,8 +50,19 @@ func _on_resource_changed(_amount) -> void:
 	refresh()
 
 
+func set_display_time(day := 0, phase := "") -> void:
+	# Screens previewing a trip can show its destination phase without advancing
+	# the live clock. Other hub screens keep the current day/time by default.
+	display_day = day
+	display_phase = phase
+	if is_node_ready():
+		refresh()
+
+
 func refresh() -> void:
-	day_label.text = "DAY %d / %s" % [PlayerState.get_current_day(), PlayerState.get_current_time_of_day().capitalize()]
+	var day: int = display_day if display_day > 0 else PlayerState.get_current_day()
+	var phase: String = display_phase if not display_phase.is_empty() else PlayerState.get_current_time_of_day()
+	day_label.text = "DAY %d / %s" % [day, phase.capitalize()]
 	PlayerStatsRow.refresh(stats_refs)
 	call_deferred("layout_in", get_parent().size)
 

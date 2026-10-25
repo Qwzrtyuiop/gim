@@ -2,6 +2,8 @@ extends Control
 
 const StoreItems := preload("res://scripts/store/store_items.gd")
 const StoreTutorial := preload("res://scripts/store/store_tutorial.gd")
+const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
+const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
@@ -45,6 +47,7 @@ var owner_panel: Panel
 var owner_portrait: TextureRect
 var active_category := ""
 var is_transitioning := false
+var hub_dialogue: HubDialogue
 
 
 func _ready() -> void:
@@ -52,6 +55,7 @@ func _ready() -> void:
 	PlayerState.ensure_daily_conditions_for_current_day()
 	_create_stats_row()
 	_create_street()
+	_create_hub_dialogue()
 	back_button.pressed.connect(_close_shop)
 	ButtonGlow.attach(self, back_button)
 	_start_store_bgm()
@@ -70,13 +74,15 @@ func _input(event: InputEvent) -> void:
 		# Consume the press here so the final step cannot also buy or navigate.
 		get_viewport().set_input_as_handled()
 		_advance_tutorial()
+	elif hub_dialogue != null and hub_dialogue.handle_input(event):
+		get_viewport().set_input_as_handled()
 	elif shop_overlay.visible and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		_close_shop()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if tutorial_active or is_transitioning:
+	if tutorial_active or is_transitioning or _speech_is_blocking():
 		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
@@ -160,7 +166,7 @@ func _layout_store() -> void:
 
 
 func _on_street_action(action: String) -> void:
-	if tutorial_active or shop_overlay.visible or is_transitioning:
+	if tutorial_active or shop_overlay.visible or is_transitioning or _speech_is_blocking():
 		return
 	match action:
 		"home": _go_home()
@@ -169,6 +175,9 @@ func _on_street_action(action: String) -> void:
 
 
 func _open_shop(category: String) -> void:
+	if _speech_is_blocking():
+		return
+	hub_dialogue.clear()
 	active_category = category
 	for index in range(store_item_rows.size()):
 		var item: Dictionary = StoreItemCatalog.ITEMS[index]
@@ -182,6 +191,7 @@ func _open_shop(category: String) -> void:
 	shop_overlay.show()
 	_layout_store()
 	back_button.grab_focus()
+	_show_shop_greeting()
 
 
 func _refresh_owner_portrait() -> void:
@@ -195,6 +205,9 @@ func _refresh_owner_portrait() -> void:
 
 
 func _close_shop() -> void:
+	if _speech_is_blocking():
+		return
+	hub_dialogue.clear()
 	shop_overlay.hide()
 	back_button.release_focus()
 	for button in store_buy_buttons:
@@ -208,11 +221,16 @@ func _build_items() -> void:
 
 
 func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
+	if tutorial_active or not shop_overlay.visible or is_transitioning or _speech_is_blocking():
+		return
 	await StoreItems.buy_item(self, item, label, tier_container, button)
+	if not is_transitioning and shop_overlay.visible and not PlayerState.is_run_failed():
+		_show_shop_feedback(status_label.text)
 
 
 func _refresh_header() -> void:
 	_refresh_stats_row()
+	street.set_night(PlayerState.get_current_time_of_day() == "night")
 	money_label.text = "Gas Price: %s / %s%%" % [
 		PlayerState.get_gas_price_text(),
 		String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
@@ -233,8 +251,9 @@ func _start_store_bgm() -> void:
 
 
 func _ride() -> void:
-	if is_transitioning:
+	if is_transitioning or _speech_is_blocking():
 		return
+	hub_dialogue.clear()
 	is_transitioning = true
 	street.set_enabled(false)
 	PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
@@ -242,8 +261,9 @@ func _ride() -> void:
 
 
 func _go_home() -> void:
-	if is_transitioning:
+	if is_transitioning or _speech_is_blocking():
 		return
+	hub_dialogue.clear()
 	is_transitioning = true
 	street.set_enabled(false)
 	# Visiting home does not consume the current time slot or reroll its passengers.
@@ -294,7 +314,98 @@ func _is_any_press(event: InputEvent) -> bool:
 
 
 func _fade_to_scene(scene_path: String) -> void:
+	hub_dialogue.clear()
+	is_transitioning = true
+	street.set_enabled(false)
 	var tween := create_tween()
 	tween.tween_property(fade_overlay, "color:a", 1.0, FAIL_FADE_SECONDS)
 	await tween.finished
 	get_tree().change_scene_to_file(scene_path)
+
+
+func _create_hub_dialogue() -> void:
+	hub_dialogue = HubDialogue.new()
+	hub_dialogue.name = "HubDialogue"
+	add_child(hub_dialogue)
+	hub_dialogue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hub_dialogue.set_gate(func() -> bool:
+		return not tutorial_active and not is_transitioning
+	)
+	hub_dialogue.register_target("lito", _store_message_target.bind("tricycle"))
+	hub_dialogue.register_target("eddie", _store_message_target.bind("food"))
+	hub_dialogue.register_target("shopkeeper", _active_shop_message_target)
+	for action in ["home", "station", "tricycle", "food"]:
+		hub_dialogue.register_target(action, _street_message_target.bind(action))
+
+
+func _store_message_target(category: String) -> Rect2:
+	return DialogueAnchors.store_owner(self, category)
+
+
+func _active_shop_message_target() -> Rect2:
+	return _store_message_target(active_category) if not active_category.is_empty() else Rect2()
+
+
+func _street_message_target(action: String) -> Rect2:
+	if shop_overlay.visible:
+		return Rect2()
+	return DialogueAnchors.image_region(street, street.REGIONS.get(action, Rect2()))
+
+
+func _show_shop_greeting() -> void:
+	var greeting := {
+		"english": "Need gas or parts? Take a look.",
+		"tagalog": "Kailangan mo ng gasolina o piyesa? Tingin ka lang.",
+	} if active_category == "tricycle" else {
+		"english": "Take a break. What would you like?",
+		"tagalog": "Pahinga ka muna. Ano ang sa iyo?",
+	}
+	show_message(greeting, {
+		"target": "shopkeeper",
+		"speaker": "Lito" if active_category == "tricycle" else "Shopkeeper",
+		"duration": 4.0,
+	})
+
+
+func _show_shop_feedback(text: String) -> void:
+	show_message(text, {
+		"target": "shopkeeper",
+		"speaker": "Lito" if active_category == "tricycle" else "Shopkeeper",
+		"duration": 3.0,
+	})
+
+
+func show_message(text: Variant, options: Dictionary = {}) -> bool:
+	return hub_dialogue.say(text, _store_message_options(options)) if hub_dialogue != null else false
+
+
+func show_messages(lines: Array, options: Dictionary = {}) -> bool:
+	if hub_dialogue == null:
+		return false
+	var prepared: Array = []
+	for value in lines:
+		var line := options.duplicate(true)
+		if value is String:
+			line["text"] = value
+		elif value is Dictionary:
+			line.merge(value, true)
+		else:
+			return false
+		prepared.append(_store_message_options(line))
+	return hub_dialogue.play(prepared)
+
+
+func _store_message_options(options: Dictionary) -> Dictionary:
+	var adjusted := options.duplicate(true)
+	var target := str(adjusted.get("target", ""))
+	var matches_owner := target == "shopkeeper" or (target == "lito" and active_category == "tricycle") or (target == "eddie" and active_category == "food")
+	if shop_overlay != null and shop_overlay.visible and matches_owner:
+		if not adjusted.has("side"):
+			adjusted["side"] = "below"
+		if not adjusted.has("width"):
+			adjusted["width"] = minf(380, owner_panel.size.x + 24)
+	return adjusted
+
+
+func _speech_is_blocking() -> bool:
+	return hub_dialogue != null and hub_dialogue.blocks_input()

@@ -153,6 +153,21 @@ static func get_character_session_dialogue(player_state, character_id: String, c
 static func _character_with_progress(player_state, character_data: Dictionary) -> Dictionary:
 	var character_copy: Dictionary = character_data.duplicate(true)
 	var character_id: String = str(character_copy.get("id", ""))
+	var intro_completion_event: String = str(character_copy.get("intro_completion_event", ""))
+	var intro_times: Variant = character_copy.get("intro_eligible_times", [])
+	var intro_completed := not intro_completion_event.is_empty() and bool(player_state.event_values.get(intro_completion_event, false))
+	if not intro_completion_event.is_empty() and not intro_completed:
+		if intro_times is Array and not intro_times.is_empty():
+			character_copy["eligible_times"] = intro_times.duplicate(true)
+	else:
+		# The first event already stores its ride date with the unpaid fare. Reuse
+		# that historical day so reloads/replays cannot start a new absence period.
+		var day_event: String = str(character_copy.get("intro_absence_day_event", ""))
+		var history: Variant = player_state.event_values.get(day_event, {})
+		if intro_completed and not day_event.is_empty() and history is Dictionary:
+			var first_day: Variant = history.get("day", 0)
+			if first_day is int and first_day > 0:
+				character_copy["unavailable_day"] = first_day
 	character_copy["progress"] = player_state.get_unique_character_progress(character_id)
 	var story_state: Dictionary = get_unique_character_story_state(player_state, character_id)
 	if not story_state.is_empty():

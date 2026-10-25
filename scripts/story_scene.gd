@@ -14,7 +14,9 @@ const StoryPayload := preload("res://scripts/story/story_payload.gd")
 const StoryCheckpoint := preload("res://scripts/story/story_checkpoint.gd")
 const StoryPortraitLayer := preload("res://scripts/story/story_portrait_layer.gd")
 const StoryGameFlow := preload("res://scripts/story/story_game_flow.gd")
+const PassengerStory := preload("res://scripts/ride_selection/passenger_story.gd")
 const StoryDialoguePlayback := preload("res://scripts/story/story_dialogue_playback.gd")
+const CharacterSpriteRuntime := preload("res://scripts/story/story_character_sprite_runtime.gd")
 
 @onready var background: TextureRect = $Background
 @onready var background_fade_overlay: ColorRect = $BackgroundFadeOverlay
@@ -61,6 +63,7 @@ var active_music_action: Dictionary = {}
 var active_loop_sfx_action: Dictionary = {}
 var checkpoint_continuation: Dictionary = {}
 var dialogue_playback: Node
+var character_sprites: Dictionary = {}
 
 
 # Scene lifecycle.
@@ -169,9 +172,10 @@ func _load_story_payload() -> void:
 	current_left_portrait_ref = story_payload.get("left_portrait", null)
 	current_right_portrait_ref = story_payload.get("right_portrait", null)
 	var portrait_state: Dictionary = {} if _is_replay_mode() else Dictionary(story_payload.get("_portrait_state", {}))
+	CharacterSpriteRuntime.initialize(self, portrait_state)
 	current_left_portrait_ref = portrait_state.get("left", current_left_portrait_ref)
 	current_right_portrait_ref = portrait_state.get("right", current_right_portrait_ref)
-	portrait_layer.replace_portraits(portrait_state.get("portraits", story_payload.get("portraits", [])))
+	portrait_layer.replace_portraits(CharacterSpriteRuntime.resolve_portraits(self, portrait_state.get("portraits", story_payload.get("portraits", []))))
 	current_background_ref = portrait_state.get("background", current_background_ref)
 	StoryPresentation.set_background_texture(self, current_background_ref, true)
 	StoryPresentation.remember_gallery_image(self, current_background_ref)
@@ -356,6 +360,8 @@ func _finish_story() -> void:
 		_end_checkpoint_batch()
 		get_tree().change_scene_to_file("res://scenes/story_scene.tscn")
 		return
+	if not _is_replay_mode():
+		target_scene = PassengerStory.complete(story_payload, target_scene)
 	if not _is_replay_mode() and not PlayerState.is_run_failed() and not story_payload.has("_story_destination") and bool(story_payload.get("prepare_stage_start", false)):
 		var stage_descriptor := str(story_payload.get("stage_descriptor", ""))
 		if not PlayerState.prepare_stage_start(stage_descriptor):

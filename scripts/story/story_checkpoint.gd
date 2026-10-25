@@ -3,6 +3,7 @@ extends RefCounted
 const StoryAudioRuntime := preload("res://scripts/story/story_audio_runtime.gd")
 const StoryPresentation := preload("res://scripts/story/story_presentation.gd")
 const StoryInterface := preload("res://scripts/story/story_interface.gd")
+const CharacterSpriteRuntime := preload("res://scripts/story/story_character_sprite_runtime.gd")
 
 # Snapshot the state reached along the chosen path, not every preceding array
 # element. Completed line effects are not run again after a save is loaded.
@@ -15,6 +16,7 @@ static func capture(reader) -> Dictionary:
 		"left": reader.current_left_portrait_ref,
 		"right": reader.current_right_portrait_ref,
 		"portraits": reader.portrait_layer.entries.duplicate(true),
+		"character_sprites": reader.character_sprites.duplicate(true),
 		"focus": reader.current_focus_side,
 		"zoom": reader.background_zoom,
 		"pan": reader.background_pan,
@@ -36,6 +38,8 @@ static func capture(reader) -> Dictionary:
 
 static func restore(reader, state: Dictionary) -> void:
 	reader.is_input_locked = true
+	if state.has("character_sprites"):
+		reader.character_sprites = CharacterSpriteRuntime.normalize_choices(state.character_sprites)
 	reader.current_line_index = int(state.line_index)
 	reader.current_background_ref = state.background
 	reader.current_left_portrait_ref = state.left

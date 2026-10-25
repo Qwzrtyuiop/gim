@@ -7,6 +7,7 @@ const STORY_TRIGGER_DAY_END := "day_end"
 const STORY_TRIGGER_SLEEP_MIDPOINT := "sleep_midpoint"
 const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
+const STORY_TRIGGER_PASSENGER_SELECTED := "passenger_selected"
 
 
 static func normalize_trigger(player_state, trigger_data: Dictionary) -> Dictionary:
@@ -49,11 +50,24 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 			"id": "jessa_runaway_fare",
 			"phase": STORY_TRIGGER_STAGE_COMPLETE,
 			"character_id": "jessa",
+			"times": ["morning", "noon"],
 			"min_character_progress": 1,
 			# Her first completed ride can happen before the Day 2 event.
 			"bypass_character_story_gate": true,
 			"forbidden_events": ["jessa_runaway_fare_seen"],
 			"payload_id": "jessa_runaway_fare",
+		},
+		{
+			"id": "jessa_second_encounter",
+			"phase": STORY_TRIGGER_PASSENGER_SELECTED,
+			"character_id": "jessa",
+			"bypass_character_story_gate": true,
+			"required_events": ["jessa_runaway_fare_seen"],
+			"required_event_values": {
+				"jessa_runaway_fare_seen": true,
+			},
+			"forbidden_events": ["jessa_second_encounter_seen"],
+			"payload_id": "jessa_second_encounter",
 		},
 		{
 			"id": "benny_class_clown",
@@ -88,13 +102,24 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 
 static func normalize_story_trigger_phase(phase: String) -> String:
 	match phase:
-		STORY_TRIGGER_DAY_END, STORY_TRIGGER_SLEEP_MIDPOINT, STORY_TRIGGER_DAY_START, STORY_TRIGGER_STAGE_COMPLETE:
+		STORY_TRIGGER_DAY_END, STORY_TRIGGER_SLEEP_MIDPOINT, STORY_TRIGGER_DAY_START, STORY_TRIGGER_STAGE_COMPLETE, STORY_TRIGGER_PASSENGER_SELECTED:
 			return phase
 	return ""
 
 
 static func ensure_required_story_triggers(story_triggers: Array) -> bool:
 	var changed := false
+	# The unrestricted built-in rule shipped before Jessa's daytime introduction.
+	# Match its full saved shape so authored/custom schedules are left intact.
+	var previous_jessa_rule := {
+		"id": "jessa_runaway_fare",
+		"phase": STORY_TRIGGER_STAGE_COMPLETE,
+		"character_id": "jessa",
+		"min_character_progress": 1,
+		"bypass_character_story_gate": true,
+		"forbidden_events": ["jessa_runaway_fare_seen"],
+		"payload_id": "jessa_runaway_fare",
+	}
 	# Saves retain their trigger dictionaries. Upgrade old built-in rules
 	# without replacing custom rules or resetting consumed/seen event state.
 	for trigger_data in story_triggers:
@@ -119,6 +144,9 @@ static func ensure_required_story_triggers(story_triggers: Array) -> bool:
 			trigger_data["min_character_progress"] = 1
 			trigger_data["bypass_character_story_gate"] = true
 			trigger_data.erase("required_events")
+			changed = true
+		if trigger_data == previous_jessa_rule:
+			trigger_data["times"] = ["morning", "noon"]
 			changed = true
 	for required_trigger in build_default_story_triggers():
 		var required_id := str(required_trigger.get("id", ""))

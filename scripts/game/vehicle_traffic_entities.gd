@@ -83,7 +83,7 @@ static func same_entity_sprite(a: Dictionary, b: Dictionary) -> bool:
 
 
 static func entity_collision_disabled(entity: Dictionary) -> bool:
-	return bool(entity.get("top_lane_evasive_offset_active", false))
+	return bool(entity.get("top_lane_evasive_offset_active", false)) or bool(entity.get("horn_yield_clear", false))
 
 
 static func bottom_lane_traffic_can_pass_parked(moving_entity: Dictionary, parked_entity: Dictionary) -> bool:

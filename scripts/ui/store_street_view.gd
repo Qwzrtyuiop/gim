@@ -2,14 +2,20 @@ extends Control
 
 signal action_pressed(action: String)
 
+const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const BACKGROUND := preload("res://assets/story/backgrounds/locations/store.png")
-const SELECTED := preload("res://assets/story/backgrounds/locations/storewithselect.png")
+const NIGHT := preload("res://assets/story/backgrounds/locations/storenight.png")
+const SELECTED := preload("res://assets/story/backgrounds/locations/store_select.png")
+const ART_SIZE := Vector2(1698, 926)
 const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+# The supplied sheet marks rectangular interaction areas. Their full interiors
+# are clickable, including the transparent space inside each drawn border.
+# One layout serves both background phases; no alpha scan is needed for input.
 const REGIONS := {
-	"tricycle": Rect2(0.106, 0.357, 0.402, 0.537),
-	"food": Rect2(0.639, 0.435, 0.277, 0.262),
-	"home": Rect2(0.0, 552.0 / 1536.0, 169.0 / 2816.0, 903.0 / 1536.0),
-	"station": Rect2(2636.0 / 2816.0, 554.0 / 1536.0, 179.0 / 2816.0, 899.0 / 1536.0),
+	"tricycle": Rect2(203.0 / 1698.0, 352.0 / 926.0, 653.0 / 1698.0, 470.0 / 926.0),
+	"food": Rect2(1089.0 / 1698.0, 409.0 / 926.0, 448.0 / 1698.0, 236.0 / 926.0),
+	"home": Rect2(1.0 / 1698.0, 353.0 / 926.0, 89.0 / 1698.0, 495.0 / 926.0),
+	"station": Rect2(1592.0 / 1698.0, 410.0 / 926.0, 103.0 / 1698.0, 453.0 / 926.0),
 }
 const TOOLTIPS := {
 	"tricycle": "Lito's: tricycle upgrades and gas",
@@ -24,6 +30,8 @@ var image_rect := Rect2()
 var hovered_action := ""
 var focused_action := ""
 var enabled := true
+var is_night := false
+var highlight_mode := InputHighlightMode.new()
 
 
 func _ready() -> void:
@@ -34,11 +42,12 @@ func _ready() -> void:
 		button.name = action.capitalize() + "Hotspot"
 		button.tooltip_text = TOOLTIPS[action]
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		button.disabled = not enabled
 		for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 			button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 		if action in ["home", "station"]:
-			# Keep the original street signs separate so their text does not
-			# expand the narrow exit hotspots beyond the outlined posts.
+			# The existing street captions remain separate from the narrow exit
+			# rectangles so their text cannot expand the authored hit areas.
 			var label := Label.new()
 			label.text = "< HOME" if action == "home" else "STATION >"
 			label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -51,47 +60,45 @@ func _ready() -> void:
 			label.add_theme_constant_override("outline_size", 4)
 			add_child(label)
 			exit_labels[action] = label
-		button.mouse_entered.connect(func() -> void:
-			hovered_action = action
-			queue_redraw()
-		)
-		button.mouse_exited.connect(func() -> void:
-			if hovered_action == action:
-				hovered_action = ""
-			queue_redraw()
-		)
-		button.focus_entered.connect(func() -> void:
-			focused_action = action
-			queue_redraw()
-		)
-		button.focus_exited.connect(func() -> void:
-			if focused_action == action:
-				focused_action = ""
-			queue_redraw()
-		)
-		button.pressed.connect(func() -> void: action_pressed.emit(action))
+		button.mouse_entered.connect(_on_hovered.bind(action))
+		button.mouse_exited.connect(_on_unhovered.bind(action))
+		button.focus_entered.connect(_on_focused.bind(action))
+		button.focus_exited.connect(_on_unfocused.bind(action))
+		button.pressed.connect(_on_action_pressed.bind(action))
 		add_child(button)
 		UIAudioManager.attach_button(button)
 		buttons[action] = button
 	resized.connect(_layout)
+	visibility_changed.connect(_on_visibility_changed)
 	_layout()
+
+
+func _input(event: InputEvent) -> void:
+	if enabled and is_visible_in_tree() and highlight_mode.handle_input(event):
+		queue_redraw()
+
+
+func active_action() -> String:
+	return highlight_mode.active(hovered_action, focused_action) if enabled else ""
+
+
+func set_night(value: bool) -> void:
+	is_night = value
+	queue_redraw()
 
 
 func set_enabled(value: bool) -> void:
 	enabled = value
 	for button: Button in buttons.values():
 		button.disabled = not value
-		if not value:
-			button.release_focus()
 	if not value:
-		hovered_action = ""
-		focused_action = ""
+		_clear_focus()
 	queue_redraw()
 
 
 func _layout() -> void:
-	var ratio := minf(size.x / BACKGROUND.get_width(), size.y / BACKGROUND.get_height())
-	image_rect = Rect2((size - BACKGROUND.get_size() * ratio) * 0.5, BACKGROUND.get_size() * ratio)
+	var ratio := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
+	image_rect = Rect2((size - ART_SIZE * ratio) * 0.5, ART_SIZE * ratio)
 	for action: String in buttons:
 		var region: Rect2 = REGIONS[action]
 		buttons[action].position = image_rect.position + region.position * image_rect.size
@@ -105,13 +112,57 @@ func _layout() -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("17110b"))
-	draw_texture_rect(BACKGROUND, image_rect, false)
-	var action := hovered_action if not hovered_action.is_empty() else focused_action
+	draw_texture_rect(NIGHT if is_night else BACKGROUND, image_rect, false)
+	var action := active_action()
 	for exit_action: String in exit_labels:
-		exit_labels[exit_action].add_theme_color_override("font_color", Color("ffdf52") if enabled and action == exit_action else Color("f5dfac"))
-	if not enabled or not REGIONS.has(action):
+		exit_labels[exit_action].add_theme_color_override("font_color", Color("ffdf52") if action == exit_action else Color("f5dfac"))
+	if not REGIONS.has(action):
 		return
 	var region: Rect2 = REGIONS[action]
+	var source := Rect2((region.position * ART_SIZE).round(), (region.size * ART_SIZE).round())
 	draw_texture_rect_region(SELECTED,
 		Rect2(image_rect.position + region.position * image_rect.size, region.size * image_rect.size),
-		Rect2(region.position * SELECTED.get_size(), region.size * SELECTED.get_size()))
+		source)
+
+
+func _on_hovered(action: String) -> void:
+	if enabled:
+		hovered_action = action
+		queue_redraw()
+
+
+func _on_unhovered(action: String) -> void:
+	if hovered_action == action:
+		hovered_action = ""
+	queue_redraw()
+
+
+func _on_focused(action: String) -> void:
+	if enabled:
+		focused_action = action
+		queue_redraw()
+
+
+func _on_unfocused(action: String) -> void:
+	if focused_action == action:
+		focused_action = ""
+	queue_redraw()
+
+
+func _on_action_pressed(action: String) -> void:
+	if enabled and is_visible_in_tree():
+		action_pressed.emit(action)
+
+
+func _clear_focus() -> void:
+	for button: Button in buttons.values():
+		button.release_focus()
+	hovered_action = ""
+	focused_action = ""
+	highlight_mode.reset()
+
+
+func _on_visibility_changed() -> void:
+	if not is_visible_in_tree():
+		_clear_focus()
+		queue_redraw()

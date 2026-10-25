@@ -1,6 +1,7 @@
 extends Control
 
 const PortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
+const CharacterSprites := preload("res://scripts/story/story_character_sprites.gd")
 
 # Character cutouts, bottom-aligned to the dialogue panel.
 var entries: Array[Dictionary] = []
@@ -40,6 +41,24 @@ func set_portrait(data: Dictionary) -> void:
 		entry["texture"] = data["path"]
 	elif data.has("portrait"):
 		entry["texture"] = data["portrait"]
+	entry.erase("path")
+	entry.erase("portrait")
+	var explicit_texture := data.has("texture") or data.has("path") or data.has("portrait")
+	var previous_character := CharacterSprites.canonical_character_id(str(entries[index].get("character_id", id))) if index >= 0 else ""
+	var next_character := CharacterSprites.canonical_character_id(str(entry.get("character_id", id)))
+	var update_sprite := data.has("sprite") or previous_character != next_character or not entry.has("texture")
+	if not explicit_texture and update_sprite and (entry.has("character_id") or entry.has("sprite")):
+		var character_id := CharacterSprites.canonical_character_id(str(entry.get("character_id", id)))
+		var sprite := str(entry.get("sprite", "default")).strip_edges().to_lower()
+		if previous_character != next_character and not data.has("sprite"):
+			sprite = "default"
+		var path := CharacterSprites.texture_path(character_id, sprite)
+		if path.is_empty():
+			push_warning("Unknown character sprite '%s' for portrait '%s'." % [sprite, id])
+			return
+		entry["character_id"] = character_id
+		entry["sprite"] = sprite
+		entry["texture"] = path
 	var texture_ref = entry.get("texture", null)
 	var texture: Texture2D = resolve_texture.call(texture_ref)
 	if texture == null:

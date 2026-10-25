@@ -4,7 +4,7 @@ extends RefCounted
 
 const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 const StoryPortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
-const StorySpeakerPortraits := preload("res://scripts/story/story_speaker_portraits.gd")
+const CharacterSpriteRuntime := preload("res://scripts/story/story_character_sprite_runtime.gd")
 const StoryInterface := preload("res://scripts/story/story_interface.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
@@ -17,8 +17,9 @@ const INACTIVE_PORTRAIT_MODULATE := Color(0.56, 0.56, 0.60, 0.82)
 
 
 static func apply_line_visuals(owner, line: Dictionary) -> void:
+	CharacterSpriteRuntime.apply_line(owner, line)
 	if line.has("portraits"):
-		owner.portrait_layer.replace_portraits(line["portraits"])
+		owner.portrait_layer.replace_portraits(CharacterSpriteRuntime.resolve_portraits(owner, line["portraits"]))
 	var background_changed := false
 	var next_background_ref = owner.current_background_ref
 	if line.has("background"):
@@ -45,7 +46,7 @@ static func apply_line_visuals(owner, line: Dictionary) -> void:
 	set_portrait(owner, owner.right_portrait_frame, owner.right_portrait, owner.current_right_portrait_ref)
 	apply_portrait_focus_from_side(owner, str(line.get("focus", line.get("speaker_side", "none"))))
 	if bool(line.get("speaker_portraits", owner.story_payload.get("speaker_portraits", false))) and not line.has("portraits"):
-		owner.portrait_layer.replace_portraits(StorySpeakerPortraits.for_speaker(str(line.get("speaker", ""))))
+		owner.portrait_layer.replace_portraits(CharacterSpriteRuntime.for_speaker(owner, str(line.get("speaker", ""))))
 	save_portrait_state(owner)
 
 
@@ -159,7 +160,7 @@ static func play_outro_fade(owner) -> void:
 
 static func apply_portrait_action(owner, action_data: Dictionary) -> void:
 	if action_data.has("id"):
-		owner.portrait_layer.set_portrait(action_data)
+		owner.portrait_layer.set_portrait(CharacterSpriteRuntime.resolve_portrait_update(owner, action_data))
 		save_portrait_state(owner)
 		return
 	var side := str(action_data.get("side", "left")).to_lower()
@@ -172,6 +173,11 @@ static func apply_portrait_action(owner, action_data: Dictionary) -> void:
 		_:
 			owner.current_left_portrait_ref = texture_ref
 	refresh_portrait_state(owner)
+
+
+static func apply_character_sprite_action(owner, action_data: Dictionary) -> void:
+	if CharacterSpriteRuntime.set_sprite(owner, str(action_data.get("character_id", "")), str(action_data.get("sprite", ""))):
+		save_portrait_state(owner)
 
 
 static func clear_portrait_action(owner, action_data: Dictionary) -> void:
@@ -196,7 +202,7 @@ static func refresh_portrait_state(owner) -> void:
 
 
 static func replace_portraits(owner, entries: Array) -> void:
-	owner.portrait_layer.replace_portraits(entries)
+	owner.portrait_layer.replace_portraits(CharacterSpriteRuntime.resolve_portraits(owner, entries))
 	save_portrait_state(owner)
 
 
@@ -205,6 +211,7 @@ static func save_portrait_state(owner) -> void:
 		return
 	var state := {
 		"portraits": owner.portrait_layer.entries.duplicate(true),
+		"character_sprites": owner.character_sprites.duplicate(true),
 		"left": owner.current_left_portrait_ref,
 		"right": owner.current_right_portrait_ref,
 		"background": owner.current_background_ref,

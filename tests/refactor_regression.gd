@@ -28,6 +28,8 @@ func _ready() -> void:
 	_test_payloads()
 	_test_catalog()
 	_test_jessa_first_ride()
+	load("res://tests/jessa_daytime_checks.gd").run()
+	await load("res://tests/jessa_absence_checks.gd").run(self)
 	_test_traffic()
 	_test_state_ownership()
 	load("res://tests/save_bug_checks.gd").run()
@@ -35,8 +37,17 @@ func _ready() -> void:
 	load("res://tests/traffic_bug_checks.gd").run(self)
 	_test_trigger_contracts()
 	await _test_scene_modules()
+	await load("res://tests/house_select_checks.gd").run(self)
+	await load("res://tests/store_select_checks.gd").run(self)
+	await load("res://tests/station_navigation_checks.gd").run(self)
+	await load("res://tests/terminal_spawn_checks.gd").run(self)
+	await load("res://tests/passenger_confirmation_checks.gd").run(self)
+	await load("res://tests/results_screen_checks.gd").run(self)
+	await load("res://tests/hub_dialogue_checks.gd").run(self)
+	await load("res://tests/post_ride_home_checks.gd").run(self)
 	await _test_library_modules()
 	await _test_driving_modules()
+	load("res://tests/horn_checks.gd").run(self)
 	await _test_checkpoints()
 	await _test_interrupted_step()
 	await _test_choice_event_resume()
@@ -46,6 +57,8 @@ func _ready() -> void:
 	load("res://tests/story_game_effects_checks.gd").run(self)
 	load("res://tests/story_branch_tools_checks.gd").run(self)
 	await load("res://tests/story_game_flow_checks.gd").run(self)
+	await load("res://tests/passenger_story_checks.gd").run(self)
+	await load("res://tests/story_character_sprite_checks.gd").run(self)
 	load("res://tests/story_dialogue_voice_checks.gd").run(self)
 	await load("res://tests/story_dialogue_playback_checks.gd").run(self)
 	print("PASS: all refactor regression checks")
@@ -274,7 +287,9 @@ func _test_scene_modules() -> void:
 	var selection = load("res://scenes/ride_selection.tscn").instantiate()
 	get_tree().root.add_child(selection)
 	await get_tree().process_frame
-	assert(selection.tutorial.active)
+	assert(selection.passenger_overlay.visible and selection.tutorial.active, "The opening ride goes straight to passenger selection and its tutorial")
+	selection._close_passengers()
+	assert(selection.passenger_overlay.visible and selection.tutorial.active, "The active tutorial keeps its targets visible")
 	for step in range(16):
 		if not selection.tutorial.active:
 			break
@@ -388,24 +403,36 @@ func _test_catalog() -> void:
 
 func _test_jessa_first_ride() -> void:
 	for language in ["english", "tagalog"]:
+		for daytime in ["morning", "noon"]:
+			PlayerState.reset()
+			StoryLanguageManager.set_language(language)
+			PlayerState.money = 500
+			PlayerState.current_day = 1
+			PlayerState.set_current_mock_character("jessa")
+			PlayerState.set_current_stage_time(daytime)
+			assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": daytime}).is_empty(), "No event before her first completed ride")
+			var stage := "short-%s-normal" % daytime
+			Economy.store_stage_result(stage, "short", daytime, "normal", "", "", 200, 200, 1, 0, 0, 10, 2, 0)
+			assert(PlayerState.get_unique_character_progress("jessa") == 1)
+			assert(not PlayerState.event_values.has("day_2_station_bill"))
+			var original_total: int = PlayerState.last_stage_result.total
+			var payload := Economy.stage_complete_story_payload(stage, "short", daytime, "normal")
+			assert(payload.get("story_id") == "jessa_runaway_fare", "A daytime first ride queues Jessa's event, including a noon result whose live clock is already night")
+			assert(payload.original_ride_earnings.total == original_total and original_total > 0)
+			assert(PlayerState.last_stage_result.total == 0 and PlayerState.last_stage_result.fare == 0 and PlayerState.last_stage_result.bonus == 0)
+			assert(PlayerState.get_character_display_name("jessa") == "???")
+			assert(PlayerState.claim_last_stage_total() == 0 and PlayerState.money == 500)
+			assert(PlayerState.find_story_trigger_for_phase("stage_complete", 2, {"character_id": "jessa", "time_of_day": daytime}).get("id") != "jessa_runaway_fare", "Consumed Jessa events cannot repeat; other daytime events remain eligible")
+		# An older locked nighttime offer must not consume the encounter or fare.
 		PlayerState.reset()
-		StoryLanguageManager.set_language(language)
-		PlayerState.money = 500
-		PlayerState.current_day = 1
 		PlayerState.set_current_mock_character("jessa")
 		PlayerState.set_current_stage_time("night")
-		assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "night"}).is_empty(), "No event before her first completed ride")
 		Economy.store_stage_result("short-night-normal", "short", "night", "normal", "", "", 200, 200, 1, 0, 0, 10, 2, 0)
-		assert(PlayerState.get_unique_character_progress("jessa") == 1)
-		assert(not PlayerState.event_values.has("day_2_station_bill"))
-		var original_total: int = PlayerState.last_stage_result.total
-		var payload := Economy.stage_complete_story_payload("short-night-normal", "short", "night", "normal")
-		assert(payload.get("story_id") == "jessa_runaway_fare", "First ride queues Jessa's event even before Day 2")
-		assert(payload.original_ride_earnings.total == original_total and original_total > 0)
-		assert(PlayerState.last_stage_result.total == 0 and PlayerState.last_stage_result.fare == 0 and PlayerState.last_stage_result.bonus == 0)
-		assert(PlayerState.get_character_display_name("jessa") == "???")
-		assert(PlayerState.claim_last_stage_total() == 0 and PlayerState.money == 500)
-		assert(PlayerState.find_story_trigger_for_phase("stage_complete", 2, {"character_id": "jessa", "time_of_day": "night"}).is_empty(), "Consumed event cannot repeat")
+		var night_total: int = PlayerState.last_stage_result.total
+		assert(Economy.stage_complete_story_payload("short-night-normal", "short", "night", "normal").is_empty())
+		assert(PlayerState.pending_story.is_empty() and not bool(PlayerState.consumed_story_triggers.get("jessa_runaway_fare", false)))
+		assert(PlayerState.last_stage_result.total == night_total and PlayerState.claim_last_stage_total() == night_total)
+		assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "morning"}).get("id") == "jessa_runaway_fare", "A blocked nighttime encounter remains eligible next daytime")
 	# Existing saves keep their old rule; loading must migrate it, preserving
 	# already consumed events and custom rules with different requirements.
 	PlayerState.reset()
@@ -414,29 +441,42 @@ func _test_jessa_first_ride() -> void:
 			trigger.min_character_progress = 2
 			trigger.required_events = ["day_2_station_bill"]
 			trigger.erase("bypass_character_story_gate")
+			trigger.erase("times")
 	Codec.save_to_path(PlayerState, "res://test_user/jessa_old_trigger.tres", PlayerState.SAVE_VERSION)
 	assert(Codec.load_from_path(PlayerState, "res://test_user/jessa_old_trigger.tres"))
-	var migrated := PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "night"})
+	var migrated := PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "morning"})
 	assert(migrated.is_empty())
 	PlayerState.set_unique_character_progress("jessa", 1)
-	migrated = PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "night"})
+	assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "night"}).is_empty())
+	migrated = PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "morning"})
 	assert(migrated.get("id") == "jessa_runaway_fare")
 	assert(not Triggers.ensure_required_story_triggers(PlayerState.story_triggers), "Migration must be idempotent")
 	PlayerState.consume_story_trigger(migrated)
 	Codec.save_to_path(PlayerState, "res://test_user/jessa_consumed_trigger.tres", PlayerState.SAVE_VERSION)
 	assert(Codec.load_from_path(PlayerState, "res://test_user/jessa_consumed_trigger.tres"))
+	assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "morning"}).is_empty())
+	# Current-version saves may contain the unrestricted, already upgraded rule.
+	PlayerState.reset()
+	for trigger: Dictionary in PlayerState.story_triggers:
+		if trigger.id == "jessa_runaway_fare":
+			trigger.erase("times")
+	Codec.save_to_path(PlayerState, "res://test_user/jessa_unrestricted_trigger.tres", PlayerState.SAVE_VERSION)
+	assert(Codec.load_from_path(PlayerState, "res://test_user/jessa_unrestricted_trigger.tres"))
+	PlayerState.set_unique_character_progress("jessa", 1)
 	assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "night"}).is_empty())
+	assert(PlayerState.find_story_trigger_for_phase("stage_complete", 1, {"character_id": "jessa", "time_of_day": "noon"}).get("id") == "jessa_runaway_fare")
 	var custom_rules := Triggers.build_default_story_triggers()
 	for trigger: Dictionary in custom_rules:
 		if trigger.id == "jessa_runaway_fare":
 			trigger.min_character_progress = 3
 			trigger.required_events = ["custom_event"]
+			trigger.erase("times")
 	var custom_before := custom_rules.duplicate(true)
 	assert(not Triggers.ensure_required_story_triggers(custom_rules) and custom_rules == custom_before)
 	for character_id in ["benny", "ely"]:
 		assert(Triggers.find_story_trigger_for_phase(Triggers.build_default_story_triggers(), {}, {}, "stage_complete", 1, null, {"character_id": character_id, "character_progress": 2, "time_of_day": "night"}).is_empty(), "Other characters keep their Day 2 gate")
 	PlayerState.reset()
-	print("PASS: Jessa first ride in both languages, hidden name, unpaid fare, saved-rule migration, once per run")
+	print("PASS: Jessa daytime first encounter in both languages, nighttime fare preservation, hidden name, saved-rule migrations and once-per-run behavior")
 
 func _test_traffic() -> void:
 	var owner := TrafficOwner.new()

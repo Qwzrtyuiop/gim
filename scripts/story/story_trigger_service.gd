@@ -34,6 +34,7 @@ const STORY_TRIGGER_DAY_END := StoryTriggerRules.STORY_TRIGGER_DAY_END
 const STORY_TRIGGER_SLEEP_MIDPOINT := StoryTriggerRules.STORY_TRIGGER_SLEEP_MIDPOINT
 const STORY_TRIGGER_DAY_START := StoryTriggerRules.STORY_TRIGGER_DAY_START
 const STORY_TRIGGER_STAGE_COMPLETE := StoryTriggerRules.STORY_TRIGGER_STAGE_COMPLETE
+const STORY_TRIGGER_PASSENGER_SELECTED := StoryTriggerRules.STORY_TRIGGER_PASSENGER_SELECTED
 
 
 static func normalize_trigger(player_state, trigger_data: Dictionary) -> Dictionary:

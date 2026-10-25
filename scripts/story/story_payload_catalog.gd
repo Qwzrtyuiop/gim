@@ -28,6 +28,12 @@ const STORIES := {
 		"tagalog": preload("res://scripts/story/payloads/characters/jessa/jessa_runaway_fare_tagalog.gd"),
 		"title": "Runaway Fare", "subtitle": "A passenger leaves without paying.",
 	},
+	"jessa_second_encounter": {
+		"english": preload("res://scripts/story/payloads/characters/jessa/jessa_second_encounter.gd"),
+		"tagalog": preload("res://scripts/story/payloads/characters/jessa/jessa_second_encounter_tagalog.gd"),
+		"title": "A Familiar Passenger",
+		"subtitle": "Jessa appears again at the terminal.",
+	},
 	"benny_tropa_night": {
 		"english": preload("res://scripts/story/payloads/characters/benny/benny_tropa_night.gd"),
 		"tagalog": preload("res://scripts/story/payloads/characters/benny/benny_tropa_night_tagalog.gd"),

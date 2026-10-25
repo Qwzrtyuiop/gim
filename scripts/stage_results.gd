@@ -5,45 +5,33 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const STORE_SCENE := "res://scenes/store.tscn"
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
-const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
+const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
-const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
-const HubMenuLayout := preload("res://scripts/ui/hub_menu_layout.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const ResultsView := preload("res://scripts/results/results_view.gd")
+const ResultPassenger := preload("res://scripts/results/result_passenger.gd")
 const LAST_ENERGY_WARNING := "Start this trip with critically low energy?\nYour vehicle will handle worse until John recovers."
 
-@onready var results_label: Label = $ResultsLabel
-@onready var status_label: Label = $StatusLabel
 @onready var rest_button: BaseButton = $BreakButtons/RestButton
 @onready var store_button: BaseButton = $BreakButtons/StoreButton
 @onready var ride_button: BaseButton = $BreakButtons/RideButton
 
 var ride_confirm_dialog: ConfirmationDialog
-var stats_row_refs: Dictionary = {}
-var earnings_summary_label: Label
+var results_view: ResultsView
 var carried_music_players: Array[AudioStreamPlayer] = []
-var heading_label: Label
+var is_transitioning := false
 
 
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/stage_results.tscn")
 	_start_carried_result_music()
-	_create_earnings_summary_label()
-	_create_stats_row()
-	heading_label = Label.new()
-	heading_label.label_settings = results_label.label_settings.duplicate()
-	heading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(heading_label)
-	results_label.label_settings = results_label.label_settings.duplicate()
-	results_label.label_settings.font_size = 13
-	results_label.label_settings.line_spacing = 8
-	results_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	results_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	HubMenuLayout.build(self, heading_label, stats_row_refs["row"], results_label, [earnings_summary_label, status_label], $BreakButtons)
+	results_view = ResultsView.new()
+	results_view.name = "ResultsView"
+	add_child(results_view)
+	results_view.build($BreakButtons)
 	ButtonGlow.attach(self, rest_button)
 	ButtonGlow.attach(self, store_button)
 	ButtonGlow.attach(self, ride_button)
-	rest_button.pressed.connect(_rest_then_next_stage)
+	rest_button.pressed.connect(_go_home)
 	store_button.pressed.connect(_open_store)
 	ride_button.pressed.connect(_attempt_next_stage)
 	_create_dialogs()
@@ -58,87 +46,39 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_accept"):
 		if rest_button.visible and rest_button.has_focus():
-			_rest_then_next_stage()
-		elif store_button.has_focus():
+			_go_home()
+		elif store_button.visible and store_button.has_focus():
 			_open_store()
-		else:
+		elif ride_button.visible:
 			_attempt_next_stage()
 
 
 func _render_results(result: Dictionary) -> void:
-	var stage_name := str(result.get("stage_type", "stage")).to_upper()
-	var day_number := int(result.get("day", PlayerState.get_current_day()))
 	var time_of_day := str(result.get("time_of_day", "morning"))
-	var total := int(result.get("total", 0))
-	var completed := bool(result.get("completed", true))
 	var skipped_phase := str(result.get("bayanihan_skipped_phase", ""))
 	var is_night_stage := time_of_day == "night" or skipped_phase == "night"
-	var sleep_after_event := not skipped_phase.is_empty() and PlayerState.get_current_time_of_day() == "night"
 	var has_pending_night_skip := time_of_day == "noon" and PlayerState.has_pending_night_phase_skip()
-	var stage_special_label := PlayerState.get_stage_special_display_name(str(result.get("stage_special_type", "")))
-	var detail_lines: Array[String] = _stringify_detail_lines(result.get("detail_lines", []))
-	if detail_lines.is_empty():
-		detail_lines = _fallback_detail_lines(result)
+	var passenger := ResultPassenger.resolve(result, PlayerState.get_character_by_id(PlayerState.get_current_mock_character_id()))
+	results_view.present(result, passenger)
 
-	heading_label.text = "RIDE COMPLETE" if completed else "TRIP ENDED"
-	var header_line := "Day %d / %s\n%s" % [day_number, time_of_day.capitalize(), stage_name]
-	if not stage_special_label.is_empty():
-		header_line += "  [%s]" % stage_special_label
-	var rendered_lines: Array[String] = [header_line, ""]
-	for detail_line_variant in detail_lines:
-		rendered_lines.append(str(detail_line_variant))
-	if not skipped_phase.is_empty():
-		rendered_lines.append("Bayanihan: %s turn spent helping." % skipped_phase.capitalize())
-	results_label.text = "\n".join(rendered_lines)
-	_render_earnings_summary(total)
-
-	var allow_rest := is_night_stage or sleep_after_event or PlayerState.can_rest_after_stage_result(time_of_day, day_number) or has_pending_night_skip
-	rest_button.visible = allow_rest
+	# This action only returns home. Recovery/time changes happen when the
+	# player explicitly confirms Rest/Sleep from the house menu.
+	rest_button.show()
 	store_button.visible = not is_night_stage and not has_pending_night_skip
 	ride_button.visible = not is_night_stage and not has_pending_night_skip
-	if allow_rest:
-		rest_button.grab_focus()
-	elif store_button.visible:
-		store_button.grab_focus()
-	else:
-		ride_button.grab_focus()
-
-	var rest_note := ""
-	if is_night_stage or sleep_after_event:
-		rest_note = "Rest: sleep, recover +3 energy, then choose a morning trip."
-	elif allow_rest:
-		if time_of_day == "morning":
-			rest_note = "Rest: recover +2 energy, then return home for night."
-		elif time_of_day == "noon":
-			rest_note = "Tonight is spoken for. Head out with Benny, then sleep and start the next day in the morning." if has_pending_night_skip else "Rest: sleep, recover +5 energy, then choose a morning trip."
-	elif time_of_day == "morning" or time_of_day == "noon":
-		rest_note = "Rest already used for Day %d." % PlayerState.get_current_day()
-
+	rest_button.grab_focus()
+	var rest_note := "Rest: go home. Choose Rest or Sleep there to recover and advance time."
+	if has_pending_night_skip:
+		rest_note = "Head home. Tonight's plans with Benny will continue when you choose to sleep."
 	_refresh_status(rest_note)
 
 
-func _rest_then_next_stage() -> void:
-	var result: Dictionary = PlayerState.get_last_stage_result()
-	var result_time := str(result.get("time_of_day", PlayerState.get_current_time_of_day())).strip_edges().to_lower()
-	var result_day := int(result.get("day", PlayerState.get_current_day()))
-	if result_time == "night" or (result.has("bayanihan_skipped_phase") and PlayerState.get_current_time_of_day() == "night"):
-		PlayerState.apply_night_rest_bonus()
-		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
+func _go_home() -> void:
+	if is_transitioning:
 		return
-
-	var has_pending_night_skip := result_time == "noon" and PlayerState.has_pending_night_phase_skip()
-	if not PlayerState.can_rest_after_stage_result(result_time, result_day) and not has_pending_night_skip:
-		return
-
-	if result_time == "noon":
-		if not has_pending_night_skip:
-			PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NEXT_DAY)
-		_begin_sleep_transition(PlayerState.TRANSITION_SLEEP_TO_NEXT_DAY)
-		return
-
-	PlayerState.apply_transition_energy_bonus(PlayerState.TRANSITION_REST_TO_NIGHT)
-	PlayerState.set_current_stage_time("night")
-	_begin_sleep_transition(PlayerState.TRANSITION_REST_TO_NIGHT)
+	is_transitioning = true
+	PlayerState.set_pending_trip_selection(HOME_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
+	get_tree().change_scene_to_file(HOME_SCENE)
 
 
 func _next_stage() -> void:
@@ -146,66 +86,32 @@ func _next_stage() -> void:
 
 
 func _begin_trip_selection(transition_mode: String) -> void:
+	if is_transitioning:
+		return
+	is_transitioning = true
 	PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, transition_mode)
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
-func _begin_sleep_transition(transition_mode: String) -> void:
-	PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, transition_mode, false)
-	get_tree().change_scene_to_file(SLEEP_TRANSITION_SCENE)
-
-
 func _open_store() -> void:
+	if is_transitioning or not store_button.visible:
+		return
+	is_transitioning = true
 	if not PlayerState.has_locked_pending_trip_selection():
 		PlayerState.set_pending_trip_selection(STAGE_RESULTS_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 	get_tree().change_scene_to_file(STORE_SCENE)
 
 
 func _refresh_status(note := "") -> void:
-	_refresh_stats_row()
-	status_label.text = "WEEKLY GOAL: PhP %d\n\nDebt remaining: PhP %d\n%s" % [PlayerState.get_current_weekly_goal(), PlayerState.get_total_debt_goal(), PlayerState.get_debt_due_text()]
+	var result: Dictionary = PlayerState.get_last_stage_result()
+	results_view.update_goal(int(result.get("total", 0)), bool(result.get("completed", true)))
+	results_view.set_rest_note(note)
 	rest_button.tooltip_text = note if not note.is_empty() else "Rest"
 
 
-func _render_earnings_summary(total: int) -> void:
-	if earnings_summary_label == null:
-		return
-	var result: Dictionary = PlayerState.get_last_stage_result()
-	if not bool(result.get("completed", true)):
-		earnings_summary_label.text = "No payout for this trip.\nRecover and try another route."
-		return
-
-	var weekly_goal := PlayerState.get_current_weekly_goal()
-	if weekly_goal <= 0:
-		earnings_summary_label.text = "You just earned PhP %d.\nWeekly goal already paid." % total
-		return
-
-	var goal_percent := float(total) / float(weekly_goal) * 100.0
-	earnings_summary_label.text = "You just earned PhP %d.\nThat's %.1f%% of your weekly goal." % [
-		total,
-		goal_percent,
-	]
-
-
-func _fallback_detail_lines(result: Dictionary) -> Array[String]:
-	return [
-		"Distance: %dm" % int(result.get("distance", 0)),
-		"Fare: PhP %d" % int(result.get("fare", 0)),
-		"Bonus: PhP %d" % int(result.get("bonus", 0)),
-		"Total: PhP %d" % int(result.get("total", 0)),
-	]
-
-
-func _stringify_detail_lines(detail_line_variants: Variant) -> Array[String]:
-	var detail_lines: Array[String] = []
-	if not detail_line_variants is Array:
-		return detail_lines
-	for detail_line_variant in detail_line_variants:
-		detail_lines.append(str(detail_line_variant))
-	return detail_lines
-
-
 func _attempt_next_stage() -> void:
+	if is_transitioning or not ride_button.visible:
+		return
 	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
 		ride_confirm_dialog.popup_centered()
 		return
@@ -221,51 +127,6 @@ func _create_dialogs() -> void:
 	ride_confirm_dialog.get_cancel_button().text = "BACK"
 	ride_confirm_dialog.confirmed.connect(_next_stage)
 	add_child(ride_confirm_dialog)
-
-
-func _create_earnings_summary_label() -> void:
-	earnings_summary_label = Label.new()
-	earnings_summary_label.set_anchors_preset(Control.PRESET_CENTER)
-	earnings_summary_label.offset_left = -430.0
-	earnings_summary_label.offset_top = -46.0
-	earnings_summary_label.offset_right = 430.0
-	earnings_summary_label.offset_bottom = 18.0
-	earnings_summary_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	earnings_summary_label.grow_vertical = Control.GROW_DIRECTION_BOTH
-	earnings_summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	earnings_summary_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	earnings_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	earnings_summary_label.add_theme_font_override("font", UI_FONT)
-	earnings_summary_label.add_theme_font_size_override("font_size", 13)
-	earnings_summary_label.add_theme_color_override("font_color", Color(0.25, 0.15, 0.08, 1.0))
-	earnings_summary_label.add_theme_color_override("font_outline_color", Color(0.95, 0.90, 0.78, 0.92))
-	earnings_summary_label.add_theme_constant_override("outline_size", 1)
-	add_child(earnings_summary_label)
-
-
-func _create_stats_row() -> void:
-	stats_row_refs.clear()
-	stats_row_refs.merge(PlayerStatsRow.create({
-		"spread": true,
-		"font": UI_FONT,
-		"font_size": 11,
-		"font_color": Color(0.27, 0.18, 0.10, 1.0),
-		"outline_color": Color(0.95, 0.90, 0.78, 0.92),
-	}), true)
-	var stats_row := stats_row_refs.get("row") as HBoxContainer
-	if stats_row == null:
-		return
-	stats_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stats_row.position = Vector2(330.0, 410.0)
-	stats_row.size = Vector2(620.0, 24.0)
-	add_child(stats_row)
-
-
-func _refresh_stats_row() -> void:
-	if stats_row_refs.is_empty():
-		return
-
-	PlayerStatsRow.refresh(stats_row_refs)
 
 
 func _start_carried_result_music() -> void:

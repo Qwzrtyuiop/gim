@@ -53,11 +53,21 @@ static func validate(payload: Dictionary) -> PackedStringArray:
 	var errors := PackedStringArray()
 	if str(payload.get("story_id", "")).is_empty():
 		errors.append("Missing story_id")
+	if payload.has("character_sprites"):
+		if not payload.character_sprites is Dictionary:
+			errors.append("character_sprites must map character IDs to sprite names")
+		else:
+			for character_id in payload.character_sprites:
+				for error in StoryActionCatalog.validate_action({"type": "set_character_sprite", "character_id": character_id, "sprite": payload.character_sprites[character_id]}):
+					errors.append("character_sprites: %s" % error)
 	var lines: Array = payload.get("composition", [])
 	if lines.is_empty():
 		errors.append("Empty composition")
 	for i in range(lines.size()):
 		var line: Dictionary = lines[i]
+		if line.has("sprite"):
+			for error in StoryActionCatalog.validate_action({"type": "set_character_sprite", "character_id": line.get("speaker", ""), "sprite": line.sprite}):
+				errors.append("Section %d: %s" % [i, error])
 		var targets: Array = [line]
 		targets.append_array(line.get("choices", []))
 		for target: Dictionary in targets:

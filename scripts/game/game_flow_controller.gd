@@ -8,6 +8,7 @@ const GameEnvironmentController := preload("res://scripts/game/game_environment_
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
 const VehicleCollisionController := preload("res://scripts/game/vehicle_collision_controller.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
+const PlayerHorn := preload("res://scripts/game/player_horn_controller.gd")
 
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
@@ -58,6 +59,7 @@ static func current_speed_kmh(owner) -> int:
 static func end_game(owner, title: String, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
+	PlayerHorn.stop(owner)
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()
 	if title == "CRASH":
@@ -110,6 +112,7 @@ static func handle_player_hit(owner, detail: String, damage: int) -> void:
 static func send_to_crash_repair(owner, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
+	PlayerHorn.stop(owner)
 	owner.game_state = "CRASH"
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()

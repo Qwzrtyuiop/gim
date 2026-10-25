@@ -338,6 +338,9 @@ const MOCK_CHARACTERS := [
 		"first_appearance_chance": 0.75,
 		"eligible_distances": ["short", "medium"],
 		"eligible_times": ["night"],
+		"intro_eligible_times": ["morning", "noon"],
+		"intro_completion_event": "jessa_runaway_fare_seen",
+		"intro_absence_day_event": "jessa_runaway_fare_earnings",
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "A Quiet Ride"},

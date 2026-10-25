@@ -11,6 +11,7 @@ const TrafficEntities := preload("res://scripts/game/vehicle_traffic_entities.gd
 const TrafficSignals := preload("res://scripts/game/vehicle_traffic_signals.gd")
 const LaneNavigation := preload("res://scripts/game/vehicle_lane_navigation.gd")
 const TrafficSpacing := preload("res://scripts/game/vehicle_traffic_spacing.gd")
+const HornResponse := preload("res://scripts/game/vehicle_horn_response.gd")
 
 
 static func update_speeder_lane_change_warning(owner, delta: float) -> void:
@@ -65,6 +66,8 @@ static func update_random_lane_changes(owner, delta: float) -> void:
 		return
 
 	for entity in owner.active_entities:
+		if bool(entity.get("horn_yielding", false)) or float(entity.get("horn_speed_timer", 0.0)) > 0.0:
+			continue
 		if bool(entity.get("lane_change_warning_active", false)):
 			continue
 		if entity.get("kind", "traffic") != "traffic":
@@ -122,6 +125,7 @@ static func update_vehicle_speeds(owner, delta: float) -> void:
 		owner.vehicle_speed_change_max_delay,
 		owner.vehicle_speed_acceleration
 	)
+	HornResponse.update_speeds(owner, delta)
 	TrafficSpacing.apply_bottom_lane_speed_cap(owner)
 
 
@@ -222,6 +226,8 @@ static func update_busy_vehicle_ai(owner, delta: float) -> void:
 		return
 
 	for entity in owner.active_entities:
+		if bool(entity.get("horn_yielding", false)) or float(entity.get("horn_speed_timer", 0.0)) > 0.0:
+			continue
 		if entity.get("kind", "traffic") != "traffic":
 			continue
 		if bool(entity.get("is_parked", false)):
@@ -253,6 +259,8 @@ static func update_busy_vehicle_ai(owner, delta: float) -> void:
 
 static func update_vehicle_overtake_ai(owner, delta: float) -> void:
 	for entity in owner.active_entities:
+		if bool(entity.get("horn_yielding", false)) or float(entity.get("horn_speed_timer", 0.0)) > 0.0:
+			continue
 		if entity.get("kind", "traffic") != "traffic":
 			continue
 		if bool(entity.get("is_parked", false)):

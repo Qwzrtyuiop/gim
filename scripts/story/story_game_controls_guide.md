@@ -127,6 +127,11 @@ for compatibility, but nested conditions are clearer for new content.
 
 ## Control what happens after dialogue
 
+Passenger-card events can return to the same offers, start the selected ride,
+or skip a phase with `selection_outcome`. See
+[passenger event authoring](passenger_events_guide.md) for its trigger phase,
+outcomes and save behavior.
+
 ```gdscript
 "actions": [
 	{"type": "return_to", "destination": "store"},

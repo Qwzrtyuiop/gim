@@ -158,7 +158,7 @@ func layout(size: Vector2, player_x: float, player_lane: int, stage_type: String
 
 	var help_label := refs.get("help_label") as Label
 	if help_label:
-		help_label.text = "UP/DOWN lane    LEFT/RIGHT speed    SHIFT boost    SPACE/R action"
+		help_label.text = "UP/DOWN lane   LEFT/RIGHT speed   SHIFT boost   Q horn"
 		help_label.position = Vector2(28.0, size.y - 45.0)
 		help_label.size = Vector2(size.x * 0.34, 34.0)
 

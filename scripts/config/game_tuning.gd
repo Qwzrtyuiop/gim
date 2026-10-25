@@ -114,6 +114,20 @@ const SPEEDER_FRONT_CLEARANCE_PIXELS := 10.0
 const SPEEDER_BOB_X_PIXELS := 2.0
 const SPEEDER_BOB_CYCLES_PER_SECOND := 1.5
 
+# Player horn: separate taps persuade nearby bottom-lane drivers once per car.
+const HORN_PRESS_COOLDOWN := 0.15
+const HORN_REPEAT_WINDOW := 2.5
+const HORN_MIN_PRESSES := 2
+const HORN_MAX_PRESSES := 5
+const HORN_RANGE := 350.0
+const HORN_IGNORE_CHANCE := 0.30
+const HORN_SPEED_CHANCE := 0.35
+const HORN_SPEED_BOOST := 160.0
+const HORN_MAX_RESPONSE_SPEED := 650.0
+const HORN_SPEED_SECONDS := 3.0
+const HORN_PULL_OVER_GAP := 18.0
+const HORN_YIELD_CLEAR_DISTANCE := 2.0
+
 # Wheel animation shared by gameplay and the main menu.
 # Rotation follows road speed; cap revolutions/second to keep spokes readable.
 const WHEEL_ANIMATION_ENABLED := true

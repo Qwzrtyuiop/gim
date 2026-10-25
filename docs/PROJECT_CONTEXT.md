@@ -11,7 +11,7 @@ Gulong is a single-player, Philippine-set 2D side-scrolling driving game. John T
 - Entry: `res://scenes/main_menu.tscn` in [project.godot](../project.godot).
 - Autoload order: AudioSettingsManager, StoryLanguageManager, PlayerState, AchievementPopupManager, PauseMenuManager, UIAudioManager.
 - Saves: `user://progress_save.tres`, explicit version-4 resource/codec. Language and audio preferences use separate files. Live driving is restarted rather than restored as an exact traffic/RNG snapshot.
-- Controls: W/Up and S/Down change lanes, D/Right accelerates, A/Left brakes, Shift boosts, Escape pauses in supported scenes. Main-menu hold-R resets progress.
+- Controls: W/Up and S/Down change lanes, D/Right accelerates, A/Left brakes, Shift boosts, Q holds the horn (repeat taps can persuade bottom-lane traffic), Escape pauses in supported scenes. Main-menu hold-R resets progress.
 
 ## Where to work
 
@@ -42,13 +42,243 @@ Current changes visible in source:
 - Story builders across intro, events, and character encounters now use a shared normalized schema in the new `story_payload.gd`. The old `payloads/events/random_event_payload.gd` and its UID are deleted. The payload guide and template document the canonical format.
 - The new `story_checkpoint.gd` and changes to `story_scene.gd` capture reached presentation state, batch saves per completed step, and retain an action cursor when exiting during an animated step. Resume continues remaining actions without repeating completed rewards. Gallery replay remains separate from persistent effects.
 - `story_catalog.gd` indexes static identity data while constructing live progress/name results and returning independent dictionaries.
-- Jessa's runaway-fare trigger now becomes eligible after her first completed ride, including before Day 2, with a narrowly matched migration of the older saved trigger rule. Tests cover unpaid fare, hidden name, migration, and once-per-run behavior in both languages.
+- Jessa's runaway-fare trigger becomes eligible after a completed morning/noon ride, including before Day 2. Before that encounter is completed, her live passenger availability is morning/noon; afterward it returns to its existing night schedule. Narrow saved-rule migrations preserve consumed events and custom rules. Tests cover unpaid fare, hidden name, daytime/nighttime eligibility, migration, and once-per-run behavior in both languages.
 - The new `vehicle_traffic_index.gd` caches ordered lane buckets per owner/frame. Spawn, removal, reset, and lane changes invalidate it. Collision rectangles cache by geometry inputs so same-frame movement/scale/texture changes can refresh them.
 - `tests/run_refactor_checks.py` and the Godot regression scene are untracked parts of this work and must be preserved with their dependencies.
 
 The next request was to clean up code and put related functions in their respective files. The organization below reflects that refactor; story content and saved IDs/section indices were preserved.
 
 ## Function ownership after cleanup
+
+The store street now uses aligned 1698x926 `store.png` / `storenight.png` art and
+the transparent `store_select.png` rectangle borders. Four shared full rectangles
+select Lito's, the food counter, Home and Station, including their transparent
+interiors; there are no separate night hit areas or alpha scans for store input.
+`ui/store_street_view.gd` uses the shared pointer/keyboard mode and lighting from
+the current clock. See [store selection artwork](STORE_SELECTIONS.md).
+Seven unused sources (five older station images, the garage spotlight and the
+duplicate house selector) moved to `locations/check/unused/` with their image
+bytes and import UIDs retained. Previous station path migrations still point
+directly to the current station art; garage-spotlight paths migrate to its archive
+location. Source sheets used by extraction tools remain active, and author-deleted
+images were not restored. The archive README records the moved files.
+The full isolated suite passed with `tests/store_select_checks.gd` covering
+rectangular interiors, shared phases, resizing/focus, actual shop entry/purchases,
+tutorial gates and archived save paths. Import/source hashes and moved-image bytes
+were checked, with UIDs retained. A separate 16-case headless layout probe and
+inspected composites covered both lighting phases and all four selection borders.
+No interactive GUI playtest or export was performed; existing certificate-store
+and exit-leak diagnostics remain.
+
+Home now uses the aligned 1698x926 day/night backgrounds and the transparent
+`locations/houseselect.png` sheet. Radio, calendar and sleeping curtain have
+shared cached alpha masks and source regions, with phase-matched yellow-outlined
+hover art. A selected item enlarges 6% above the room; its resting alpha remains
+the hit shape. Phase changes only swap art and do not rebuild day/night hitboxes.
+Home now uses the shared pointer/keyboard highlight mode so clicked items do not
+remain enlarged after the pointer leaves. The existing bottom-right exit polygon,
+actions, tutorials and modal rules remain. Speech anchors follow item enlargement.
+`ui/house_selectable_catalog.gd` owns placement/art/masks and `ui/house_view.gd`
+owns rendering/input. See [house selection artwork](HOUSE_SELECTABLES.md) for
+regeneration commands, source rectangles and validation. User source images and
+deleted older day/night selection images were preserved as supplied.
+The full isolated suite passed with `tests/house_select_checks.gd` covering
+shared masks, transparent picking, hover/focus isolation, three aspect ratios,
+real home actions and speech anchors. The extraction/pixel checks and imported
+source hashes passed. A separate 18-case headless probe and inspected day/night
+composites covered foreground enlargement down to 640x360. No interactive GUI
+playtest or export was performed; existing certificate-store/exit-leak diagnostics
+remain.
+
+Home, station/terminal and store now expose scene-local `show_message` /
+`show_messages` APIs for speech balloons beside sprites or registered hotspots.
+`ui/hub_dialogue.gd` owns transient queues, optional blocking input, localization,
+gated/timed playback and the existing text-reveal/SFX helper;
+`ui/hub_speech_box.gd` owns safe balloon/tail layout and bounded scrolling;
+`ui/hub_dialogue_anchors.gd` tracks letterboxed art, terminal sprites and fitted
+shop-owner portraits. Tutorials, home info panels and passenger confirmation
+suspend speech; navigation/rest clears it. Store greetings and purchase/error
+feedback demonstrate the feature. There are no new save fields, story actions or
+automatic home/terminal conversations. See [hub speech authoring](HUB_DIALOGUE.md)
+for targets, queues, custom Control/Sprite2D anchors and continuation signals.
+The full isolated suite passed with `tests/hub_dialogue_checks.gd` covering queue
+callbacks/cancellation, Unicode reveal, localized/hidden names, click isolation,
+pause/blocking input, gated timers, moving/hidden/freed targets and real menu
+integration. Store speech avoids visible purchase controls at standard and square
+sizes. Independent headless probes and inspected composites cover home, terminal
+and store, long-message scrolling and close clicks down to 640x360. No interactive
+GUI/audio playtest or export was performed; existing certificate-store/exit-leak
+diagnostics remain.
+
+The ride-results screen now uses the terminal's warm dark panels over the city
+background, with a full passenger portrait, a structured fare receipt, a prominent
+total and a weekly-goal panel. `results/results_view.gd` owns presentation and
+switches to a two-row composition for square/narrow viewports;
+`results/result_passenger.gd` resolves the completed ride's saved identity and
+hidden display name. Named passengers use existing VN portraits; generic/unknown
+passengers use the existing silhouette. Failed rides now also retain the existing
+`character_id` result key. Older results fall back to the current passenger only
+when that key is absent. Authored unpaid/waived fares, penalties, failure reasons
+and skipped-phase notes remain in the receipt. The goal bar shows available money
+against the current collection goal; it does not record a debt payment.
+`stage_results.gd` retains payout, music and Rest/Store/Ride routing.
+The post-ride Rest button now returns directly home at the current clock, without
+recovery or rest counters; it remains available even after the daily rest was used.
+The existing home Rest/Sleep confirmation owns energy recovery and time changes.
+Returning home preserves locked offers and pending night events, including on Day 1.
+`tests/post_ride_home_checks.gd` verifies the actual result-to-home handoff, repeated
+click protection, confirmed daytime/night recovery and deferred Benny night story.
+`tests/results_screen_checks.gd` covers saved identity, portrait fitting, payout
+once, special receipts, action availability, low-energy cancellation and three
+viewport sizes. The full isolated suite passed. A separate headless probe and
+inspected composites also cover 640x360 and tall/square portrait art; no interactive
+GUI playtest or export was performed. Existing certificate-store/exit-leak
+diagnostics remain.
+
+Jessa's first encounter is daytime-only. `StoryCatalog` resolves
+`intro_eligible_times` while `intro_completion_event` is not true, so merely seeing
+her card or gaining ride progress does not switch her to nighttime availability.
+After completing that event, she is absent for the rest of its recorded day and
+can return on later nights. The live catalog derives `unavailable_day` from the
+existing saved `jessa_runaway_fare_earnings.day`; no new persisted field, story
+section or save-version change is needed. Shared `story/character_availability.gd`
+checks the projected trip day and phase for random, seeded and cached offers.
+Missing historical dates in older saves preserve the previous night schedule.
+Her first-event trigger filters the completed ride's morning/noon phase, even if
+finishing a noon ride has already moved the live clock to night. Older built-in
+unrestricted trigger rules migrate without resetting consumed events; existing
+locked night rides do not trigger the event or lose their fare. Story IDs, section
+indices, current checkpoints and later encounter rules are preserved.
+Coverage includes both localized daytime first encounters, nighttime fare/trigger
+preservation, old/current saved-rule migration and `tests/jessa_daytime_checks.gd`
+passenger-pool checks. The same-day absence also covers saved/seeded/terminal
+offers, later-night availability, checkpoint reload and replay isolation.
+Source/UID/link and diff checks passed; existing certificate-store/exit-leak
+diagnostics remain.
+
+Q uses a trimmed PCM `hold_horn.wav` derived from the original `hold_horn.mp3`
+through a dedicated registered SFX player. The source MP3 is preserved; playback
+uses its 0.12-1.10s audible core with 1ms edge fades, removing startup/tail silence
+and MP3 decoding from horn taps. The WAV import uses uncompressed 16-bit PCM;
+the regression checks for audible samples within the first 10ms. Holding it loops
+the sound; separate presses count toward the nearest same-direction normal driver
+ahead in the bottom lane when the player is in that lane (350-pixel bumper range).
+Each car needs 2-5 taps, with counts resetting after a 2.5-second gap. At its
+threshold it chooses ignore (30%), accelerate (35%) or pull over (35%); a blocked
+pull-over falls back to acceleration. Ignore/response decisions stay with that car.
+Acceleration lasts three seconds and respects following safety. Yielding cars stop,
+move down to parked-car level, then allow passage once visibly off the driving
+line. Existing parked cars, speeders and oncoming traffic do not react. Pausing,
+focus loss, crash repair, ride completion and leaving gameplay stop the horn.
+`game/player_horn_controller.gd` owns input/hold/cooldown; `vehicle_horn_response.gd`
+owns patience, responses and shoulder clearance. Shared tuning uses `HORN_*` in
+`config/game_tuning.gd`; normal following and overlap order is preserved. Reactions
+are live traffic state and reset with a ride restart rather than changing saves.
+The full isolated suite passed with `tests/horn_checks.gd` covering Q/audio lifecycle,
+tap thresholds/timeout, all three seeded reactions, following/cap safety, occupied
+shoulders, delayed pass-through and pause/focus/end cleanup. Three runner safety
+tests and source/UID/link checks also passed. Existing certificate-store/exit-leak
+diagnostics remain; no interactive driving/audio playtest or export was performed.
+
+`ride_selection.tscn` now opens on the station street. Click the foreground
+tricycle to enter the terminal, or the outlined entrance at
+the far left edge to visit the store. The replacement art uses `Updated_day.png`
+/ `Updated_night.png` with `Updated_day_select.png` / `Updated_night_select.png`
+for hover outlines.
+Both phases share a 1672x941 composition; source-pixel polygon traces scale with
+the image, including the tricycle canopy and the narrow store entrance.
+Selection, story and gallery references use the new paths; saved station
+backgrounds and gallery keys migrate through `save/asset_path_migration.gd`.
+`ui/station_view.gd` draws day/night art and the matching supplied outline inside
+separate polygon hotspots. The passenger screen now uses `terminalday.png` /
+`terminalnight.png` with individually segmented characters at the exact positions
+in the supplied transparent day/night spawn sheets. All locked distances appear
+together; hover/focus shows each passenger's trip in a padded card with separate
+name/route/traffic, an optional special badge and aligned fare/fuel/risk columns.
+Clicking opens a confirmation with the same card; Confirm uses the existing
+ride/story entry. Cancel/Escape/backdrop returns without saves, costs, clock or
+offer changes. The modal blocks background controls and starts on Cancel for
+keyboard input. It revalidates the exact locked offer and clock before departure.
+`passenger_trip_card.gd` and `passenger_confirmation.gd` own this presentation;
+the coordinator owns the transient request and existing entry path.
+Generic riders use eight faceless poses extracted from
+`terminalspawns/genericspawns.png`, shared across day/night. Named spots are reserved
+first; generics fill unused positions in stable ID order. Dante also reserves the
+first standing spot to avoid an edge overlap. A full nine-offer lineup can use an
+extra narrow standing position at the far left. Future missing art retains the
+empty-box fallback; the existing six generic passenger IDs and fare rules stay intact.
+Hover/focus replaces the resting sprite with one 6% larger foreground image,
+anchored at its feet; the previous shifted-copy outline has been removed.
+Shared `ui/input_highlight_mode.gd` distinguishes pointer hover from intentional
+keyboard/controller navigation. Programmatic focus on terminal open/close no longer
+leaves the tricycle or one passenger highlighted while the mouse is elsewhere;
+Tab/arrows/controller navigation still exposes focus until the pointer is used.
+The terminal and station share the same `HubStatusHeader` instance and styling,
+with live money/energy/fuel icons and values. The terminal uses its optional
+display-time override for the projected trip's day/phase; closing it returns the
+header to the current clock. Passenger instructions start below the header and
+the tutorial highlights the shared header instead of duplicate plain text.
+`terminal_spawn_catalog.gd` owns placements; `terminal_passenger_view.gd` owns
+rendering and alpha-aware input; `selection_view.gd` gathers live eligible offers
+and formats details. The old card panel and distance controls have been removed.
+See [terminal passenger art and behavior](TERMINAL_PASSENGERS.md), including the
+lossless extraction command. `ride_selection/station_interface.gd` owns terminal
+navigation, header and back control. Closing the screen preserves offers and
+the last selected distance. The first passenger tutorial starts on open;
+the prologue's opening ride enters the terminal automatically. The same first-ride
+check repairs older station saves whose passenger tutorial has not started;
+later visits use the street normally. Both localized intro handoffs have a real
+reader-to-selection regression that verifies tutorial visibility and one entry cost.
+Saved passenger stories return to the open terminal. Its `passengers_open` flag uses
+the existing pending-selection dictionary. Same-mode rest transitions also retain
+their locked offers when walking to the store and back, without time/resource costs.
+The full isolated regression suite passed, including actual pointer clicks on the
+tricycle, terminal passengers and generic riders; all-distance offers; live/projected
+schedules and Jessa's intro gate; tutorial gating; resizing; store round trips;
+saved VN returns; and one-time repair of wholly unusable legacy locks. Extraction
+checks prove all 23 crops reproduce the transparent placement sheets exactly.
+Pointer/focus checks cover automatic focus, mouse departure, keyboard navigation,
+opening/closing and resumed terminals. Header checks cover shared styling, live
+resource updates, projected time and layout at three aspect ratios.
+Confirmation checks cover no-effect cancellation, Escape/focus/background input,
+stale-clock rejection, correct confirmed trips, one-time costs and Jessa's event
+starting only after confirmation. Shared trip-card bounds and column separation
+are checked at three viewport sizes, with a separate component probe at 640x360.
+Source/UID/link and diff checks passed. Independent headless view probes and
+inspected composites covered both phases and information-panel/control separation;
+no interactive GUI playtest or export was performed. Existing certificate-store
+and exit-leak diagnostics remain.
+
+VN character sprites now support named variants. Magda uses saved ID `faye` with
+`magda` as an alias; her `alt` variant resolves `Magda_alt.png`. Jessa's `alt`
+variant resolves `Jessa_alt.png` under her existing `jessa` ID. The shared
+`story_character_sprites.gd` registry owns character art/aliases, while
+`story_character_sprite_runtime.gd` owns scene-local selections. Use a line's
+`sprite`, initial payload `character_sprites`, or a `set_character_sprite` action.
+Automatic speakers and named casts retain their choices through checkpoints;
+memory playback remains isolated. See [sprite authoring](../scripts/story/story_portraits_guide.md#character-sprite-variants).
+The full isolated suite passed with sprite-specific tests for remembered choices,
+named-cast geometry/custom textures, stale texture aliases, old checkpoints,
+special-CG visibility and live-save isolation during memory playback. Three runner
+checks and source/UID/link checks passed. User-supplied character art was preserved;
+no GUI playtest or export was performed.
+
+Passenger selections support `passenger_selected` story triggers before entry
+costs or time advancement. Jessa's second encounter (`jessa_second_encounter`)
+requires her completed runaway-fare event and currently contains matching short
+English/Tagalog scaffolds. It returns to the same locked offers and clock.
+`ride_selection/passenger_story.gd` owns the saved continuation;
+`ride_selection/ride_departure.gd` shares normal ride entry with the card screen.
+The new `selection_outcome` action supports `return`, `ride`, and `skip` (one phase).
+See [passenger events](../scripts/story/passenger_events_guide.md) for authoring,
+chained stories and longer skips. These use existing version-4 dictionaries.
+The full isolated regression suite passed with passenger-event checks for both
+languages, pre-cost entry, unchanged offers/time, rest recovery, optional rides
+and phase skips, actual reader handoffs, saved departure reload and replay
+suppression. Three runner safety checks and source/UID/link checks also passed.
+The runner now allows 12000 frames/120 seconds for the expanded suite; expected
+invalid-input warnings and existing certificate-store/exit-leak diagnostics remain.
+No GUI playtest or export was performed for this addition.
 
 Story text now reveals gradually with original retro talking blips by default.
 `scripts/story/story_dialogue_playback.gd` owns Label reveal/skip timing;

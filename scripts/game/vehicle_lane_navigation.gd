@@ -280,7 +280,7 @@ static func speeder_has_player_lane_change_clearance(owner, entity: Dictionary, 
 static func update_entity_lane_position(owner, entity: Dictionary, delta: float) -> void:
 	var target_lane := int(entity.get("target_lane", entity["lane"]))
 	var sprite: Sprite2D = entity["sprite"]
-	if bool(entity.get("is_parked", false)):
+	if bool(entity.get("is_parked", false)) or bool(entity.get("horn_yielding", false)):
 		sprite.z_index = VehicleGeometry.z_for_lane(owner, target_lane, owner.PARKED_VEHICLE_Z_OFFSET)
 	elif bool(entity.get("top_lane_evasive_offset_active", false)):
 		sprite.z_index = VehicleGeometry.z_for_lane(owner, 0, int(owner.ROAD_ACTOR_Z_STEP * 0.5))
@@ -300,6 +300,8 @@ static func update_entity_lane_position(owner, entity: Dictionary, delta: float)
 
 static func target_guide_y_for_entity(owner, entity: Dictionary, target_lane: int) -> float:
 	var size: Vector2 = owner.get_viewport_rect().size
+	if bool(entity.get("horn_yielding", false)) and target_lane == 2:
+		return VehicleGeometry.entity_lane_y(owner, 2, size, true)
 	if bool(entity.get("top_lane_evasive_offset_active", false)) and int(entity.get("lane", -1)) == 0 and target_lane == 0:
 		var top_lane_y: float = VehicleGeometry.entity_lane_y(owner, 0, size, false)
 		var middle_lane_y: float = VehicleGeometry.entity_lane_y(owner, 1, size, false)

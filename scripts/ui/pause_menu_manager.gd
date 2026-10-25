@@ -379,6 +379,11 @@ func _can_pause_current_scene() -> bool:
 	var current_scene := get_tree().current_scene
 	if current_scene == null:
 		return false
+	# A blocking hub conversation owns Escape until it is dismissed. Ordinary
+	# ambient bubbles leave the existing pause behavior available.
+	var dialogue := current_scene.get_node_or_null("HubDialogue")
+	if dialogue != null and dialogue.has_method("blocks_input") and dialogue.blocks_input():
+		return false
 	var scene_file := str(current_scene.scene_file_path)
 	if scene_file.is_empty():
 		return false

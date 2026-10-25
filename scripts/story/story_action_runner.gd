@@ -108,6 +108,8 @@ static func run(owner, action_data: Dictionary) -> void:
 			StoryAudioRuntime.stop_sfx_action(owner)
 		"set_portrait", "change_portrait":
 			StoryPresentation.apply_portrait_action(owner, action_data)
+		"set_character_sprite":
+			StoryPresentation.apply_character_sprite_action(owner, action_data)
 		"set_portraits":
 			StoryPresentation.replace_portraits(owner, action_data.get("portraits", []))
 		"clear_portraits":

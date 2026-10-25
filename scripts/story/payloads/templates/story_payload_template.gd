@@ -9,6 +9,8 @@ const DECLINE := 7
 const FINISH := 8
 
 # Copy this file for a new story. See ../../story_payloads_guide.md.
+# Sprite variants: a Magda line can use "sprite": "alt"; use "default" to reset.
+# Choices can run {"type": "set_character_sprite", "character_id": "magda", "sprite": "alt"}.
 
 
 static func build() -> Dictionary:

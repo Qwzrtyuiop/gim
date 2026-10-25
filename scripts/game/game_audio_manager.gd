@@ -11,6 +11,7 @@ const STAGE_BGM_SPEEDER_BUSY_D_PATH := "res://assets/audio/music/driving/speeder
 const STAGE_BGM_TRAFFIC_JAM_PATH := "res://assets/audio/music/driving/traffic_jam.mp3"
 const STAGE_BGM_RAIN_LOOP_PATH := "res://assets/audio/ambience/rain_loop.mp3"
 const CRASH_SFX := preload("res://assets/audio/sfx/driving/crash.mp3")
+const HORN_SFX := preload("res://assets/audio/sfx/driving/hold_horn.wav")
 
 const STAGE_BGM_NORMAL_CHILL_PATHS := [
 	STAGE_BGM_NORMAL_CHILL_A_PATH,
@@ -27,6 +28,7 @@ const STAGE_BGM_SPEEDER_BUSY_PATHS := [
 
 var speeder_beep_player: AudioStreamPlayer
 var crash_sfx_player: AudioStreamPlayer
+var horn_player: AudioStreamPlayer
 var stage_bgm_player: AudioStreamPlayer
 var rain_loop_bgm_player: AudioStreamPlayer
 var current_stage_bgm_path := ""
@@ -47,6 +49,19 @@ func setup(parent: Node) -> void:
 	crash_sfx_player.bus = "Master"
 	parent.add_child(crash_sfx_player)
 	AudioSettingsManager.register_player(crash_sfx_player, "sfx")
+
+	horn_player = AudioStreamPlayer.new()
+	horn_player.name = "PlayerHornSFXPlayer"
+	horn_player.bus = "Master"
+	# The derived PCM clip starts at the audible onset and excludes the MP3's
+	# silent padding, so short taps start promptly and held loops stay audible.
+	var horn_stream := HORN_SFX.duplicate() as AudioStreamWAV
+	horn_stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	horn_stream.loop_begin = 0
+	horn_stream.loop_end = roundi(horn_stream.get_length() * horn_stream.mix_rate)
+	horn_player.stream = horn_stream
+	parent.add_child(horn_player)
+	AudioSettingsManager.register_player(horn_player, "sfx")
 
 	stage_bgm_player = AudioStreamPlayer.new()
 	stage_bgm_player.name = "StageBGMPlayer"
@@ -119,6 +134,22 @@ func play_crash_sfx() -> void:
 
 func is_crash_sfx_playing() -> bool:
 	return is_instance_valid(crash_sfx_player) and crash_sfx_player.playing
+
+
+func set_horn_active(active: bool) -> void:
+	if not is_instance_valid(horn_player):
+		return
+	if not active:
+		stop_horn()
+		return
+	# Input edges start the horn; polling a held key must not restart its loop.
+	if not horn_player.playing:
+		horn_player.play()
+
+
+func stop_horn() -> void:
+	if is_instance_valid(horn_player):
+		horn_player.stop()
 
 
 func get_result_music_carry_state() -> Dictionary:

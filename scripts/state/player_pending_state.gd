@@ -6,15 +6,18 @@ static func set_pending_trip_selection(player_state, return_scene: String, trans
 	var should_preserve_locked_selection: bool = (
 		safe_transition_mode == player_state.TRANSITION_RIDE
 		or safe_transition_mode == player_state.TRANSITION_CURRENT_STAGE
+		or safe_transition_mode == str(player_state.pending_trip_selection.get("transition_mode", ""))
 	)
 	var locked_characters: Array = []
 	var locked_character_pools: Dictionary = {}
 	var locked_distance: String = ""
+	var passengers_open := false
 	if should_preserve_locked_selection:
 		locked_characters = player_state.pending_trip_selection.get("locked_characters", [])
 		locked_characters = locked_characters.duplicate(true)
 		locked_character_pools = Dictionary(player_state.pending_trip_selection.get("locked_character_pools", {})).duplicate(true)
 		locked_distance = str(player_state.pending_trip_selection.get("selected_distance", ""))
+		passengers_open = bool(player_state.pending_trip_selection.get("passengers_open", false))
 	player_state.pending_trip_selection = {
 		"return_scene": return_scene,
 		"transition_mode": safe_transition_mode,
@@ -26,6 +29,8 @@ static func set_pending_trip_selection(player_state, return_scene: String, trans
 		player_state.pending_trip_selection["locked_characters"] = locked_characters
 	if player_state.STAGE_DIFFICULTIES.has(locked_distance):
 		player_state.pending_trip_selection["selected_distance"] = locked_distance
+	if passengers_open:
+		player_state.pending_trip_selection["passengers_open"] = true
 	player_state.save_progress()
 
 
@@ -80,6 +85,26 @@ static func lock_pending_trip_selection(player_state, locked_character_data, sel
 static func clear_pending_trip_selection(player_state) -> void:
 	player_state.pending_trip_selection.clear()
 	player_state.save_progress()
+
+
+static func set_pending_passengers_open(player_state, value: bool) -> void:
+	if value:
+		player_state.pending_trip_selection["passengers_open"] = true
+	else:
+		player_state.pending_trip_selection.erase("passengers_open")
+	player_state.save_progress()
+
+
+static func set_pending_trip_selection_error(player_state, message: String) -> void:
+	player_state.pending_trip_selection["start_error"] = message
+	player_state.save_progress()
+
+
+static func take_pending_trip_selection_error(player_state) -> String:
+	var message := str(player_state.pending_trip_selection.get("start_error", ""))
+	if player_state.pending_trip_selection.erase("start_error"):
+		player_state.save_progress()
+	return message
 
 
 static func set_pending_story(player_state, story_payload: Dictionary, save_immediately: bool = true) -> void:

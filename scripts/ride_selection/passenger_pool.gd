@@ -4,6 +4,7 @@ extends RefCounted
 # Keep generation order and rule consumption here so retry/fallback rolls stay aligned.
 
 const EMPTY_CARD_CHANCE := 0.28
+const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
 
 var screen
 var rng := RandomNumberGenerator.new()
@@ -191,11 +192,11 @@ func _supports_distance_in_selection(character: Dictionary, distance: String, is
 
 
 func _supports_time_in_selection(character: Dictionary) -> bool:
-	var next_time_of_day: String = PlayerState.get_next_stage_time(screen._transition_mode())
-	var eligible_times: Array = character.get("eligible_times", [])
-	if eligible_times.is_empty():
-		return true
-	return eligible_times.has(next_time_of_day)
+	return CharacterAvailability.supports_time(
+		character,
+		PlayerState.get_next_stage_time(screen._transition_mode()),
+		PlayerState.get_transition_display_day(screen._transition_mode()),
+	)
 
 
 func _lock_character_for_selection(picked_character: Dictionary, active_distance: String, forced_traffic: String = "") -> Dictionary:

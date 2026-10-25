@@ -4,12 +4,13 @@ extends RefCounted
 const Catalog := preload("res://scripts/story/story_action_catalog.gd")
 const PayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
 const StoryTime := preload("res://scripts/state/player_story_time_state.gd")
+const PassengerStory := preload("res://scripts/ride_selection/passenger_story.gd")
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 
 
 static func supports(action_type: String) -> bool:
-	return action_type in ["advance_time", "skip_days", "skip_phases", "queue_story", "return_to", "end_run"]
+	return action_type in ["advance_time", "skip_days", "skip_phases", "queue_story", "return_to", "selection_outcome", "end_run"]
 
 
 static func run(owner, action: Dictionary) -> void:
@@ -17,6 +18,8 @@ static func run(owner, action: Dictionary) -> void:
 		return
 	var type := Catalog.canonical_type(str(action.get("type", "")))
 	match type:
+		"selection_outcome":
+			PassengerStory.set_outcome(owner, str(action.get("outcome", "")))
 		"advance_time", "skip_days", "skip_phases":
 			var options := action.duplicate(true)
 			if type == "skip_days":
@@ -64,12 +67,20 @@ static func queued_story(owner, target_scene: String) -> Dictionary:
 	if not payload.is_empty():
 		payload["return_scene"] = target_scene
 		payload["next_scene"] = target_scene
+		for key in ["_passenger_selection", "_selection_outcome"]:
+			if owner.story_payload.has(key):
+				var value = owner.story_payload[key]
+				payload[key] = value.duplicate(true) if value is Dictionary else value
 	return payload
 
 
 static func prepare_destination(owner, target_scene: String) -> void:
 	# Direct story handoffs enter the current calendar slot rather than advancing a ride.
 	if not owner.story_payload.has("_story_destination"):
+		return
+	if owner.story_payload.has("_passenger_selection") and target_scene == Catalog.DESTINATIONS.ride_selection:
+		# The passenger continuation preserves the original offers/rest mode, or
+		# rebuilds selection for a changed clock at the final end of a story chain.
 		return
 	PlayerState.claim_last_stage_total()
 	PlayerState.clear_pending_sleep_transition_state()

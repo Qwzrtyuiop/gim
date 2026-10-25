@@ -5,10 +5,18 @@ and [the gameplay event template](payloads/templates/gameplay_event_template.gd)
 These add time skips, resources/upgrades/debt/weather effects, gameplay conditions,
 locked choices, story chaining, and post-dialogue destinations.
 
+For stories that start when clicking a passenger card, see
+[passenger events](passenger_events_guide.md). These can return to the same
+selection, start the clicked ride after dialogue, or skip a phase.
+
 For gradual text and talking blips, see [dialogue playback](story_dialogue_playback_guide.md).
 Text reveals by default. Payload/line `typewriter` settings control speed, sound
 and pitch; `typewriter: false` keeps a line instant. Checkpoints restore reached
 dialogue fully and silently while preserving the action cursor.
+
+For character expressions/outfits, see [sprite variants](story_portraits_guide.md#character-sprite-variants).
+Use a speaking line's `sprite`, payload `character_sprites`, or the ordered
+`set_character_sprite` action. Choices can switch sprites through actions too.
 
 Start with `payloads/templates/story_payload_template.gd`. Every authored story
 uses a single `build()` returning `StoryPayload.normalize({...})`, with the full

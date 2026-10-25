@@ -21,6 +21,8 @@ static func apply_bottom_lane_speed_cap(owner) -> void:
 			continue
 		if bool(entity.get("is_parked", false)):
 			continue
+		if float(entity.get("horn_speed_timer", 0.0)) > 0.0:
+			continue
 		if TrafficEntities.is_overtake_speed_exempt(entity):
 			continue
 

@@ -3,6 +3,7 @@ extends RefCounted
 # Supported story commands and persistence metadata. Validators never mutate state.
 const GameEffects := preload("res://scripts/story/story_game_effects.gd")
 const StoryTime := preload("res://scripts/state/player_story_time_state.gd")
+const CharacterSprites := preload("res://scripts/story/story_character_sprites.gd")
 const ACTIONS := {
 	"resolve_bayanihan": true,
 	"show_weekly_debt_transition": false,
@@ -39,6 +40,7 @@ const ACTIONS := {
 	"play_sfx": false,
 	"stop_sfx": false,
 	"set_portrait": false,
+	"set_character_sprite": false,
 	"set_portraits": false,
 	"clear_portraits": false,
 	"clear_portrait": false,
@@ -56,6 +58,7 @@ const ACTIONS := {
 	"skip_phases": true,
 	"queue_story": true,
 	"return_to": true,
+	"selection_outcome": true,
 	"end_run": true,
 	"set_resource": true,
 	"change_resource": true,
@@ -146,6 +149,11 @@ static func validate_action(action: Dictionary) -> PackedStringArray:
 		canonical["type"] = type
 		return GameEffects.validate(canonical)
 	match type:
+		"set_character_sprite":
+			_require_text(action, "character_id", errors)
+			_require_text(action, "sprite", errors)
+			if not CharacterSprites.is_valid(str(action.get("character_id", "")), str(action.get("sprite", ""))):
+				errors.append("Unknown character sprite")
 		"advance_time":
 			if action.has("days") == action.has("phases"):
 				errors.append("advance_time needs exactly one of days or phases")
@@ -158,6 +166,9 @@ static func validate_action(action: Dictionary) -> PackedStringArray:
 		"return_to":
 			if not DESTINATIONS.has(str(action.get("destination", ""))):
 				errors.append("Destination must be home, store, ride_selection, or main_menu")
+		"selection_outcome":
+			if str(action.get("outcome", "")) not in ["return", "ride", "skip"]:
+				errors.append("selection_outcome must be return, ride, or skip")
 		"end_run":
 			_require_text(action, "reason", errors)
 	if type in ["advance_time", "skip_days", "skip_phases"]:

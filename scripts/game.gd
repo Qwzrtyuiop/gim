@@ -23,6 +23,7 @@ const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
+const PlayerHorn := preload("res://scripts/game/player_horn_controller.gd")
 const GameRenderer := preload("res://scripts/game/game_renderer.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
 const PassengerDialogueController := preload("res://scripts/game/passenger_dialogue_controller.gd")
@@ -354,6 +355,8 @@ var debt_goal_label: Label
 var speeder_warning_label: Label
 var game_hud
 var audio_manager
+var horn_held := false
+var horn_press_cooldown := 0.0
 var fade_rect: ColorRect
 var stage_tutorial
 var passenger_dialogue_controller
@@ -446,9 +449,15 @@ func _ready() -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_PAUSED or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
+		PlayerHorn.stop(self)
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		GameEnvironmentController.layout_scene(self)
 		queue_redraw()
+
+
+func _exit_tree() -> void:
+	PlayerHorn.stop(self)
 
 
 func _pick_stage_background() -> Texture2D:
@@ -464,6 +473,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if GameInput.is_any_press(event) and game_state == "GAME OVER":
 		get_tree().change_scene_to_file(MAIN_MENU_SCENE)
+		return
+	if PlayerHorn.handle_input(self, event):
+		get_viewport().set_input_as_handled()
 		return
 
 	if game_state == "playing" and GameInput.is_stage_complete_debug_shortcut(event):
@@ -490,6 +502,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	PlayerHorn.update(self, delta)
 	if crash_repair_transition_active:
 		GameFlowController.update_crash_repair_transition(self, delta)
 		return

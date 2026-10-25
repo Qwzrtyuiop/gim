@@ -36,11 +36,80 @@ the speaking character on the left above the text box; narration clears the auto
 portrait. John/John Toda and Benny/Ben share their respective artwork in both
 languages. The mapping lives in `story_speaker_portraits.gd`. The Collector
 (including Man Outside) uses `assets/characters/placeholder.png`.
-Arvin and Dylan intentionally remain portrait-free.
+Magda/Faye, Alma, Celina, Dante, Gardo, Hana and Isidro also resolve through the
+shared character sprite registry. Arvin and Dylan intentionally remain portrait-free.
 
 An explicit `portraits` array on a line takes precedence for scenes with several
 characters. Set `"speaker_portraits": false` on a line or payload to use only
 manual portraits.
+
+## Character sprite variants
+
+Choose a named sprite directly on a speaking line:
+
+```gdscript
+{
+	"speaker": "Magda",
+	"text": "Dialogue goes here.",
+	"sprite": "alt",
+}
+```
+
+Magda has `default` (`Magda.png`) and `alt` (`Magda_alt.png`). Her saved character
+ID is `faye`; both `magda` and `faye` select the same character. A line's choice
+stays active when other characters speak or narration hides her. Use
+`"sprite": "default"` on a later Magda line to switch back.
+
+Jessa also has `default` (`Jessa.png`) and `alt` (`Jessa_alt.png`). Use
+`"speaker": "Jessa"` with `"sprite": "alt"`, or use `jessa` as the character ID
+in an action. Her existing hidden-name rules still apply.
+
+To switch through an ordered line/choice action, including while another
+character speaks:
+
+```gdscript
+{
+	"type": "set_character_sprite",
+	"character_id": "magda",
+	"sprite": "alt",
+}
+```
+
+The action updates visible matching portraits immediately, preserving placement,
+height, mirroring and the rest of the cast. If she is offscreen, her next automatic
+portrait uses the selected sprite. To start a scene with a variant, add payload
+metadata `"character_sprites": {"magda": "alt"}`.
+
+Sprite choices belong to the current VN scene. Checkpoints remember every
+character's choice, including characters currently offscreen. Loading a save
+retains the choices; another story starts with its own defaults. Memory replays
+show sprite changes without replacing live story state.
+
+Add more expressions or outfits to `SPRITES` in
+[`story_character_sprites.gd`](story_character_sprites.gd), under the stable
+character ID. All registered characters have `default`; Magda and Jessa currently
+have `alt`. Unknown variants leave the current sprite unchanged. Payload/action
+validation reports invalid names.
+
+For a manual cast, identify the character instead of supplying a texture path:
+
+```gdscript
+{
+	"id": "magda_right",
+	"character_id": "faye",
+	"sprite": "alt",
+	"position": "right",
+	"height": 300,
+	"flip_h": true,
+}
+```
+
+`id` names the on-screen portrait; `character_id` links it to the character and
+their registered sprites. A known character name used as `id` is also supported.
+Omitting `sprite` on a new portrait uses the scene's current choice for that
+character. An explicit portrait `sprite` sets that instance; line fields and
+`set_character_sprite` remember the choice for future automatic portraits.
+Existing texture/path-based portraits and side-based actions remain supported.
 
 Any background inside a `specialCG` folder hides **all** named and legacy
 portraits, even when dialogue or actions change the cast. This also applies to
@@ -68,8 +137,10 @@ Placement follows the dialogue panel if it moves or resizes.
 
 ## Change characters during dialogue
 
-Omitting `portraits` keeps the current cast. Supplying the array replaces the
-entire cast. Use `"portraits": []` to clear it.
+In manual mode (`speaker_portraits: false`), omitting `portraits` keeps the current
+cast. Supplying the array replaces the entire cast. Use `"portraits": []` to clear
+it. With automatic speakers enabled, the next line without `portraits` shows its
+speaker as usual.
 
 For individual changes, use actions on sections or choices:
 

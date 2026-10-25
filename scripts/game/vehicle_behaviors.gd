@@ -249,6 +249,9 @@ static func update_speed_targets(
 			entity["world_speed"] = 0.0
 			entity["desired_world_speed"] = 0.0
 			continue
+		if bool(entity.get("horn_yielding", false)) or float(entity.get("horn_speed_timer", 0.0)) > 0.0:
+			# Horn targets have their own duration, then return to normal bounds.
+			continue
 
 		var min_speed := float(entity.get("min_world_speed", entity.get("world_speed", 0.0)))
 		var max_speed := float(entity.get("max_world_speed", maxf(min_speed, float(entity.get("world_speed", 0.0)))))

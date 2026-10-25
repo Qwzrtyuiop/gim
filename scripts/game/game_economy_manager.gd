@@ -111,6 +111,7 @@ static func store_failed_stage_result(
 	]
 
 	PlayerState.set_last_stage_result({
+		"character_id": PlayerState.get_current_mock_character_id(),
 		"day": PlayerState.get_current_day(),
 		"stage_type": stage_type,
 		"difficulty": stage_difficulty,

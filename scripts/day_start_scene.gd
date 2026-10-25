@@ -2,6 +2,8 @@ extends Control
 
 const HomeInterface := preload("res://scripts/home/home_interface.gd")
 const HomeTutorial := preload("res://scripts/home/home_tutorial.gd")
+const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
+const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 
 const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
@@ -40,6 +42,7 @@ var tutorial_text_label: Label
 var tutorial_step_index := 0
 var tutorial_steps: Array[Dictionary] = []
 var tutorial_active := false
+var hub_dialogue: HubDialogue
 
 
 func _ready() -> void:
@@ -56,6 +59,7 @@ func _ready() -> void:
 		PlayerState.mark_home_tutorial_shown()
 	_create_hud()
 	_create_info_overlay()
+	_create_hub_dialogue()
 	house.action_pressed.connect(_on_house_action)
 	resized.connect(_layout_ui)
 	_start_home_bgm()
@@ -70,13 +74,15 @@ func _input(event: InputEvent) -> void:
 	if tutorial_active and _is_any_press(event):
 		get_viewport().set_input_as_handled()
 		_advance_tutorial()
+	elif hub_dialogue != null and hub_dialogue.handle_input(event):
+		get_viewport().set_input_as_handled()
 	elif info_overlay != null and info_overlay.visible and event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
 		_close_info()
 
 
 func _on_house_action(action: String) -> void:
-	if is_transitioning or tutorial_active or info_overlay.visible:
+	if is_transitioning or tutorial_active or info_overlay.visible or _speech_is_blocking():
 		return
 	match action:
 		"radio", "calendar":
@@ -108,6 +114,8 @@ func _render_day_start() -> void:
 
 
 func _show_info(action: String) -> void:
+	if _speech_is_blocking():
+		return
 	HomeInterface.show_info(self, action)
 
 
@@ -118,6 +126,7 @@ func _close_info() -> void:
 func _confirm_rest() -> void:
 	if is_transitioning or not info_overlay.visible or info_action != "rest":
 		return
+	hub_dialogue.clear()
 	_close_info()
 	_rest_then_noon()
 
@@ -129,13 +138,15 @@ func _ride_now() -> void:
 func _choose_outside_destination(scene_path: String) -> void:
 	if is_transitioning or not info_overlay.visible or info_action != "outside":
 		return
+	hub_dialogue.clear()
 	_close_info()
 	_leave_home(scene_path)
 
 
 func _leave_home(scene_path: String) -> void:
-	if is_transitioning:
+	if is_transitioning or _speech_is_blocking():
 		return
+	hub_dialogue.clear()
 	is_transitioning = true
 	house.set_enabled(false)
 	PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.get_home_ride_transition_mode())
@@ -143,8 +154,9 @@ func _leave_home(scene_path: String) -> void:
 
 
 func _rest_then_noon() -> void:
-	if is_transitioning:
+	if is_transitioning or _speech_is_blocking():
 		return
+	hub_dialogue.clear()
 	if PlayerState.get_current_time_of_day() == "night":
 		is_transitioning = true
 		house.set_enabled(false)
@@ -157,6 +169,7 @@ func _rest_then_noon() -> void:
 
 
 func _transition_home_rest(next_time: String) -> void:
+	hub_dialogue.clear()
 	is_transitioning = true
 	house.set_enabled(false)
 	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
@@ -194,6 +207,36 @@ func _load_looping_audio_stream(path: String):
 		stream = stream.duplicate()
 		stream.loop = true
 	return stream
+
+
+func _create_hub_dialogue() -> void:
+	hub_dialogue = HubDialogue.new()
+	hub_dialogue.name = "HubDialogue"
+	add_child(hub_dialogue)
+	hub_dialogue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hub_dialogue.set_gate(func() -> bool:
+		return not tutorial_active and not is_transitioning and not info_overlay.visible
+	)
+	for action: String in house.REGIONS:
+		hub_dialogue.register_target(action, _home_message_target.bind(action))
+
+
+func _home_message_target(action: String) -> Rect2:
+	if not house.is_visible_in_tree():
+		return Rect2()
+	return DialogueAnchors.transform_rect(house, house.sprite_rect_for(action, house.active_action() == action))
+
+
+func show_message(text: Variant, options: Dictionary = {}) -> bool:
+	return hub_dialogue.say(text, options) if hub_dialogue != null else false
+
+
+func show_messages(lines: Array, options: Dictionary = {}) -> bool:
+	return hub_dialogue.play(lines, options) if hub_dialogue != null else false
+
+
+func _speech_is_blocking() -> bool:
+	return hub_dialogue != null and hub_dialogue.blocks_input()
 
 
 func _build_tutorial() -> void:

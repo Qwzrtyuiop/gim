@@ -79,6 +79,7 @@ const STORY_TRIGGER_DAY_END := "day_end"
 const STORY_TRIGGER_SLEEP_MIDPOINT := "sleep_midpoint"
 const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
+const STORY_TRIGGER_PASSENGER_SELECTED := "passenger_selected"
 const END_OF_DAY_ENERGY_BONUS := 2
 const NIGHT_SLEEP_ENERGY_BONUS := 3
 const ESTIMATED_BONUS_TIME_RATIO := 0.35
@@ -734,6 +735,18 @@ func get_run_fail_reason() -> String:
 # Pending scene and transition state
 func set_pending_trip_selection(return_scene: String, transition_mode: String = TRANSITION_RIDE, allow_back := true) -> void:
 	PlayerPendingState.set_pending_trip_selection(self, return_scene, transition_mode, allow_back)
+
+
+func set_pending_passengers_open(value: bool) -> void:
+	PlayerPendingState.set_pending_passengers_open(self, value)
+
+
+func set_pending_trip_selection_error(message: String) -> void:
+	PlayerPendingState.set_pending_trip_selection_error(self, message)
+
+
+func take_pending_trip_selection_error() -> String:
+	return PlayerPendingState.take_pending_trip_selection_error(self)
 
 
 func get_pending_trip_selection() -> Dictionary:

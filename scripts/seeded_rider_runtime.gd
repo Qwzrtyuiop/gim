@@ -1,6 +1,7 @@
 extends RefCounted
 class_name SeededRiderRuntime
 
+const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
 
 static func add_rule(player_state, rule_data: Dictionary) -> void:
 	if rule_data.is_empty():
@@ -121,7 +122,7 @@ static func get_pool_setup(player_state, selection_context: Dictionary) -> Dicti
 		var character: Dictionary = player_state.get_character_by_id(character_id)
 		if character.is_empty():
 			continue
-		if not supports_character_time(player_state, character, str(context.get("time_of_day", ""))):
+		if not supports_character_time(player_state, character, str(context.get("time_of_day", "")), int(context.get("day", player_state.get_transition_display_day()))):
 			continue
 
 		var target_distances: Array[String] = get_target_distances(player_state, rule, character)
@@ -234,18 +235,12 @@ static func get_target_distances(player_state, rule_data: Dictionary, character:
 	return filtered_distances
 
 
-static func supports_character_time(player_state, character: Dictionary, time_of_day: String) -> bool:
-	var safe_time: String = normalize_time(player_state, time_of_day)
-	var eligible_times_variant: Variant = character.get("eligible_times", [])
-	if not eligible_times_variant is Array or (eligible_times_variant as Array).is_empty():
-		return true
-	if safe_time.is_empty():
-		return false
-	for time_variant in eligible_times_variant:
-		var eligible_time: String = normalize_time(player_state, str(time_variant))
-		if not eligible_time.is_empty() and eligible_time == safe_time:
-			return true
-	return false
+static func supports_character_time(player_state, character: Dictionary, time_of_day: String, day := -1) -> bool:
+	return CharacterAvailability.supports_time(
+		character,
+		normalize_time(player_state, time_of_day),
+		day if day > 0 else player_state.get_current_day(),
+	)
 
 
 static func resolve_slot_index(rule_data: Dictionary, current_assignments: Array) -> int:

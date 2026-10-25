@@ -43,6 +43,18 @@ static func is_boosting() -> bool:
 	return Input.is_key_pressed(KEY_SHIFT)
 
 
+static func is_horn_event(event: InputEvent) -> bool:
+	return (
+		event is InputEventKey
+		and not event.echo
+		and (event.physical_keycode == KEY_Q or event.keycode == KEY_Q)
+	)
+
+
+static func is_horn_pressed() -> bool:
+	return Input.is_physical_key_pressed(KEY_Q) or Input.is_key_pressed(KEY_Q)
+
+
 static func is_stage_complete_debug_shortcut(event: InputEvent) -> bool:
 	if not OS.is_debug_build() and not bool(ProjectSettings.get_setting("application/config/enable_debug_shortcuts", false)):
 		return false

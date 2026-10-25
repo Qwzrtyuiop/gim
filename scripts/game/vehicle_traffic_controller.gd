@@ -15,6 +15,7 @@ const TrafficSignals := preload("res://scripts/game/vehicle_traffic_signals.gd")
 const LaneNavigation := preload("res://scripts/game/vehicle_lane_navigation.gd")
 const TrafficSpacing := preload("res://scripts/game/vehicle_traffic_spacing.gd")
 const TrafficManeuvers := preload("res://scripts/game/vehicle_traffic_maneuvers.gd")
+const HornResponse := preload("res://scripts/game/vehicle_horn_response.gd")
 
 
 static func update_speeder_warning(owner, delta: float) -> void:
@@ -70,6 +71,7 @@ static func update_entities(owner, delta: float) -> void:
 		sprite.position.x += screen_velocity * delta
 		update_speeder_bob(entity, delta)
 		LaneNavigation.update_entity_lane_position(owner, entity, delta)
+		HornResponse.update_yield_clearance(owner, entity)
 
 	TrafficSpacing.resolve_vehicle_overlaps(owner)
 	for entity in owner.active_entities:
