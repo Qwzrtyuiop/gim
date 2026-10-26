@@ -2,6 +2,7 @@ extends RefCounted
 class_name PassengerDialogueController
 
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const CATEGORY_GO_FASTER := "go_faster"
 const CATEGORY_HURRY_UP := "hurry_up"
@@ -83,6 +84,9 @@ func setup(owner, target_ui_root: CanvasLayer) -> void:
 
 
 func update(owner, delta: float) -> void:
+	if not GameTuning.PASSENGER_MESSAGES_ENABLED:
+		clear()
+		return
 	if bubble_root == null:
 		return
 

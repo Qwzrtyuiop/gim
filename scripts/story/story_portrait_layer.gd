@@ -3,20 +3,24 @@ extends Control
 const PortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const CharacterSprites := preload("res://scripts/story/story_character_sprites.gd")
 
-# Character cutouts, bottom-aligned to the dialogue panel.
+# Character cutouts, bottom-aligned to dialogue or positioned on the background.
 var entries: Array[Dictionary] = []
 var images: Dictionary = {}
 var dialogue_panel: Control
+var background: TextureRect
 var resolve_texture: Callable
 
 
-func setup(panel: Control, resolver: Callable) -> void:
+func setup(panel: Control, resolver: Callable, scene_background: TextureRect = null) -> void:
 	dialogue_panel = panel
+	background = scene_background
 	resolve_texture = resolver
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	dialogue_panel.resized.connect(layout_portraits)
 	dialogue_panel.item_rect_changed.connect(layout_portraits)
+	if is_instance_valid(background):
+		background.item_rect_changed.connect(layout_portraits)
 	resized.connect(layout_portraits)
 
 
@@ -80,7 +84,11 @@ func set_portrait(data: Dictionary) -> void:
 	rect.flip_h = bool(entry.get("flip_h", false))
 	rect.flip_v = bool(entry.get("flip_v", false))
 	rect.visible = bool(entry.get("visible", true))
-	PortraitOutline.apply_to(rect)
+	# Scene cutouts keep their original shading; portrait outlines distort atlas UVs.
+	if entry.has("background_region"):
+		rect.material = null
+	else:
+		PortraitOutline.apply_to(rect)
 	layout_portraits()
 
 
@@ -111,6 +119,8 @@ func layout_portraits() -> void:
 	for index in range(entries.size()):
 		var entry: Dictionary = entries[index]
 		var rect: TextureRect = images[str(entry["id"])]
+		if _layout_background_portrait(rect, entry.get("background_region", null)):
+			continue
 		var offset := _offset(entry.get("offset", Vector2.ZERO))
 		var bottom := panel_rect.position.y - float(entry.get("gap", 0.0)) + offset.y
 		var height := clampf(float(entry.get("height", 320.0)), 1.0, maxf(1.0, bottom))
@@ -132,6 +142,26 @@ func layout_portraits() -> void:
 		center = clampf(center, panel_rect.position.x + width * 0.5, panel_rect.end.x - width * 0.5)
 		rect.size = Vector2(width, height)
 		rect.position = Vector2(center - width * 0.5, bottom - height)
+
+
+func _layout_background_portrait(rect: TextureRect, region_data: Variant) -> bool:
+	if not region_data is Array or region_data.size() < 4 or not is_instance_valid(background) or background.texture == null:
+		return false
+	var texture_size := background.texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return false
+	var region := Rect2(float(region_data[0]), float(region_data[1]), float(region_data[2]), float(region_data[3]))
+	var drawn_rect := Rect2(Vector2.ZERO, background.size)
+	if background.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
+		drawn_rect.size = texture_size * minf(background.size.x / texture_size.x, background.size.y / texture_size.y)
+		drawn_rect.position = (background.size - drawn_rect.size) * 0.5
+	var image_scale := drawn_rect.size / texture_size
+	var image_rect := Rect2(drawn_rect.position + region.position * image_scale, region.size * image_scale)
+	var local_transform := get_global_transform_with_canvas().affine_inverse() * background.get_global_transform_with_canvas()
+	var local_rect: Rect2 = local_transform * image_rect
+	rect.position = local_rect.position
+	rect.size = local_rect.size
+	return true
 
 
 func _entry_index(id: String) -> int:

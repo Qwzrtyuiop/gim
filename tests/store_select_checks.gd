@@ -142,16 +142,18 @@ static func _test_midnight_rectangles(host: Node) -> void:
 		assert(street.buttons[action].get_rect() == button_rects[action])
 	for category in ["tricycle", "food"]:
 		var button: Button = street.buttons[category]
-		assert(button.disabled and button.focus_mode == Control.FOCUS_NONE and button.mouse_filter == Control.MOUSE_FILTER_IGNORE)
-		assert(button.tooltip_text.is_empty())
+		assert(not button.disabled and button.focus_mode == Control.FOCUS_ALL and button.mouse_filter == Control.MOUSE_FILTER_STOP)
+		assert(button.tooltip_text == "Closed")
 		await _click(host, button.get_global_rect().get_center())
+		assert(pressed.back() == category)
 		button.pressed.emit()
 		button.mouse_entered.emit()
 		button.focus_entered.emit()
-		assert(pressed.is_empty() and street.active_action().is_empty(), "Closed shops cannot emit actions or acquire hover/focus outlines")
+		assert(pressed.back() == category and street.active_action() == category, "Closed shops remain selectable for John's response")
 	street.set_enabled(false)
+	assert(street.buttons.tricycle.disabled and street.buttons.food.disabled)
 	street.set_enabled(true)
-	assert(street.buttons.tricycle.disabled and street.buttons.food.disabled, "Modal re-enabling cannot unlock midnight shops")
+	assert(not street.buttons.tricycle.disabled and not street.buttons.food.disabled, "Closing a modal restores midnight shop interaction")
 	for action in ["home", "station"]:
 		var button: Button = street.buttons[action]
 		assert(not button.disabled and button.focus_mode != Control.FOCUS_NONE and button.mouse_filter != Control.MOUSE_FILTER_IGNORE)
@@ -198,6 +200,9 @@ static func _test_midnight_store(host: Node) -> void:
 			store.street.action_pressed.emit(category)
 			store._open_shop(category)
 			assert(not store.shop_overlay.visible and store.active_category.is_empty())
+			assert(store.hub_dialogue.active_line.text == "It's closed.")
+			assert(store.hub_dialogue.active_line.speaker == "John Toda" and store.hub_dialogue.active_line.target == category)
+			assert(not store.hub_dialogue.blocks_input())
 		assert(_snapshot() == original, "Closed shop entry attempts do not change state or save")
 		var resources := _travel_resources()
 		await _click(host, store.street.buttons[exit_action].get_global_rect().get_center())

@@ -28,6 +28,7 @@ const CONTEXT_TRIGGER_FIELDS := {
 	"traffic": "traffic_types",
 	"character_id": "character_ids",
 	"story_stage_id": "story_stage_ids",
+	"unsafe_driving": "unsafe_driving_values",
 }
 
 const STORY_TRIGGER_DAY_END := StoryTriggerRules.STORY_TRIGGER_DAY_END
@@ -35,6 +36,7 @@ const STORY_TRIGGER_SLEEP_MIDPOINT := StoryTriggerRules.STORY_TRIGGER_SLEEP_MIDP
 const STORY_TRIGGER_DAY_START := StoryTriggerRules.STORY_TRIGGER_DAY_START
 const STORY_TRIGGER_STAGE_COMPLETE := StoryTriggerRules.STORY_TRIGGER_STAGE_COMPLETE
 const STORY_TRIGGER_PASSENGER_SELECTED := StoryTriggerRules.STORY_TRIGGER_PASSENGER_SELECTED
+const STORY_TRIGGER_DRIVING := StoryTriggerRules.STORY_TRIGGER_DRIVING
 
 
 static func normalize_trigger(player_state, trigger_data: Dictionary) -> Dictionary:
@@ -202,11 +204,12 @@ static func _select_matching_trigger(matching_triggers: Array[Dictionary]) -> Di
 		return {}
 
 	var first_match: Dictionary = matching_triggers[0]
-	if not _is_character_story_trigger(first_match):
+	# The station bill waits when this passenger has an eligible character scene.
+	if not _is_character_story_trigger(first_match) and _story_trigger_id(first_match) != "day_2_station_bill":
 		return first_match
 
 	var selected_trigger: Dictionary = first_match
-	var selected_order: float = _character_story_trigger_order(first_match)
+	var selected_order: float = _character_story_trigger_order(first_match) if _is_character_story_trigger(first_match) else INF
 	for trigger_data in matching_triggers:
 		if not _is_character_story_trigger(trigger_data):
 			continue

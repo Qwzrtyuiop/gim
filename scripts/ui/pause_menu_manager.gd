@@ -3,15 +3,20 @@ extends CanvasLayer
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
-const UI_FRAME_TEXTURE := preload("res://assets/ui/frames/ui_frame.png")
+const NOTEBOOK_TEXTURE := preload("res://assets/ui/frames/notebookclosed.png")
+const NOTEBOOK_REGION := Rect2(224, 108, 860, 1068)
 const BUTTON_TEXTURE := preload("res://assets/ui/buttons/button_generic.png")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const AudioSettingsPanel := preload("res://scripts/ui/audio_settings_panel.gd")
+const SaveSlotScreen := preload("res://scripts/ui/save_slot_screen.gd")
+const SaveGameContext := preload("res://scripts/save/save_game_context.gd")
 
 var overlay: ColorRect
 var menu_panel: Panel
 var menu_title: Label
 var return_button: TextureButton
+var save_button: TextureButton
+var load_button: TextureButton
 var achievements_button: TextureButton
 var exit_button: TextureButton
 var library_panel: Panel
@@ -27,6 +32,9 @@ var detail_subtitle: Label
 var detail_body: Label
 var detail_close_button: Button
 var audio_panel_refs: Dictionary = {}
+var save_screen: SaveSlotScreen
+var save_preview: Image
+var save_screen_mode := "save"
 
 
 func _ready() -> void:
@@ -34,10 +42,12 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	_build_ui()
+	get_viewport().size_changed.connect(_layout_menu)
+	_layout_menu()
 
 
 func _input(event: InputEvent) -> void:
-	if not event.is_action_pressed("ui_cancel"):
+	if not event.is_action_pressed("ui_cancel") or event.is_echo():
 		return
 	if not request_toggle():
 		return
@@ -49,6 +59,9 @@ func request_toggle() -> bool:
 	if achievement_popups != null and achievement_popups.is_description_open():
 		return true
 	if visible:
+		if save_screen.visible:
+			save_screen.handle_cancel()
+			return true
 		if detail_overlay.visible:
 			_hide_detail()
 			return true
@@ -70,16 +83,29 @@ func is_menu_open() -> bool:
 
 
 func show_pause_menu() -> void:
+	# Capture the last unobscured frame, before the notebook overlays appear.
+	save_preview = null
+	var viewport_texture := get_viewport().get_texture() if DisplayServer.get_name() != "headless" else null
+	if viewport_texture != null:
+		var frame := viewport_texture.get_image()
+		if frame != null and not frame.is_empty():
+			save_preview = frame
 	visible = true
 	overlay.visible = true
 	menu_panel.visible = true
 	library_panel.visible = false
 	detail_overlay.visible = false
+	save_screen.hide()
+	var reason := SaveGameContext.save_block_reason()
+	save_button.disabled = not reason.is_empty()
+	save_button.tooltip_text = reason
 	get_tree().paused = true
 	return_button.grab_focus()
 
 
 func hide_pause_menu() -> void:
+	save_screen.hide()
+	save_preview = null
 	detail_overlay.visible = false
 	library_panel.visible = false
 	menu_panel.visible = true
@@ -105,43 +131,52 @@ func _build_ui() -> void:
 	menu_panel.anchor_right = 0.5
 	menu_panel.anchor_bottom = 0.5
 	menu_panel.offset_left = -250.0
-	menu_panel.offset_top = -255.0
+	menu_panel.offset_top = -310.0
 	menu_panel.offset_right = 250.0
-	menu_panel.offset_bottom = 255.0
+	menu_panel.offset_bottom = 310.0
+	menu_panel.pivot_offset = Vector2(250.0, 310.0)
 	menu_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	_apply_panel_theme(menu_panel, Color(0.10, 0.09, 0.08, 0.95))
+	menu_panel.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	overlay.add_child(menu_panel)
 
 	var frame := TextureRect.new()
-	frame.texture = UI_FRAME_TEXTURE
+	var cover := AtlasTexture.new()
+	cover.atlas = NOTEBOOK_TEXTURE
+	cover.region = NOTEBOOK_REGION
+	frame.texture = cover
 	frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	frame.stretch_mode = TextureRect.STRETCH_SCALE
+	frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	frame.anchor_right = 1.0
 	frame.anchor_bottom = 1.0
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	menu_panel.add_child(frame)
 
-	menu_title = _make_label(18, Color(0.25, 0.14, 0.08, 1.0), 1)
+	menu_title = _make_label(20, Color(0.98, 0.91, 0.72, 1.0), 2)
 	menu_title.text = "PAUSED"
-	menu_title.position = Vector2(0.0, 34.0)
-	menu_title.size = Vector2(500.0, 28.0)
+	menu_title.position = Vector2(125.0, 45.0)
+	menu_title.size = Vector2(320.0, 30.0)
 	menu_panel.add_child(menu_title)
 
-	return_button = _make_texture_button("RETURN", Vector2(110.0, 92.0))
+	return_button = _make_texture_button("RETURN", Vector2(145.0, 94.0))
 	return_button.pressed.connect(hide_pause_menu)
 
-	achievements_button = _make_texture_button("ACHIEVEMENTS", Vector2(110.0, 166.0), 14)
+	save_button = _make_texture_button("SAVE", Vector2(145.0, 152.0))
+	save_button.pressed.connect(_show_save_screen.bind("save"))
+	load_button = _make_texture_button("LOAD", Vector2(145.0, 210.0))
+	load_button.pressed.connect(_show_save_screen.bind("load"))
+	achievements_button = _make_texture_button("ACHIEVEMENTS", Vector2(145.0, 268.0), 14)
 	achievements_button.pressed.connect(_show_library)
 
-	exit_button = _make_texture_button("EXIT", Vector2(110.0, 240.0))
+	exit_button = _make_texture_button("EXIT", Vector2(145.0, 326.0))
 	exit_button.pressed.connect(_exit_to_main_menu)
 
 	audio_panel_refs = AudioSettingsPanel.create(
 		self,
 		menu_panel,
 		UI_FONT,
-		Vector2(56.0, 316.0),
-		Vector2(388.0, 170.0),
+		Vector2(125.0, 396.0),
+		Vector2(320.0, 170.0),
 		"AUDIO"
 	)
 
@@ -245,6 +280,89 @@ func _build_ui() -> void:
 	_apply_flat_button_theme(detail_close_button)
 	detail_close_button.pressed.connect(_hide_detail)
 	detail_panel.add_child(detail_close_button)
+	save_screen = SaveSlotScreen.new()
+	overlay.add_child(save_screen)
+	save_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	save_screen.hide()
+	save_screen.closed.connect(_hide_save_screen)
+	save_screen.save_requested.connect(_save_requested)
+	save_screen.load_requested.connect(_load_requested)
+	SaveSlotManager.slots_changed.connect(_refresh_save_slots)
+
+
+func _layout_menu() -> void:
+	var viewport_size := get_viewport().get_visible_rect().size
+	var fit := minf(1.0, minf(maxf(1.0, viewport_size.x - 24.0) / 500.0, maxf(1.0, viewport_size.y - 24.0) / 620.0))
+	menu_panel.scale = Vector2.ONE * fit
+
+
+func _show_save_screen(mode: String) -> void:
+	save_screen_mode = mode
+	menu_panel.hide()
+	var reason := SaveGameContext.save_block_reason()
+	save_screen.open(mode, SaveSlotManager.list_slots(), reason.is_empty(), reason)
+
+
+func _hide_save_screen() -> void:
+	save_screen.hide()
+	menu_panel.show()
+	(save_button if save_screen_mode == "save" else load_button).grab_focus()
+
+
+func _refresh_save_slots() -> void:
+	if save_screen != null and save_screen.visible:
+		save_screen.refresh_slots(SaveSlotManager.list_slots())
+
+
+func _save_requested(slot: int) -> void:
+	var reason := SaveGameContext.save_block_reason()
+	if not reason.is_empty():
+		save_screen.show_status(reason, false)
+		return
+	var context: Dictionary = SaveGameContext.capture(null, save_preview)
+	var error: Error = SaveSlotManager.save_slot(slot, context)
+	if error == OK:
+		save_screen.refresh_slots(SaveSlotManager.list_slots())
+		save_screen.show_status("Saved to slot %d." % slot)
+	else:
+		save_screen.show_status("Could not save: %s" % error_string(error), false)
+
+
+func _load_requested(slot: int) -> void:
+	var valid := false
+	for entry: Dictionary in SaveSlotManager.list_slots():
+		if int(entry.slot) == slot:
+			valid = bool(entry.valid)
+			break
+	if not valid:
+		save_screen.show_status("Could not load this save.", false)
+		return
+	# Retire pending story checkpoints before the slot replaces PlayerState.
+	SaveGameContext.prepare_scene_for_load(get_tree().current_scene)
+	if not SaveSlotManager.load_slot(slot):
+		save_screen.show_status("Could not load this save.", false)
+		return
+	var destination: String = SaveGameContext.resume_scene()
+	_finish_slot_load.call_deferred(destination)
+
+
+func _finish_slot_load(destination: String) -> void:
+	var old_scene := get_tree().current_scene
+	var previous_mode: int = old_scene.process_mode if old_scene != null else Node.PROCESS_MODE_INHERIT
+	if old_scene != null:
+		old_scene.process_mode = Node.PROCESS_MODE_DISABLED
+	var error := get_tree().change_scene_to_file(destination)
+	if error != OK:
+		if is_instance_valid(old_scene):
+			old_scene.process_mode = previous_mode
+		show_pause_menu()
+		_show_save_screen("load")
+		save_screen.show_status("Could not open the saved location.", false)
+		return
+	# Keep the discarded reader/ride paused until Godot frees it and installs
+	# the loaded scene. Pending old waits must not run against loaded progress.
+	await get_tree().scene_changed
+	hide_pause_menu()
 
 
 func _make_texture_button(text: String, position_value: Vector2, font_size := 16) -> TextureButton:
@@ -256,7 +374,7 @@ func _make_texture_button(text: String, position_value: Vector2, font_size := 16
 	button.ignore_texture_size = true
 	button.stretch_mode = TextureButton.STRETCH_SCALE
 	button.position = position_value
-	button.size = Vector2(280.0, 58.0)
+	button.size = Vector2(280.0, 50.0)
 	menu_panel.add_child(button)
 
 	var label := _make_label(font_size, Color(0.96, 0.92, 0.78, 1.0), 1)

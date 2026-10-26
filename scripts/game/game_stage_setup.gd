@@ -190,13 +190,10 @@ static func apply_hidden_special_modifiers(owner) -> void:
 			owner.incoming_spawn_max_delay *= owner.special_mode_hidden_modifiers["busy_density_x"]
 			owner.main_spawn_min_delay *= owner.special_mode_hidden_modifiers["busy_density_x"]
 			owner.main_spawn_max_delay *= owner.special_mode_hidden_modifiers["busy_density_x"]
-			owner.shoulder_spawn_min_delay *= owner.special_mode_hidden_modifiers["busy_density_x"]
-			owner.shoulder_spawn_max_delay *= owner.special_mode_hidden_modifiers["busy_density_x"]
 			owner.incoming_vehicle_min_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.incoming_vehicle_max_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.main_vehicle_min_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.main_vehicle_max_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
-			owner.shoulder_vehicle_min_speed *= owner.special_mode_hidden_modifiers["busy_speed_x"]
 			owner.npc_lane_change_chance_per_second *= owner.special_mode_hidden_modifiers["lane_weave_x"]
 			owner.npc_collision_lookahead *= owner.special_mode_hidden_modifiers["close_call_x"]
 		"speeders":

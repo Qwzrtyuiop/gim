@@ -33,7 +33,8 @@ Gulong (Windows product name: Gulong ng Buhay) is a Godot 4.6 / GDScript 2D tric
 
 ## Validation and reporting
 
-- For gameplay/story changes, run the existing isolated runner: `python tests/run_refactor_checks.py --godot "<Godot console executable>"`. See the context document for the verified local path and coverage.
+- Follow the user's preference: skip checks unless requested. For small dialogue, music-cue, or presentation edits, make the change without a regression run or new tests.
+- When checks are requested, use the smallest relevant target: `python tests/run_refactor_checks.py --godot "<Godot console executable>" --check <name>`. Use `--list` to find targets. Run `--full` only when the user explicitly requests the full suite; do not repeat successful checks without a new reason. See the context document for the verified local path.
 - Never launch `tests/refactor_regression.tscn` directly: the suite resets state. The Python runner copies the project and redirects save/settings paths to protect real progress.
 - Use disposable saves for manual progression checks. Ordinary game startup can autosave; main-menu reset removes progress.
 - Check the final diff for unintended changes and report what changed, what was verified, and any remaining limitations. Documentation-only work needs link/command/diff checks, not a new test suite.

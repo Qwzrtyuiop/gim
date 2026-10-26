@@ -17,6 +17,10 @@ const GAS_SAVE_INTERVAL := 0.75
 
 
 static func update_progress(owner, delta: float) -> void:
+	# Capture driving conditions before reaching the destination saves the result.
+	owner.trip_peak_speed_kmh = maxf(owner.trip_peak_speed_kmh, current_speed_kmh_exact(owner))
+	if owner.ride_story_interruption.try_start(owner):
+		return
 	var distance_delta: float = owner.player_speed * distance_scale(owner) * delta
 	owner.distance += distance_delta
 	_drain_distance_gas(owner, distance_delta, delta)
@@ -50,10 +54,14 @@ static func _drain_distance_gas(owner, distance_delta: float, delta: float) -> v
 
 static func current_speed_kmh(owner) -> int:
 	return clampi(
-		roundi(owner.player_speed / owner.SPEEDOMETER_REFERENCE_MAX_SPEED * owner.SPEEDOMETER_BASE_MAX_KMH),
+		roundi(current_speed_kmh_exact(owner)),
 		0,
 		owner.SPEEDOMETER_MAX_KMH
 	)
+
+
+static func current_speed_kmh_exact(owner) -> float:
+	return maxf(0.0, owner.player_speed / owner.SPEEDOMETER_REFERENCE_MAX_SPEED * owner.SPEEDOMETER_BASE_MAX_KMH)
 
 
 static func end_game(owner, title: String, detail: String) -> void:
@@ -88,6 +96,7 @@ static func handle_player_hit(owner, detail: String, damage: int) -> void:
 	if owner.game_state != "playing" or owner.player_hit_invincible_timer > 0.0:
 		return
 
+	owner.trip_vehicle_collision_count += 1
 	PlayerState.record_stage_crash()
 	owner.audio_manager.play_crash_sfx()
 	owner.player_speed = 0.0
@@ -103,6 +112,8 @@ static func handle_player_hit(owner, detail: String, damage: int) -> void:
 		PlayerState.spend_energy(energy_loss)
 		PlayerState.save_progress()
 
+	if owner.ride_story_interruption.try_start(owner, detail if PlayerState.energy <= 0 else ""):
+		return
 	if PlayerState.energy > 0:
 		return
 
@@ -185,6 +196,7 @@ static func reset_game(owner) -> void:
 	TrafficIndex.invalidate(owner)
 	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	owner.spawn_timers = [0.4, 0.8, 1.2]
+	owner.traffic_jam_gaps.reset()
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	owner.player_lane = GameTuning.PLAYER_START_LANE
 	owner.player_speed = owner.player_start_speed
@@ -195,6 +207,8 @@ static func reset_game(owner) -> void:
 	owner.end_message = ""
 	owner.player_is_stage_clear_exiting = false
 	owner.passenger_rule_violation_count = 0
+	owner.trip_peak_speed_kmh = 0.0
+	owner.trip_vehicle_collision_count = 0
 	owner.stage_clear_transition_started = false
 	owner.stage_clear_fade_time = 0.0
 	owner.crash_repair_transition_active = false
@@ -267,5 +281,9 @@ static func store_stage_result(owner) -> void:
 		owner.overtime_fare_penalty_php_per_second,
 		owner.time_left,
 		owner.time_bonus_php_per_second,
-		owner.passenger_rule_violation_count
+		owner.passenger_rule_violation_count,
+		{
+			"peak_speed_kmh": owner.trip_peak_speed_kmh,
+			"vehicle_collision_count": owner.trip_vehicle_collision_count,
+		}
 	)

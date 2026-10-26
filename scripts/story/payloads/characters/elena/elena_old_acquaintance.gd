@@ -14,7 +14,7 @@ static func build() -> Dictionary:
 		"story_id": "elena_old_acquaintance",
 		"chapter_title": "An Old Acquaintance",
 		"speaker_portraits": true,
-		"background": StoryConstants.BACKGROUND_ROAD_1,
+		"background": StoryConstants.street_background(str(PlayerState.get_last_stage_result().get("time_of_day", PlayerState.get_current_time_of_day()))),
 		"music": StoryConstants.DRIVING_CHILL_MUSIC,
 		"ambient_sfx": {
 			"loop": true,

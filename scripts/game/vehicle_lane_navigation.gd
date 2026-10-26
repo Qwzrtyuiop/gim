@@ -6,6 +6,7 @@ const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.g
 const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const TrafficEntities := preload("res://scripts/game/vehicle_traffic_entities.gd")
+const TrafficJamGaps := preload("res://scripts/game/traffic_jam_gaps.gd")
 
 
 static func update_top_lane_evasive_offsets(owner) -> void:
@@ -67,6 +68,8 @@ static func top_lane_incoming_collision_is_inevitable(owner, entity: Dictionary)
 
 
 static func lane_is_safe_for_entity(owner, moving_entity: Dictionary, target_lane: int, safe_gap: float) -> bool:
+	if target_lane in [1, 2] and TrafficJamGaps.reserved_gap_intersects(owner, projected_entity_collision_rect(owner, moving_entity, target_lane)):
+		return false
 	return (
 		VehicleBehaviors.is_lane_safe(
 			moving_entity,

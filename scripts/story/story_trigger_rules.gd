@@ -8,6 +8,7 @@ const STORY_TRIGGER_SLEEP_MIDPOINT := "sleep_midpoint"
 const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
 const STORY_TRIGGER_PASSENGER_SELECTED := "passenger_selected"
+const STORY_TRIGGER_DRIVING := "driving"
 
 
 static func normalize_trigger(player_state, trigger_data: Dictionary) -> Dictionary:
@@ -58,6 +59,24 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 			"payload_id": "jessa_runaway_fare",
 		},
 		{
+			"id": "isidro_first_encounter",
+			"phase": STORY_TRIGGER_DRIVING,
+			"character_id": "ito",
+			"bypass_character_story_gate": true,
+			"unsafe_driving": true,
+			"forbidden_events": ["isidro_first_encounter_seen"],
+			"payload_id": "isidro_first_encounter",
+		},
+		{
+			"id": "gardo_first_encounter",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "gardo",
+			"times": ["night"],
+			"bypass_character_story_gate": true,
+			"forbidden_events": ["gardo_first_encounter_seen"],
+			"payload_id": "gardo_first_encounter",
+		},
+		{
 			"id": "jessa_second_encounter",
 			"phase": STORY_TRIGGER_PASSENGER_SELECTED,
 			"character_id": "jessa",
@@ -77,6 +96,62 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 			"required_events": ["day_2_station_bill"],
 			"forbidden_events": ["benny_class_clown_seen"],
 			"payload_id": "benny_class_clown",
+		},
+		{
+			"id": "magda_first_encounter",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "faye",
+			"min_character_progress": 2,
+			"bypass_character_story_gate": true,
+			"forbidden_events": ["magda_first_encounter_seen"],
+			"payload_id": "magda_first_encounter",
+		},
+		{
+			"id": "hana_first_encounter",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "hana",
+			"min_character_progress": 2,
+			"bypass_character_story_gate": true,
+			"forbidden_events": ["hana_first_encounter_seen"],
+			"payload_id": "hana_first_encounter",
+		},
+		{
+			"id": "hana_second_encounter",
+			"phase": STORY_TRIGGER_PASSENGER_SELECTED,
+			"character_id": "hana",
+			"bypass_character_story_gate": true,
+			"required_event_values": {
+				"hana_first_encounter_seen": true,
+			},
+			"forbidden_events": ["hana_second_encounter_seen"],
+			"payload_id": "hana_second_encounter",
+		},
+		{
+			"id": "celina_first_encounter",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "cel",
+			"min_character_progress": 2,
+			"bypass_character_story_gate": true,
+			"forbidden_events": ["celina_first_encounter_seen"],
+			"payload_id": "celina_first_encounter",
+		},
+		{
+			"id": "alma_first_encounter",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "alma",
+			"min_character_progress": 2,
+			"bypass_character_story_gate": true,
+			"forbidden_events": ["alma_first_encounter_seen"],
+			"payload_id": "alma_first_encounter",
+		},
+		{
+			"id": "dante_first_encounter",
+			"phase": STORY_TRIGGER_STAGE_COMPLETE,
+			"character_id": "dante",
+			"min_character_progress": 2,
+			"bypass_character_story_gate": true,
+			"forbidden_events": ["dante_first_encounter_seen"],
+			"payload_id": "dante_first_encounter",
 		},
 		{
 			"id": "day_7_night_scene_03",
@@ -102,7 +177,7 @@ static func build_default_story_triggers() -> Array[Dictionary]:
 
 static func normalize_story_trigger_phase(phase: String) -> String:
 	match phase:
-		STORY_TRIGGER_DAY_END, STORY_TRIGGER_SLEEP_MIDPOINT, STORY_TRIGGER_DAY_START, STORY_TRIGGER_STAGE_COMPLETE, STORY_TRIGGER_PASSENGER_SELECTED:
+		STORY_TRIGGER_DAY_END, STORY_TRIGGER_SLEEP_MIDPOINT, STORY_TRIGGER_DAY_START, STORY_TRIGGER_STAGE_COMPLETE, STORY_TRIGGER_PASSENGER_SELECTED, STORY_TRIGGER_DRIVING:
 			return phase
 	return ""
 

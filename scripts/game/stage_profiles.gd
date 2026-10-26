@@ -4,6 +4,15 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 const FIRST_STAGE_TYPE := "short-morning-chill"
 
+# Main-lane convoys leave pockets wide enough to merge back after overtaking.
+const TRAFFIC_JAM_SAFE_GAPS := {
+	"convoy_min": 3,
+	"convoy_max": 4,
+	"gap_pixels": 650.0,
+	"gap_speed_response": 1.5,
+	"spawn_prediction_seconds": 2.0,
+}
+
 const DEFAULT_STAGE_PROFILE := {
 	"target_distance": 525.0,
 	"time_limit": 58.0,
@@ -147,14 +156,14 @@ const TRAFFIC_PROFILES := {
 		"incoming_spawn_max_delay": 6.0,
 		"main_spawn_min_delay": 1.8,
 		"main_spawn_max_delay": 3.2,
-		"shoulder_spawn_min_delay": 3.8,
-		"shoulder_spawn_max_delay": 6.8,
+		"shoulder_spawn_min_delay": 11.0,
+		"shoulder_spawn_max_delay": 17.5,
 		"spawn_delay_progress_reduction": 0.35,
 		"incoming_vehicle_min_speed": 500.0,
 		"incoming_vehicle_max_speed": 780.0,
 		"main_vehicle_min_speed": 520.0,
 		"main_vehicle_max_speed": 780.0,
-		"shoulder_vehicle_min_speed": 340.0,
+		"shoulder_vehicle_min_speed": 35.0,
 		"vehicle_speed_change_min_delay": 0.7,
 		"vehicle_speed_change_max_delay": 2.2,
 		"vehicle_speed_acceleration": 260.0,

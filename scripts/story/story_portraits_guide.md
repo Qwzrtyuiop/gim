@@ -126,6 +126,11 @@ a normal background restores portrait visibility.
 - `height`: displayed height in pixels, default 320. Aspect ratio is preserved.
 - `gap`: pixels above the dialogue box, default 0.
 - `offset`: optional `[x, y]` pixels. Negative y lifts the image.
+- `background_region`: optional `[x, y, width, height]` in background-image pixels;
+  places a cutout within the scene instead of above the dialogue panel. It follows
+  the background's fit, movement and resizing, using the original art without the
+  portrait outline shader. Disable automatic speaker portraits
+  on subsequent lines to keep this manual cast until it is cleared.
 - `flip_h`: mirror horizontally, default false.
 - `flip_v`: invert vertically, default false.
 - `visible`: temporarily hide the image without removing it.

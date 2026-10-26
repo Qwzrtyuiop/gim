@@ -302,6 +302,8 @@ const MOCK_CHARACTERS := [
 	{
 		"id": "hana",
 		"name": "Hana",
+		"name_unlock_event": "hana_name_revealed",
+		"phase_absence_event": "hana_second_encounter_absence",
 		"blurb": "Student journalist chasing rumors.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": 1.03},
 		"first_distance": "medium",
@@ -318,6 +320,7 @@ const MOCK_CHARACTERS := [
 	{
 		"id": "ito",
 		"name": "Isidro",
+		"name_reveal_event": "isidro_name_revealed",
 		"blurb": "Corrupt barangay tanod who looks perpetually worn down.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": 1.09},
 		"first_distance": "long",
@@ -344,6 +347,7 @@ const MOCK_CHARACTERS := [
 		"intro_eligible_times": ["morning", "noon"],
 		"intro_completion_event": "jessa_runaway_fare_seen",
 		"intro_absence_day_event": "jessa_runaway_fare_earnings",
+		"phase_absence_event": "jessa_second_encounter_absence",
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "A Quiet Ride"},

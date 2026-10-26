@@ -27,8 +27,9 @@ shop or tutorial does not restore stale hover state. Existing shop categories,
 prices, owner portraits, speech, resource costs and navigation remain in their
 screen-specific helpers.
 
-At midnight, Lito's and Mang Eddie's are closed: their rectangles ignore mouse
-input, cannot receive keyboard/controller focus, and draw no hover outline.
+At midnight, Lito's and Mang Eddie's are closed but remain selectable with mouse,
+keyboard or controller. Clicking either shows John's floating "It's closed."
+message at that shop, without opening its panel or blocking navigation.
 Home and Station remain available, using the same exit rectangles. Shop entry
 and purchase handlers also reject stale callbacks at midnight, and refreshing
 an already-open shop closes its overlay. Unseen shop tutorials wait until the

@@ -180,7 +180,16 @@ func _on_street_action(action: String) -> void:
 
 
 func _open_shop(category: String) -> void:
-	if PlayerState.is_midnight() or _speech_is_blocking():
+	if _speech_is_blocking():
+		return
+	if PlayerState.is_midnight():
+		show_message("It's closed.", {
+			"target": category,
+			"speaker": "John Toda",
+			"show_tail": false,
+			"duration": 2.5,
+			"blocking": false,
+		})
 		return
 	hub_dialogue.clear()
 	active_category = category

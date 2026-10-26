@@ -22,6 +22,19 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 	if not state.active_event_special_stage.is_empty():
 		return str(state.active_event_special_stage.get("id", "")) == safe_id
 	var definition := SpecialStages.get_definition(safe_id)
+	var repeat_last_stage := bool(definition.get("repeat_last_stage", false))
+	if repeat_last_stage:
+		var previous_result: Dictionary = state.get_last_stage_result()
+		if (
+			not bool(previous_result.get("completed", false))
+			or int(previous_result.get("day", -1)) != state.get_current_day()
+			or str(previous_result.get("time_of_day", "")) != state.get_current_time_of_day()
+			or str(previous_result.get("character_id", "")) != str(definition.get("character_id", ""))
+		):
+			push_warning("Cannot repeat a trip without its completed passenger and calendar slot.")
+			return false
+		definition["stage_type"] = str(previous_result.get("stage_type", ""))
+		definition["target_distance"] = maxf(1.0, float(previous_result.get("target_distance", previous_result.get("distance", 1.0))))
 	var error := definition_error(state, definition)
 	if not error.is_empty():
 		push_warning("Cannot start special stage '%s': %s" % [safe_id, error])
@@ -42,7 +55,7 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 		int(last_result.get("day", -1)) == state.get_current_day()
 		and str(last_result.get("time_of_day", "")) == phase
 	)
-	if state.STAGE_TIMES.find(phase) < state.STAGE_TIMES.find(current_phase) or slot_already_used:
+	if not repeat_last_stage and (state.STAGE_TIMES.find(phase) < state.STAGE_TIMES.find(current_phase) or slot_already_used):
 		state.prepare_day_start(state.get_current_day() + 1)
 	state.pending_trip_selection.clear()
 	state.pending_sleep_transition_state.clear()
@@ -72,7 +85,8 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 	state.pending_result_music.clear()
 	state.pending_gameplay_entry_fade_duration = 0.35
 	state.resume_scene_path = GAME_SCENE
-	# This replaces a calendar slot without an energy/fuel check or rider roll.
+	# A repeated leg continues its spent slot; normal special stages replace one.
+	# Both enter without an energy/fuel check or rider roll.
 	state.save_progress()
 	state._end_state_batch()
 	return true

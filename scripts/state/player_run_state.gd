@@ -1,14 +1,20 @@
 extends RefCounted
 
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
+const SaveGameContext := preload("res://scripts/save/save_game_context.gd")
 
 
 static func begin_stage_sequence(player_state) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var slots := tree.root.get_node_or_null("SaveSlotManager") if tree != null else null
+	if slots != null:
+		slots.begin_new_run()
 	player_state._begin_state_batch()
 	apply_new_run_defaults(player_state)
 	player_state.last_stage_result.clear()
 	player_state.save_progress()
 	player_state._end_state_batch()
+	SaveGameContext.request_daily_autosave(player_state)
 
 
 static func current_stage_type(player_state) -> String:
@@ -76,6 +82,8 @@ static func advance_to_next_stage(player_state, transition_mode: String = "", se
 		player_state.pending_skip_night_phase = false
 	player_state.save_progress()
 	player_state._end_state_batch()
+	if player_state.current_day != current_day_before_advance:
+		SaveGameContext.request_daily_autosave(player_state)
 	return player_state.current_stage_type
 
 
@@ -103,6 +111,7 @@ static func prepare_day_start(player_state, target_day: int) -> void:
 	player_state._resolve_debt_collection_for_day(player_state.current_day)
 	player_state.save_progress()
 	player_state._end_state_batch()
+	SaveGameContext.request_daily_autosave(player_state)
 
 
 static func set_current_stage_time(player_state, day_time: String) -> void:

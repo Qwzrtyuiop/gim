@@ -3,8 +3,9 @@ extends RefCounted
 # Generates and locks passenger offers, including first appearances and seeded riders.
 # Keep generation order and rule consumption here so retry/fallback rolls stay aligned.
 
-const EMPTY_CARD_CHANCE := 0.28
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
+const CARDS_PER_DISTANCE := 3
 
 var screen
 var rng := RandomNumberGenerator.new()
@@ -18,93 +19,87 @@ func _init(selection_screen) -> void:
 func roll() -> Dictionary:
 	if not PlayerState.are_passengers_available():
 		return {"short": [], "medium": [], "long": []}
+	var capacity := _ordered_distances_for_generation().size() * CARDS_PER_DISTANCE
+	var target := rng.randi_range(mini(GameTuning.TERMINAL_MIN_PASSENGERS, capacity), capacity)
+	var seeded_setup := PlayerState.get_seeded_rider_pool_setup(_build_seed_selection_context())
 	for _attempt in range(24):
-		var seeded_setup := PlayerState.get_seeded_rider_pool_setup(_build_seed_selection_context())
-		var rolled_pools := _roll_once(false, seeded_setup)
-		if _has_distance_coverage(rolled_pools):
-			PlayerState.consume_seeded_rider_rules(seeded_setup.get("rule_ids", []))
-			return rolled_pools
+		var rolled_pools := _roll_once(false, seeded_setup, target)
+		if _has_minimum_offers(rolled_pools):
+			return _lock_pools(rolled_pools)
 
-	var fallback_seeded_setup := PlayerState.get_seeded_rider_pool_setup(_build_seed_selection_context())
-	var fallback_pools := _roll_once(true, fallback_seeded_setup)
-	PlayerState.consume_seeded_rider_rules(fallback_seeded_setup.get("rule_ids", []))
-	return fallback_pools
+	return _lock_pools(_roll_once(true, seeded_setup, target))
 
 
-func _roll_once(force_first_appearance_unlocks: bool, seeded_setup: Dictionary = {}) -> Dictionary:
-	var character_pools: Dictionary = {}
+func _roll_once(force_first_appearance_unlocks: bool, seeded_setup: Dictionary, target: int) -> Dictionary:
+	var character_pools := {"short": [{}, {}, {}], "medium": [{}, {}, {}], "long": [{}, {}, {}]}
 	var used_ids: Dictionary = {}
 	var first_appearance_rolls := _build_first_appearance_rolls(force_first_appearance_unlocks)
 	var seeded_distance_slots: Dictionary = Dictionary(seeded_setup.get("distance_slots", {}))
+	var distances := _ordered_distances_for_generation()
 
-	for distance_variant in _ordered_distances_for_generation():
-		var distance := str(distance_variant)
-		character_pools[distance] = _build_distance_pool(
-			distance,
-			used_ids,
-			first_appearance_rolls,
-			force_first_appearance_unlocks,
-			Array(seeded_distance_slots.get(distance, []))
-		)
+	# Reserve every scripted rider before random filling can select their ID.
+	# These are raw candidates: rejected attempts must not mark anyone seen.
+	for distance: String in distances:
+		for assignment_variant in Array(seeded_distance_slots.get(distance, [])):
+			if not assignment_variant is Dictionary:
+				continue
+			var assignment: Dictionary = assignment_variant
+			var character: Dictionary = assignment.get("character", {})
+			var character_id := str(character.get("id", ""))
+			var slot := int(assignment.get("slot", -1))
+			if slot < 0 or slot >= CARDS_PER_DISTANCE or character_id.is_empty() or used_ids.has(character_id):
+				continue
+			if not Dictionary(character_pools[distance][slot]).is_empty():
+				continue
+			used_ids[character_id] = true
+			character_pools[distance][slot] = {
+				"character": character,
+				"forced_traffic": str(assignment.get("forced_traffic", "")),
+				"rule_id": str(assignment.get("rule_id", "")),
+			}
 
+	target = maxi(target, used_ids.size())
+	var priority_distance: String = distances[0]
+	var priority_pool: Array = character_pools[priority_distance]
+	var needs_short: bool = PlayerState.gas <= 40.0 or screen._is_forced_first_day_ride()
+	if _count_non_empty_cards(priority_pool) == 0 and (used_ids.size() < target or needs_short):
+		_add_candidate(character_pools, priority_distance, 0, used_ids, first_appearance_rolls, force_first_appearance_unlocks)
+
+	var open_slots: Array[Dictionary] = []
+	for distance: String in distances:
+		for slot in range(CARDS_PER_DISTANCE):
+			if Dictionary(character_pools[distance][slot]).is_empty():
+				open_slots.append({"distance": distance, "slot": slot})
+	while used_ids.size() < target and not open_slots.is_empty():
+		var slot: Dictionary = open_slots.pop_at(rng.randi_range(0, open_slots.size() - 1))
+		_add_candidate(character_pools, slot.distance, int(slot.slot), used_ids, first_appearance_rolls, force_first_appearance_unlocks)
 	return character_pools
 
 
-func _build_distance_pool(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool, seeded_assignments: Array = []) -> Array[Dictionary]:
-	var card_results: Array[Dictionary] = [{}, {}, {}]
-	var has_seeded_character := false
+func _add_candidate(pools: Dictionary, distance: String, slot: int, used_ids: Dictionary, first_rolls: Dictionary, force_first: bool) -> void:
+	var character := _pick_character_for_distance(distance, used_ids, first_rolls, force_first)
+	if character.is_empty():
+		return
+	used_ids[str(character.id)] = true
+	pools[distance][slot] = {"character": character}
 
-	for assignment_variant in seeded_assignments:
-		if not assignment_variant is Dictionary:
-			continue
-		var assignment: Dictionary = assignment_variant
-		var seeded_character: Dictionary = assignment.get("character", {})
-		var character_id := str(seeded_character.get("id", ""))
-		var slot_index := int(assignment.get("slot", -1))
-		if slot_index < 0 or slot_index >= card_results.size():
-			continue
-		if seeded_character.is_empty() or character_id.is_empty() or used_ids.has(character_id):
-			continue
-		used_ids[character_id] = true
-		has_seeded_character = true
-		card_results[slot_index] = _lock_character_for_selection(
-			seeded_character,
-			distance,
-			str(assignment.get("forced_traffic", ""))
-		)
 
-	if not has_seeded_character:
-		var guaranteed_character := _pick_character_for_distance(
-			distance,
-			used_ids,
-			first_appearance_rolls,
-			force_first_appearance_unlocks
-		)
-		if not guaranteed_character.is_empty():
-			used_ids[str(guaranteed_character["id"])] = true
-			var first_open_slot := _find_first_empty_card_slot(card_results)
-			if first_open_slot >= 0:
-				card_results[first_open_slot] = _lock_character_for_selection(guaranteed_character, distance)
-
-	for slot_index in range(card_results.size()):
-		if not (card_results[slot_index] as Dictionary).is_empty():
-			continue
-		if slot_index > 0 and rng.randf() < EMPTY_CARD_CHANCE:
-			continue
-
-		var filler := _pick_character_for_distance(
-			distance,
-			used_ids,
-			first_appearance_rolls,
-			force_first_appearance_unlocks
-		)
-		if filler.is_empty():
-			continue
-
-		used_ids[str(filler["id"])] = true
-		card_results[slot_index] = _lock_character_for_selection(filler, distance)
-
-	return card_results
+func _lock_pools(candidates: Dictionary) -> Dictionary:
+	var locked_pools: Dictionary = {}
+	var rule_ids: Array[String] = []
+	for distance: String in PlayerState.STAGE_DIFFICULTIES:
+		var locked: Array[Dictionary] = []
+		for candidate: Dictionary in candidates.get(distance, []):
+			if candidate.is_empty():
+				locked.append({})
+				continue
+			locked.append(_lock_character_for_selection(candidate.character, distance, str(candidate.get("forced_traffic", ""))))
+			var rule_id := str(candidate.get("rule_id", ""))
+			if not rule_id.is_empty() and not rule_ids.has(rule_id):
+				rule_ids.append(rule_id)
+		locked_pools[distance] = locked
+	PlayerState.consume_seeded_rider_rules(rule_ids)
+	return locked_pools
 
 
 func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool) -> Dictionary:
@@ -130,11 +125,9 @@ func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_
 		unseen_candidates.append(character)
 
 	if not unseen_candidates.is_empty():
-		unseen_candidates.shuffle()
-		return unseen_candidates[0]
+		return unseen_candidates[rng.randi_range(0, unseen_candidates.size() - 1)]
 	if not seen_candidates.is_empty():
-		seen_candidates.shuffle()
-		return seen_candidates[0]
+		return seen_candidates[rng.randi_range(0, seen_candidates.size() - 1)]
 	return {}
 
 
@@ -150,6 +143,8 @@ func _build_first_appearance_rolls(force_first_appearance_unlocks: bool) -> Dict
 
 
 func _ordered_distances_for_generation() -> Array[String]:
+	if screen._is_forced_first_day_ride():
+		return ["short"]
 	var ordered_distances: Array[String] = []
 	if PlayerState.gas <= 40.0:
 		ordered_distances.append("short")
@@ -162,12 +157,13 @@ func _ordered_distances_for_generation() -> Array[String]:
 	return ordered_distances
 
 
-func _has_distance_coverage(character_pools: Dictionary) -> bool:
-	for difficulty_variant in PlayerState.STAGE_DIFFICULTIES:
-		var difficulty := str(difficulty_variant)
-		if _count_non_empty_cards(character_pools.get(difficulty, [])) <= 0:
-			return false
-	return true
+func _has_minimum_offers(character_pools: Dictionary) -> bool:
+	var count := 0
+	for cards: Array in character_pools.values():
+		count += _count_non_empty_cards(cards)
+	if count < GameTuning.TERMINAL_MIN_PASSENGERS:
+		return false
+	return PlayerState.gas > 40.0 or _count_non_empty_cards(character_pools.get("short", [])) > 0
 
 
 func _count_non_empty_cards(card_results: Array) -> int:
@@ -248,13 +244,6 @@ func _roll_stage_special_type(active_distance: String, selected_traffic: String)
 	if roll < urgent_weight + careful_weight:
 		return PlayerState.STAGE_SPECIAL_TYPE_CAREFUL
 	return PlayerState.STAGE_SPECIAL_TYPE_NONE
-
-
-func _find_first_empty_card_slot(card_results: Array[Dictionary]) -> int:
-	for slot_index in range(card_results.size()):
-		if (card_results[slot_index] as Dictionary).is_empty():
-			return slot_index
-	return -1
 
 
 func _build_seed_selection_context() -> Dictionary:

@@ -4,6 +4,12 @@ Click the station tricycle to enter the terminal. All currently locked passenger
 offers appear together, including short, medium and long trips. Hover or keyboard
 focus shows a passenger's trip details. Clicking opens a confirmation with the
 same trip summary; Confirm uses the existing story trigger and ride-entry path.
+Fresh lineups roll a total from two passengers up to the nine available slots;
+individual distance pools can be empty. Scripted riders reserve their places
+before random filling. The opening tutorial uses two or three short-trip riders,
+and low fuel keeps at least one short-trip offer. Only retained passengers are
+marked seen. Reopening the terminal, visiting the store, or saving/loading keeps
+the same locked lineup, including older saves with fewer passengers.
 Cancel, Escape or a backdrop click returns to the same passengers without saving,
 changing the selected distance, charging resources or consuming a story event.
 Generic passengers use the faceless sprites from

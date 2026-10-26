@@ -8,9 +8,18 @@ without resetting consumed triggers.
 Jessa's second event is registered as `jessa_second_encounter`. It requires
 `jessa_runaway_fare_seen: true`, then triggers once when she is selected from her
 normal passenger offers. It does not force her to appear. The English and Tagalog
-[Jessa payloads](payloads/characters/jessa/jessa_second_encounter.gd) are short
-scaffolds ready for the full scene. Completion marks
-`jessa_second_encounter_seen`; her hidden name remains hidden.
+[Jessa payloads](payloads/characters/jessa/jessa_second_encounter.gd) confront her
+about the unpaid fare, then offer police or warning branches. Both endings mark
+`jessa_second_encounter_seen` and return at the same clock with the other offers
+preserved. Jessa leaves until that live phase changes; the saved
+`jessa_second_encounter_absence` day/phase also blocks random, seeded and cached
+offers on revisits/reloads. An entirely empty lineup can roll other passengers.
+The choice
+is saved as `jessa_second_encounter_choice` (`police` or `warning`). Only her
+spoken introduction in the warning branch sets `jessa_name_revealed`; explicit
+speaker labels preserve the reveal in memory replays without changing live state.
+The original scaffold completion at section 1 remains reserved for older saves;
+new encounters jump over it into the appended scene.
 
 ## Schedule another passenger event
 

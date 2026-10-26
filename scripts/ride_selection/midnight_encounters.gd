@@ -4,6 +4,8 @@ extends RefCounted
 const GARDO_ID := "gardo_midnight_encounter"
 const ROLL_EVENT := "gardo_midnight_spawn"
 const SPAWN_CHANCE := 0.35
+const BOOSTED_SPAWN_CHANCE := 0.70
+const BOOST_EVENT := "gardo_midnight_encounter_boost"
 const GARDO_LINES := [
 	"Go away.",
 	"Leave me alone.",
@@ -27,9 +29,10 @@ static func prepare(player_state) -> void:
 	# This private generator leaves passenger, event and driving RNG untouched.
 	var encounter_rng := RandomNumberGenerator.new()
 	encounter_rng.randomize()
+	var spawn_chance: float = BOOSTED_SPAWN_CHANCE if bool(player_state.get_event_value(BOOST_EVENT, false)) else SPAWN_CHANCE
 	player_state.set_event_value(ROLL_EVENT, {
 		"day": player_state.get_current_day(),
-		"present": encounter_rng.randf() < SPAWN_CHANCE,
+		"present": encounter_rng.randf() < spawn_chance,
 	})
 
 

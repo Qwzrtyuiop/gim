@@ -7,6 +7,14 @@ const CharacterSpriteRuntime := preload("res://scripts/story/story_character_spr
 
 # Snapshot the state reached along the chosen path, not every preceding array
 # element. Completed line effects are not run again after a save is loaded.
+static func capture_payload(reader) -> Dictionary:
+	var payload: Dictionary = reader.story_payload.duplicate(true)
+	payload["story_id"] = reader.story_id
+	if reader.current_line_index >= 0 and reader.current_line_index < reader.story_lines.size():
+		payload["_checkpoint"] = capture(reader)
+	return payload
+
+
 static func capture(reader) -> Dictionary:
 	return {
 		"version": 1,

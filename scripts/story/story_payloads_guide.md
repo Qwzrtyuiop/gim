@@ -124,6 +124,10 @@ static func build() -> Dictionary:
   once, then receive a checkpoint after the next completed step.
 - Exiting during an animated step saves its action cursor. On resume, remaining
   actions continue; completed money, energy, and achievement actions do not repeat.
+- Escape-menu manual saves can also capture dialogue reveal, choice prompts and
+  unfinished action waits. Their checkpoint is copied into the selected slot;
+  the live story's batch, action cursor and pending checkpoint remain unchanged.
+  Reached text loads fully revealed and silently using the same resume contract.
 - Each completed line, or choice plus its destination line, flushes one save.
   Keep state changes behind PlayerState APIs so they participate in batching.
 
@@ -134,10 +138,12 @@ The existing Day 7 Tagalog placeholder and Bayanihan English fallback remain as 
 ## Regression checks
 
 ```powershell
-python tests/run_refactor_checks.py --godot "<path to Godot console executable>"
+python tests/run_refactor_checks.py --godot "<path to Godot console executable>" --check payloads
 ```
 
-Run after importing the project in Godot. The runner copies the project and import
+Run only when requested, after importing the project in Godot. Use `--list` for
+other focused targets, or `--full` for an explicitly requested complete run.
+The runner copies the project and import
 cache into `.godot/refactor_checks`, redirects save/settings paths inside that copy,
 and instruments save counts there. It does not modify real player saves or settings.
 Checks cover payloads, live passenger progress/name rules, traffic lane membership,

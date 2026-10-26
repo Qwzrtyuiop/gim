@@ -6,19 +6,14 @@ const MainMenuSettings := preload("res://scripts/menu/main_menu_settings.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const MenuTrafficController := preload("res://scripts/game/menu_traffic_controller.gd")
 
-const GAME_SCENE := "res://scenes/main.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
-const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
 const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
-const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
 const GALLERY_LIBRARY_SCENE := "res://scenes/gallery_library.tscn"
-const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
-const STORE_SCENE := "res://scenes/store.tscn"
-const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
-const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
-const REPAIR_SCENE := "res://scenes/repair_transition.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const SaveSlotScreen := preload("res://scripts/ui/save_slot_screen.gd")
+const SaveGameContext := preload("res://scripts/save/save_game_context.gd")
+const LOAD_BUTTON_TEXTURE := preload("res://assets/ui/buttons/button_generic.png")
 const Scene01IntroPayloadEnglish := preload("res://scripts/story/payloads/intro/scene_01_intro.gd")
 const Scene01IntroPayloadTagalog := preload("res://scripts/story/payloads/intro/scene_01_intro_tagalog.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -72,6 +67,9 @@ var debug_achievement_list: VBoxContainer
 var debug_close_button: Button
 var debug_unlock_gallery_memory_button: Button
 var debug_unlock_memories_button: Button
+var load_button: TextureButton
+var save_slot_screen: SaveSlotScreen
+var _load_disabled_controls: Dictionary = {}
 
 
 func _ready() -> void:
@@ -101,6 +99,7 @@ func _ready() -> void:
 	_build_audio_panel()
 	_build_language_button()
 	_build_debug_unlock_panel()
+	_build_save_slot_screen()
 	_create_dialogs()
 	MenuTrafficController.spawn(self)
 	_start_main_menu_bgm()
@@ -113,6 +112,11 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if save_slot_screen != null and save_slot_screen.visible:
+		if event.is_action_pressed("ui_cancel"):
+			save_slot_screen.handle_cancel()
+			get_viewport().set_input_as_handled()
+		return
 	if _is_debug_unlock_panel_open():
 		if event.is_action_pressed("ui_cancel"):
 			_close_debug_unlock_panel()
@@ -125,6 +129,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_open_achievements_library()
 		elif quit_button.has_focus():
 			_quit_game()
+		elif load_button.has_focus():
+			_open_load_slots()
 		else:
 			_start_game()
 	elif event.is_action_pressed("ui_cancel"):
@@ -134,14 +140,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _start_game() -> void:
 	if is_start_transitioning:
 		return
-	if PlayerState.is_run_failed():
-		_fade_to_scene(GAME_OVER_SCENE)
-		return
 
-	if PlayerState.has_save_data():
-		_continue_saved_game()
-		return
-
+	PlayerState.reset()
 	PlayerState.begin_stage_sequence()
 	if PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
 		start_confirm_dialog.popup_centered()
@@ -158,6 +158,7 @@ func _confirm_start_game() -> void:
 
 	is_start_transitioning = true
 	start_button.disabled = true
+	load_button.disabled = true
 	quit_button.disabled = true
 	gallery_button.disabled = true
 	achievements_button.disabled = true
@@ -171,16 +172,94 @@ func _confirm_start_game() -> void:
 	_fade_to_intro_story()
 
 
-func _continue_saved_game() -> void:
+func _build_save_slot_screen() -> void:
+	load_button = TextureButton.new()
+	load_button.name = "LoadButton"
+	load_button.z_index = 10
+	load_button.texture_normal = LOAD_BUTTON_TEXTURE
+	load_button.texture_hover = LOAD_BUTTON_TEXTURE
+	load_button.texture_pressed = LOAD_BUTTON_TEXTURE
+	load_button.texture_focused = LOAD_BUTTON_TEXTURE
+	load_button.ignore_texture_size = true
+	load_button.stretch_mode = TextureButton.STRETCH_SCALE
+	load_button.anchor_top = 1.0
+	load_button.anchor_bottom = 1.0
+	load_button.offset_left = 38
+	load_button.offset_right = 286
+	load_button.offset_top = -170
+	load_button.offset_bottom = -128
+	load_button.tooltip_text = "Load a saved game"
+	load_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	add_child(load_button)
+	var label := Label.new()
+	label.text = "LOAD GAME"
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", UI_FONT)
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
+	label.add_theme_color_override("font_outline_color", Color.BLACK)
+	label.add_theme_constant_override("outline_size", 1)
+	load_button.add_child(label)
+	label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ButtonGlow.attach(self, load_button)
+	load_button.pressed.connect(_open_load_slots)
+	save_slot_screen = SaveSlotScreen.new()
+	save_slot_screen.name = "LoadSlots"
+	save_slot_screen.z_index = 150
+	add_child(save_slot_screen)
+	save_slot_screen.closed.connect(_close_load_slots)
+	save_slot_screen.load_requested.connect(_load_slot)
+	SaveSlotManager.slots_changed.connect(_refresh_load_availability)
+	_refresh_load_availability()
+
+
+func _open_load_slots() -> void:
+	if is_start_transitioning or save_slot_screen.visible:
+		return
+	_close_debug_unlock_panel()
+	var audio_panel := audio_panel_refs.get("panel") as Panel
+	if audio_panel != null:
+		audio_panel.hide()
+	_load_disabled_controls.clear()
+	for button: BaseButton in _menu_controls():
+		_load_disabled_controls[button] = button.disabled
+		button.disabled = true
+	save_slot_screen.open("load", SaveSlotManager.list_slots(), false)
+
+
+func _close_load_slots() -> void:
+	for button in _load_disabled_controls:
+		if is_instance_valid(button):
+			button.disabled = bool(_load_disabled_controls[button])
+	_load_disabled_controls.clear()
+	_refresh_load_availability()
+	if not is_start_transitioning:
+		start_button.grab_focus()
+
+
+func _load_slot(slot: int) -> void:
+	if is_start_transitioning:
+		return
+	if not SaveSlotManager.load_slot(slot):
+		save_slot_screen.refresh_slots(SaveSlotManager.list_slots())
+		save_slot_screen.show_status("Couldn't load this save. Choose another slot.", false)
+		return
+	save_slot_screen.close()
 	is_start_transitioning = true
-	start_button.disabled = true
-	quit_button.disabled = true
-	gallery_button.disabled = true
-	achievements_button.disabled = true
-	debug_unlock_all_button.disabled = true
-	audio_toggle_button.disabled = true
-	language_toggle_button.disabled = true
-	_fade_to_scene(_saved_resume_scene())
+	for button: BaseButton in _menu_controls():
+		button.disabled = true
+	_fade_to_scene(SaveGameContext.resume_scene())
+
+
+func _refresh_load_availability() -> void:
+	if load_button != null and (save_slot_screen == null or not save_slot_screen.visible):
+		load_button.disabled = is_start_transitioning or not SaveSlotManager.has_slots()
+
+
+func _menu_controls() -> Array[BaseButton]:
+	return [start_button, quit_button, gallery_button, achievements_button, debug_unlock_all_button, audio_toggle_button, language_toggle_button, load_button]
 
 
 func _quit_game() -> void:
@@ -298,29 +377,11 @@ func _fade_to_scene(scene_path: String) -> void:
 	get_tree().change_scene_to_file(scene_path)
 
 
-func _saved_resume_scene() -> String:
-	if not PlayerState.active_event_special_stage.is_empty():
-		return GAME_SCENE
-	var saved_scene := PlayerState.get_resume_scene()
-	match saved_scene:
-		GAME_SCENE, STORY_SCENE, DAY_START_SCENE, HOUSE_DAY_START_SCENE, RIDE_SELECTION_SCENE, STORE_SCENE, STAGE_RESULTS_SCENE, SLEEP_TRANSITION_SCENE, GAME_OVER_SCENE, REPAIR_SCENE:
-			return saved_scene
-
-	if PlayerState.is_run_failed():
-		return GAME_OVER_SCENE
-
-	if not PlayerState.get_pending_story().is_empty():
-		return STORY_SCENE
-	if not PlayerState.get_pending_crash_repair().is_empty():
-		return SLEEP_TRANSITION_SCENE if bool(PlayerState.get_pending_crash_repair().get("transition_started", false)) else REPAIR_SCENE
-	if not PlayerState.get_pending_sleep_transition_state().is_empty():
-		return SLEEP_TRANSITION_SCENE
-	if not PlayerState.get_pending_trip_selection().is_empty():
-		return RIDE_SELECTION_SCENE
-	return GAME_SCENE
-
-
 func _update_reset_progress(delta: float) -> void:
+	if is_start_transitioning or (save_slot_screen != null and save_slot_screen.visible):
+		reset_hold_time = 0.0
+		reset_hold_completed = true
+		return
 	if Input.is_key_pressed(KEY_R):
 		if reset_hold_completed:
 			return

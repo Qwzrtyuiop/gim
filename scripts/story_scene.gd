@@ -17,6 +17,7 @@ const StoryGameFlow := preload("res://scripts/story/story_game_flow.gd")
 const PassengerStory := preload("res://scripts/ride_selection/passenger_story.gd")
 const StoryDialoguePlayback := preload("res://scripts/story/story_dialogue_playback.gd")
 const CharacterSpriteRuntime := preload("res://scripts/story/story_character_sprite_runtime.gd")
+const RideStoryInterruption := preload("res://scripts/game/ride_story_interruption.gd")
 
 @onready var background: TextureRect = $Background
 @onready var background_fade_overlay: ColorRect = $BackgroundFadeOverlay
@@ -64,6 +65,7 @@ var active_loop_sfx_action: Dictionary = {}
 var checkpoint_continuation: Dictionary = {}
 var dialogue_playback: Node
 var character_sprites: Dictionary = {}
+var inline_complete_callback := Callable()
 
 
 # Scene lifecycle.
@@ -79,7 +81,7 @@ func _ready() -> void:
 	portrait_layer = StoryPortraitLayer.new()
 	add_child(portrait_layer)
 	move_child(portrait_layer, chapter_label.get_index())
-	portrait_layer.setup(dialogue_panel, StoryPresentation.resolve_texture)
+	portrait_layer.setup(dialogue_panel, StoryPresentation.resolve_texture, background)
 	_load_story_payload()
 	if not _is_replay_mode():
 		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
@@ -104,7 +106,10 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
+	if event.is_action_pressed("ui_cancel"):
+		if not event.is_echo() and PauseMenuManager.request_toggle():
+			# Stop the global pause handler from toggling the same press again.
+			get_viewport().set_input_as_handled()
 		return
 	var continue_pressed := event.is_action_pressed("ui_accept") and not event.is_echo()
 	continue_pressed = continue_pressed or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
@@ -118,8 +123,6 @@ func _input(event: InputEvent) -> void:
 
 	if event.is_action_pressed("ui_accept"):
 		_advance_story()
-	elif event.is_action_pressed("ui_cancel"):
-		_finish_story()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_advance_story()
 
@@ -348,7 +351,7 @@ func _finish_story() -> void:
 	await StoryPresentation.play_outro_fade(self)
 	if not special_stage_id.is_empty() and PlayerState.begin_event_special_stage(special_stage_id, target_scene):
 		_end_checkpoint_batch()
-		get_tree().change_scene_to_file("res://scenes/game_over.tscn" if PlayerState.is_run_failed() else "res://scenes/main.tscn")
+		_transition_from_story("res://scenes/game_over.tscn" if PlayerState.is_run_failed() else "res://scenes/main.tscn")
 		return
 	if not _is_replay_mode():
 		StoryGameFlow.prepare_destination(self, target_scene)
@@ -358,7 +361,7 @@ func _finish_story() -> void:
 		PlayerState.set_pending_story(queued_story)
 		PlayerState.set_resume_scene("res://scenes/story_scene.tscn")
 		_end_checkpoint_batch()
-		get_tree().change_scene_to_file("res://scenes/story_scene.tscn")
+		_transition_from_story("res://scenes/story_scene.tscn")
 		return
 	if not _is_replay_mode():
 		target_scene = PassengerStory.complete(story_payload, target_scene)
@@ -369,10 +372,18 @@ func _finish_story() -> void:
 	if _is_replay_mode():
 		PlayerState.clear_pending_memory_replay()
 	else:
+		target_scene = RideStoryInterruption.resolve_destination(story_payload, target_scene)
 		PlayerState.clear_pending_story()
 		PlayerState.set_resume_scene(StoryGameFlow.resume_destination(target_scene))
 	_end_checkpoint_batch()
-	get_tree().change_scene_to_file(target_scene)
+	_transition_from_story(target_scene)
+
+
+func _transition_from_story(target_scene: String) -> void:
+	if inline_complete_callback.is_valid():
+		inline_complete_callback.call(target_scene)
+	else:
+		get_tree().change_scene_to_file(target_scene)
 
 
 func _preview_story_payload() -> Dictionary:

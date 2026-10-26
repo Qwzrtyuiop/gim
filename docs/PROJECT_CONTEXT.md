@@ -9,9 +9,10 @@ Gulong is a single-player, Philippine-set 2D side-scrolling driving game. John T
 - Engine: Godot 4.6; installed editor/console: 4.6.2.
 - Rendering: Forward Plus, Windows D3D12; viewport 1280x720, `canvas_items` stretch.
 - Entry: `res://scenes/main_menu.tscn` in [project.godot](../project.godot).
-- Autoload order: AudioSettingsManager, StoryLanguageManager, PlayerState, AmbientAudioManager, AchievementPopupManager, PauseMenuManager, UIAudioManager.
-- Saves: `user://progress_save.tres`, explicit version-4 resource/codec. Language and audio preferences use separate files. Live driving is restarted rather than restored as an exact traffic/RNG snapshot.
+- Autoload order: AudioSettingsManager, StoryLanguageManager, PlayerState, SaveSlotManager, AmbientAudioManager, AchievementPopupManager, PauseMenuManager, UIAudioManager.
+- Saves: ten scrollable notebook slots in `user://saves/slot_01.tres` through `slot_10.tres`. Slot 1 autosaves once on arrival at each new day; slots 2–10 are manual saves from Escape → Save. Escape → Load and the main-menu Load Game open the same selector. The notebook frame presents a scrollable slot list on its left page and a larger preview/day/location/time on the right; the scrollbar stays hidden. Start Ride always resets the live run and begins the intro on Day 1, preserving the saved slots. The version-4 codec still owns progress data; optional resource metadata holds time, location, thumbnail and live driving state. `user://progress_save.tres` remains an internal recovery checkpoint and migrates into Slot 2 when no slots exist. Language/audio preferences remain separate.
 - Controls: W/Up and S/Down change lanes, D/Right accelerates, A/Left brakes, Shift boosts, Q holds the horn (repeat taps can persuade bottom-lane traffic), Escape pauses in supported scenes. Main-menu hold-R resets progress.
+- The Escape menu uses `ui/frames/notebookclosed.png`, cropped to the visible cover with controls kept clear of the binder. Save/Load open the matching two-page notebook selector.
 
 ## Where to work
 
@@ -20,11 +21,13 @@ Gulong is a single-player, Philippine-set 2D side-scrolling driving game. John T
 | Shared balance, resources, shop prices, upgrades | `scripts/config/game_tuning.gd` |
 | Stage profiles and modifier application | `scripts/game/stage_profiles.gd`, `scripts/game/game_stage_setup.gd` |
 | Driving coordination, input, player movement | `scripts/game.gd`, `scripts/game/game_input.gd`, `scripts/game/player_vehicle_controller.gd` |
+| Immediate passenger stories during driving | `scripts/game/ride_story_interruption.gd`, [driving story events](DRIVING_STORY_EVENTS.md) |
 | NPC spawning, traffic AI, lane lookup | `scripts/game/vehicle_spawner.gd`, `scripts/game/vehicle_traffic_controller.gd`, `scripts/game/vehicle_behaviors.gd`, `scripts/game/vehicle_traffic_index.gd` |
 | Hitboxes and collision rules | `scripts/game/vehicle_geometry.gd`, `scripts/game/vehicle_collision_controller.gd` |
 | Menu traffic and wheels | `scripts/game/menu_traffic_controller.gd`, `scripts/game/vehicle_wheel_animation.gd` |
 | Fare, trip completion, crash repair | `scripts/game/game_economy_manager.gd`, `scripts/game/game_flow_controller.gd`, `scripts/repair_transition.gd`, `scripts/state/player_crash_repair_state.gd` |
 | Persistent state and migrations | `scripts/player_state.gd`, `scripts/state/`, `scripts/save/player_state_save_codec.gd`, `scripts/save/game_save_resource.gd` |
+| Save slots, daily autosave, notebook selector, live ride restoration | `scripts/save/save_slot_manager.gd`, `scripts/save/save_game_context.gd`, `scripts/save/driving_save_snapshot.gd`, `scripts/ui/save_slot_screen.gd` |
 | Selection, rider identities/progress | `scripts/ride_selection.gd`, `scripts/seeded_rider_runtime.gd`, `scripts/story/story_catalog.gd`, `scripts/story/story_catalog_data.gd` |
 | Daily flow, rest, results | `scripts/day_start_scene.gd`, `scripts/stage_results.gd`, `scripts/sleep_transition.gd` |
 | Story registry, routing, triggers | `scripts/story/story_payload_catalog.gd`, `scripts/story/story_trigger_service.gd`, `scripts/story/story_trigger_runtime.gd` |
@@ -39,11 +42,17 @@ Snapshot base: branch `main`, HEAD `feccfa8` (Stop tracking local Godot editor s
 
 Current changes visible in source:
 
+- Save slots preserve independent snapshots and confirm overwrites/loads. Manual previews capture the scene before the pause overlay appears; daily saves use its background artwork. Day-start writes wait for a stable scene and completed actions; money changes/location visits do not overwrite Slot 1. Loading an older day permits the next reached day to replace the autosave again. Starting/resetting a run preserves manual slots. Live driving restores distance, timers, vehicle positions/state and RNG; hazard cues restart in full and music/visual particles restart with the scene. Story slots capture the current presentation/action cursor even while text reveals, at choice prompts, during action waits and before the first line. Capture writes a separate payload into the slot without closing the live reader's batch or changing its pending checkpoint; reached text loads fully revealed and silently, and remaining actions run once. Loading closes the discarded reader's batches before applying the selected save. Scene transitions, story completion, unrelated state batches and gallery replay still block saving. `tests/save_slot_checks.gd` covers the slot UI, independence, driving restoration and daily trigger; `tests/story_slot_save_checks.gd` covers VN save/resume and batch isolation. Focused `save_slot` and `story_slot_save` checks passed together on 26 October in 9.7 seconds.
+- Save-overhaul validation on 26 October: the full isolated Godot suite passed with 38 localized payloads, real Escape input, save/load, checkpoint/action-cursor, hub, driving, ambience and replay coverage (137.5 seconds Godot, 138.5 seconds total). All six Python fixture/runner tests passed. Story wait timers honor pause, and the old scene stays paused until the loaded scene is installed. No interactive visual playtest or export was performed; existing certificate-store and ObjectDB exit diagnostics remain, alongside expected invalid-input rejection warnings.
+- VN Escape input consumes its press after opening pause so the global handler cannot toggle it closed again; held-key repeats are ignored. The VN save regression sends actual viewport key presses/releases during standalone and inline driving stories, including typing, choices, waits and intro. Memory viewing disables the Save button, and the slot backend rejects manual saves and daily autosaves even if called directly without story context. Rejected attempts leave slot files, live progress, the recovery checkpoint and autosave marker unchanged.
 - Story builders across intro, events, and character encounters now use a shared normalized schema in the new `story_payload.gd`. The old `payloads/events/random_event_payload.gd` and its UID are deleted. The payload guide and template document the canonical format.
 - The new `story_checkpoint.gd` and changes to `story_scene.gd` capture reached presentation state, batch saves per completed step, and retain an action cursor when exiting during an animated step. Resume continues remaining actions without repeating completed rewards. Gallery replay remains separate from persistent effects.
 - `story_catalog.gd` indexes static identity data while constructing live progress/name results and returning independent dictionaries.
 - Jessa's runaway-fare trigger becomes eligible after a completed morning/noon ride, including before Day 2. Before that encounter is completed, her live passenger availability is morning/noon; afterward it returns to its existing night schedule. Narrow saved-rule migrations preserve consumed events and custom rules. Tests cover unpaid fare, hidden name, daytime/nighttime eligibility, migration, and once-per-run behavior in both languages.
 - The new `vehicle_traffic_index.gd` caches ordered lane buckets per owner/frame. Spawn, removal, reset, and lane changes invalidate it. Collision rectangles cache by geometry inputs so same-frame movement/scale/texture changes can refresh them.
+- Traffic-jam trips use `game/traffic_jam_gaps.gd` to split the main queue into groups of three or four cars with 650-pixel bumper gaps. Drivers preserve these openings; shoulder spawns and NPC lane changes avoid filling them. Tuning lives in `stage_profiles.gd`, and retries reset the grouping. Other traffic modes retain their usual spawning.
+- Eligible passenger character scenes take priority over the Day 2 station-bill event. Only the selected scene's trigger is consumed; the bill remains available for a later eligible morning/noon ride. Other scheduled-event priority and character prerequisites remain as authored.
+- Busy trips retain ordinary bottom-lane spawns: right-edge entry, 35–280 speed range, parked vehicles and 11–17.5-second base spawn delays. Busy speed/density randomization applies to the upper lanes. Cars from other lanes can still merge into the bottom lane using normal clearance checks; horn and overtaking exceptions remain available.
 - `tests/run_refactor_checks.py` and the Godot regression scene are untracked parts of this work and must be preserved with their dependencies.
 
 The next request was to clean up code and put related functions in their respective files. The organization below reflects that refactor; story content and saved IDs/section indices were preserved.
@@ -104,9 +113,9 @@ select Lito's, the food counter, Home and Station, including their transparent
 interiors; there are no separate night hit areas or alpha scans for store input.
 `ui/store_street_view.gd` uses the shared pointer/keyboard mode and lighting from
 the current clock. Midnight uses the shuttered `storemidnight.png` image in the
-same fitted canvas. Shop rectangles, focus, hover and stale purchase/entry callbacks
-are disabled then; Home and Station exits remain available without spending a
-turn. Unseen shop tutorials wait for reopening. See
+same fitted canvas. Shop rectangles remain selectable and show John's floating
+"It's closed." response; entry and purchases remain blocked. Home and Station
+exits remain available without spending a turn. Unseen shop tutorials wait for reopening. See
 [store selection artwork](STORE_SELECTIONS.md).
 Seven unused sources (five older station images, the garage spotlight and the
 duplicate house selector) moved to `locations/check/unused/` with their image
@@ -317,8 +326,29 @@ no GUI playtest or export was performed.
 
 Passenger selections support `passenger_selected` story triggers before entry
 costs or time advancement. Jessa's second encounter (`jessa_second_encounter`)
-requires her completed runaway-fare event and currently contains matching short
-English/Tagalog scaffolds. It returns to the same locked offers and clock.
+requires her completed runaway-fare event and contains the full English/Tagalog
+confrontation, with police and warning branches. Both endings return at the same
+clock with the other offers preserved; Jessa leaves until the live phase changes,
+including across revisits/reloads and projected trip phases. Only the warning
+branch reveals her name when she introduces herself. Branch, completion and
+phase-absence flags use existing event values.
+
+Hana's `hana_first_encounter` (Lost ID 1) replaces her bond-2 placeholder after
+a completed ride. Reading the ID reveals her name; finishing the scene records
+the ID in existing story event values. `hana_second_encounter` (Lost ID 2) starts
+when Hana is next selected at the terminal after event 1. It returns the ID,
+awards her notebook, plays funny music at the notebook reveal, and returns to the
+same selection without a ride or time cost. Hana leaves that live phase's offers,
+using the same saved absence handling as Jessa. Both item images show during
+their relevant lines. English is authored; Tagalog body text stays `to be translated`.
+
+Gardo's `gardo_first_encounter` plays once after a completed nighttime ride,
+without a bond gate. Accepting starts `gardo_extra_lap`, repeating that route
+and distance in the same night with double fare rate and no new entry cost.
+Refusing pays the original fare, returns home, and raises his future midnight
+encounter chance from 35% to 70%. English contains the full scene; Tagalog body
+text remains `to be translated`. No checks were run for this addition.
+
 `ride_selection/passenger_story.gd` owns the saved continuation;
 `ride_selection/ride_departure.gd` shares normal ride entry with the card screen.
 The new `selection_outcome` action supports `return`, `ride`, and `skip` (one phase).
@@ -328,7 +358,7 @@ The full isolated regression suite passed with passenger-event checks for both
 languages, pre-cost entry, unchanged offers/time, rest recovery, optional rides
 and phase skips, actual reader handoffs, saved departure reload and replay
 suppression. Three runner safety checks and source/UID/link checks also passed.
-The runner now allows 12000 frames/120 seconds for the expanded suite; expected
+The runner now allows 24000 frames/120 seconds for the expanded suite; expected
 invalid-input warnings and existing certificate-store/exit-leak diagnostics remain.
 No GUI playtest or export was performed for this addition.
 
@@ -422,8 +452,16 @@ Run from the repository root in PowerShell. Godot is not on PATH in the inspecte
 $godotConsole = 'C:/Users/qwzrt/Documents/godot/Godot_v4.6.2-stable_win64_console.exe'
 & $godotConsole --version
 
-# Existing isolated regression suite (requires imported assets).
-python tests/run_refactor_checks.py --godot $godotConsole
+# List focused checks without preparing a fixture or launching Godot.
+python tests/run_refactor_checks.py --list
+
+# When requested, run only the relevant checks (requires imported assets).
+python tests/run_refactor_checks.py --godot $godotConsole --check payloads
+# Repeat --check to select several targets in one isolated run.
+python tests/run_refactor_checks.py --godot $godotConsole --check story_dialogue_voice --check story_dialogue_playback
+
+# Run the entire suite only when explicitly requested.
+python tests/run_refactor_checks.py --godot $godotConsole --full
 
 # Fixture-copy safety and stale-source checks (no Godot dependency).
 python -m unittest discover -s tests -p test_refactor_runner.py -v
@@ -433,7 +471,15 @@ git diff --check
 git status --short
 ```
 
-On a fresh checkout, import assets with the Godot editor before running regressions. The runner replaces the mirrored scripts, scenes, assets, and tests in `.godot/refactor_checks/` so stale deleted sources cannot mask broken imports. It checks resolved destination paths before removal, including fixture-root aliases. It preserves the import cache and fixture `test_user/`, redirects `user://` paths there, and instruments save counts in the copy. It uses headless GL compatibility rendering and a 90-second subprocess timeout. Success requires exit code 0, no unexpected engine/script errors, and `PASS: all refactor regression checks`. Output is buffered until the Godot process exits.
+Skip checks unless the user requests them. Small dialogue, music-cue and presentation edits do not need a regression run or new tests. When checks are requested, select the smallest relevant target and do not repeat passing checks without a new reason. The runner requires `--check` or `--full`, preventing accidental full-suite runs.
+
+On a fresh checkout, import assets with the Godot editor before running regressions. The runner refreshes mirrored scripts, scenes and tests in `.godot/refactor_checks/`; assets and imported resources copy only when size or modification time changes, with stale files removed. Copies remain independent of live sources. It checks resolved destination paths before removal, including fixture-root aliases. It preserves fixture `test_user/`, redirects `user://` paths there, and instruments save counts in the copy. It uses headless GL compatibility rendering, with a 30-second focused timeout and a 150-second full-suite timeout; `--timeout SECONDS` overrides either. It reports preparation and runtime separately, and focused targets report their duration. Success requires exit code 0, no unexpected engine/script errors, and the selected/full PASS marker. Godot output is buffered until the process exits.
+
+On 26 October 2026 the full isolated suite passed in 129 seconds after updating
+Isidro's old scaffold fixtures for the authored no-fare ending. It includes 26
+localized payloads and the street-background/seated-sprite checks. The existing
+certificate-store error, deliberate invalid-input warnings and ObjectDB exit-leak
+warning remain. The 150-second full-suite timeout accommodates this measured run.
 
 Covered checks: registered payloads in both languages and English fallbacks, schema normalization/legacy adaptation/jump bounds, catalog identity and live progress, Jessa first-ride routing/migration, traffic lane order/membership, same-frame collision cache invalidation, following, one-save-per-step behavior, real save/load, branch-correct presentation, interrupted actions, and authored Elena/Jessa resumes. Cleanup coverage also exercises seeded-rule copy/mutation behavior, one-time payout batching, real menu/home/store/selection scenes, tutorial completion, shop purchases, locked passenger offers across distances, and driving initialization/traffic/hit visuals in normal, busy, and speeders profiles. Warning playback is enabled after fixing the active-buffer error; accelerated driving still does not verify real-time Tween/audio timing.
 

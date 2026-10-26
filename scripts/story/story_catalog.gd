@@ -30,6 +30,9 @@ static func get_character_display_name(player_state, character_id: String) -> St
 	var name_unlock_event: String = str(character.get("name_unlock_event", ""))
 	if not name_unlock_event.is_empty():
 		return str(character.get("name", "???")) if bool(player_state.event_values.get(name_unlock_event, false)) else "???"
+	var name_reveal_event: String = str(character.get("name_reveal_event", ""))
+	if not name_reveal_event.is_empty() and bool(player_state.event_values.get(name_reveal_event, false)):
+		return str(character.get("name", "???"))
 	if is_unique_character(safe_id) and int(player_state.character_completed_rides.get(safe_id, 0)) < GameTuning.CHARACTER_NAME_UNLOCK_RIDES:
 		return "???"
 	return str(character.get("name", "???"))
@@ -153,6 +156,15 @@ static func get_character_session_dialogue(player_state, character_id: String, c
 static func _character_with_progress(player_state, character_data: Dictionary) -> Dictionary:
 	var character_copy: Dictionary = character_data.duplicate(true)
 	var character_id: String = str(character_copy.get("id", ""))
+	var absence_event: String = str(character_copy.get("phase_absence_event", ""))
+	var absence: Variant = player_state.event_values.get(absence_event, {})
+	if not absence_event.is_empty() and absence is Dictionary:
+		# Phase departures follow the live clock, including when terminal offers
+		# preview another phase. Rebuild this flag instead of caching an expiry.
+		character_copy["unavailable_now"] = (
+			absence.get("day", 0) == player_state.get_current_day()
+			and str(absence.get("phase", "")) == player_state.get_current_time_of_day()
+		)
 	var intro_completion_event: String = str(character_copy.get("intro_completion_event", ""))
 	var intro_times: Variant = character_copy.get("intro_eligible_times", [])
 	var intro_completed := not intro_completion_event.is_empty() and bool(player_state.event_values.get(intro_completion_event, false))

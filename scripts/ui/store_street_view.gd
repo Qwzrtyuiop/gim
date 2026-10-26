@@ -126,7 +126,7 @@ func set_enabled(value: bool) -> void:
 
 
 func _action_enabled(action: String) -> bool:
-	return enabled and REGIONS.has(action) and (not is_midnight or action in ["home", "station"])
+	return enabled and REGIONS.has(action)
 
 
 func _refresh_buttons() -> void:
@@ -138,6 +138,8 @@ func _refresh_buttons() -> void:
 		button.mouse_filter = Control.MOUSE_FILTER_STOP if available else Control.MOUSE_FILTER_IGNORE
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if available else Control.CURSOR_ARROW
 		button.tooltip_text = TOOLTIPS[action] if available else ""
+		if available and is_midnight and action in ["tricycle", "food"]:
+			button.tooltip_text = "Closed"
 		if not available:
 			button.release_focus()
 			if hovered_action == action:

@@ -5,12 +5,15 @@ const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
+const VehicleSpawnRules := preload("res://scripts/game/vehicle_spawn_rules.gd")
 const NPC_OVERLAP_SEPARATION_GAP := 8.0
 const TrafficEntities := preload("res://scripts/game/vehicle_traffic_entities.gd")
 
 
 static func apply_bottom_lane_speed_cap(owner) -> void:
 	var cap := maxf(owner.main_vehicle_min_speed, owner.main_vehicle_max_speed)
+	if str(owner.get("stage_traffic")) == "busy":
+		cap = VehicleSpawnRules.shoulder_speed_range(owner).y
 	if cap <= 0.0:
 		return
 

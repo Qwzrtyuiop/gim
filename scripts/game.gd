@@ -22,6 +22,7 @@ const RAIN_FLOOR_DROPS_TEXTURE := preload("res://assets/weather/rain_floor_drops
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
+const RideStoryInterruption := preload("res://scripts/game/ride_story_interruption.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const PlayerHorn := preload("res://scripts/game/player_horn_controller.gd")
 const GameRenderer := preload("res://scripts/game/game_renderer.gd")
@@ -32,6 +33,8 @@ const StageTutorialController := preload("res://scripts/game/stage_tutorial_cont
 const VehicleCollisionController := preload("res://scripts/game/vehicle_collision_controller.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleSpawnScheduler := preload("res://scripts/game/vehicle_spawn_scheduler.gd")
+const DrivingSaveSnapshot := preload("res://scripts/save/driving_save_snapshot.gd")
+const TrafficJamGaps := preload("res://scripts/game/traffic_jam_gaps.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
 const PLAYER_TEXTURE := preload("res://assets/vehicles/player_tricycle.png")
 const VEHICLE_TEXTURES := {
@@ -330,6 +333,7 @@ var time_left := 0.0
 var overtime_seconds := 0.0
 var active_entities: Array = []
 var spawn_timers := [0.4, 0.8, 1.2]
+var traffic_jam_gaps := TrafficJamGaps.new()
 var oncoming_warning_elapsed := -1.0
 var oncoming_warning_beep_index := -1
 var oncoming_warning_label: Label
@@ -361,6 +365,9 @@ var fade_rect: ColorRect
 var stage_tutorial
 var passenger_dialogue_controller
 var passenger_rule_violation_count := 0
+var trip_peak_speed_kmh := 0.0
+var trip_vehicle_collision_count := 0
+var ride_story_interruption := RideStoryInterruption.new()
 var texture_hitbox_cache := {}
 var stage_clear_transition_started := false
 var stage_clear_fade_time := 0.0
@@ -445,6 +452,10 @@ func _ready() -> void:
 	StageTutorialController.schedule(self)
 	if use_player_state_stage_sequence:
 		PlayerState.confirm_stage_started()
+	var loaded_runtime: Variant = PlayerState.get_meta("loaded_slot_runtime", {})
+	if loaded_runtime is Dictionary and str(loaded_runtime.get("scene", "")) == scene_file_path and loaded_runtime.get("driving") is Dictionary:
+		PlayerState.remove_meta("loaded_slot_runtime")
+		DrivingSaveSnapshot.restore(self, loaded_runtime.driving)
 	set_process(true)
 
 
@@ -458,6 +469,7 @@ func _notification(what: int) -> void:
 
 func _exit_tree() -> void:
 	PlayerHorn.stop(self)
+	ride_story_interruption.dispose()
 
 
 func _pick_stage_background() -> Texture2D:
@@ -535,6 +547,8 @@ func _process(delta: float) -> void:
 		else:
 			PlayerVehicleController.handle_speed(self, delta)
 		GameFlowController.update_progress(self, delta)
+		if game_state == "story":
+			return
 		VehicleTrafficController.prune_invalid_entities(self)
 		VehicleSpawnScheduler.update_spawns(self, delta)
 		VehicleTrafficController.update_speeder_warning(self, delta)
@@ -555,6 +569,8 @@ func _process(delta: float) -> void:
 		var collision: Dictionary = VehicleCollisionController.collision_data(self)
 		if not collision.is_empty():
 			GameFlowController.handle_player_hit(self, collision["detail"], collision["energy_loss"])
+			if game_state == "story":
+				return
 	elif game_state == "YOU MADE IT":
 		VehicleCollisionController.update_stage_clear_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta, true)

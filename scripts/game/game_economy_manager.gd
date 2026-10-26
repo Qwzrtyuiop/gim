@@ -33,7 +33,8 @@ static func store_stage_result(
 	overtime_fare_penalty_php_per_second: float,
 	time_left: float,
 	time_bonus_php_per_second: float,
-	passenger_rule_violation_count: int
+	passenger_rule_violation_count: int,
+	driving_stats: Dictionary = {}
 ) -> void:
 	var completed_distance: int = floori(minf(distance, target_distance))
 	var base_fare: int = roundi(completed_distance * fare_php_per_meter)
@@ -69,6 +70,7 @@ static func store_stage_result(
 		"stage_special_type": PlayerState.normalize_stage_special_type(stage_special_type),
 		"special_stage_id": PlayerState.normalize_special_stage_id(special_stage_id),
 		"distance": completed_distance,
+		"target_distance": maxf(0.0, target_distance),
 		"base_fare": base_fare,
 		"fare_penalty": fare_penalty,
 		"raw_fare": raw_fare,
@@ -76,6 +78,8 @@ static func store_stage_result(
 		"fare": fare,
 		"bonus": bonus,
 		"passenger_rule_violation_count": maxi(0, int(passenger_rule_violation_count)),
+		"peak_speed_kmh": maxf(0.0, float(driving_stats.get("peak_speed_kmh", 0.0))),
+		"vehicle_collision_count": maxi(0, int(driving_stats.get("vehicle_collision_count", 0))),
 		"passenger_penalty": rider_penalty,
 		"detail_lines": detail_lines,
 		"total": total,

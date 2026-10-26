@@ -6,6 +6,15 @@ const WEEKLY_DEBT_GOALS := [2500, 5000]
 # Completed rides with each named passenger before revealing their name.
 const CHARACTER_NAME_UNLOCK_RIDES := 2
 
+# Fresh terminal lineups vary from this minimum up to the available nine slots.
+const TERMINAL_MIN_PASSENGERS := 2
+
+# Temporary switch for incidental passenger chatter during driving.
+const PASSENGER_MESSAGES_ENABLED := false
+
+# Isidro's first event qualifies above this speed, or after a vehicle collision.
+const ISIDRO_FIRST_EVENT_SPEED_KMH := 70.0
+
 # Random ride stories: probability per eligible unnamed-passenger ride (0..1).
 const MALASAKIT_EVENT_CHANCE := 0.10
 const BAYANIHAN_EVENT_CHANCE := 0.10

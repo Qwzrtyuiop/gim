@@ -15,7 +15,7 @@ static func apply_to(rect: TextureRect) -> void:
 
 
 static func update_size(rect: TextureRect) -> void:
-	if rect.texture == null:
+	if rect.texture == null or not rect.material is ShaderMaterial or rect.material.shader != OUTLINE_SHADER:
 		return
 	# Both named and legacy portraits use KEEP_ASPECT_CENTERED.
 	var texture_size := rect.texture.get_size()

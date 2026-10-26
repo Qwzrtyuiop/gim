@@ -16,6 +16,7 @@ const LaneNavigation := preload("res://scripts/game/vehicle_lane_navigation.gd")
 const TrafficSpacing := preload("res://scripts/game/vehicle_traffic_spacing.gd")
 const TrafficManeuvers := preload("res://scripts/game/vehicle_traffic_maneuvers.gd")
 const HornResponse := preload("res://scripts/game/vehicle_horn_response.gd")
+const TrafficJamGaps := preload("res://scripts/game/traffic_jam_gaps.gd")
 
 
 static func update_speeder_warning(owner, delta: float) -> void:
@@ -54,6 +55,9 @@ static func update_entities(owner, delta: float) -> void:
 	remove_invalid_top_lane_direction_entities(owner)
 	TrafficSpacing.relieve_player_pin_pressure(owner)
 	LaneNavigation.update_top_lane_evasive_offsets(owner)
+	if owner.stage_traffic == "traffic-jam":
+		TrafficJamGaps.preserve_gaps(owner, delta)
+		TrafficSpacing.update_npc_following(owner)
 	for entity in owner.active_entities:
 		TrafficEntities.update_lane_change_fault_grace(entity, delta)
 		var sprite: Sprite2D = entity["sprite"]

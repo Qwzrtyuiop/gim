@@ -19,6 +19,14 @@ static func load_from_path(player_state, save_path: String) -> bool:
 		return false
 
 	var save_resource := loaded_resource as GameSaveResource
+	return load_snapshot(player_state, save_resource)
+
+
+static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool:
+	if player_state._is_loading_save:
+		return false
+	if not snapshot_error(save_resource, player_state.SAVE_VERSION).is_empty():
+		return false
 	var saved_version := int(save_resource.version)
 	var save_data: Dictionary = save_resource.data.duplicate(true)
 	if save_data.is_empty():
@@ -169,6 +177,13 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 	if player_state._is_loading_save:
 		return
 
+	var save_resource := build_snapshot(player_state, save_version)
+	var error := write_snapshot(save_resource, save_path)
+	if error != OK:
+		push_error("Could not save progress to %s: %s" % [save_path, error_string(error)])
+
+
+static func build_snapshot(player_state, save_version: int) -> GameSaveResource:
 	var save_resource := GameSaveResource.new()
 	save_resource.version = save_version
 	save_resource.data = {
@@ -246,9 +261,48 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		"store_tutorial_shown": player_state.store_tutorial_shown,
 		"home_tutorial_shown": player_state.home_tutorial_shown,
 	}
-	var error := write_snapshot(save_resource, save_path)
-	if error != OK:
-		push_error("Could not save progress to %s: %s" % [save_path, error_string(error)])
+	return save_resource
+
+
+static func snapshot_error(snapshot: Resource, maximum_version: int, require_slot_fields := false) -> String:
+	if not snapshot is GameSaveResource:
+		return "This is not a Gulong save."
+	var save_resource := snapshot as GameSaveResource
+	if save_resource.version < 1 or save_resource.version > maximum_version:
+		return "This save uses an unsupported version."
+	var data: Dictionary = save_resource.data
+	if data.is_empty():
+		return "This save is empty."
+	# Slots always contain a complete snapshot. Legacy checkpoints may omit fields
+	# introduced later, but a damaged slot must not inherit the currently active run.
+	for field in ["money", "max_energy", "energy", "max_gas", "gas", "gas_price", "gas_price_delta", "previous_gas_price", "daily_conditions_day", "karma", "current_day", "stage_round", "last_rest_day", "yosi_bought_today", "yosi_bought_day", "yosi_bought_total", "rests_taken_today", "rests_taken_day", "tamad_rest_day", "rides_completed_today", "rides_completed_day", "non_gas_store_purchases_this_week", "clean_stage_streak", "low_resource_trip_count", "low_both_resource_trip_count", "debt_goal_index", "debt_carryover", "last_debt_collection_day", "remaining_debt", "pending_gameplay_entry_fade_duration"]:
+		if require_slot_fields and not data.has(field):
+			return "This save is missing progress data."
+		if data.has(field) and (not (data[field] is int or data[field] is float) or not is_finite(float(data[field]))):
+			return "This save contains invalid numeric data."
+	for field in ["weather_forecasts", "weather_phase_cache", "pending_trip_selection", "pending_story", "active_event_special_stage", "pending_sleep_transition_state", "pending_crash_repair", "seen_mock_characters", "unique_character_progress", "character_completed_rides", "locked_unique_character_stories", "consumed_unique_session_dialogue", "consumed_seeded_rider_rules", "last_debt_collection", "last_stage_result", "consumed_story_triggers", "upgrades", "achievements", "last_seen_story_sections", "event_values", "unlocked_gallery_images"]:
+		if require_slot_fields and not data.has(field):
+			return "This save is missing progress data."
+		if data.has(field) and not data[field] is Dictionary:
+			return "This save contains invalid progress data."
+	for field in ["seeded_rider_rules", "story_triggers", "tamad_rest_times_today"]:
+		if require_slot_fields and not data.has(field):
+			return "This save is missing progress data."
+		if data.has(field) and not data[field] is Array:
+			return "This save contains invalid event data."
+	if data.has("current_day") and int(data.current_day) < 1:
+		return "This save contains an invalid day."
+	for field in ["resume_scene_path", "current_stage_type", "current_stage_special_type", "current_special_stage_id", "current_phase", "current_weather", "current_mock_character_id", "last_seen_story_id", "run_fail_reason"]:
+		if require_slot_fields and not data.has(field):
+			return "This save is missing progress data."
+		if data.has(field) and not data[field] is String:
+			return "This save contains invalid text data."
+	for field in ["pending_stage_energy_cost", "pending_skip_night_phase", "current_trip_had_crash", "current_trip_low_energy", "current_trip_low_gas", "run_failed", "gallery_image_unlocks_initialized", "ride_select_tutorial_shown", "store_tutorial_shown", "home_tutorial_shown"]:
+		if require_slot_fields and not data.has(field):
+			return "This save is missing progress data."
+		if data.has(field) and not data[field] is bool:
+			return "This save contains invalid flag data."
+	return ""
 
 
 static func write_snapshot(save_resource: Resource, save_path: String) -> Error:

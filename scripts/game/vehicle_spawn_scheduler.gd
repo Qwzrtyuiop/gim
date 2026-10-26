@@ -60,7 +60,7 @@ static func spawn_delay_range_for_lane(owner, lane_index: int) -> Vector2:
 
 
 static func vehicle_spawn_side(owner, lane_index: int) -> String:
-	if lane_index == 0:
+	if lane_index == 0 or lane_index == 2:
 		return BusyTrafficBehavior.RIGHT_SPAWN_SIDE
 	if owner.stage_traffic == "busy":
 		return BusyTrafficBehavior.spawn_side(owner.rng, owner.player_speed, owner.player_max_speed)
@@ -68,7 +68,7 @@ static func vehicle_spawn_side(owner, lane_index: int) -> String:
 
 
 static func lane_has_spawn_room(owner, lane_index: int, spawn_side := BusyTrafficBehavior.RIGHT_SPAWN_SIDE) -> bool:
-	if owner.stage_traffic == "busy":
+	if owner.stage_traffic == "busy" and lane_index != 2:
 		return BusyTrafficBehavior.lane_has_spawn_room(
 			owner.active_entities,
 			lane_index,

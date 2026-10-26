@@ -392,7 +392,7 @@ static func refresh_background_transform(owner, duration := 0.0) -> void:
 static func pause_for_seconds(owner, duration: float) -> void:
 	if duration <= 0.0:
 		return
-	await owner.get_tree().create_timer(duration).timeout
+	await owner.get_tree().create_timer(duration, false).timeout
 
 
 static func fade_background_overlay(owner, target_alpha: float, duration: float) -> void:

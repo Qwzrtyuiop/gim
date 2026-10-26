@@ -18,6 +18,8 @@ const PARKED_FALLBACK_HEIGHTS := {
 
 
 static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehavior.RIGHT_SPAWN_SIDE) -> bool:
+	if owner.stage_traffic == "busy" and lane_index == 2:
+		spawn_side = BusyTrafficBehavior.RIGHT_SPAWN_SIDE
 	var size: Vector2 = owner.get_viewport_rect().size
 	var sprite := Sprite2D.new()
 	var vehicle_key := ""
@@ -57,12 +59,13 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 					"jeepney": 4.0,
 					"sedan": 4.0,
 				})
-				min_world_speed = owner.shoulder_vehicle_min_speed
-				max_world_speed = maxf(owner.main_vehicle_min_speed, owner.main_vehicle_max_speed)
+				var shoulder_range := VehicleSpawnRules.shoulder_speed_range(owner)
+				min_world_speed = shoulder_range.x
+				max_world_speed = shoulder_range.y
 				fallback_height = 90.0
 
 	if not is_parked:
-		var speed_range: Vector2 = VehicleSpawnRules.vehicle_speed_range_for_spawn_side(owner, min_world_speed, max_world_speed, spawn_side)
+		var speed_range: Vector2 = VehicleSpawnRules.vehicle_speed_range_for_spawn_side(owner, min_world_speed, max_world_speed, spawn_side, lane_index)
 		min_world_speed = speed_range.x
 		max_world_speed = speed_range.y
 		world_speed = owner.rng.randf_range(min_world_speed, max_world_speed)
@@ -88,7 +91,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 		var visible_rect := VehicleGeometry.local_hitbox_rect(sprite, Vector4.ZERO, owner)
 		spawn_x = size.x + maxf(0.0, GameTuning.ONCOMING_SPAWN_EDGE_GAP) - visible_rect.position.x * sprite.scale.x
 	else:
-		spawn_x = VehicleSpawnRules.vehicle_spawn_x(owner, size, spawn_side)
+		spawn_x = VehicleSpawnRules.vehicle_spawn_x(owner, size, spawn_side, lane_index)
 	sprite.position = Vector2(
 		spawn_x,
 		VehicleGeometry.sprite_y_for_hitbox_bottom(
@@ -100,6 +103,9 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 	)
 	sprite.z_index = VehicleGeometry.z_for_lane(owner, lane_index, owner.PARKED_VEHICLE_Z_OFFSET if is_parked else 0)
 	if not spawn_hitbox_is_clear(owner, sprite, lane_index, spawn_side, world_speed):
+		sprite.free()
+		return false
+	if not owner.traffic_jam_gaps.can_spawn(owner, sprite, lane_index, world_speed):
 		sprite.free()
 		return false
 
@@ -127,6 +133,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 		"lane_change_cooldown": owner.rng.randf_range(0.6, 2.0),
 		"lane_change_warning_active": false,
 	})
+	owner.traffic_jam_gaps.spawned(owner, owner.active_entities.back())
 	return true
 
 

@@ -80,6 +80,7 @@ const STORY_TRIGGER_SLEEP_MIDPOINT := "sleep_midpoint"
 const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
 const STORY_TRIGGER_PASSENGER_SELECTED := "passenger_selected"
+const STORY_TRIGGER_DRIVING := "driving"
 const END_OF_DAY_ENERGY_BONUS := 2
 const NIGHT_SLEEP_ENERGY_BONUS := 3
 const ESTIMATED_BONUS_TIME_RATIO := 0.35
@@ -1175,6 +1176,10 @@ func _normalize_weather(weather_value: String) -> String:
 
 # Reset helpers
 func reset() -> void:
+	var save_context := load("res://scripts/save/save_game_context.gd")
+	save_context.cancel_daily_autosave()
+	if has_meta("loaded_slot_runtime"):
+		remove_meta("loaded_slot_runtime")
 	_is_loading_save = true
 	_begin_state_batch()
 	_reset_resource_state()

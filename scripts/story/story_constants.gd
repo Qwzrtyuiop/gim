@@ -5,14 +5,22 @@ const BACKGROUND_INHOUSE_NIGHT := "res://assets/story/backgrounds/locations/inho
 const BACKGROUND_BAR := "res://assets/story/backgrounds/locations/bar.jpeg"
 const BACKGROUND_GARAGE_NORMAL := "res://assets/story/backgrounds/locations/garagenormal.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/locations/Updated_day.png"
+const BACKGROUND_TERMINAL := "res://assets/story/backgrounds/locations/terminalday.png"
+const BACKGROUND_TERMINAL_NIGHT := "res://assets/story/backgrounds/locations/terminalnight.png"
 const BACKGROUND_ALLEY := "res://assets/story/backgrounds/locations/Alley.png"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/locations/city.png"
 const BACKGROUND_STORYDOOR := "res://assets/story/backgrounds/locations/storydoor.png"
 const BACKGROUND_STORYDOOR_ZOOM := "res://assets/story/backgrounds/locations/storydoorzoom.png"
 const BACKGROUND_LOWANGLE_HOUSE := "res://assets/story/backgrounds/locations/lowanglehouse.png"
 const BACKGROUND_STORE := "res://assets/story/backgrounds/locations/store.png"
+const BACKGROUND_STREET_DAY := "res://assets/story/backgrounds/locations/streetday.png"
+const BACKGROUND_STREET_NIGHT := "res://assets/story/backgrounds/locations/streetnight.png"
 const BACKGROUND_ROAD_1 := "res://assets/story/backgrounds/roads/bg1_loop.png"
 const CG_TROPA := "res://assets/story/specialCG/tropaCg.png"
+const ITEM_JESSA_WALLET := "res://assets/story/items/jessawallet.png"
+const ITEM_HANA_ID := "res://assets/story/items/hanaid.png"
+const ITEM_HANA_NOTEBOOK := "res://assets/story/items/hananotebook.png"
+const SPRITE_GARDO_MIDNIGHT := "res://assets/characters/sprites/terminal/midnight/gardo.tres"
 
 const MUSIC_CITY_AMBIENCE := "res://assets/audio/ambience/city_ambience.mp3"
 const MUSIC_BAR := "res://assets/audio/music/story/bar.mp3"
@@ -24,6 +32,7 @@ const MUSIC_WIND_BREEZE_SFX := "res://assets/audio/ambience/wind_breeze.mp3"
 const MUSIC_MORNING_CHILL := "res://assets/audio/music/driving/morning_chill.mp3"
 const MUSIC_FUNNY := "res://assets/audio/music/story/funny.mp3"
 const MUSIC_MIND := "res://assets/audio/music/story/mind.mp3"
+const MUSIC_MURDER := "res://assets/audio/music/story/murder.mp3"
 
 const SFX_KNOCK := "res://assets/audio/sfx/story/knock.mp3"
 const SFX_DOOR_OPEN := "res://assets/audio/sfx/story/door_open.mp3"
@@ -49,3 +58,7 @@ const DRIVING_CHILL_MUSIC := {
 	"volume_db": -9.0,
 	"restart": false,
 }
+
+
+static func street_background(time_of_day: String) -> String:
+	return BACKGROUND_STREET_NIGHT if time_of_day.strip_edges().to_lower() in ["night", "midnight"] else BACKGROUND_STREET_DAY

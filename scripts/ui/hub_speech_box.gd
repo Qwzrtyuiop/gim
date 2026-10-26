@@ -195,7 +195,7 @@ func _position_for(target: Rect2, balloon_size: Vector2, safe_rect: Rect2, prefe
 
 func _build_tail(target: Rect2, balloon: Rect2, safe_rect: Rect2, has_target: bool) -> void:
 	tail_points.clear()
-	if not has_target or balloon.has_point(target.get_center()):
+	if not bool(_options.get("show_tail", true)) or not has_target or balloon.has_point(target.get_center()):
 		return
 	var toward := target.get_center()
 	var base := balloon.get_center()

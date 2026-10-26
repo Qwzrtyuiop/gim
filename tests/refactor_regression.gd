@@ -25,6 +25,14 @@ func _ready() -> void:
 	await get_tree().process_frame
 	PlayerState.achievement_unlocked.disconnect(AchievementPopupManager._on_achievement_unlocked)
 	PlayerState.reset()
+	var selected_checks: Array = ProjectSettings.get_setting("testing/checks", [])
+	if not selected_checks.is_empty():
+		if await _run_selected_checks(selected_checks):
+			print("PASS: selected refactor regression checks")
+			get_tree().quit()
+		else:
+			get_tree().quit(1)
+		return
 	_test_payloads()
 	_test_catalog()
 	_test_jessa_first_ride()
@@ -33,6 +41,8 @@ func _ready() -> void:
 	_test_traffic()
 	_test_state_ownership()
 	load("res://tests/save_bug_checks.gd").run()
+	await load("res://tests/save_slot_checks.gd").run(self)
+	await load("res://tests/story_slot_save_checks.gd").run(self)
 	load("res://tests/day_flow_bug_checks.gd").run()
 	load("res://tests/traffic_bug_checks.gd").run(self)
 	_test_trigger_contracts()
@@ -41,6 +51,7 @@ func _ready() -> void:
 	await load("res://tests/store_select_checks.gd").run(self)
 	await load("res://tests/station_navigation_checks.gd").run(self)
 	await load("res://tests/terminal_spawn_checks.gd").run(self)
+	await load("res://tests/passenger_count_checks.gd").run(self)
 	await load("res://tests/passenger_confirmation_checks.gd").run(self)
 	await load("res://tests/results_screen_checks.gd").run(self)
 	await load("res://tests/hub_dialogue_checks.gd").run(self)
@@ -66,11 +77,49 @@ func _ready() -> void:
 	load("res://tests/story_branch_tools_checks.gd").run(self)
 	await load("res://tests/story_game_flow_checks.gd").run(self)
 	await load("res://tests/passenger_story_checks.gd").run(self)
+	await load("res://tests/isidro_first_encounter_checks.gd").run(self)
 	await load("res://tests/story_character_sprite_checks.gd").run(self)
+	await load("res://tests/story_street_background_checks.gd").run(self)
 	load("res://tests/story_dialogue_voice_checks.gd").run(self)
 	await load("res://tests/story_dialogue_playback_checks.gd").run(self)
 	print("PASS: all refactor regression checks")
 	get_tree().quit()
+
+func _run_selected_checks(selected_checks: Array) -> bool:
+	for selected: Variant in selected_checks:
+		if not selected is String or not str(selected).is_valid_identifier():
+			push_error("Invalid regression check target: %s" % str(selected))
+			return false
+		var target: String = str(selected)
+		var method_name: String = "_test_%s" % target
+		var runner: Callable
+		if has_method(method_name):
+			runner = Callable(self, method_name)
+		else:
+			var path: String = "res://tests/%s_checks.gd" % target
+			if not ResourceLoader.exists(path):
+				push_error("Unknown regression check target: %s" % target)
+				return false
+			var check: Script = load(path)
+			if check == null:
+				push_error("Could not load regression check target: %s" % target)
+				return false
+			runner = Callable(check, "run")
+		if not runner.is_valid():
+			push_error("Regression check target has no callable run method: %s" % target)
+			return false
+		var argument_count: int = runner.get_argument_count()
+		if argument_count < 0 or argument_count > 1:
+			push_error("Regression check target must accept zero or one argument: %s" % target)
+			return false
+		print("RUN: %s" % target)
+		var started_ms: int = Time.get_ticks_msec()
+		if argument_count == 0:
+			await runner.call()
+		else:
+			await runner.call(self)
+		print("DONE: %s (%.2fs)" % [target, float(Time.get_ticks_msec() - started_ms) / 1000.0])
+	return true
 
 func _find_filter_trigger(trigger: Dictionary, context: Dictionary = {}, events: Dictionary = {}) -> Dictionary:
 	return Triggers.find_story_trigger_for_phase([trigger], {}, events, "day_end", 4, null, context)
@@ -119,6 +168,16 @@ func _test_trigger_contracts() -> void:
 	event_trigger.required_event_values = {"known": false}
 	assert(not _find_filter_trigger(event_trigger, {}, {"known": false}).is_empty())
 	assert(_find_filter_trigger(event_trigger, {}, {"known": true}).is_empty())
+	var story_rules: Array = Triggers.build_default_story_triggers()
+	var consumed: Dictionary = {}
+	var rider_context := {"character_id": "hana", "character_progress": 2, "time_of_day": "morning"}
+	var character_event := Triggers.find_story_trigger_for_phase(story_rules, consumed, {}, "stage_complete", 2, null, rider_context)
+	assert(character_event.get("id") == "hana_first_encounter", "Eligible character scenes take priority over the Day 2 bill")
+	Triggers.consume_story_trigger(consumed, character_event)
+	assert(not consumed.has("day_2_station_bill"), "Deferring the bill must not consume it")
+	assert(Triggers.find_story_trigger_for_phase(story_rules, consumed, {}, "stage_complete", 2, null, rider_context).get("id") == "day_2_station_bill")
+	rider_context.character_progress = 1
+	assert(Triggers.find_story_trigger_for_phase(story_rules, {}, {}, "stage_complete", 2, null, rider_context).get("id") == "day_2_station_bill", "The bill still runs when no character scene qualifies")
 	print("PASS: trigger scalar/array filters, time aliases, and false/zero event-presence contracts")
 
 func _test_library_modules() -> void:

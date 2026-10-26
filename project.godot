@@ -21,6 +21,7 @@ config/enable_debug_shortcuts=false
 AudioSettingsManager="*res://scripts/audio_settings_manager.gd"
 StoryLanguageManager="*res://scripts/story_language_manager.gd"
 PlayerState="*res://scripts/player_state.gd"
+SaveSlotManager="*res://scripts/save/save_slot_manager.gd"
 AmbientAudioManager="*res://scripts/audio/ambient_audio_manager.gd"
 AchievementPopupManager="*res://scripts/ui/achievement_popup_manager.gd"
 PauseMenuManager="*res://scripts/ui/pause_menu_manager.gd"

@@ -67,7 +67,7 @@ static func queued_story(owner, target_scene: String) -> Dictionary:
 	if not payload.is_empty():
 		payload["return_scene"] = target_scene
 		payload["next_scene"] = target_scene
-		for key in ["_passenger_selection", "_selection_outcome"]:
+		for key in ["_passenger_selection", "_selection_outcome", "_driving_interruption"]:
 			if owner.story_payload.has(key):
 				var value = owner.story_payload[key]
 				payload[key] = value.duplicate(true) if value is Dictionary else value

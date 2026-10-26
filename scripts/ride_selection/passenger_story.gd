@@ -6,6 +6,10 @@ const Departure := preload("res://scripts/ride_selection/ride_departure.gd")
 const SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
+const PHASE_ABSENCE_EVENTS := {
+	"jessa_second_encounter": "jessa_second_encounter_absence",
+	"hana_second_encounter": "hana_second_encounter_absence",
+}
 
 
 static func begin(character: Dictionary, distance: String, transition_mode: String, forced_first := false) -> bool:
@@ -85,6 +89,14 @@ static func complete(payload: Dictionary, target_scene: String) -> String:
 		return target_scene
 	if payload.has("_selection_completed_scene"):
 		return str(payload["_selection_completed_scene"])
+	# Departures follow the conversation's live phase, even when selection
+	# previews a later ride phase without moving time.
+	var story_id := str(payload.get("story_id", ""))
+	if PHASE_ABSENCE_EVENTS.has(story_id) and bool(PlayerState.get_event_value(story_id + "_seen", false)):
+		PlayerState.set_event_value(str(PHASE_ABSENCE_EVENTS[story_id]), {
+			"day": PlayerState.get_current_day(),
+			"phase": PlayerState.get_current_time_of_day(),
+		})
 	var changed_time := (
 		int(context.get("day", -1)) != PlayerState.get_current_day()
 		or str(context.get("time_of_day", "")) != PlayerState.get_current_time_of_day()
