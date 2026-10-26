@@ -2,6 +2,7 @@ extends Control
 
 const PortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const CharacterSprites := preload("res://scripts/story/story_character_sprites.gd")
+const Placements := preload("res://scripts/story/story_portrait_placements.gd")
 
 # Character cutouts, bottom-aligned to dialogue or positioned on the background.
 var entries: Array[Dictionary] = []
@@ -9,6 +10,7 @@ var images: Dictionary = {}
 var dialogue_panel: Control
 var background: TextureRect
 var resolve_texture: Callable
+var _texture_cache: Dictionary = {}
 
 
 func setup(panel: Control, resolver: Callable, scene_background: TextureRect = null) -> void:
@@ -47,6 +49,7 @@ func set_portrait(data: Dictionary) -> void:
 		entry["texture"] = data["portrait"]
 	entry.erase("path")
 	entry.erase("portrait")
+	var uses_background_placement: bool = entry.has("background_placements") or str(entry.get("placement", "")).strip_edges().to_lower() == "background"
 	var explicit_texture := data.has("texture") or data.has("path") or data.has("portrait")
 	var previous_character := CharacterSprites.canonical_character_id(str(entries[index].get("character_id", id))) if index >= 0 else ""
 	var next_character := CharacterSprites.canonical_character_id(str(entry.get("character_id", id)))
@@ -58,14 +61,16 @@ func set_portrait(data: Dictionary) -> void:
 			sprite = "default"
 		var path := CharacterSprites.texture_path(character_id, sprite)
 		if path.is_empty():
-			push_warning("Unknown character sprite '%s' for portrait '%s'." % [sprite, id])
-			return
-		entry["character_id"] = character_id
-		entry["sprite"] = sprite
-		entry["texture"] = path
+			if not uses_background_placement:
+				push_warning("Unknown character sprite '%s' for portrait '%s'." % [sprite, id])
+				return
+		else:
+			entry["character_id"] = character_id
+			entry["sprite"] = sprite
+			entry["texture"] = path
 	var texture_ref = entry.get("texture", null)
 	var texture: Texture2D = resolve_texture.call(texture_ref)
-	if texture == null:
+	if texture == null and not uses_background_placement:
 		push_warning("Story portrait '%s' has no valid texture." % id)
 		return
 	if index >= 0:
@@ -110,6 +115,7 @@ func clear_portraits() -> void:
 		rect.queue_free()
 	images.clear()
 	entries.clear()
+	_texture_cache.clear()
 
 
 func layout_portraits() -> void:
@@ -119,8 +125,22 @@ func layout_portraits() -> void:
 	for index in range(entries.size()):
 		var entry: Dictionary = entries[index]
 		var rect: TextureRect = images[str(entry["id"])]
-		if _layout_background_portrait(rect, entry.get("background_region", null)):
+		var scene_texture: Texture2D = background.texture if is_instance_valid(background) else null
+		var active: Dictionary = Placements.resolve(entry, scene_texture)
+		rect.visible = not active.is_empty() and bool(entry.get("visible", true)) and bool(active.get("visible", true))
+		if not rect.visible:
 			continue
+		var texture := _placement_texture(active)
+		if texture == null:
+			rect.hide()
+			continue
+		rect.texture = texture
+		rect.flip_h = bool(active.get("flip_h", false))
+		rect.flip_v = bool(active.get("flip_v", false))
+		if _layout_background_portrait(rect, active.get("background_region", null)):
+			rect.material = null
+			continue
+		PortraitOutline.apply_to(rect)
 		var offset := _offset(entry.get("offset", Vector2.ZERO))
 		var bottom := panel_rect.position.y - float(entry.get("gap", 0.0)) + offset.y
 		var height := clampf(float(entry.get("height", 320.0)), 1.0, maxf(1.0, bottom))
@@ -145,12 +165,12 @@ func layout_portraits() -> void:
 
 
 func _layout_background_portrait(rect: TextureRect, region_data: Variant) -> bool:
-	if not region_data is Array or region_data.size() < 4 or not is_instance_valid(background) or background.texture == null:
+	var region: Rect2 = Placements.region(region_data)
+	if not region.has_area() or not is_instance_valid(background) or background.texture == null:
 		return false
 	var texture_size := background.texture.get_size()
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return false
-	var region := Rect2(float(region_data[0]), float(region_data[1]), float(region_data[2]), float(region_data[3]))
 	var drawn_rect := Rect2(Vector2.ZERO, background.size)
 	if background.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
 		drawn_rect.size = texture_size * minf(background.size.x / texture_size.x, background.size.y / texture_size.y)
@@ -162,6 +182,28 @@ func _layout_background_portrait(rect: TextureRect, region_data: Variant) -> boo
 	rect.position = local_rect.position
 	rect.size = local_rect.size
 	return true
+
+
+func _placement_texture(entry: Dictionary) -> Texture2D:
+	var source: Variant = entry.get("sheet", entry.get("texture", null))
+	var crop: Variant = entry.get("source_region", entry.get("background_region", null) if entry.has("sheet") else null)
+	var key := "%s|%s" % [str(source), str(crop)]
+	if _texture_cache.has(key):
+		return _texture_cache[key]
+	var texture: Texture2D = resolve_texture.call(source)
+	if texture == null:
+		return null
+	if crop != null:
+		var source_region: Rect2 = Placements.region(crop)
+		if not source_region.has_area() or not Rect2(Vector2.ZERO, texture.get_size()).encloses(source_region):
+			return null
+		var atlas := AtlasTexture.new()
+		atlas.atlas = texture
+		atlas.region = source_region
+		atlas.filter_clip = true
+		texture = atlas
+	_texture_cache[key] = texture
+	return texture
 
 
 func _entry_index(id: String) -> int:

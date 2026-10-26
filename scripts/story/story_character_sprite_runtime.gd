@@ -21,9 +21,14 @@ static func normalize_choices(raw_choices) -> Dictionary:
 	return choices
 
 
-static func for_speaker(owner, speaker: String) -> Array:
+static func for_speaker(owner, speaker: String, placement := "portrait") -> Array:
 	var key := Sprites.canonical_character_id(speaker)
-	return Sprites.for_speaker(speaker, str(owner.character_sprites.get(key, "default")))
+	var entries: Array = Sprites.for_speaker(speaker, str(owner.character_sprites.get(key, "default")))
+	if placement == "background":
+		for entry: Dictionary in entries:
+			entry["placement"] = "background"
+			entry.erase("height")
+	return entries
 
 
 static func apply_line(owner, line: Dictionary) -> void:

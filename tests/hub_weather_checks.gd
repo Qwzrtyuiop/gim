@@ -9,7 +9,7 @@ const VIEWS := {
 	"terminal": preload("res://scripts/ride_selection/terminal_passenger_view.gd"),
 }
 const MARKERS := {
-	"house": {"texture": preload("res://assets/story/backgrounds/locations/houserain.png"), "size": Vector2(1698, 926)},
+	"house": {"texture": preload("res://assets/story/backgrounds/locations/houserain_indoor.png"), "size": Vector2(1698, 926)},
 	"station": {"texture": preload("res://assets/story/backgrounds/locations/stationrain.png"), "size": Vector2(1672, 941)},
 	"store": {"texture": preload("res://assets/story/backgrounds/locations/storerain.png"), "size": Vector2(1698, 926)},
 	"terminal": {"texture": preload("res://assets/story/backgrounds/locations/terminalrain.png"), "size": Vector2(1672, 941)},

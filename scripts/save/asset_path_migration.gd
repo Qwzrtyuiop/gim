@@ -2,6 +2,7 @@ extends RefCounted
 
 # Compatibility for asset paths stored before folder cleanup or art replacement.
 const LEGACY_PATHS := {
+	"res://assets/story/backgrounds/locations/houserain.png": "res://assets/story/backgrounds/locations/houserain_indoor.png",
 	"res://assets/background/backgroundfishing.png": "res://assets/story/backgrounds/roads/backgroundfishing.png",
 	"res://assets/background/bg1_loop.png": "res://assets/story/backgrounds/roads/bg1_loop.png",
 	"res://assets/background/farmloop.png": "res://assets/story/backgrounds/roads/farmloop.png",
@@ -47,7 +48,8 @@ const LEGACY_PATHS := {
 	"res://assets/stagebgm/store.mp3": "res://assets/audio/music/menus/store.mp3",
 	"res://assets/stagebgm/traffic_jam.mp3": "res://assets/audio/music/driving/traffic_jam.mp3",
 	"res://assets/story/backgrounds/backgroundfishing.png": "res://assets/story/backgrounds/roads/backgroundfishing.png",
-	"res://assets/story/backgrounds/bar.jpeg": "res://assets/story/backgrounds/locations/bar.jpeg",
+	"res://assets/story/backgrounds/bar.jpeg": "res://assets/story/backgrounds/locations/bar.png",
+	"res://assets/story/backgrounds/locations/bar.jpeg": "res://assets/story/backgrounds/locations/bar.png",
 	"res://assets/story/backgrounds/bg1_loop.png": "res://assets/story/backgrounds/roads/bg1_loop.png",
 	"res://assets/story/backgrounds/city.png": "res://assets/story/backgrounds/locations/city.png",
 	"res://assets/story/backgrounds/farmloop.png": "res://assets/story/backgrounds/roads/farmloop.png",

@@ -10,6 +10,7 @@ static func run(host: Node) -> void:
 	assert(ProjectSettings.get_setting("testing/isolated", false))
 	_test_catalog()
 	await _test_generic_lineups(host)
+	await _test_alternate_generics(host)
 	await _test_hover_input_modes(host)
 	await _test_all_offers(host)
 	await _test_schedules(host)
@@ -59,6 +60,18 @@ static func _test_catalog() -> void:
 		generic.region = Rect2()
 		assert(SpawnCatalog.generic_entry(slot).region.has_area(), "Generic presentation lookups cannot modify shared slots")
 	assert(SpawnCatalog.generic_entry(-1).is_empty() and SpawnCatalog.generic_entry(8).is_empty())
+	assert(SpawnCatalog.GENERIC_ALTERNATE_ENTRIES.size() == 6)
+	for slot in range(SpawnCatalog.GENERIC_ENTRIES.size()):
+		var alternate: Dictionary = SpawnCatalog.generic_entry(slot, true)
+		if SpawnCatalog.GENERIC_ALTERNATE_ENTRIES.has(slot):
+			assert(alternate.region == SpawnCatalog.GENERIC_ALTERNATE_ENTRIES[slot].region)
+			assert(alternate.texture.get_size() == alternate.region.size, "Alternate poses retain their own authored proportions")
+			assert(Rect2(Vector2.ZERO, SpawnCatalog.ART_SIZE).encloses(alternate.region))
+			assert(is_equal_approx(float(alternate.opacity), 0.7))
+			alternate.region = Rect2()
+			assert(SpawnCatalog.generic_entry(slot, true).region.has_area(), "Alternate lookups cannot mutate the authored sheet geometry")
+		else:
+			assert(alternate == SpawnCatalog.generic_entry(slot), "Unchanged waiting spots retain their original poses")
 	for character_id: String in SpawnCatalog.GENERIC_IDS:
 		assert(bool(PlayerState.get_character_by_id(character_id).get("is_generic", false)), "Generic art must preserve the existing six passenger IDs")
 
@@ -134,6 +147,53 @@ static func _test_generic_lineups(host: Node) -> void:
 	assert(fallback.is_placeholder and fallback.texture == null, "Missing future art retains the empty-box fallback")
 	assert(view.sprite_rect_for("missing_character") == view.sprite_rect_for("missing_character", true))
 	assert(bool(fallback.call("_has_point", fallback.size * 0.5)))
+	view.free()
+	await host.get_tree().process_frame
+
+
+static func _test_alternate_generics(host: Node) -> void:
+	var view := TerminalView.new()
+	host.get_tree().root.add_child(view)
+	view.size = Vector2(1280, 720)
+	var seen_alternates: Dictionary = {}
+	var seen_originals: Dictionary = {}
+	var slot_characters := ["ely", "gardo", "ito", "cel", "hana", "benny", "jessa", "alma"]
+	for day in [3, 4]:
+		PlayerState.current_day = day
+		for phase in ["morning", "noon", "night"]:
+			PlayerState.current_phase = phase
+			for open_slot: int in SpawnCatalog.GENERIC_ALTERNATE_ENTRIES:
+				var offers: Array[Dictionary] = []
+				# Reserve every other authored position, so each alternate is exercised.
+				for slot in range(slot_characters.size()):
+					if slot != open_slot:
+						offers.append(_offer(slot_characters[slot], slot))
+				offers.append(_offer("generic_guy", 8))
+				view.set_offers(offers, false)
+				var button = view.buttons.generic_guy
+				assert(button.spawn_slot == open_slot, "Alternate art must still respect occupied waiting spots")
+				var original: Dictionary = SpawnCatalog.generic_entry(open_slot)
+				var alternate: Dictionary = SpawnCatalog.generic_entry(open_slot, true)
+				var is_alternate: bool = button.texture == alternate.texture
+				var expected: Dictionary = alternate if is_alternate else original
+				assert(button.texture == expected.texture and button.source_region == expected.region)
+				assert(is_equal_approx(float(view._art.generic_guy.opacity), 0.7 if is_alternate else 1.0))
+				assert(_has_opaque_target(button), "Visual transparency must not remove the passenger's body hit area")
+				for other_id: String in view.buttons:
+					if other_id != "generic_guy":
+						assert(not _opaque_overlap(button, view.buttons[other_id]), "An alternate body cannot overlap an occupied waiting spot")
+				if is_alternate:
+					seen_alternates[open_slot] = true
+				else:
+					seen_originals[open_slot] = true
+				view._on_offer_hovered("generic_guy")
+				assert(is_equal_approx(float(view._art.generic_guy.opacity), 0.7 if is_alternate else 1.0), "Hover preserves the selected batch's opacity")
+				view._on_offer_unhovered("generic_guy")
+				var texture: Texture2D = button.texture
+				offers.reverse()
+				view.set_offers(offers, false)
+				assert(view.buttons.generic_guy.texture == texture and view.buttons.generic_guy.source_region == expected.region, "Reopening cannot reroll a generic appearance")
+	assert(seen_alternates.size() == 6 and seen_originals.size() == 6, "All six spots offer both authored batches across days/phases")
 	view.free()
 	await host.get_tree().process_frame
 

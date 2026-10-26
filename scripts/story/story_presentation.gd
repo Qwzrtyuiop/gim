@@ -6,6 +6,7 @@ const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocke
 const StoryPortraitOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const CharacterSpriteRuntime := preload("res://scripts/story/story_character_sprite_runtime.gd")
 const StoryInterface := preload("res://scripts/story/story_interface.gd")
+const StoryBackgroundWeather := preload("res://scripts/story/story_background_weather.gd")
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -46,7 +47,8 @@ static func apply_line_visuals(owner, line: Dictionary) -> void:
 	set_portrait(owner, owner.right_portrait_frame, owner.right_portrait, owner.current_right_portrait_ref)
 	apply_portrait_focus_from_side(owner, str(line.get("focus", line.get("speaker_side", "none"))))
 	if bool(line.get("speaker_portraits", owner.story_payload.get("speaker_portraits", false))) and not line.has("portraits"):
-		owner.portrait_layer.replace_portraits(CharacterSpriteRuntime.for_speaker(owner, str(line.get("speaker", ""))))
+		var placement: String = str(line.get("speaker_placement", owner.story_payload.get("speaker_placement", "portrait")))
+		owner.portrait_layer.replace_portraits(CharacterSpriteRuntime.for_speaker(owner, str(line.get("speaker", "")), placement))
 	save_portrait_state(owner)
 
 
@@ -90,12 +92,16 @@ static func set_background_texture(owner, texture_ref, reset_camera := false) ->
 	var resolved_texture := resolve_texture(texture_ref)
 	owner.background.texture = resolved_texture
 	owner.background.visible = resolved_texture != null
+	StoryBackgroundWeather.apply(owner.background)
 	if resolved_texture != null:
 		remember_gallery_image(owner, texture_ref)
 	if reset_camera:
 		owner.background_zoom = 1.0
 		owner.background_pan = Vector2.ZERO
 	refresh_background_transform(owner)
+	# A new texture can keep identical geometry, so it may emit no rect-change signal.
+	if is_instance_valid(owner.portrait_layer):
+		owner.portrait_layer.layout_portraits()
 	refresh_portrait_visibility(owner)
 	save_portrait_state(owner)
 
@@ -348,21 +354,8 @@ static func refresh_background_transform(owner, duration := 0.0) -> void:
 
 	var fit_scale := minf(viewport_size.x / texture_size.x, viewport_size.y / texture_size.y)
 	var target_size: Vector2 = texture_size * fit_scale * DEFAULT_BG_FIT_SCALE * owner.background_zoom
-	var should_use_centered_fit := target_size.x <= viewport_size.x and target_size.y <= viewport_size.y
-
-	if should_use_centered_fit:
-		owner.background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if duration <= 0.0:
-			owner.background.position = Vector2.ZERO
-			owner.background.size = viewport_size
-			return
-
-		owner.background_motion_tween = owner.create_tween()
-		owner.background_motion_tween.set_parallel(true)
-		owner.background_motion_tween.tween_property(owner.background, "position", Vector2.ZERO, duration)
-		owner.background_motion_tween.tween_property(owner.background, "size", viewport_size, duration)
-		return
-
+	# Keep the computed image size even when it fits. Refitting a viewport-sized
+	# TextureRect discarded every zoom-out and caused a jump at the fit boundary.
 	owner.background.stretch_mode = TextureRect.STRETCH_SCALE
 	var target_position := Vector2.ZERO
 	var x_space := viewport_size.x - target_size.x

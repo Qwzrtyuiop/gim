@@ -94,7 +94,7 @@ static func build() -> Dictionary:
 			# 12
 			{
 				"text": "As I arrive, Benny is already standing at the entrance, waiting.",
-				"background": StoryConstants.BACKGROUND_CITY,
+				"background": StoryConstants.BACKGROUND_BAR_EXTERIOR_NIGHT,
 				"background_fade": 0.28,
 			},
 			# 13
@@ -264,6 +264,8 @@ static func build() -> Dictionary:
 			# 46
 			{
 				"text": "Later, when we finally step outside, my face hurts a little from smiling.",
+				"background": StoryConstants.BACKGROUND_BAR_EXTERIOR_NIGHT,
+				"background_fade": 0.28,
 			},
 			# 47
 			{

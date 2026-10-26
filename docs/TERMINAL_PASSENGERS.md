@@ -13,8 +13,12 @@ the same locked lineup, including older saves with fewer passengers.
 Cancel, Escape or a backdrop click returns to the same passengers without saving,
 changing the selected distance, charging resources or consuming a story event.
 Generic passengers use the faceless sprites from
-`terminalspawns/genericspawns.png` in both day and night scenes. Named passengers
-keep their authored spots; generics fill unused spots in a stable order. A full
+`terminalspawns/genericspawns.png` and `genericspawns2.png` in both day and night
+scenes. The second sheet supplies six alternate poses for existing waiting spots,
+each retaining its own authored size and position. A stable day/phase and passenger
+hash chooses between available poses; reopening or loading does not reroll them
+or consume gameplay randomness. Named passengers keep their authored spots;
+generics fill unused spots in a stable order. A full
 nine-offer lineup can use an extra standing position at the far left. Missing
 future character art still uses an empty outlined box.
 
@@ -79,7 +83,8 @@ clock. Pause freezes the timer and playback; leaving the station frees them.
 The empty backgrounds are `terminalday.png` and `terminalnight.png` in
 `assets/story/backgrounds/locations/`. The transparent placement sheets are
 `terminalspawns/dayspawns.png`, `terminalspawns/nightspawns.png`, and
-`terminalspawns/genericspawns.png`. All use the same 1672x941 canvas. Keep
+`terminalspawns/genericspawns.png` / `genericspawns2.png`. All use the same
+1672x941 canvas. Keep
 characters separated on the transparent sheets.
 
 The renderer uses isolated crops from those sheets to retain their exact poses,
@@ -99,7 +104,7 @@ sprites also requires updating its placement sheet to change the rendered art.
 | `hana` | Hana | `hanasprite.png` | Day, night |
 | `ito` | Isidro | `isidrosprite.png` | Day |
 | `jessa` | Jessa | `jessasprite.png` | Day, night |
-| Existing six `generic_*` IDs | Generic riders | `genericspawns.png` | Shared day/night poses |
+| Existing six `generic_*` IDs | Generic riders | `genericspawns.png`, `genericspawns2.png` | Shared day/night poses and six alternates |
 
 Placement availability and story availability are separate. For example, Jessa
 has both poses, but her live schedule remains morning/noon before her first event
@@ -116,11 +121,11 @@ python tools/extract_terminal_spawns.py
 python tools/extract_terminal_spawns.py --check
 ```
 
-The tool verifies all 23 crops and preserves each visible source pixel exactly once, including disconnected
+The tool preserves each visible source pixel exactly once, including disconnected
 details and shadows. It fails if the expected character components cannot be
 identified. Update the matching `DAY_ENTRIES` / `NIGHT_ENTRIES` rectangles in
 `scripts/ride_selection/terminal_spawn_catalog.gd` if positions change, along with
-`GENERIC_ENTRIES` for the generic sheet; `--check`
+`GENERIC_ENTRIES` and `GENERIC_ALTERNATE_ENTRIES` for the generic sheets; `--check`
 verifies both the generated images and these rectangles. Import changed assets
 in Godot before running the isolated regression suite.
 

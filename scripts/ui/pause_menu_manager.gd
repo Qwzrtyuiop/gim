@@ -287,6 +287,7 @@ func _build_ui() -> void:
 	save_screen.closed.connect(_hide_save_screen)
 	save_screen.save_requested.connect(_save_requested)
 	save_screen.load_requested.connect(_load_requested)
+	save_screen.delete_requested.connect(_delete_requested)
 	SaveSlotManager.slots_changed.connect(_refresh_save_slots)
 
 
@@ -326,6 +327,12 @@ func _save_requested(slot: int) -> void:
 		save_screen.show_status("Saved to slot %d." % slot)
 	else:
 		save_screen.show_status("Could not save: %s" % error_string(error), false)
+
+
+func _delete_requested(slot: int) -> void:
+	var error: Error = SaveSlotManager.delete_slot(slot)
+	save_screen.refresh_slots(SaveSlotManager.list_slots())
+	save_screen.show_status("Deleted slot %02d." % slot if error == OK else "Could not delete: %s" % error_string(error), error == OK)
 
 
 func _load_requested(slot: int) -> void:

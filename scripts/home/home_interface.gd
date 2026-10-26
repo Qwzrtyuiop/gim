@@ -1,6 +1,7 @@
 extends RefCounted
 
 const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
+const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const ImageOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const HouseCalendar := preload("res://scripts/ui/house_calendar.gd")
@@ -18,6 +19,13 @@ static func create_hud(owner) -> void:
 	owner.add_child(owner.status_header)
 	owner.header_label = owner.status_header.day_label
 	owner.stats_row_refs = owner.status_header.stats_refs
+	owner.map_button = Button.new()
+	owner.map_button.name = "HomeMapButton"
+	owner.map_button.text = "MAP"
+	DashboardTheme.apply_button(owner.map_button)
+	owner.map_button.pressed.connect(owner._open_map)
+	owner.add_child(owner.map_button)
+	UIAudioManager.attach_button(owner.map_button)
 
 
 static func label(owner, font_size: int) -> Label:
@@ -127,6 +135,8 @@ static func layout_ui(owner) -> void:
 	if owner.header_label == null:
 		return
 	owner.status_header.layout_in(owner.size)
+	owner.map_button.position = Vector2(20, owner.size.y - 60)
+	owner.map_button.size = DashboardTheme.BUTTON_SIZE
 	var content_origin = Vector2(0, HubStatusHeader.CONTENT_TOP)
 	var content_size = owner.size - content_origin - Vector2(0, 16)
 	if owner.info_action == "calendar":

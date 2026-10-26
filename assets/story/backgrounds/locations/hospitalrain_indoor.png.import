@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bcvo02lgc7s0v"
-path="res://.godot/imported/almahouse.png-6885086e1c8772a6e82060d085019127.ctex"
+uid="uid://u2s17nny6035"
+path="res://.godot/imported/hospitalrain_indoor.png-bf2c2153b4b56ec75185280812420c80.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/story/backgrounds/locations/check/wip/almahouse.png"
-dest_files=["res://.godot/imported/almahouse.png-6885086e1c8772a6e82060d085019127.ctex"]
+source_file="res://assets/story/backgrounds/locations/hospitalrain_indoor.png"
+dest_files=["res://.godot/imported/hospitalrain_indoor.png-bf2c2153b4b56ec75185280812420c80.ctex"]
 
 [params]
 

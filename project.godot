@@ -18,6 +18,7 @@ config/enable_debug_shortcuts=false
 
 [autoload]
 
+InputBindings="*res://scripts/input_bindings.gd"
 AudioSettingsManager="*res://scripts/audio_settings_manager.gd"
 StoryLanguageManager="*res://scripts/story_language_manager.gd"
 PlayerState="*res://scripts/player_state.gd"

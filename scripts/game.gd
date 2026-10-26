@@ -501,16 +501,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo:
-		match event.keycode:
-			KEY_UP, KEY_W:
-				PlayerVehicleController.change_lane(self, -1)
-			KEY_DOWN, KEY_S:
-				PlayerVehicleController.change_lane(self, 1)
-			KEY_SPACE, KEY_R:
-				if game_state == "YOU MADE IT":
-					GameFlowController.go_to_profit_screen(self)
-				elif game_state != "playing":
-					GameFlowController.try_retry_stage(self)
+		if event.is_action_pressed("ui_up") or event.keycode == KEY_W:
+			PlayerVehicleController.change_lane(self, -1)
+		elif event.is_action_pressed("ui_down") or event.keycode == KEY_S:
+			PlayerVehicleController.change_lane(self, 1)
+		elif event.keycode == KEY_SPACE or event.keycode == KEY_R:
+			if game_state == "YOU MADE IT":
+				GameFlowController.go_to_profit_screen(self)
+			elif game_state != "playing":
+				GameFlowController.try_retry_stage(self)
 
 
 func _process(delta: float) -> void:

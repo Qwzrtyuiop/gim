@@ -229,7 +229,7 @@ static func build() -> Dictionary:
 			},
 			# 33
 			{
-				"text": "She repeats my name quietly, as though trying to memorize it.",
+				"text": "She repeats my name quietly under her breath.",
 			},
 			# 34
 			{

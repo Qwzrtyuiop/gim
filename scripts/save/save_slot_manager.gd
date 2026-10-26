@@ -9,6 +9,7 @@ const SLOT_COUNT := 10
 const AUTOSAVE_SLOT := 1
 const SAVE_DIRECTORY := "user://saves"
 const PREVIEW_DIRECTORY := "user://saves/previews"
+const LEGACY_MIGRATION_MARKER := SAVE_DIRECTORY + "/.legacy_migration_complete"
 const HOME_PREVIEW := "res://assets/story/backgrounds/locations/inhouse.png"
 
 var _run_id := ""
@@ -87,6 +88,29 @@ func save_slot(slot: int, context: Dictionary = {}) -> Error:
 	if not _valid_slot(slot) or slot == AUTOSAVE_SLOT:
 		return ERR_INVALID_PARAMETER
 	return _save(slot, context)
+
+
+func delete_slot(slot: int) -> Error:
+	if not _valid_slot(slot):
+		return ERR_INVALID_PARAMETER
+	var path := slot_path(slot)
+	if not FileAccess.file_exists(path):
+		return ERR_DOES_NOT_EXIST
+	# Removing the last slot must not make startup import the recovery checkpoint
+	# again. Commit that distinction before destroying any selected save.
+	var error := _mark_legacy_migration_complete()
+	if error != OK:
+		return error
+	error = DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	if error != OK:
+		return error
+	# Do not parse the deleted resource: damaged saves must be removable too.
+	# Only this slot's generated preview names can be removed, never a path
+	# supplied by save metadata or another slot's artwork.
+	_remove_slot_previews(slot)
+	# Retain the daily marker so deleting Slot 1 stays effective for this day.
+	slots_changed.emit()
+	return OK
 
 
 func autosave_day(context: Dictionary = {}) -> Error:
@@ -220,6 +244,8 @@ func _read_slot(slot: int) -> SaveResource:
 
 
 func _migrate_legacy_save() -> void:
+	if FileAccess.file_exists(LEGACY_MIGRATION_MARKER):
+		return
 	for slot in range(1, SLOT_COUNT + 1):
 		if FileAccess.file_exists(slot_path(slot)):
 			return
@@ -238,6 +264,26 @@ func _migrate_legacy_save() -> void:
 	var error := _save(2, context)
 	if error != OK:
 		push_warning("Could not import previous progress into Slot 2: %s" % error_string(error))
+	else:
+		_mark_legacy_migration_complete()
+
+
+static func _mark_legacy_migration_complete() -> Error:
+	if FileAccess.file_exists(LEGACY_MIGRATION_MARKER):
+		return OK
+	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SAVE_DIRECTORY))
+	if error != OK:
+		return error
+	var marker := FileAccess.open(LEGACY_MIGRATION_MARKER, FileAccess.WRITE)
+	if marker == null:
+		return FileAccess.get_open_error()
+	marker.store_string("1\n")
+	marker.flush()
+	error = marker.get_error()
+	marker.close()
+	if error != OK:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(LEGACY_MIGRATION_MARKER))
+	return error
 
 
 static func _write_preview(source: Image, path: String) -> Error:
@@ -259,6 +305,17 @@ static func _remove_preview(path: String) -> void:
 	var safe_path := path.simplify_path()
 	if safe_path.begins_with(PREVIEW_DIRECTORY + "/") and safe_path.get_extension() == "png" and FileAccess.file_exists(safe_path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(safe_path))
+
+
+static func _remove_slot_previews(slot: int) -> void:
+	var directory := DirAccess.open(PREVIEW_DIRECTORY)
+	if directory == null:
+		return
+	var generated_name := RegEx.new()
+	generated_name.compile("^slot_%02d_[0-9]+\\.png$" % slot)
+	for filename: String in directory.get_files():
+		if generated_name.search(filename) != null:
+			_remove_preview(PREVIEW_DIRECTORY.path_join(filename))
 
 
 static func _valid_slot(slot: int) -> bool:

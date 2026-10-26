@@ -140,6 +140,75 @@ Large images can overlap; use height and x to arrange a crowd. Portraits draw
 behind the dialogue box, choices, and screen fade, and do not intercept clicks.
 Placement follows the dialogue panel if it moves or resizes.
 
+## Location-specific scene placement
+
+Foreground dialogue portraits use a fixed display height. Characters standing
+inside the scene need an authored layout for each background's perspective.
+Their placement must not be copied from a different location.
+
+For automatic speakers using scene layouts, add this to the story payload:
+
+```gdscript
+"speaker_portraits": true,
+"speaker_placement": "background",
+```
+
+The speaker uses the current background's entry in
+[`story_location_spawns.gd`](story_location_spawns.gd), keyed by full background
+path and stable character ID. Existing terminal day/night layouts are available;
+other locations remain empty until their placements are authored. A line may
+override `speaker_placement` with `"portrait"` for a close-up.
+
+For a persistent manual cast, set `speaker_portraits: false` and use:
+
+```gdscript
+"portraits": [
+	{
+		"id": "jessa_in_scene",
+		"character_id": "jessa",
+		"placement": "background",
+	},
+],
+```
+
+Prepare each location like `terminalspawns`: place and scale characters against
+the background, hide the background, and export a transparent sheet on the same
+canvas. Keep individual cutouts separable. The registered layout records each
+cutout and its background-image rectangle. Day/night images can share the same
+placement data when their camera and perspective match.
+
+Alternatively, a portrait can own an explicit `background_placements` map. This
+example reuses the existing terminal source sheets and their authored regions:
+
+```gdscript
+{
+	"id": "jessa_in_scene",
+	"character_id": "jessa",
+	"background_placements": {
+		StoryConstants.BACKGROUND_TERMINAL: {
+			"sheet": "res://assets/story/backgrounds/locations/terminalspawns/dayspawns.png",
+			"background_region": [1200, 329, 111, 235],
+		},
+		StoryConstants.BACKGROUND_TERMINAL_NIGHT: {
+			"sheet": "res://assets/story/backgrounds/locations/terminalspawns/nightspawns.png",
+			"background_region": [1189, 329, 122, 236],
+		},
+	},
+}
+```
+
+`sheet` crops from the transparent canvas. `source_region` overrides its crop;
+otherwise it uses `background_region`. A separate cropped PNG or AtlasTexture
+can be supplied as `texture` instead. Optional `variants` within a placement
+provide different cutouts/regions for named outfits such as `alt`.
+
+Scene placement follows background fit, zoom, pan and resizing. A character with
+no placement for the current background stays hidden until a matching layout is
+available. Switching locations never overwrites the authored map or carries a
+resolved rectangle into the next location. Checkpoints retain the authored
+layout and sprite choice; replay remains read-only. Existing fixed-height
+portraits and legacy `background_region` entries keep their prior behavior.
+
 ## Change characters during dialogue
 
 In manual mode (`speaker_portraits: false`), omitting `portraits` keeps the current

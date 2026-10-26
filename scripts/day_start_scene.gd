@@ -2,6 +2,7 @@ extends Control
 
 const HomeInterface := preload("res://scripts/home/home_interface.gd")
 const HomeTutorial := preload("res://scripts/home/home_tutorial.gd")
+const HomeMap := preload("res://scripts/home/home_map.gd")
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
 const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
 const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
@@ -47,6 +48,8 @@ var tutorial_step_index := 0
 var tutorial_steps: Array[Dictionary] = []
 var tutorial_active := false
 var hub_dialogue: HubDialogue
+var map_button: Button
+var home_map: HomeMap
 
 
 func _ready() -> void:
@@ -63,6 +66,7 @@ func _ready() -> void:
 		PlayerState.mark_home_tutorial_shown()
 	_create_hud()
 	_create_info_overlay()
+	_create_map()
 	_create_hub_dialogue()
 	night_ambience = AmbientAudioManager
 	AmbientAudioManager.enter_hub()
@@ -88,7 +92,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _on_house_action(action: String) -> void:
-	if is_transitioning or tutorial_active or info_overlay.visible or _speech_is_blocking():
+	if is_transitioning or tutorial_active or info_overlay.visible or home_map.visible or _speech_is_blocking():
 		return
 	match action:
 		"radio", "calendar":
@@ -101,6 +105,31 @@ func _on_house_action(action: String) -> void:
 
 func _create_hud() -> void:
 	HomeInterface.create_hud(self)
+
+
+func _create_map() -> void:
+	home_map = HomeMap.new()
+	add_child(home_map)
+	home_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	home_map.closed.connect(_close_map)
+	home_map.destination_requested.connect(_leave_home)
+
+
+func _open_map() -> void:
+	if is_transitioning or tutorial_active or info_overlay.visible or home_map.visible or _speech_is_blocking():
+		return
+	hub_dialogue.clear()
+	house.set_enabled(false)
+	map_button.hide()
+	status_header.hide()
+	home_map.open()
+
+
+func _close_map() -> void:
+	house.set_enabled(not is_transitioning and not tutorial_active)
+	map_button.show()
+	status_header.show()
+	map_button.grab_focus()
 
 
 func _label(font_size: int) -> Label:
@@ -232,7 +261,7 @@ func _create_hub_dialogue() -> void:
 	add_child(hub_dialogue)
 	hub_dialogue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hub_dialogue.set_gate(func() -> bool:
-		return not tutorial_active and not is_transitioning and not info_overlay.visible
+		return not tutorial_active and not is_transitioning and not info_overlay.visible and not home_map.visible
 	)
 	for action: String in house.REGIONS:
 		hub_dialogue.register_target(action, _home_message_target.bind(action))

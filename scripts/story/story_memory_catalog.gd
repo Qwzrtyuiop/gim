@@ -5,7 +5,7 @@ const JessaFareEvent := preload("res://scripts/story/jessa_fare_event.gd")
 const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 const BACKGROUND_INHOUSE := "res://assets/story/backgrounds/locations/inhouse.png"
 const BACKGROUND_STATION := "res://assets/story/backgrounds/locations/Updated_day.png"
-const BACKGROUND_BAR := "res://assets/story/backgrounds/locations/bar.jpeg"
+const BACKGROUND_BAR := "res://assets/story/backgrounds/locations/bar.png"
 const BACKGROUND_CITY := "res://assets/story/backgrounds/locations/city.png"
 const TROPA_CG := "res://assets/story/specialCG/tropaCg.png"
 
@@ -37,6 +37,13 @@ const GALLERY_ENTRIES := [
 		"subtitle": "A few hours where the years feel smaller.",
 		"unlock_story_id": "benny_tropa_night",
 		"image": BACKGROUND_BAR,
+	},
+	{
+		"id": "tropa_bar_exterior",
+		"title": "Outside the Bar",
+		"subtitle": "Waiting for old friends under the bar's lights.",
+		"unlock_story_id": "benny_tropa_night",
+		"image": "res://assets/story/backgrounds/locations/barnight.png",
 	},
 	{
 		"id": "tropa_cg",

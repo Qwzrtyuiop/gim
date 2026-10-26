@@ -6,6 +6,7 @@ uniform vec2 logical_size = vec2(1280.0, 720.0);
 uniform float elapsed = 0.0;
 uniform float rain_strength : hint_range(0.0, 1.0) = 0.0;
 uniform bool indoor = false;
+uniform bool strict_marker_colors = false;
 
 float hash_value(vec2 point) {
 	return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
@@ -16,6 +17,11 @@ float marked(vec2 uv) {
 		return 0.0;
 	}
 	vec4 sample_color = texture(marker_mask, uv);
+	if (strict_marker_colors) {
+		return step(0.5, sample_color.a) * step(160.0 / 255.0, sample_color.r)
+			* step(sample_color.r, 240.0 / 255.0) * step(240.0 / 255.0, sample_color.g)
+			* step(sample_color.b, 20.0 / 255.0);
+	}
 	return step(0.5, sample_color.a) * step(0.4, sample_color.r)
 		* step(0.7, sample_color.g) * step(sample_color.b, 0.3);
 }

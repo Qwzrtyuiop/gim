@@ -211,6 +211,7 @@ func _build_save_slot_screen() -> void:
 	add_child(save_slot_screen)
 	save_slot_screen.closed.connect(_close_load_slots)
 	save_slot_screen.load_requested.connect(_load_slot)
+	save_slot_screen.delete_requested.connect(_delete_slot)
 	SaveSlotManager.slots_changed.connect(_refresh_load_availability)
 	_refresh_load_availability()
 
@@ -253,9 +254,22 @@ func _load_slot(slot: int) -> void:
 	_fade_to_scene(SaveGameContext.resume_scene())
 
 
+func _delete_slot(slot: int) -> void:
+	if is_start_transitioning:
+		return
+	var error: Error = SaveSlotManager.delete_slot(slot)
+	save_slot_screen.refresh_slots(SaveSlotManager.list_slots())
+	save_slot_screen.show_status("Deleted slot %02d." % slot if error == OK else "Could not delete: %s" % error_string(error), error == OK)
+
+
 func _refresh_load_availability() -> void:
 	if load_button != null and (save_slot_screen == null or not save_slot_screen.visible):
-		load_button.disabled = is_start_transitioning or not SaveSlotManager.has_slots()
+		var has_save_file := false
+		for entry: Dictionary in SaveSlotManager.list_slots():
+			if bool(entry.get("exists", false)):
+				has_save_file = true
+				break
+		load_button.disabled = is_start_transitioning or not has_save_file
 
 
 func _menu_controls() -> Array[BaseButton]:

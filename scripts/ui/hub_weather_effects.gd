@@ -8,15 +8,17 @@ const HEAVY_RAIN_TINT := Color(0.58, 0.64, 0.72)
 var weather := "clear"
 var elapsed := 0.0
 var indoor := false
+var strict_marker_colors := false
 var marker_texture: Texture2D
 var shader_material: ShaderMaterial
 var effect_rect: ColorRect
 var _marker_image: Image
 
 
-func configure(marker: Texture2D, inside := false) -> void:
+func configure(marker: Texture2D, inside := false, strict_colors := false) -> void:
 	marker_texture = marker
 	indoor = inside
+	strict_marker_colors = strict_colors
 	_marker_image = null
 	_sync_material()
 
@@ -77,6 +79,7 @@ func _sync_material() -> void:
 	shader_material.set_shader_parameter("marker_mask", marker_texture)
 	shader_material.set_shader_parameter("logical_size", marker_texture.get_size() if marker_texture != null else Vector2(1280, 720))
 	shader_material.set_shader_parameter("indoor", indoor)
+	shader_material.set_shader_parameter("strict_marker_colors", strict_marker_colors)
 	shader_material.set_shader_parameter("elapsed", elapsed)
 	shader_material.set_shader_parameter("rain_strength", 1.0 if weather == "heavy rain" else (0.6 if weather == "rain" else 0.0))
 
@@ -94,4 +97,6 @@ func contains_marked_uv(uv: Vector2) -> bool:
 	var pixel := Vector2i(floori(uv.x * dimensions.x), floori(uv.y * dimensions.y))
 	var color := _marker_image.get_pixelv(pixel)
 	# Transparent yellow padding must never become an emission region.
+	if strict_marker_colors:
+		return color.a >= 0.5 and color.r >= 160.0 / 255.0 and color.r <= 240.0 / 255.0 and color.g >= 240.0 / 255.0 and color.b <= 20.0 / 255.0
 	return color.a >= 0.5 and color.r >= 0.4 and color.g >= 0.7 and color.b <= 0.3

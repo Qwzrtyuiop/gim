@@ -8,6 +8,7 @@ const NIGHT_BACKGROUND := preload("res://assets/story/backgrounds/locations/term
 const DAY_LAYOUT := preload("res://assets/story/backgrounds/locations/terminalspawns/dayspawns.png")
 const NIGHT_LAYOUT := preload("res://assets/story/backgrounds/locations/terminalspawns/nightspawns.png")
 const GENERIC_LAYOUT := preload("res://assets/story/backgrounds/locations/terminalspawns/genericspawns.png")
+const GENERIC_ALTERNATE_LAYOUT := preload("res://assets/story/backgrounds/locations/terminalspawns/genericspawns2.png")
 const GENERIC_IDS := [
 	"generic_guy",
 	"generic_vendor",
@@ -155,15 +156,47 @@ const GENERIC_ENTRIES := [
 ]
 
 
+const GENERIC_ALTERNATE_ENTRIES := {
+	0: {
+		"region": Rect2(247, 306, 118, 277),
+		"texture": preload("res://assets/characters/sprites/terminal/generic2/slot_0.png"),
+	},
+	2: {
+		"region": Rect2(641, 300, 102, 375),
+		"texture": preload("res://assets/characters/sprites/terminal/generic2/slot_2.png"),
+	},
+	3: {
+		"region": Rect2(816, 283, 91, 282),
+		"texture": preload("res://assets/characters/sprites/terminal/generic2/slot_3.png"),
+	},
+	5: {
+		"region": Rect2(1047, 314, 106, 349),
+		"texture": preload("res://assets/characters/sprites/terminal/generic2/slot_5.png"),
+	},
+	6: {
+		"region": Rect2(1224, 305, 87, 278),
+		"texture": preload("res://assets/characters/sprites/terminal/generic2/slot_6.png"),
+	},
+	7: {
+		"region": Rect2(1373, 291, 76, 296),
+		"texture": preload("res://assets/characters/sprites/terminal/generic2/slot_7.png"),
+	},
+}
+
+
 static func entry(character_id: String, night: bool) -> Dictionary:
 	var entries: Dictionary = NIGHT_ENTRIES if night else DAY_ENTRIES
 	var data: Dictionary = entries.get(character_id, {})
 	return data.duplicate()
 
 
-static func generic_entry(slot: int) -> Dictionary:
+static func generic_entry(slot: int, alternate := false) -> Dictionary:
 	if slot < 0 or slot >= GENERIC_ENTRIES.size():
 		return {}
+	if alternate and GENERIC_ALTERNATE_ENTRIES.has(slot):
+		var presentation: Dictionary = GENERIC_ALTERNATE_ENTRIES[slot].duplicate()
+		presentation["opacity"] = 0.7
+		return presentation
 	return GENERIC_ENTRIES[slot].duplicate()
 
 

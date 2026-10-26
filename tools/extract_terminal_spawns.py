@@ -8,6 +8,7 @@ The transparent day/night/generic sheets remain the placement source. Each major
 component is one character, ordered from left to right. Disconnected details
 (smoke, soft shadows, antialiased pieces) follow the nearest character bounds.
 The game keeps each crop's original canvas rectangle in terminal_spawn_catalog.gd.
+Use --layout generic2 to extract only the second generic placement sheet.
 """
 
 from argparse import ArgumentParser
@@ -26,7 +27,9 @@ CHARACTERS = {
     "day": ("ely", "gardo", "ito", "cel", "hana", "benny", "jessa", "alma"),
     "night": ("dante", "gardo", "cel", "hana", "jessa", "alma", "faye"),
     "generic": tuple(f"slot_{index}" for index in range(8)),
+    "generic2": tuple(f"slot_{index}" for index in (0, 2, 3, 5, 6, 7)),
 }
+LAYOUT_FILES = {"generic2": "genericspawns2.png"}
 MAJOR_COMPONENT_PIXELS = 1000
 
 
@@ -70,7 +73,7 @@ def ownership_distance(component, major):
 
 
 def extract(phase):
-    source = Image.open(LAYOUTS / f"{phase}spawns.png").convert("RGBA")
+    source = Image.open(LAYOUTS / LAYOUT_FILES.get(phase, f"{phase}spawns.png")).convert("RGBA")
     if source.size != ART_SIZE:
         raise ValueError(f"{phase}: expected {ART_SIZE}, got {source.size}")
     components = alpha_components(source)
@@ -120,14 +123,18 @@ def extract(phase):
 def main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Verify existing crops instead of writing them")
+    parser.add_argument("--layout", action="append", choices=CHARACTERS, help="Process only this layout (repeatable)")
     args = parser.parse_args()
     catalog = (ROOT / "scripts/ride_selection/terminal_spawn_catalog.gd").read_text(encoding="utf-8")
-    for phase in CHARACTERS:
-        if phase == "generic":
-            catalog_entries = catalog.split("const GENERIC_ENTRIES := [", 1)[1].split("\n]", 1)[0]
-            generic_regions = re.findall(r'"region": Rect2\(([^)]+)\)', catalog_entries)
-        else:
-            catalog_entries = catalog.split(f"const {phase.upper()}_ENTRIES := {{", 1)[1].split("\n}\n", 1)[0]
+    for phase in args.layout or CHARACTERS:
+        if args.check:
+            if phase == "generic":
+                catalog_entries = catalog.split("const GENERIC_ENTRIES := [", 1)[1].split("\n]", 1)[0]
+                generic_regions = re.findall(r'"region": Rect2\(([^)]+)\)', catalog_entries)
+            elif phase == "generic2":
+                catalog_entries = catalog.split("const GENERIC_ALTERNATE_ENTRIES := {", 1)[1].split("\n}\n", 1)[0]
+            else:
+                catalog_entries = catalog.split(f"const {phase.upper()}_ENTRIES := {{", 1)[1].split("\n}\n", 1)[0]
         for name, (region, crop) in extract(phase).items():
             destination = OUTPUT / phase / f"{name}.png"
             if args.check:
@@ -137,6 +144,10 @@ def main():
                 if phase == "generic":
                     index = int(name.removeprefix("slot_"))
                     catalog_region = generic_regions[index] if index < len(generic_regions) else ""
+                elif phase == "generic2":
+                    index = int(name.removeprefix("slot_"))
+                    match = re.search(rf'\b{index}:\s*\{{\s*"region": Rect2\(([^)]+)\)', catalog_entries)
+                    catalog_region = match.group(1) if match else ""
                 else:
                     match = re.search(rf'"{name}":\s*\{{\s*"region": Rect2\(([^)]+)\)', catalog_entries)
                     catalog_region = match.group(1) if match else ""

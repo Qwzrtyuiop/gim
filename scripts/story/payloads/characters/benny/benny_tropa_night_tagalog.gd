@@ -88,7 +88,7 @@ static func build() -> Dictionary:
 			# 11
 			{
 				"text": "Naghihintay na si Benny sa may pintuan nang makarating ako.",
-				"background": StoryConstants.BACKGROUND_CITY,
+				"background": StoryConstants.BACKGROUND_BAR_EXTERIOR_NIGHT,
 				"background_fade": 0.28,
 			},
 			# 12
@@ -267,6 +267,8 @@ static func build() -> Dictionary:
 			# 47
 			{
 				"text": "Mayamaya, nang kami'y papaalis na, pinisil ko ang aking pisngi",
+				"background": StoryConstants.BACKGROUND_BAR_EXTERIOR_NIGHT,
+				"background_fade": 0.28,
 			},
 			# 48
 			{

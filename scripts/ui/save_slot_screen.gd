@@ -1,9 +1,10 @@
 extends Control
 
-# The pause menu and main menu own saving/loading; this view only selects slots.
+# The pause menu and main menu own save operations; this view selects slots.
 signal closed
 signal save_requested(slot: int)
 signal load_requested(slot: int)
+signal delete_requested(slot: int)
 
 const DESIGN_SIZE := Vector2(1218, 931)
 const NOTEBOOK := preload("res://assets/ui/frames/notebook.png")
@@ -22,6 +23,7 @@ var slot_list: VBoxContainer
 var title_label: Label
 var status_label: Label
 var back_button: Button
+var delete_button: Button
 var confirmation: ColorRect
 var confirmation_text: Label
 var confirm_button: Button
@@ -37,6 +39,7 @@ var preview_hint: Label
 var _entries: Array[Dictionary] = []
 var _can_save := true
 var _pending_slot := 0
+var _pending_action := ""
 var _built := false
 var _preview_textures: Dictionary = {}
 var _selected_slot := 2
@@ -57,6 +60,7 @@ func open(selected_mode: String, entries: Array, can_save := true, unavailable_r
 	mode = "load" if selected_mode == "load" else "save"
 	_can_save = can_save
 	_pending_slot = 0
+	_pending_action = ""
 	confirmation.hide()
 	title_label.text = "LOAD GAME" if mode == "load" else "SAVE GAME"
 	_selected_slot = 2
@@ -91,6 +95,7 @@ func refresh_slots(entries: Array) -> void:
 
 func close() -> void:
 	_pending_slot = 0
+	_pending_action = ""
 	confirmation.hide()
 	hide()
 	closed.emit()
@@ -151,8 +156,14 @@ func _build() -> void:
 	_label(notebook, "SCROLL TO VIEW ALL SLOTS", Rect2(76, 788, 456, 27), 18, MUTED)
 	_label(notebook, "01 AUTOSAVE / 02-10 MANUAL", Rect2(76, 833, 456, 28), 19, MUTED)
 	_build_preview()
-	status_label = _label(notebook, "", Rect2(694, 696, 438, 96), 22, MUTED)
+	status_label = _label(notebook, "", Rect2(694, 696, 438, 52), 22, MUTED)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	delete_button = _button(notebook, "DELETE SAVE", Rect2(764, 758, 300, 52))
+	delete_button.name = "DeleteSave"
+	delete_button.disabled = true
+	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		delete_button.add_theme_color_override(state, RED_INK)
+	delete_button.pressed.connect(_request_delete)
 	back_button = _button(notebook, "CLOSE NOTEBOOK", Rect2(764, 821, 300, 52))
 	back_button.pressed.connect(close)
 	confirmation = ColorRect.new()
@@ -224,6 +235,11 @@ func _show_slot_details(slot: int) -> void:
 	var entry := _slot_data(slot)
 	var exists := bool(entry.get("exists", false))
 	var valid := bool(entry.get("valid", false))
+	delete_button.disabled = not exists
+	delete_button.focus_mode = Control.FOCUS_ALL if exists else Control.FOCUS_NONE
+	var selected_button: Button = slot_buttons.get(slot)
+	if selected_button != null:
+		delete_button.focus_neighbor_left = delete_button.get_path_to(selected_button)
 	preview_title.text = "SLOT %02d" % slot
 	preview_kind.text = "DAILY AUTOSAVE" if slot == 1 else "MANUAL SAVE"
 	preview_image.texture = _preview(str(entry.get("preview_path", ""))) if exists else null
@@ -259,6 +275,7 @@ func _build_slot(slot: int, entry: Dictionary) -> void:
 	_style_button(button)
 	slot_list.add_child(button)
 	slot_buttons[slot] = button
+	button.focus_neighbor_right = button.get_path_to(delete_button)
 	var title := "SLOT %02d" % slot
 	if slot == 1:
 		title += " / AUTOSAVE"
@@ -308,6 +325,7 @@ func _select_slot(slot: int) -> void:
 		save_requested.emit(slot)
 		return
 	_pending_slot = slot
+	_pending_action = mode
 	confirmation_text.text = "Load Slot %02d?\nUnsaved progress will be lost." % slot if mode == "load" else "Overwrite Slot %02d?\nThis will replace the previous save." % slot
 	confirm_button.text = "LOAD" if mode == "load" else "OVERWRITE"
 	confirmation.show()
@@ -315,24 +333,44 @@ func _select_slot(slot: int) -> void:
 	cancel_button.grab_focus()
 
 
+func _request_delete() -> void:
+	if confirmation.visible or not visible or not bool(_slot_data(_selected_slot).get("exists", false)):
+		return
+	_pending_slot = _selected_slot
+	_pending_action = "delete"
+	confirmation_text.text = "Delete Slot %02d?\nThis cannot be undone." % _pending_slot
+	confirm_button.text = "DELETE"
+	confirmation.show()
+	_set_picker_focus(false)
+	cancel_button.grab_focus()
+
+
 func _confirm_slot() -> void:
 	var slot := _pending_slot
+	var action := _pending_action
 	_pending_slot = 0
+	_pending_action = ""
 	confirmation.hide()
 	_set_picker_focus(true)
 	if slot < 1 or slot > SLOT_COUNT:
 		return
-	if mode == "load":
+	if action == "delete":
+		delete_requested.emit(slot)
+		back_button.grab_focus()
+	elif action == "load":
 		load_requested.emit(slot)
-	else:
+	elif action == "save":
 		save_requested.emit(slot)
 
 
 func _hide_confirmation() -> void:
+	var deleting := _pending_action == "delete"
 	confirmation.hide()
-	_set_picker_focus(true)
-	var button: Button = slot_buttons.get(_pending_slot)
+	var button: Button = delete_button if deleting else slot_buttons.get(_pending_slot)
 	_pending_slot = 0
+	_pending_action = ""
+	_show_slot_details(_selected_slot)
+	_set_picker_focus(true)
 	if button != null and not button.disabled:
 		button.grab_focus()
 	else:
@@ -341,6 +379,7 @@ func _hide_confirmation() -> void:
 
 func _set_picker_focus(enabled: bool) -> void:
 	back_button.focus_mode = Control.FOCUS_ALL if enabled else Control.FOCUS_NONE
+	delete_button.focus_mode = Control.FOCUS_ALL if enabled and not delete_button.disabled else Control.FOCUS_NONE
 	for button: Button in slot_buttons.values():
 		button.focus_mode = Control.FOCUS_ALL if enabled and not button.disabled else Control.FOCUS_NONE
 

@@ -153,6 +153,7 @@ func set_offers(offers: Array, night: bool) -> void:
 			"region": source_region,
 			"texture": texture,
 			"placeholder": placeholder,
+			"opacity": float(presentation.get("opacity", 1.0)),
 			"slot": int(presentation.get("slot", SpawnCatalog.GENERIC_SLOT_BY_CHARACTER.get(character_id, -1))),
 		}
 		_draw_order.append(character_id)
@@ -182,7 +183,10 @@ func _generic_presentations(generic_ids: Array[String], occupied_slots: Dictiona
 			continue
 		if not free_slots.is_empty():
 			var slot: int = free_slots.pop_front()
-			var presentation := SpawnCatalog.generic_entry(slot)
+			# Choose once per day/phase without consuming gameplay randomness.
+			# Each alternate keeps its own authored size and canvas position.
+			var appearance_key := "%d:%s:%s" % [PlayerState.current_day, PlayerState.current_phase, character_id]
+			var presentation := SpawnCatalog.generic_entry(slot, appearance_key.hash() % 2 == 0)
 			presentation["slot"] = slot
 			result[character_id] = presentation
 		else:
@@ -476,4 +480,6 @@ func _draw_passenger(character_id: String, highlighted: bool) -> void:
 		draw_rect(destination, color, false, 2.0 if highlighted else 1.0)
 		return
 	var texture: Texture2D = art.texture
-	draw_texture_rect(texture, destination, false, Color(1.12, 1.12, 1.06) if highlighted else Color.WHITE)
+	var tint := Color(1.12, 1.12, 1.06) if highlighted else Color.WHITE
+	tint.a = float(art.opacity)
+	draw_texture_rect(texture, destination, false, tint)
