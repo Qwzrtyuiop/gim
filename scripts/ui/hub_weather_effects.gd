@@ -13,14 +13,19 @@ var marker_texture: Texture2D
 var shader_material: ShaderMaterial
 var effect_rect: ColorRect
 var _marker_image: Image
+var _marker_size := Vector2(1280, 720)
 
 
 func configure(marker: Texture2D, inside := false, strict_colors := false) -> void:
+	var marker_size := marker.get_size() if marker != null else Vector2(1280, 720)
+	var changed := marker_texture != marker or _marker_size != marker_size or indoor != inside or strict_marker_colors != strict_colors
 	marker_texture = marker
+	_marker_size = marker_size
 	indoor = inside
 	strict_marker_colors = strict_colors
 	_marker_image = null
-	_sync_material()
+	if changed:
+		_sync_material()
 
 
 func _ready() -> void:
@@ -48,10 +53,13 @@ func set_art_rect(rect: Rect2) -> void:
 
 func set_weather(value: String) -> void:
 	var normalized := value.strip_edges().to_lower().replace("_", " ").replace("-", " ")
-	weather = normalized if normalized in ["clear", "cloudy", "rain", "heavy rain"] else "clear"
+	var next_weather := normalized if normalized in ["clear", "cloudy", "rain", "heavy rain"] else "clear"
+	if next_weather == weather:
+		return
+	weather = next_weather
 	if not is_raining():
 		elapsed = 0.0
-	_sync_material()
+	_sync_weather_material()
 
 
 func is_raining() -> bool:
@@ -72,14 +80,21 @@ func _process(delta: float) -> void:
 
 
 func _sync_material() -> void:
-	set_process(is_raining())
 	if shader_material == null:
+		set_process(is_raining())
 		return
-	effect_rect.visible = is_raining()
 	shader_material.set_shader_parameter("marker_mask", marker_texture)
 	shader_material.set_shader_parameter("logical_size", marker_texture.get_size() if marker_texture != null else Vector2(1280, 720))
 	shader_material.set_shader_parameter("indoor", indoor)
 	shader_material.set_shader_parameter("strict_marker_colors", strict_marker_colors)
+	_sync_weather_material()
+
+
+func _sync_weather_material() -> void:
+	set_process(is_raining())
+	if shader_material == null:
+		return
+	effect_rect.visible = is_raining()
 	shader_material.set_shader_parameter("elapsed", elapsed)
 	shader_material.set_shader_parameter("rain_strength", 1.0 if weather == "heavy rain" else (0.6 if weather == "rain" else 0.0))
 

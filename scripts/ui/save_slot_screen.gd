@@ -9,10 +9,12 @@ signal delete_requested(slot: int)
 const DESIGN_SIZE := Vector2(1218, 931)
 const NOTEBOOK := preload("res://assets/ui/frames/notebook.png")
 const NOTEBOOK_REGION := Rect2(18, 155, 1218, 931)
-const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
-const INK := Color("4b2d19")
-const RED_INK := Color("873d2c")
-const MUTED := Color("86603b")
+const NotebookTheme := preload("res://scripts/ui/save_notebook_theme.gd")
+const SlotCard := preload("res://scripts/ui/save_slot_card.gd")
+const FONT := NotebookTheme.FONT
+const INK := NotebookTheme.INK
+const RED_INK := NotebookTheme.RED_INK
+const MUTED := NotebookTheme.MUTED
 const SLOT_COUNT := 10
 
 var mode := "save"
@@ -265,44 +267,11 @@ func _show_slot_details(slot: int) -> void:
 
 func _build_slot(slot: int, entry: Dictionary) -> void:
 	var exists := bool(entry.get("exists", false))
-	var valid := bool(entry.get("valid", exists))
-	var button := Button.new()
-	button.name = "Slot%d" % slot
-	button.custom_minimum_size = Vector2(0, 136)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.disabled = (mode == "save" and (slot == 1 or not _can_save)) or (mode == "load" and not valid)
-	_style_button(button)
+	var preview: Texture2D = _preview(str(entry.get("preview_path", ""))) if exists else null
+	var button := SlotCard.build(slot, entry, mode, _can_save, preview)
 	slot_list.add_child(button)
 	slot_buttons[slot] = button
 	button.focus_neighbor_right = button.get_path_to(delete_button)
-	var title := "SLOT %02d" % slot
-	if slot == 1:
-		title += " / AUTOSAVE"
-	var preview: Texture2D = _preview(str(entry.get("preview_path", ""))) if exists else null
-	if exists:
-		var image := TextureRect.new()
-		image.texture = preview
-		image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		button.add_child(image)
-		image.position = Vector2(14, 20)
-		image.size = Vector2(132, 96)
-		image.clip_contents = true
-		_row_label(button, title, 12, 25, 19, RED_INK)
-		if valid:
-			_row_label(button, "Day %d / %s" % [int(entry.get("day", 1)), str(entry.get("phase", "morning")).capitalize()], 43, 31, 25, INK)
-			_row_label(button, str(entry.get("location", "")), 77, 25, 21, MUTED)
-			_row_label(button, str(entry.get("saved_at", "")), 106, 23, 18, MUTED)
-		else:
-			_row_label(button, "Save unavailable", 48, 32, 24, INK)
-			_row_label(button, "Click to replace" if mode == "save" and slot != 1 else "Cannot load this file", 93, 27, 20, MUTED)
-	else:
-		_label(button, "+" if slot != 1 else "AUTO", Rect2(14, 22, 132, 90), 58 if slot != 1 else 26, MUTED)
-		_row_label(button, title, 14, 27, 19, RED_INK)
-		_row_label(button, "Empty slot", 49, 35, 28, INK)
-		_row_label(button, "A new place in your story" if slot != 1 else "Saved when a new day begins", 94, 27, 19, MUTED)
 	button.pressed.connect(_select_slot.bind(slot))
 	button.mouse_entered.connect(_show_slot_details.bind(slot))
 	button.focus_entered.connect(func() -> void:
@@ -407,61 +376,17 @@ func _preview(path: String) -> Texture2D:
 	return texture
 
 
-func _row_label(parent: Control, text: String, top: float, height: float, font_size: int, color: Color) -> Label:
-	var label := _label(parent, text, Rect2(164, top, 0, height), font_size, color)
-	label.anchor_right = 1.0
-	label.offset_right = -14
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	return label
-
-
 func _label(parent: Control, text: String, rect: Rect2, font_size: int, color := INK) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.position = rect.position
-	label.size = rect.size
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_override("font", FONT)
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	parent.add_child(label)
-	return label
+	return NotebookTheme.label(parent, text, rect, font_size, color)
 
 
 func _button(parent: Control, text: String, rect: Rect2) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.position = rect.position
-	button.size = rect.size
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_font_override("font", FONT)
-	button.add_theme_font_size_override("font_size", 25)
-	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		button.add_theme_color_override(state, INK)
-	_style_button(button)
-	parent.add_child(button)
-	UIAudioManager.attach_button(button)
-	return button
+	return NotebookTheme.button(parent, text, rect)
 
 
 func _style_button(button: Button, selected := false) -> void:
-	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
-		var active: bool = selected or state in ["hover", "pressed", "focus"]
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color(0.30, 0.17, 0.08, 0.12 if active else 0.035)
-		style.border_color = RED_INK if active else Color(0.30, 0.17, 0.08, 0.35)
-		style.set_border_width_all(2 if active else 1)
-		if selected:
-			style.border_width_left = 5
-		button.add_theme_stylebox_override(state, style)
+	NotebookTheme.style_button(button, selected)
 
 
 func _fill(control: Control, margin: float) -> void:
-	control.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	control.offset_left = margin
-	control.offset_top = margin
-	control.offset_right = -margin
-	control.offset_bottom = -margin
+	NotebookTheme.fill(control, margin)

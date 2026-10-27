@@ -20,6 +20,9 @@ var _background: TextureRect
 var _effects: HubWeatherEffects
 var _base_tint := Color.WHITE
 var _weather := ""
+var _layout_background_size := Vector2(-1, -1)
+var _layout_art_size := Vector2(-1, -1)
+var _layout_stretch_mode := -1
 
 
 static func is_indoor_background(texture: Texture2D) -> bool:
@@ -57,6 +60,8 @@ func configure(background: TextureRect, marker: Texture2D, inside := false, outd
 		_background = background
 		_base_tint = background.self_modulate
 	_effects.configure(marker, inside, true)
+	# Reconfiguration reapplies layout even when the next artwork has equal dimensions.
+	_layout_stretch_mode = -1
 	visible = marker != null or outdoor_without_mask
 	set_process(visible)
 	_weather = ""
@@ -87,11 +92,19 @@ func _sync_weather() -> void:
 func _sync_art_rect() -> void:
 	if _background.texture == null:
 		return
-	var rect := Rect2(Vector2.ZERO, _background.size)
-	if _background.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
-		var art_size: Vector2 = _background.texture.get_size()
-		var fit := minf(_background.size.x / maxf(1.0, art_size.x), _background.size.y / maxf(1.0, art_size.y))
+	var background_size: Vector2 = _background.size
+	var art_size: Vector2 = _background.texture.get_size()
+	var stretch_mode: int = _background.stretch_mode
+	# Camera position/scale are inherited. Only these local inputs change the fit.
+	if background_size == _layout_background_size and art_size == _layout_art_size and stretch_mode == _layout_stretch_mode:
+		return
+	_layout_background_size = background_size
+	_layout_art_size = art_size
+	_layout_stretch_mode = stretch_mode
+	var rect := Rect2(Vector2.ZERO, background_size)
+	if stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
+		var fit := minf(background_size.x / maxf(1.0, art_size.x), background_size.y / maxf(1.0, art_size.y))
 		var fitted: Vector2 = art_size * fit
-		rect = Rect2((_background.size - fitted) * 0.5, fitted)
+		rect = Rect2((background_size - fitted) * 0.5, fitted)
 	if _effects.position != rect.position or _effects.size != rect.size:
 		_effects.set_art_rect(rect)
