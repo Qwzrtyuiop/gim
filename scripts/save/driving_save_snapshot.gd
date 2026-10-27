@@ -14,7 +14,7 @@ const OWNER_FIELDS := [
 	"player_lane", "player_speed", "player_x", "boost_active", "boost_speed_x", "boost_gas_save_timer",
 	"player_hit_recovery_timer", "player_hit_invincible_timer", "player_hit_flicker_timer", "player_hit_flicker_visible",
 	"passenger_rule_violation_count", "trip_peak_speed_kmh", "trip_vehicle_collision_count",
-	"spawn_timers", "speeder_spawn_timer", "speeder_warning_active", "speeder_warning_timer",
+	"spawn_timers", "top_lane_pressure", "speeder_spawn_timer", "speeder_warning_active", "speeder_warning_timer",
 	"speeder_warning_beeps_remaining", "speeder_warning_flash_timer", "oncoming_warning_elapsed", "oncoming_warning_beep_index",
 	"speeder_lane_change_warning_active", "speeder_lane_change_warning_target_lane",
 	"weather_effect_time", "rain_floor_drop_spawn_timer", "horn_press_cooldown",
@@ -80,12 +80,18 @@ static func restore(game, data: Dictionary) -> bool:
 		if not entry is Dictionary or not game.VEHICLE_TEXTURES.has(str(entry.get("vehicle_key", ""))) or not entry.get("_sprite") is Dictionary:
 			return false
 	var values: Dictionary = data.values
+	var pressure: Variant = values.get("top_lane_pressure", 0.0)
+	if not (pressure is int or pressure is float) or not is_finite(float(pressure)):
+		return false
 	for key: String in OWNER_FIELDS:
 		if values.has(key):
 			game.set(key, _copy_value(values[key]))
 	for key: String in StageProfiles.DEFAULT_STAGE_PROFILE:
 		if values.has(key):
 			game.set(key, _copy_value(values[key]))
+	# Older live saves predate this ride-local field; do not retain a reused
+	# scene's pressure when loading one. Valid numeric input stays bounded.
+	game.top_lane_pressure = clampf(float(pressure), 0.0, 1.0)
 	var viewport: Vector2 = game.get_viewport_rect().size
 	var saved_viewport: Vector2 = data.get("viewport", viewport)
 	var ratio := Vector2(viewport.x / maxf(1.0, saved_viewport.x), viewport.y / maxf(1.0, saved_viewport.y))

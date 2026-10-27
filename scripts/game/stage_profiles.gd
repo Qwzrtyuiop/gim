@@ -131,8 +131,8 @@ const TRAFFIC_PROFILES := {
 		"shoulder_parked_chance": 0.42,
 	},
 	"normal": {
-		"incoming_spawn_min_delay": 10.0,
-		"incoming_spawn_max_delay": 16.0,
+		"incoming_spawn_min_delay": 15.0,
+		"incoming_spawn_max_delay": 24.0,
 		"main_spawn_min_delay": 3.6,
 		"main_spawn_max_delay": 5.6,
 		"shoulder_spawn_min_delay": 11.0,
@@ -140,8 +140,8 @@ const TRAFFIC_PROFILES := {
 		"spawn_delay_progress_reduction": 0.22,
 	},
 	"traffic-jam": {
-		"incoming_spawn_min_delay": 10.0,
-		"incoming_spawn_max_delay": 16.0,
+		"incoming_spawn_min_delay": 15.0,
+		"incoming_spawn_max_delay": 24.0,
 		"main_spawn_min_delay": 1.0,
 		"main_spawn_max_delay": 1.8,
 		"shoulder_spawn_min_delay": 8.5,
@@ -152,8 +152,8 @@ const TRAFFIC_PROFILES := {
 		"shoulder_parked_chance": 0.65,
 	},
 	"busy": {
-		"incoming_spawn_min_delay": 3.6,
-		"incoming_spawn_max_delay": 6.0,
+		"incoming_spawn_min_delay": 7.2,
+		"incoming_spawn_max_delay": 12.0,
 		"main_spawn_min_delay": 1.8,
 		"main_spawn_max_delay": 3.2,
 		"shoulder_spawn_min_delay": 11.0,
@@ -171,8 +171,8 @@ const TRAFFIC_PROFILES := {
 		"npc_lane_change_chance_per_second": 0.12,
 	},
 	"speeders": {
-		"incoming_spawn_min_delay": 8.5,
-		"incoming_spawn_max_delay": 14.0,
+		"incoming_spawn_min_delay": 13.0,
+		"incoming_spawn_max_delay": 21.0,
 		"main_spawn_min_delay": 3.8,
 		"main_spawn_max_delay": 6.0,
 		"shoulder_spawn_min_delay": 10.0,

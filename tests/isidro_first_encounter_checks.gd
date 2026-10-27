@@ -465,4 +465,3 @@ static func _world(game, timer: Timer) -> Dictionary:
 
 static func _economy() -> Dictionary:
 	return {"money": PlayerState.money, "energy": PlayerState.energy, "gas": PlayerState.gas, "day": PlayerState.current_day, "phase": PlayerState.current_phase, "round": PlayerState.stage_round, "karma": PlayerState.karma, "progress": PlayerState.get_unique_character_progress("ito"), "rides": PlayerState.character_completed_rides.duplicate(true)}
-

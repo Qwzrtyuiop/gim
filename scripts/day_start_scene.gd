@@ -69,7 +69,7 @@ func _ready() -> void:
 	_create_map()
 	_create_hub_dialogue()
 	night_ambience = AmbientAudioManager
-	AmbientAudioManager.enter_hub()
+	AmbientAudioManager.enter_hub(false, true)
 	house.action_pressed.connect(_on_house_action)
 	resized.connect(_layout_ui)
 	_start_home_bgm()
@@ -113,6 +113,7 @@ func _create_map() -> void:
 	home_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	home_map.closed.connect(_close_map)
 	home_map.destination_requested.connect(_leave_home)
+	home_map.bar_music_changed.connect(_refresh_home_bgm)
 
 
 func _open_map() -> void:
@@ -240,8 +241,10 @@ func _start_home_bgm() -> void:
 
 
 func _refresh_home_bgm() -> void:
+	if not is_instance_valid(bgm_player):
+		return
 	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
-	if PlayerState.is_midnight():
+	if PlayerState.is_midnight() or (home_map != null and home_map.bar_audio != null and home_map.bar_audio.active):
 		bgm_player.stop()
 	elif not bgm_player.playing:
 		bgm_player.play()

@@ -87,8 +87,11 @@ static func update_entities(owner, delta: float) -> void:
 	for entity in owner.active_entities:
 		var sprite: Sprite2D = entity["sprite"]
 		var lane_index: int = entity["lane"]
-		var left_despawn_x := SAME_DIRECTION_BEHIND_DESPAWN_X if TrafficEntities.entity_moves_with_player(entity, lane_index) else INCOMING_BEHIND_DESPAWN_X
-		if sprite.position.x < left_despawn_x or sprite.position.x > owner.get_viewport_rect().size.x + FRONT_DESPAWN_EXTRA_X:
+		var moves_with_player := TrafficEntities.entity_moves_with_player(entity, lane_index)
+		var left_despawn_x := SAME_DIRECTION_BEHIND_DESPAWN_X if moves_with_player else INCOMING_BEHIND_DESPAWN_X
+		# Incoming groups queue offscreen to the right and leave through the left.
+		var passed_front_edge: bool = moves_with_player and sprite.position.x > owner.get_viewport_rect().size.x + FRONT_DESPAWN_EXTRA_X
+		if sprite.position.x < left_despawn_x or passed_front_edge:
 			dead_entities.append(entity)
 
 	for entity in dead_entities:

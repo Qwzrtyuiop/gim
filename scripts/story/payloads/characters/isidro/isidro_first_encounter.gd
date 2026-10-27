@@ -387,7 +387,7 @@ static func build() -> Dictionary:
 			{
 				"speaker": "Isidro",
 				"speaker_display_name": "Isidro",
-				"text": "No fines. No violations. Nothing.",
+				"text": "No fines. No violations.",
 			},
 			# 59
 			{

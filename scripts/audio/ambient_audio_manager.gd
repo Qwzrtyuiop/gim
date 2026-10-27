@@ -25,9 +25,10 @@ func _ready() -> void:
 	get_tree().scene_changed.connect(_on_scene_changed)
 
 
-func enter_hub(station := false) -> void:
+func enter_hub(station := false, indoors := false) -> void:
 	_mode = "hub"
 	_hub_station = station
+	set_rain_indoors(indoors)
 	_override_weather = ""
 	_override_phase = ""
 	refresh()
@@ -36,12 +37,14 @@ func enter_hub(station := false) -> void:
 func enter_drive(weather: String, phase: String) -> void:
 	_mode = "drive"
 	_hub_station = false
+	set_rain_indoors(false)
 	_override_weather = weather
 	_override_phase = phase.strip_edges().to_lower()
 	refresh()
 
 
 func enter_results(music_state: Dictionary) -> void:
+	set_rain_indoors(false)
 	var path := str(music_state.get("rain_path", "")).strip_edges()
 	var weather := "clear"
 	if path == RainAudioProfile.NORMAL_PATH:
@@ -73,6 +76,7 @@ func refresh() -> void:
 
 
 func stop_all() -> void:
+	set_rain_indoors(false)
 	_mode = ""
 	_hub_station = false
 	_override_weather = ""

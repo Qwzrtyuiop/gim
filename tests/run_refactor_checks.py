@@ -45,7 +45,7 @@ def main():
     selection.add_argument("--check", action="append", default=[], metavar="NAME", help="Run one focused check; repeat to select more")
     selection.add_argument("--full", action="store_true", help="Explicitly run the entire regression suite")
     parser.add_argument("--list", action="store_true", help="List available focused checks without copying or running anything")
-    parser.add_argument("--timeout", type=float, help="Godot timeout in seconds (default: 30 focused, 150 full)")
+    parser.add_argument("--timeout", type=float, help="Godot timeout in seconds (default: 30 focused, 240 full)")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     names = available_checks(root)
@@ -62,7 +62,7 @@ def main():
     if args.timeout is not None and args.timeout <= 0:
         parser.error("--timeout must be positive.")
     selected = list(dict.fromkeys(args.check))
-    timeout = args.timeout if args.timeout is not None else (150 if args.full else 30)
+    timeout = args.timeout if args.timeout is not None else (240 if args.full else 30)
     started = perf_counter()
     print("Preparing isolated fixture for " + ("full suite" if args.full else ", ".join(selected)), flush=True)
     fixture = root / ".godot" / "refactor_checks"

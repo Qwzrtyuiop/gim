@@ -25,6 +25,7 @@ const CG_TROPA := "res://assets/story/specialCG/tropaCg.png"
 const ITEM_JESSA_WALLET := "res://assets/story/items/jessawallet.png"
 const ITEM_HANA_ID := "res://assets/story/items/hanaid.png"
 const ITEM_HANA_NOTEBOOK := "res://assets/story/items/hananotebook.png"
+const ITEM_RABBIT_BANDAID := "res://assets/story/items/rabbit bandaid.png"
 const SPRITE_GARDO_MIDNIGHT := "res://assets/characters/sprites/terminal/midnight/gardo.tres"
 
 const MUSIC_CITY_AMBIENCE := "res://assets/audio/ambience/city_ambience.mp3"

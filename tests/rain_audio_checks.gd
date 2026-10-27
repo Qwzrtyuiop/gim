@@ -15,7 +15,7 @@ static func run(host: Node) -> void:
 	await _test_driving_and_results(host)
 	AmbientAudioManager.stop_all()
 	PlayerState.reset()
-	print("PASS: shared normal/heavy rain audio, daytime/midnight hub loops, noncumulative music duck/restoration, independent SFX settings, station idle/terminal continuity, driving/result carry, pause and ownership")
+	print("PASS: shared normal/heavy rain audio, indoor low-pass routing/volume and seamless restoration, daytime/midnight hub loops, noncumulative music duck/restoration, independent SFX settings, station idle/terminal continuity, driving/result carry, pause and ownership")
 
 
 static func _test_profile() -> void:
@@ -23,9 +23,11 @@ static func _test_profile() -> void:
 	assert(Profile.stream_for("rain") == Profile.NORMAL_STREAM and Profile.stream_for("heavy rain") == Profile.HEAVY_STREAM)
 	assert(Profile.path_for("rain") == Profile.NORMAL_PATH and Profile.path_for("heavy rain") == Profile.HEAVY_PATH)
 	assert(is_equal_approx(Profile.volume_db("rain"), -3.0) and is_equal_approx(Profile.volume_db("heavy rain"), -6.0))
+	assert(is_equal_approx(Profile.volume_db("rain", true), 0.0) and is_equal_approx(Profile.volume_db("heavy rain", true), -3.0))
 	assert(is_equal_approx(Profile.music_duck_db("rain"), -8.0) and is_equal_approx(Profile.music_duck_db("heavy rain"), -12.0))
 	for weather in ["clear", "cloudy"]:
 		assert(Profile.stream_for(weather) == null and Profile.path_for(weather).is_empty())
+		assert(is_zero_approx(Profile.volume_db(weather, true)))
 		assert(is_zero_approx(Profile.music_duck_db(weather)))
 
 
@@ -65,7 +67,7 @@ static func _test_hubs(host: Node) -> void:
 				assert(WeatherState.set_story_weather(PlayerState, weather))
 				var original := _snapshot()
 				_refresh(screen, path)
-				_assert_rain(rain, weather)
+				_assert_rain(rain, weather, path == HOME)
 				assert(music.playing == (not midnight))
 				assert(is_equal_approx(AudioSettingsManager.get_player_base_db(music), Profile.music_duck_db(weather)))
 				assert(screen.night_ambience.playing == midnight, "Daytime rain must not start the night ambience bed")
@@ -75,6 +77,15 @@ static func _test_hubs(host: Node) -> void:
 				assert(rain.stream == stream)
 				if rain.playing:
 					assert(rain.get_stream_playback() == playback, "Unchanged weather cannot restart its rain loop")
+					if path == STORE and not midnight:
+						screen._open_shop("food")
+						assert(screen.shop_overlay.visible)
+						_assert_rain(rain, weather, true)
+						screen._refresh_header()
+						_assert_rain(rain, weather, true)
+						screen._close_shop()
+						_assert_rain(rain, weather)
+						assert(rain.stream == stream and rain.get_stream_playback() == playback, "Entering and leaving a shop must change only rain filtering and gain")
 				assert(is_equal_approx(AudioSettingsManager.get_player_base_db(music), Profile.music_duck_db(weather)), "Repeated refreshes cannot stack music ducking")
 				assert(_snapshot() == original, "Refreshing cached rain audio cannot save, spend resources or change time/weather")
 				if path == STATION:
@@ -98,6 +109,13 @@ static func _test_hubs(host: Node) -> void:
 
 
 static func _test_station_idle(station) -> void:
+	if not PlayerState.is_midnight():
+		station._open_passengers()
+		station.idle_music._on_idle_timeout()
+		assert(not station.idle_music.active and not station.idle_music.player.playing and station.view.bgm_player.playing, "Rain cannot enable AFK music outside midnight")
+		station._close_passengers()
+		return
+	station._open_passengers()
 	station.idle_music._on_idle_timeout()
 	assert(station.idle_music.active and not station.view.bgm_player.playing)
 	var player: AudioStreamPlayer = station.idle_music.player
@@ -117,6 +135,7 @@ static func _test_station_idle(station) -> void:
 	var rain_playback = rain.get_stream_playback()
 	station._open_passengers()
 	station._close_passengers()
+	assert(not station.idle_music.active and not player.playing and station.idle_music.idle_timer.is_stopped(), "Closing midnight passenger selection stops AFK music while preserving rain")
 	assert(station.night_ambience.rain_player == rain and rain.stream == rain_source and rain.get_stream_playback() == rain_playback, "Street and terminal share one uninterrupted rain player")
 
 
@@ -180,16 +199,22 @@ static func _test_driving_and_results(host: Node) -> void:
 			results.free()
 
 
-static func _assert_rain(player: AudioStreamPlayer, weather: String) -> void:
+static func _assert_rain(player: AudioStreamPlayer, weather: String, indoors := false) -> void:
 	var wet := weather == "rain" or weather == "heavy rain"
 	assert(player.playing == wet)
 	assert(player.get_meta("audio_category") == "sfx")
+	assert(player.bus == (Profile.INDOOR_BUS if indoors else &"Master"), "Only indoor rain is routed through the muffling bus")
+	if indoors:
+		var bus_index := AudioServer.get_bus_index(Profile.INDOOR_BUS)
+		assert(bus_index >= 0 and AudioServer.get_bus_effect_count(bus_index) == 1)
+		var effect := AudioServer.get_bus_effect(bus_index, 0) as AudioEffectLowPassFilter
+		assert(effect != null and is_equal_approx(effect.cutoff_hz, Profile.INDOOR_CUTOFF_HZ) and effect.db == Profile.INDOOR_FILTER_DB)
 	if wet:
 		var stream := player.stream as AudioStreamMP3
 		var source: AudioStreamMP3 = Profile.stream_for(weather)
 		assert(stream != null and stream.loop and stream != source)
 		assert(stream.data == source.data and not source.loop)
-		assert(is_equal_approx(AudioSettingsManager.get_player_base_db(player), Profile.volume_db(weather)))
+		assert(is_equal_approx(AudioSettingsManager.get_player_base_db(player), Profile.volume_db(weather, indoors)))
 
 
 static func _refresh(screen, path: String) -> void:

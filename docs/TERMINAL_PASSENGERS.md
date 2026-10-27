@@ -65,17 +65,20 @@ successful rolls play one of eight 2-2.95 second bark excerpts from
 `ambience/night_dogs.mp3`. The separate ambience RNG leaves passenger and traffic
 randomness unchanged. All layers use SFX volume and pause together. Shared rain,
 night ambience and dog cadence survive travel between home, store and station;
-only station traffic and local music change with location. Rides/results reuse
+Station traffic, local music and rain's indoor filtering change with location.
+Home, hospital/bar interiors and open shops muffle rain; outdoor views restore it
+without restarting the loop. Rides/results reuse
 the rain/night players, and menus, sleep and story scenes stop the shared mix.
 Mix levels, excerpt offsets, interval and
 chance live in `scripts/ui/hub_night_ambience.gd`.
 
-After spending 60 seconds on the station or terminal screen, a random
-`music/story/jazz.mp3` or `midnight.mp3` track replaces normal station music and
-loops until leaving the station. Mouse movement and other interaction do not
-reset the timer or stop the track. This also works at midnight.
-Ambience continues beneath the idle track, and overlays do not restart the idle
-clock. Pause freezes the timer and playback; leaving the station frees them.
+After spending 60 seconds with passenger selection open at midnight, a random
+`music/story/jazz.mp3` or `midnight.mp3` track starts. Each
+finished track is followed by another, avoiding immediate repeats. Mouse movement and other interaction do not
+reset the timer or stop the track. Closing passenger selection stops playback and
+resets the countdown; reopening starts a fresh 60 seconds. No AFK music plays on
+the station street or during other phases. Ambience continues beneath the idle
+track. Pause freezes the timer and playback; leaving the station frees them.
 `scripts/ui/station_idle_music.gd` owns the interval, track balance and private RNG.
 
 ## Art and positions

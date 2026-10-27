@@ -219,6 +219,7 @@ const MOCK_CHARACTERS := [
 	{
 		"id": "cel",
 		"name": "Celina",
+		"name_unlock_event": "celina_name_revealed",
 		"blurb": "Clinic aide who is quietly very observant.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": 1.02},
 		"first_distance": "short",

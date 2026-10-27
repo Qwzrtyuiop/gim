@@ -17,7 +17,23 @@ const PARKED_FALLBACK_HEIGHTS := {
 }
 
 
-static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehavior.RIGHT_SPAWN_SIDE) -> bool:
+static func spawn_incoming_group(owner) -> bool:
+	if not spawn_traffic(owner, 0):
+		return false
+	var count: int = owner.rng.randi_range(GameTuning.ONCOMING_GROUP_MIN_VEHICLES, GameTuning.ONCOMING_GROUP_MAX_VEHICLES)
+	for _index in range(1, count):
+		var previous: Sprite2D = owner.active_entities.back().sprite
+		var visible_rect := VehicleGeometry.local_hitbox_rect(previous, Vector4.ZERO, owner)
+		var gap: float = owner.rng.randf_range(GameTuning.ONCOMING_GROUP_MIN_GAP, GameTuning.ONCOMING_GROUP_MAX_GAP)
+		var front_x: float = previous.position.x + visible_rect.end.x * previous.scale.x + gap
+		# Queue the next visible front behind the preceding car's rear bumper.
+		# Each car still passes normal overlap and player-clearance checks.
+		if not spawn_traffic(owner, 0, BusyTrafficBehavior.RIGHT_SPAWN_SIDE, front_x):
+			break
+	return true
+
+
+static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehavior.RIGHT_SPAWN_SIDE, incoming_front_x := -1.0) -> bool:
 	if owner.stage_traffic == "busy" and lane_index == 2:
 		spawn_side = BusyTrafficBehavior.RIGHT_SPAWN_SIDE
 	var size: Vector2 = owner.get_viewport_rect().size
@@ -89,7 +105,8 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 	if not moves_with_player:
 		# Keep the whole car just offscreen, regardless of its width or transparent padding.
 		var visible_rect := VehicleGeometry.local_hitbox_rect(sprite, Vector4.ZERO, owner)
-		spawn_x = size.x + maxf(0.0, GameTuning.ONCOMING_SPAWN_EDGE_GAP) - visible_rect.position.x * sprite.scale.x
+		var front_x := maxf(size.x + maxf(0.0, GameTuning.ONCOMING_SPAWN_EDGE_GAP), incoming_front_x)
+		spawn_x = front_x - visible_rect.position.x * sprite.scale.x
 	else:
 		spawn_x = VehicleSpawnRules.vehicle_spawn_x(owner, size, spawn_side, lane_index)
 	sprite.position = Vector2(

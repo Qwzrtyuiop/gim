@@ -333,6 +333,7 @@ var time_left := 0.0
 var overtime_seconds := 0.0
 var active_entities: Array = []
 var spawn_timers := [0.4, 0.8, 1.2]
+var top_lane_pressure := 0.0
 var traffic_jam_gaps := TrafficJamGaps.new()
 var oncoming_warning_elapsed := -1.0
 var oncoming_warning_beep_index := -1

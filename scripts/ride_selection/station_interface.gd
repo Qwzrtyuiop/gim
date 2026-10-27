@@ -44,6 +44,7 @@ func setup() -> void:
 	screen.status_label = screen.terminal_view.status_label
 	screen.terminal_view.offer_pressed.connect(screen._choose_offer)
 	screen.terminal_view.offer_focused.connect(screen._focus_offer)
+	screen.terminal_view.object_pressed.connect(screen._on_terminal_object_pressed)
 	screen.terminal_view.close_button.pressed.connect(screen._close_passengers)
 	screen.terminal_view.store_button.pressed.connect(screen._open_store)
 	screen.passenger_overlay.hide()

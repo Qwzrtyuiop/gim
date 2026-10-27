@@ -11,9 +11,11 @@ static func update_spawns(owner, delta: float) -> void:
 	if owner.game_state != "playing":
 		VehicleTrafficSignals.clear_oncoming_warning(owner)
 		return
+	update_top_lane_pressure(owner, delta)
 	var progress: float = clampf(owner.distance / maxf(1.0, owner.target_distance), 0.0, 1.0)
 	for lane_index in range(3):
-		owner.spawn_timers[lane_index] -= delta
+		var clock_rate := top_lane_spawn_rate(owner) if lane_index == 0 else 1.0
+		owner.spawn_timers[lane_index] -= delta * clock_rate
 		if owner.spawn_timers[lane_index] <= 0.0:
 			var spawn_side: String = vehicle_spawn_side(owner, lane_index)
 			if lane_index == 0 and GameTuning.ONCOMING_WARNING_ENABLED:
@@ -24,10 +26,26 @@ static func update_spawns(owner, delta: float) -> void:
 					owner.oncoming_warning_elapsed = 0.0
 					VehicleTrafficSignals.update_oncoming_warning(owner, 0.0)
 					continue
-			if lane_has_spawn_room(owner, lane_index, spawn_side) and VehicleSpawner.spawn_traffic(owner, lane_index, spawn_side):
+			var spawned := false
+			if lane_has_spawn_room(owner, lane_index, spawn_side):
+				spawned = VehicleSpawner.spawn_incoming_group(owner) if lane_index == 0 else VehicleSpawner.spawn_traffic(owner, lane_index, spawn_side)
+			if spawned:
 				owner.spawn_timers[lane_index] = next_spawn_delay(owner, lane_index, progress)
 			else:
 				owner.spawn_timers[lane_index] = blocked_spawn_retry_delay(owner)
+
+
+static func update_top_lane_pressure(owner, delta: float) -> void:
+	if owner.game_state != "playing" or not is_finite(delta) or delta <= 0.0:
+		return
+	if owner.is_inside_tree() and owner.get_tree().paused:
+		return
+	var change := delta / GameTuning.TOP_LANE_PRESSURE_FILL_SECONDS if owner.player_lane == 0 else -delta / GameTuning.TOP_LANE_PRESSURE_DECAY_SECONDS
+	owner.top_lane_pressure = clampf(owner.top_lane_pressure + change, 0.0, 1.0)
+
+
+static func top_lane_spawn_rate(owner) -> float:
+	return lerpf(1.0, GameTuning.TOP_LANE_PRESSURE_MAX_SPAWN_RATE, clampf(owner.top_lane_pressure, 0.0, 1.0))
 
 
 static func next_spawn_delay(owner, lane_index: int, progress: float) -> float:

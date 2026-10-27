@@ -93,6 +93,7 @@ static func set_background_texture(owner, texture_ref, reset_camera := false) ->
 	owner.background.texture = resolved_texture
 	owner.background.visible = resolved_texture != null
 	StoryBackgroundWeather.apply(owner.background)
+	AmbientAudioManager.set_rain_indoors(StoryBackgroundWeather.is_indoor_background(resolved_texture))
 	if resolved_texture != null:
 		remember_gallery_image(owner, texture_ref)
 	if reset_camera:

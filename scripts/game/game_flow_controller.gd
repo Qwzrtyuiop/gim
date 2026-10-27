@@ -196,6 +196,7 @@ static func reset_game(owner) -> void:
 	TrafficIndex.invalidate(owner)
 	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	owner.spawn_timers = [0.4, 0.8, 1.2]
+	owner.top_lane_pressure = 0.0
 	owner.traffic_jam_gaps.reset()
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	owner.player_lane = GameTuning.PLAYER_START_LANE

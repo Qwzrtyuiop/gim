@@ -203,6 +203,7 @@ func _open_shop(category: String) -> void:
 	_refresh_header()
 	street.set_enabled(false)
 	shop_overlay.show()
+	AmbientAudioManager.set_rain_indoors(true)
 	_layout_store()
 	back_button.grab_focus()
 	_show_shop_greeting()
@@ -223,6 +224,7 @@ func _close_shop() -> void:
 		return
 	hub_dialogue.clear()
 	shop_overlay.hide()
+	AmbientAudioManager.set_rain_indoors(false)
 	back_button.release_focus()
 	for button in store_buy_buttons:
 		button.release_focus()

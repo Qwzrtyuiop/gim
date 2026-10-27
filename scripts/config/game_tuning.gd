@@ -72,6 +72,15 @@ const ONCOMING_WARNING_ENABLED := true
 const ONCOMING_WARNING_FLASH_INTERVAL := 0.28 # Seconds per flash cycle.
 const ONCOMING_WARNING_BEEPS := 3 # Spawn only after this many warning pulses.
 const ONCOMING_SPAWN_EDGE_GAP := 20.0 # Pixels between the screen edge and the car's visible front.
+const ONCOMING_GROUP_MIN_VEHICLES := 1
+const ONCOMING_GROUP_MAX_VEHICLES := 4
+const ONCOMING_GROUP_MIN_GAP := 120.0 # Visible bumper gap between cars in one group.
+const ONCOMING_GROUP_MAX_GAP := 220.0
+# Hidden per-ride top-lane pressure (0..1): builds faster than it fades.
+# Pressure speeds up only the incoming-lane spawn clock, retaining warnings.
+const TOP_LANE_PRESSURE_FILL_SECONDS := 8.0
+const TOP_LANE_PRESSURE_DECAY_SECONDS := 90.0
+const TOP_LANE_PRESSURE_MAX_SPAWN_RATE := 6.0
 const CRASH_RECOVERY_SECONDS := 0.45
 const CRASH_INVINCIBLE_SECONDS := 1.6
 const CRASH_FLICKER_INTERVAL := 0.08
@@ -247,6 +256,13 @@ const STORE_OWNER_PORTRAITS := {
 # and about 20.83 PHP). Warlboro is the cheaper, risky recovery option.
 const STORE_ITEMS := [
 	{
+		"id": "gas_can",
+		"name": "Gas Can",
+		"description": "Add {gas}% gas",
+		"type": "gas",
+		"gas": GAS_CAN_PERCENT,
+	},
+	{
 		"id": "engine_tune",
 		"name": "Engine Tune",
 		"description": "increase top speed and acceleration",
@@ -329,12 +345,5 @@ const STORE_ITEMS := [
 		"cost": 125,
 		"type": "energy",
 		"energy": 6,
-	},
-	{
-		"id": "gas_can",
-		"name": "Gas Can",
-		"description": "Add {gas}% gas",
-		"type": "gas",
-		"gas": GAS_CAN_PERCENT,
 	},
 ]

@@ -27,6 +27,7 @@ var auto_refresh := true
 var dogs_player: AudioStreamPlayer
 var cars_player: AudioStreamPlayer
 var rain_player: AudioStreamPlayer
+var rain_indoors := false
 var _rain_path := ""
 var dog_check_timer: Timer
 var dog_stop_timer: Timer
@@ -46,6 +47,7 @@ func _ready() -> void:
 	dogs_player = _make_layer("NightDogs", DOGS_STREAM, false, DOG_VOLUME_DB)
 	cars_player = _make_layer("NightCars", CARS_STREAM, true, CARS_VOLUME_DB)
 	rain_player = _make_layer("RainAmbience", RainAudioProfile.NORMAL_STREAM, true, RainAudioProfile.NORMAL_VOLUME_DB)
+	set_rain_indoors(rain_indoors)
 	dog_check_timer = Timer.new()
 	dog_check_timer.name = "DogCheckTimer"
 	dog_check_timer.wait_time = DOG_CHECK_INTERVAL
@@ -87,6 +89,18 @@ func refresh_for(weather: String, night: bool, traffic: bool, dogs := true) -> v
 		cars_player.stop()
 
 
+func set_rain_indoors(value: bool) -> void:
+	rain_indoors = value
+	if rain_player == null:
+		return
+	var rain_bus: StringName = RainAudioProfile.indoor_bus() if value else &"Master"
+	if rain_player.bus != rain_bus:
+		rain_player.bus = rain_bus
+	if not _rain_path.is_empty():
+		var weather := "heavy rain" if _rain_path == RainAudioProfile.HEAVY_PATH else "rain"
+		AudioSettingsManager.set_player_base_db(rain_player, RainAudioProfile.volume_db(weather, rain_indoors))
+
+
 func _refresh_rain(weather: String) -> void:
 	var source := RainAudioProfile.stream_for(weather)
 	if source == null:
@@ -100,7 +114,7 @@ func _refresh_rain(weather: String) -> void:
 		loop.loop = true
 		rain_player.stream = loop
 		_rain_path = path
-	AudioSettingsManager.set_player_base_db(rain_player, RainAudioProfile.volume_db(weather))
+	AudioSettingsManager.set_player_base_db(rain_player, RainAudioProfile.volume_db(weather, rain_indoors))
 	if not rain_player.playing:
 		rain_player.play()
 

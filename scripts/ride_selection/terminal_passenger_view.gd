@@ -4,6 +4,7 @@ extends Control
 # Offer generation, story eligibility, and departure costs stay in the coordinator.
 signal offer_pressed(distance: String, slot: int)
 signal offer_focused(distance: String, slot: int)
+signal object_pressed(object_id: String)
 
 const SpawnCatalog := preload("res://scripts/ride_selection/terminal_spawn_catalog.gd")
 const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
@@ -15,6 +16,9 @@ const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
 const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/terminalrain.png")
 const HOVER_SCALE := 1.06
 const PLACEHOLDER_AREA := Rect2(375, 710, 1030, 70)
+const DAY_OBJECT_REGIONS := {
+	"trashcan": Rect2(100, 440, 98, 132),
+}
 
 class PassengerButton:
 	extends Button
@@ -78,6 +82,27 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if enabled and is_visible_in_tree() and _highlight_mode.handle_input(event):
 		_refresh_info()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not enabled or not is_visible_in_tree() or is_night:
+		return
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	# Background objects have no button, hover art, tooltip, or cursor override.
+	# Passenger controls receive their own clicks before this background handler.
+	for object_id: String in DAY_OBJECT_REGIONS:
+		if object_rect_for(object_id).has_point(event.position):
+			accept_event()
+			object_pressed.emit(object_id)
+			return
+
+
+func object_rect_for(object_id: String) -> Rect2:
+	if is_night or not is_visible_in_tree() or not DAY_OBJECT_REGIONS.has(object_id):
+		return Rect2()
+	var region: Rect2 = DAY_OBJECT_REGIONS[object_id]
+	return Rect2(image_rect.position + region.position / SpawnCatalog.ART_SIZE * image_rect.size, region.size / SpawnCatalog.ART_SIZE * image_rect.size)
 
 
 func set_keyboard_navigation(value: bool) -> void:

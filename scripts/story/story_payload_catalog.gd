@@ -67,8 +67,8 @@ const STORIES := {
 	"celina_first_encounter": {
 		"english": preload("res://scripts/story/payloads/characters/celina/celina_first_encounter.gd"),
 		"tagalog": preload("res://scripts/story/payloads/characters/celina/celina_first_encounter_tagalog.gd"),
-		"title": "Celina: First Event",
-		"subtitle": "Story placeholder.",
+		"title": "Just a Scratch",
+		"subtitle": "An observant passenger insists John take care of a cut.",
 	},
 	"alma_first_encounter": {
 		"english": preload("res://scripts/story/payloads/characters/alma/alma_first_encounter.gd"),

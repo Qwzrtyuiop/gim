@@ -9,9 +9,10 @@ const STATION := "res://scenes/ride_selection.tscn"
 
 static func run(host: Node) -> void:
 	assert(ProjectSettings.get_setting("testing/isolated", false))
-	for phase in ["noon", "midnight"]:
-		for index in range(IdleMusic.TRACKS.size()):
-			await _test_station(host, phase, index)
+	for phase in ["morning", "noon", "night"]:
+		await _test_ineligible_phase(host, phase)
+	for index in range(IdleMusic.TRACKS.size()):
+		await _test_station(host, "midnight", index)
 	for path in [HOME, STORE]:
 		_setup("noon")
 		var screen = load(path).instantiate()
@@ -21,7 +22,7 @@ static func run(host: Node) -> void:
 			assert(not child is IdleMusic, "Only the station owns an AFK music clock")
 		screen.free()
 	PlayerState.reset()
-	print("PASS: sixty-second station visits, both seeded looping tracks, input/terminal/confirmation continuity, normal-track exclusion, midnight exception, paused/blocked entry, isolated RNG/state and scene ownership")
+	print("PASS: midnight passenger-only sixty-second visits, fresh entry timers, seeded initial tracks, nonrepeating shuffle on completion, input/confirmation continuity, immediate exit stop, paused/blocked callbacks, isolated RNG/state and scene ownership")
 
 
 static func _setup(phase: String) -> void:
@@ -42,6 +43,22 @@ static func _setup(phase: String) -> void:
 		PlayerState.set_last_stage_result({"day": 3, "time_of_day": "night", "completed": true})
 
 
+static func _test_ineligible_phase(host: Node, phase: String) -> void:
+	_setup(phase)
+	var station = load(STATION).instantiate()
+	host.get_tree().root.add_child(station)
+	await host.get_tree().process_frame
+	var idle: IdleMusic = station.idle_music
+	assert(idle.idle_timer.is_stopped() and not idle.active and not idle.player.playing, "Daytime and normal nighttime streets cannot start AFK music")
+	idle._on_idle_timeout()
+	_exercise_terminal(station)
+	idle._on_idle_timeout()
+	assert(idle.idle_timer.is_stopped() and not idle.active and not idle.player.playing and idle.player.stream == null, "Passenger selection is eligible only during midnight")
+	assert(station.view.bgm_player.playing, "Other phases retain normal station music")
+	station._close_passengers()
+	station.free()
+
+
 static func _test_station(host: Node, phase: String, track_index: int) -> void:
 	_setup(phase)
 	var station = load(STATION).instantiate()
@@ -51,10 +68,19 @@ static func _test_station(host: Node, phase: String, track_index: int) -> void:
 	var idle: IdleMusic = station.idle_music
 	assert(not idle.active and not idle.player.playing)
 	assert(idle.idle_timer.one_shot and is_equal_approx(idle.idle_timer.wait_time, 60.0))
-	assert(idle.idle_timer.time_left > 59.0 and idle.idle_timer.time_left <= 60.0)
+	assert(idle.idle_timer.is_stopped(), "Midnight street time does not count toward passenger AFK music")
 	assert(idle.player.get_meta("audio_category") == "music")
 	assert(station.view.bgm_player.playing == (phase != "midnight"))
-	# Staying at the station counts toward the visit even while using its UI.
+	idle._on_idle_timeout()
+	assert(not idle.active and not idle.player.playing and idle.idle_timer.is_stopped())
+	station._open_passengers()
+	assert(station.passenger_overlay.visible)
+	assert(idle.idle_timer.time_left > 59.0 and idle.idle_timer.time_left <= 60.0, "Opening midnight passenger selection starts a full sixty-second clock")
+	var inactive_random_state: int = idle._rng.state
+	var initial_remaining: float = idle.idle_timer.time_left
+	idle.player.finished.emit()
+	assert(not idle.active and not idle.player.playing and idle.player.stream == null and idle._rng.state == inactive_random_state and is_equal_approx(idle.idle_timer.time_left, initial_remaining), "Completion callbacks cannot start music before the visit clock expires")
+	# Staying on passenger selection counts even while using its UI.
 	var remaining: float = idle.idle_timer.time_left
 	for event: InputEvent in _activity_events():
 		station._input(event)
@@ -68,7 +94,12 @@ static func _test_station(host: Node, phase: String, track_index: int) -> void:
 	assert(idle.idle_timer.time_left <= remaining, "Real pointer movement cannot postpone the music")
 	remaining = idle.idle_timer.time_left
 	_exercise_terminal(station)
-	assert(not idle.active and is_equal_approx(idle.idle_timer.time_left, remaining), "Terminal and confirmation interactions share the original visit clock")
+	assert(not idle.active and is_equal_approx(idle.idle_timer.time_left, remaining), "Confirmation interactions keep the passenger visit clock")
+	idle.idle_timer.start(17.0)
+	station._close_passengers()
+	assert(idle.idle_timer.is_stopped() and not idle.active and not idle.player.playing)
+	station._open_passengers()
+	assert(is_equal_approx(idle.idle_timer.time_left, IdleMusic.IDLE_SECONDS), "Reopening passenger selection starts a fresh full delay")
 	host.get_tree().paused = true
 	remaining = idle.idle_timer.time_left
 	await host.get_tree().process_frame
@@ -79,6 +110,7 @@ static func _test_station(host: Node, phase: String, track_index: int) -> void:
 	idle._on_idle_timeout()
 	assert(not idle.active and not idle.player.playing, "Departing stations cannot start a visit track")
 	station.is_departing = false
+	idle.refresh_availability()
 	var original := _snapshot()
 	idle._rng.seed = _seed_for_index(track_index)
 	seed(92833)
@@ -90,15 +122,33 @@ static func _test_station(host: Node, phase: String, track_index: int) -> void:
 	assert(idle.idle_timer.is_stopped())
 	var source: AudioStreamMP3 = IdleMusic.TRACKS[track_index].stream
 	var playing_stream := idle.player.stream as AudioStreamMP3
-	assert(playing_stream != null and playing_stream.loop)
+	assert(playing_stream != null and not playing_stream.loop)
 	assert(playing_stream != source and not source.loop)
 	assert(playing_stream.data == source.data, "Each fresh visit can select the corresponding seeded track")
 	assert(is_equal_approx(AudioSettingsManager.get_player_base_db(idle.player), float(IdleMusic.TRACKS[track_index].base_db) + RainAudioProfile.music_duck_db(PlayerState.get_current_weather())))
 	var random_state: int = idle._rng.state
 	idle._on_idle_timeout()
 	station._refresh_terminal()
-	assert(idle._rng.state == random_state and idle.player.stream == playing_stream and idle.active and not station.view.bgm_player.playing, "Repeated callbacks and refreshes keep the same looping track")
+	assert(idle._rng.state == random_state and idle.player.stream == playing_stream and idle.active and not station.view.bgm_player.playing, "Repeated expiry callbacks and refreshes keep the current track")
 	assert(_snapshot() == original, "Visit music does not save, advance the clock, spend resources or consume stories")
+	var player_id: int = idle.player.get_instance_id()
+	for completion in range(3):
+		seed(92833 + completion)
+		expected_random = randf()
+		seed(92833 + completion)
+		idle.player.stop()
+		idle.player.finished.emit()
+		assert(randf() == expected_random, "Shuffling must not consume gameplay RNG")
+		var next_stream := idle.player.stream as AudioStreamMP3
+		assert(next_stream != null and not next_stream.loop)
+		assert(next_stream.data != playing_stream.data, "A finished track must shuffle to a different song")
+		var next_index := _track_index_for_stream(next_stream)
+		var next_source: AudioStreamMP3 = IdleMusic.TRACKS[next_index].stream
+		assert(next_stream != next_source and not next_source.loop, "Shuffle must not mutate the shared music resources")
+		assert(is_equal_approx(AudioSettingsManager.get_player_base_db(idle.player), float(IdleMusic.TRACKS[next_index].base_db) + RainAudioProfile.music_duck_db(PlayerState.get_current_weather())), "Each shuffled track reapplies its own volume and weather ducking")
+		assert(idle.active and idle.player.playing and idle.idle_timer.is_stopped() and idle.player.get_instance_id() == player_id and not station.view.bgm_player.playing, "The next song starts immediately on the existing player without another visit delay")
+		assert(_snapshot() == original, "Shuffling does not save, advance the clock, spend resources or consume stories")
+		playing_stream = next_stream
 	if phase == "midnight":
 		assert(station.night_ambience.playing and station.night_ambience.cars_player.playing, "Visit music layers over midnight ambience")
 	_exercise_terminal(station)
@@ -111,7 +161,23 @@ static func _test_station(host: Node, phase: String, track_index: int) -> void:
 	host.get_tree().paused = true
 	await host.get_tree().process_frame
 	assert(idle.player.stream_paused)
+	random_state = idle._rng.state
+	idle.player.finished.emit()
+	assert(idle.player.stream == playing_stream and idle._rng.state == random_state, "Paused completion callbacks cannot shuffle the current track")
 	host.get_tree().paused = false
+	station.is_departing = true
+	idle.player.finished.emit()
+	assert(idle.player.stream == playing_stream and idle._rng.state == random_state, "Departing stations cannot shuffle into another track")
+	station.is_departing = false
+	idle.refresh_availability()
+	idle._on_idle_timeout()
+	assert(idle.active and idle.player.playing)
+	station._close_passengers()
+	assert(not idle.active and not idle.player.playing and idle.idle_timer.is_stopped(), "Leaving passenger selection immediately stops music and its timer")
+	idle.player.finished.emit()
+	assert(not idle.active and not idle.player.playing and idle.idle_timer.is_stopped(), "A late completion cannot restart music over the street")
+	station._open_passengers()
+	assert(not idle.active and not idle.player.playing and is_equal_approx(idle.idle_timer.time_left, IdleMusic.IDLE_SECONDS), "Reentering after playback starts another full delay")
 	var references: Array[WeakRef] = [weakref(idle), weakref(idle.player), weakref(idle.idle_timer)]
 	station.free()
 	for reference: WeakRef in references:
@@ -129,10 +195,9 @@ static func _exercise_terminal(station) -> void:
 		assert(station.confirmation.visible)
 		station.confirmation.cancel_button.pressed.emit()
 		assert(not station.confirmation.visible)
-	station._close_passengers()
 	assert(music.player.get_instance_id() == player_id)
 	if music.active:
-		assert(music.player.playing and not station.view.bgm_player.playing, "Terminal/confirmation interactions keep the visit's chosen music")
+		assert(music.player.playing and not station.view.bgm_player.playing, "Confirmation interactions keep the visit's chosen music")
 
 
 static func _activity_events() -> Array[InputEvent]:
@@ -165,6 +230,15 @@ static func _seed_for_index(index: int) -> int:
 		if probe.randi_range(0, IdleMusic.TRACKS.size() - 1) == index:
 			return candidate
 	assert(false, "Each idle track must be reachable")
+	return 0
+
+
+static func _track_index_for_stream(stream: AudioStreamMP3) -> int:
+	for index in range(IdleMusic.TRACKS.size()):
+		var source: AudioStreamMP3 = IdleMusic.TRACKS[index].stream
+		if stream.data == source.data:
+			return index
+	assert(false, "Shuffled music must come from the station track pool")
 	return 0
 
 

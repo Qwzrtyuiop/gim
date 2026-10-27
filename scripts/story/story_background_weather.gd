@@ -22,6 +22,14 @@ var _base_tint := Color.WHITE
 var _weather := ""
 
 
+static func is_indoor_background(texture: Texture2D) -> bool:
+	if texture == null:
+		return false
+	var path := texture.resource_path
+	var marker_file: String = MARKERS.get(path.get_file(), "") if path.begins_with(LOCATIONS) else ""
+	return marker_file.get_basename().ends_with("_indoor")
+
+
 static func apply(background: TextureRect, outdoor_without_mask := false) -> void:
 	var layer := background.get_node_or_null("StoryBackgroundWeather") as Control
 	var path: String = background.texture.resource_path if background.texture != null else ""
@@ -33,7 +41,7 @@ static func apply(background: TextureRect, outdoor_without_mask := false) -> voi
 		layer.name = "StoryBackgroundWeather"
 		background.add_child(layer)
 	var marker: Texture2D = load(LOCATIONS + marker_file) as Texture2D if not marker_file.is_empty() else null
-	layer.call("configure", background, marker, marker_file.get_basename().ends_with("_indoor"), outdoor_without_mask)
+	layer.call("configure", background, marker, is_indoor_background(background.texture), outdoor_without_mask)
 
 
 func _ready() -> void:

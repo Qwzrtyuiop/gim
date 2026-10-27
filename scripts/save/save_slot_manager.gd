@@ -203,14 +203,14 @@ func _save(slot: int, context: Dictionary) -> Error:
 		if error != OK:
 			return error
 		snapshot.metadata["preview_path"] = preview_path
-	var previous := _read_slot(slot)
 	error = Codec.write_snapshot(snapshot, slot_path(slot))
 	if error != OK:
 		_remove_preview(preview_path)
 		return error
 	_run_id = active_run
-	if previous != null and previous.metadata.get("preview_path", "") != snapshot.metadata.preview_path:
-		_remove_preview(str(previous.metadata.get("preview_path", "")))
+	# Old metadata may point at another slot's preview. Clean only filenames
+	# generated for this slot, preserving the newly committed active image.
+	_remove_slot_previews(slot, str(snapshot.metadata.preview_path))
 	slots_changed.emit()
 	return OK
 
@@ -307,7 +307,7 @@ static func _remove_preview(path: String) -> void:
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(safe_path))
 
 
-static func _remove_slot_previews(slot: int) -> void:
+static func _remove_slot_previews(slot: int, keep_path := "") -> void:
 	var directory := DirAccess.open(PREVIEW_DIRECTORY)
 	if directory == null:
 		return
@@ -315,7 +315,9 @@ static func _remove_slot_previews(slot: int) -> void:
 	generated_name.compile("^slot_%02d_[0-9]+\\.png$" % slot)
 	for filename: String in directory.get_files():
 		if generated_name.search(filename) != null:
-			_remove_preview(PREVIEW_DIRECTORY.path_join(filename))
+			var path := PREVIEW_DIRECTORY.path_join(filename)
+			if path != keep_path.simplify_path():
+				_remove_preview(path)
 
 
 static func _valid_slot(slot: int) -> bool:

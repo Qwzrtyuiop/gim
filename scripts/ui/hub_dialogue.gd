@@ -237,7 +237,7 @@ func _present_line(instant := false) -> void:
 	bubble.show()
 	var voice_speaker := character_id if not character_id.is_empty() else speaker
 	playback.process_mode = Node.PROCESS_MODE_INHERIT
-	playback.start({"typewriter": {"sound_enabled": false}}, active_line, voice_speaker)
+	playback.start({}, active_line, voice_speaker)
 	if instant:
 		playback.finish_now()
 	_update_context()

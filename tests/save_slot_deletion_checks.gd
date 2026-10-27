@@ -26,6 +26,23 @@ static func run(host: Node) -> void:
 	var other: Resource = ResourceLoader.load(SaveSlotManager.slot_path(7), "", ResourceLoader.CACHE_MODE_IGNORE)
 	var own_preview: String = first.metadata.preview_path
 	var other_preview: String = other.metadata.preview_path
+	var other_bytes := FileAccess.get_file_as_bytes(SaveSlotManager.slot_path(7))
+	# Overwriting copied/damaged metadata must not remove another slot's image.
+	first.metadata.preview_path = other_preview
+	assert(Codec.write_snapshot(first, SaveSlotManager.slot_path(6)) == OK)
+	assert(SaveSlotManager.save_slot(6, context) == OK)
+	assert(FileAccess.file_exists(other_preview), "Overwriting Slot 6 must preserve Slot 7's preview even when old metadata references it")
+	assert(FileAccess.get_file_as_bytes(SaveSlotManager.slot_path(7)) == other_bytes)
+	assert(not FileAccess.file_exists(own_preview), "An overwrite cleans only this slot's old generated previews")
+	first = ResourceLoader.load(SaveSlotManager.slot_path(6), "", ResourceLoader.CACHE_MODE_IGNORE)
+	own_preview = first.metadata.preview_path
+	assert(FileAccess.file_exists(own_preview), "Overwrite cleanup must retain its new active preview")
+	# Normal overwrites also remove their prior image and retain the replacement.
+	assert(SaveSlotManager.save_slot(6, context) == OK)
+	assert(not FileAccess.file_exists(own_preview))
+	first = ResourceLoader.load(SaveSlotManager.slot_path(6), "", ResourceLoader.CACHE_MODE_IGNORE)
+	own_preview = first.metadata.preview_path
+	assert(FileAccess.file_exists(own_preview) and FileAccess.file_exists(other_preview))
 	var orphan_preview := SaveSlotManager.PREVIEW_DIRECTORY.path_join("slot_06_123.png")
 	var custom_preview := SaveSlotManager.PREVIEW_DIRECTORY.path_join("slot_06_keep.png")
 	var outside_preview := "res://test_user/keep_deletion_preview.png"
@@ -34,7 +51,6 @@ static func run(host: Node) -> void:
 	# Malicious metadata cannot cause deletion outside this slot's generated art.
 	first.metadata.preview_path = outside_preview
 	assert(Codec.write_snapshot(first, SaveSlotManager.slot_path(6)) == OK)
-	var other_bytes := FileAccess.get_file_as_bytes(SaveSlotManager.slot_path(7))
 	var unchanged := _snapshot()
 	var changes := [0]
 	var listener := func() -> void: changes[0] += 1
@@ -77,7 +93,7 @@ static func run(host: Node) -> void:
 	assert(not SaveSlotManager.has_slots(), "Deleting the last slot must not reimport the live recovery checkpoint on startup")
 	assert(FileAccess.file_exists(PlayerState.SAVE_PATH), "Explicit deletion must preserve the recovery checkpoint")
 	PlayerState.reset()
-	print("PASS: confirmed slot deletion, autosave policy, corrupt files, selected-only preview cleanup, live/recovery isolation and delete-all migration persistence")
+	print("PASS: confirmed slot deletion, autosave policy, corrupt files, slot-owned overwrite/deletion preview cleanup, live/recovery isolation and delete-all migration persistence")
 
 
 static func _test_screen(host: Node) -> void:

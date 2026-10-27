@@ -6,6 +6,13 @@ signal midnight_encounter_selected(encounter_id: String, character_id: String)
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
 const STORE_SCENE := "res://scenes/store.tscn"
+const TRASHCAN_LINES := [
+	"It's a trashcan",
+	"It's not a passenger",
+	"It can't go inside my tricycle",
+	"Can it?",
+	"Trash can.",
+]
 const PassengerPool := preload("res://scripts/ride_selection/passenger_pool.gd")
 const SelectionView := preload("res://scripts/ride_selection/selection_view.gd")
 const SelectionTutorial := preload("res://scripts/ride_selection/selection_tutorial.gd")
@@ -42,6 +49,7 @@ var _confirmation_input := InputHighlightMode.new()
 var hub_dialogue: HubDialogue
 var night_ambience: HubNightAmbience
 var idle_music: StationIdleMusic
+var _trashcan_line_index := 0
 
 
 func _ready() -> void:
@@ -72,9 +80,10 @@ func _ready() -> void:
 	AmbientAudioManager.enter_hub(true)
 	view.start_ride_select_bgm()
 	idle_music = StationIdleMusic.new()
-	idle_music.can_play = func() -> bool: return not is_departing
+	idle_music.can_play = _can_play_idle_music
 	idle_music.active_changed.connect(_on_idle_music_changed)
 	add_child(idle_music)
+	passenger_overlay.visibility_changed.connect(idle_music.refresh_availability)
 	MidnightEncounters.prepare(PlayerState)
 	_refresh_terminal()
 	var story_error := PlayerState.take_pending_trip_selection_error()
@@ -125,9 +134,14 @@ func _refresh_terminal() -> void:
 	view.refresh_terminal()
 	var weather := PlayerState.get_current_weather()
 	idle_music.set_weather(weather)
+	idle_music.refresh_availability()
 	station.set_weather(weather)
 	terminal_view.set_weather(weather)
 	night_ambience.refresh()
+
+
+func _can_play_idle_music() -> bool:
+	return not is_departing and PlayerState.is_midnight() and passenger_overlay.is_visible_in_tree()
 
 
 func _on_idle_music_changed(_active: bool) -> void:
@@ -179,7 +193,6 @@ func _interact_midnight_encounter(offer: Dictionary) -> void:
 	show_message(str(interaction.text), {
 		"target": "gardo",
 		"character_id": "gardo",
-		"typewriter": false,
 	})
 
 
@@ -293,6 +306,19 @@ func _on_station_action(action: String) -> void:
 			_open_store()
 
 
+func _on_terminal_object_pressed(object_id: String) -> void:
+	if is_departing or tutorial.active or confirmation.visible or not passenger_overlay.visible or _speech_is_blocking():
+		return
+	if terminal_view.object_rect_for(object_id).has_area() and object_id == "trashcan":
+		if show_message(TRASHCAN_LINES[_trashcan_line_index], {
+			"target": "trashcan",
+			"speaker": "John Toda",
+			"show_tail": false,
+			"duration": 2.5,
+		}):
+			_trashcan_line_index = mini(_trashcan_line_index + 1, TRASHCAN_LINES.size() - 1)
+
+
 func _open_passengers() -> void:
 	if _speech_is_blocking():
 		return
@@ -349,6 +375,7 @@ func _create_hub_dialogue() -> void:
 	)
 	hub_dialogue.register_target("tricycle", _station_message_target.bind("passengers"))
 	hub_dialogue.register_target("store", _station_message_target.bind("store"))
+	hub_dialogue.register_target("trashcan", _terminal_object_message_target.bind("trashcan"))
 	for character: Dictionary in PlayerState.get_mock_characters():
 		var character_id := str(character.get("id", ""))
 		if not character_id.is_empty():
@@ -364,6 +391,10 @@ func _station_message_target(action: String) -> Rect2:
 
 func _passenger_message_target(character_id: String) -> Rect2:
 	return DialogueAnchors.terminal_character(self, character_id)
+
+
+func _terminal_object_message_target(object_id: String) -> Rect2:
+	return DialogueAnchors.transform_rect(terminal_view, terminal_view.object_rect_for(object_id))
 
 
 func show_message(text: Variant, options: Dictionary = {}) -> bool:

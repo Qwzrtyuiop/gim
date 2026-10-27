@@ -134,9 +134,13 @@ center. To place a message at a normalized screen point, use
 | `font_size` | `12`, constrained to 10–18 |
 | `hint` | Optional replacement for the small click/advance caption |
 
-Talking blips are silent by default for hub speech. Opt in using the same
-[reveal and voice options](../scripts/story/story_dialogue_playback_guide.md) as VN
-text, including speaker pitch and custom short clips:
+Character speech uses the same talking blips and speaker voice settings as VN
+text, resolved from `character_id` or `speaker`. Speakerless narration and
+punctuation-only lines such as `...` stay silent. Explicit `typewriter: false`
+keeps text instant and silent; `typewriter: {"sound_enabled": false}` mutes a
+selected animated line. Customize the same
+[reveal and voice options](../scripts/story/story_dialogue_playback_guide.md),
+including speaker pitch and custom short clips:
 
 ```gdscript
 "typewriter": {

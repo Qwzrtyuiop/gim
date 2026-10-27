@@ -14,6 +14,7 @@ const DEFAULTS := {
 const SPEAKER_ALIASES := {
 	"john toda": "john",
 	"ben": "benny",
+	"ely": "elena",
 	"man outside": "collector",
 }
 const SPEAKER_VOICES := {
