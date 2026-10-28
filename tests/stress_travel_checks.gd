@@ -2,6 +2,7 @@ extends RefCounted
 
 const HomeMap := preload("res://scripts/home/home_map.gd")
 const Catalog := preload("res://scripts/map/topdown_map_catalog.gd")
+const LocationVisits := preload("res://tests/location_visit_checks.gd")
 
 
 static func run(host: Node) -> void:
@@ -17,7 +18,7 @@ static func run(host: Node) -> void:
 	UIAudioManager.press_player.stop()
 	await host.get_tree().create_timer(0.1).timeout
 	PlayerState.reset()
-	print("PASS: one-energy paid map arrivals, Celina-gated hospital, once-per-paid-arrival park stress relief, free current-location reopening/region navigation and shared pickup departures, closed-place and zero-energy guards")
+	print("PASS: free north public destinations, paid map arrivals, Celina-gated hospital, daily Park/Church inline relief, free current-location reopening/region navigation and shared pickups, closed-building and zero-energy guards")
 
 
 static func _fixture(host: Node, day := 8, phase := "night", hospital_unlocked := true) -> Dictionary:
@@ -27,6 +28,7 @@ static func _fixture(host: Node, day := 8, phase := "night", hospital_unlocked :
 	PlayerState.current_phase = phase
 	PlayerState.current_weather = "clear"
 	PlayerState.set_event_value("celina_first_encounter_seen", hospital_unlocked)
+	PlayerState.set_event_value("north_road_open_announced", true)
 	PlayerState.set_pending_trip_selection(HomeMap.HOME_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 	var rider: Dictionary = PlayerState.get_character_by_id("generic_guy")
 	rider["active_distance"] = "short"
@@ -37,6 +39,7 @@ static func _fixture(host: Node, day := 8, phase := "night", hospital_unlocked :
 	var parent := Control.new()
 	parent.size = Vector2(1280, 720)
 	host.get_tree().root.add_child(parent)
+	host.get_tree().current_scene = parent
 	var world := HomeMap.new()
 	parent.add_child(world)
 	world.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -55,6 +58,8 @@ static func _test_paid_visits(host: Node) -> void:
 	for location_id in ["park", "hospital", "bar"]:
 		var energy: int = PlayerState.energy
 		world._visit(location_id)
+		if world.hub_story_overlay.active:
+			await LocationVisits.finish_overlay(host, world)
 		assert(world.current_location == location_id and world.location_view.visible)
 		assert(PlayerState.energy == energy - 1, "A distinct map destination costs exactly one energy")
 		if location_id == "park":
@@ -68,32 +73,37 @@ static func _test_paid_visits(host: Node) -> void:
 			assert(PlayerState.energy == energy - 1, "Entering and leaving the bar building is part of the same visit")
 		world._show_map()
 	world._visit("park")
-	unchanged.stress -= 2
-	assert(PlayerState.energy == 1, "Returning to a different paid location is a new arrival")
+	assert(PlayerState.energy == 2 and world.map_view.visible, "The daily Park limit blocks another arrival before charging")
+	assert(str(world.hub_dialogue.active_line.get("text", "")).contains("tomorrow"))
 	world._show_map()
 	world._visit("north")
-	assert(world.map_view.map_region == "north" and PlayerState.energy == 1)
+	assert(world.map_view.map_region == "north" and PlayerState.energy == 2)
 	PlayerState.energy = PlayerState.max_energy
 	var energy_supplied: int = PlayerState.max_energy
 	var paid_visits := 0
 	for location_id: String in Catalog.NORTH_REGIONS:
 		if location_id == "town":
 			continue
-		# Refill the fixture after five visits to cover every authored destination.
-		if PlayerState.energy == 0:
-			PlayerState.energy = PlayerState.max_energy
-			energy_supplied += PlayerState.max_energy
 		var energy: int = PlayerState.energy
+		var cost: int = world.travel_energy_cost(location_id)
 		world._visit(location_id)
-		paid_visits += 1
-		assert(world.current_location == location_id and world.background.texture is AtlasTexture)
-		assert(PlayerState.energy == energy - 1, "Each authored north destination costs one energy")
+		if location_id == "abandoned_building":
+			assert(world.map_view.visible and PlayerState.energy == energy and world.hub_dialogue.active_line.get("text") == world.ABANDONED_BUILDING_MESSAGE)
+			continue
+		if world.hub_story_overlay.active:
+			await LocationVisits.finish_overlay(host, world)
+		paid_visits += cost
+		if location_id == "church":
+			unchanged.stress -= 2
+		assert(world.current_location == location_id and world.background.texture != null)
+		assert(cost == (0 if location_id in ["pier", "school", "big_station"] else 1))
+		assert(PlayerState.energy == energy - cost, "North public destinations are free; the court, construction site and church cost one energy")
 		world._show_map()
 		world._visit(location_id)
-		assert(PlayerState.energy == energy - 1)
+		assert(PlayerState.energy == energy - cost, "Current-location reopening never spends another energy point")
 		world._show_map()
 	assert(PlayerState.energy == energy_supplied - paid_visits)
-	assert(_other_resources() == unchanged, "Only paid park arrivals relieve stress; other travel preserves stress, hull, cash, fuel and the clock")
+	assert(_other_resources() == unchanged, "The two daily Park/Church arrivals relieve stress; ordinary travel preserves stress, hull, cash, fuel and the clock")
 	fixture.parent.free()
 	await _settle(host)
 
@@ -139,29 +149,32 @@ static func _test_park_relief(host: Node) -> void:
 	world._confirm_travel()
 	unchanged.stress = 5
 	assert(PlayerState.energy == 4 and _other_resources() == unchanged)
-	assert(int(PlayerState.get_meta("test_save_count", 0)) == saves + 1, "Park energy cost and stress relief save as one complete arrival")
+	assert(world.hub_story_overlay.active and PlayerState.has_visited_location_today("park"))
+	await LocationVisits.finish_overlay(host, world)
 	assert(PlayerState._state_batch_depth == 0 and not PlayerState._suppress_auto_save)
+	saves = int(PlayerState.get_meta("test_save_count", 0))
 	for _repeat in range(3):
 		world._show_map()
 		assert(world.travel_energy_cost("park") == 0)
 		world._request_visit("park")
 		assert(world.location_view.visible and not world.travel_confirmation.visible)
-		assert(PlayerState.energy == 4 and _other_resources() == unchanged and int(PlayerState.get_meta("test_save_count", 0)) == saves + 1, "Reopening the current park cannot farm relief or save another arrival")
+		assert(PlayerState.energy == 4 and _other_resources() == unchanged and int(PlayerState.get_meta("test_save_count", 0)) == saves, "Reopening the current park cannot farm relief, another scene or another save")
 	world._show_map()
 	world._visit("hospital")
 	world._show_map()
 	saves = int(PlayerState.get_meta("test_save_count", 0))
 	world._visit("park")
-	unchanged.stress = 3
-	assert(PlayerState.energy == 2 and _other_resources() == unchanged and int(PlayerState.get_meta("test_save_count", 0)) == saves + 1, "Returning after another destination buys a new park arrival and its relief")
-	world._show_map()
-	world._visit("hospital")
+	assert(PlayerState.energy == 3 and _other_resources() == unchanged and int(PlayerState.get_meta("test_save_count", 0)) == saves, "Returning after another destination cannot buy a second visit on the same day")
+	assert(world.map_view.visible and str(world.hub_dialogue.active_line.get("text", "")).contains("tomorrow"))
+	PlayerState.current_day = 9
+	PlayerState.energy = 1
 	world._show_map()
 	PlayerState.stress = 1
-	saves = int(PlayerState.get_meta("test_save_count", 0))
 	world._visit("park")
+	await LocationVisits.finish_overlay(host, world)
 	unchanged.stress = 0
-	assert(PlayerState.energy == 0 and _other_resources() == unchanged and int(PlayerState.get_meta("test_save_count", 0)) == saves + 1, "Park relief clamps at zero without another save")
+	unchanged.day = 9
+	assert(PlayerState.energy == 0 and _other_resources() == unchanged and int(PlayerState.get_event_value("park_visit_count", 0)) == 2, "Tomorrow's visit is available again and relief clamps at zero")
 	fixture.parent.free()
 	await _settle(host)
 	fixture = _fixture(host, 8, "morning")

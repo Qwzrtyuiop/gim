@@ -3,6 +3,7 @@ extends RefCounted
 const MapView := preload("res://scripts/map/topdown_map_view.gd")
 const MapCatalog := preload("res://scripts/map/topdown_map_catalog.gd")
 const WeatherState := preload("res://scripts/state/player_weather_state.gd")
+const LocationVisits := preload("res://tests/location_visit_checks.gd")
 const HOME := "res://scenes/day_start_scene.tscn"
 const STATION := "res://scenes/ride_selection.tscn"
 const STORE := "res://scenes/store.tscn"
@@ -13,6 +14,7 @@ static func run(host: Node) -> void:
 	await _test_geometry_and_input(host)
 	await _test_travel_confirmation(host)
 	await _test_north_road(host)
+	await _test_north_announcement(host)
 	await _test_location_phases(host)
 	await _test_home_gates(host)
 	await _test_hub_departures(host)
@@ -36,6 +38,9 @@ static func _setup(phase := "morning", day := 3) -> void:
 	PlayerState.ride_select_tutorial_shown = true
 	PlayerState.clear_story_triggers()
 	PlayerState.set_event_value("celina_first_encounter_seen", true)
+	if day >= 8:
+		# Announcement input/checkpoints have a dedicated scenario below.
+		PlayerState.set_event_value("north_road_open_announced", true)
 	PlayerState.ensure_daily_conditions_for_current_day()
 	assert(WeatherState.set_story_weather(PlayerState, "rain"))
 	PlayerState.set_pending_trip_selection(HOME, PlayerState.TRANSITION_CURRENT_STAGE)
@@ -60,6 +65,10 @@ static func _home(host: Node, phase := "morning", day := 3) -> Variant:
 
 
 static func _snapshot(include_navigation := true) -> Dictionary:
+	var events := PlayerState.event_values.duplicate(true)
+	# These authored arrival effects have their own progression/visit checks.
+	for event_id in ["daily_location_visit_days", "park_visit_count", "church_visit_count", "alma_bar_visit_absence", "celina_hospital_visit_absence", "hub_story_return", "construction_work_accepted"]:
+		events.erase(event_id)
 	var result := {
 		"day": PlayerState.current_day,
 		"phase": PlayerState.current_phase,
@@ -71,7 +80,7 @@ static func _snapshot(include_navigation := true) -> Dictionary:
 		"gas": PlayerState.gas,
 		"weather": PlayerState.current_weather,
 		"rests": PlayerState.rests_taken_today,
-		"events": PlayerState.event_values.duplicate(true),
+		"events": events,
 		"story": PlayerState.get_pending_story(),
 		"pools": PlayerState.get_locked_pending_trip_character_pools(),
 	}
@@ -154,19 +163,28 @@ static func _test_north_road(host: Node) -> void:
 				assert(world.map_view.weather_effects.weather == "rain")
 				assert(not world.map_view.buttons.bar.visible and world.map_view.buttons.town.visible)
 				for location_id: String in ["pier", "basketball_court", "construction_site", "school", "big_station", "church", "abandoned_building"]:
-					if PlayerState.energy == 0:
-						# Refill the fixture to cover all seven destinations within the five-point cap.
-						PlayerState.energy = PlayerState.max_energy
-						original.energy += PlayerState.max_energy
-						original.saves += 1
 					var energy_before: int = PlayerState.energy
+					var cost: int = world.travel_energy_cost(location_id)
 					await _travel(host, world, location_id)
-					assert(PlayerState.energy == energy_before - 1, "Every north destination charges one energy on arrival")
+					if location_id == "abandoned_building":
+						assert(world.map_view.visible and not world.location_view.visible and PlayerState.energy == energy_before)
+						assert(world.hub_dialogue.active_line.get("text") == world.ABANDONED_BUILDING_MESSAGE and world.hub_dialogue.bubble.tail_points.is_empty())
+						continue
+					assert(cost == (0 if location_id in ["pier", "school", "big_station"] else 1))
+					assert(PlayerState.energy == energy_before - cost, "North arrivals use the current free/paid destination rules")
 					assert(world.location_view.visible and not world.map_view.visible and world.current_location == location_id)
-					assert(world.background.texture is AtlasTexture)
-					assert(world.background.texture.atlas == world.map_view.get_background_texture())
+					if location_id == "construction_site":
+						assert(world.background.texture.resource_path.ends_with("constructionnight.png" if phase == "night" else "constructionday.png"))
+					elif location_id == "church":
+						assert(world.background.texture.resource_path.ends_with("churchday.png"))
+					else:
+						assert(world.background.texture is AtlasTexture)
+						assert(world.background.texture.atlas == world.map_view.get_background_texture())
 					var rain = world.background.get_node("StoryBackgroundWeather")
-					assert(rain._effects.is_raining() and not rain._effects.indoor)
+					if location_id != "church":
+						assert(rain._effects.is_raining() and not rain._effects.indoor)
+					else:
+						assert(not rain.visible, "An indoor church without an authored rain mask cannot show falling rain across the pews")
 					assert(not world.entrance_button.visible and not world.store_button.visible)
 					await _key(host, KEY_ESCAPE)
 					assert(world.map_view.map_region == "north" and world.map_view.visible)
@@ -176,12 +194,36 @@ static func _test_north_road(host: Node) -> void:
 				await _key(host, KEY_ESCAPE)
 				assert(world.map_view.map_region == "town" and world.visible and not PauseMenuManager.visible)
 			if day >= 8:
-				original.energy -= 7
-				original.saves += 7
-			assert(_snapshot() == original, "Only paid destination arrivals spend energy/save; construction speech and region navigation preserve all other state")
+				original.energy -= 3
+			var actual := _snapshot()
+			actual.erase("saves")
+			original.erase("saves")
+			assert(actual == original, "Only the basketball court, first construction visit and church spend energy; region navigation and closed-building speech preserve other state")
 			host.get_tree().current_scene = null
 			home.free()
 			await _settle(host)
+
+
+static func _test_north_announcement(host: Node) -> void:
+	var home = await _home(host, "morning", 8)
+	PlayerState.clear_event_value("north_road_open_announced")
+	var energy: int = PlayerState.energy
+	var phase: String = PlayerState.current_phase
+	home._open_map()
+	await _settle(host)
+	var world = home.home_map
+	assert(world.hub_story_overlay.active and not world.map_view.enabled)
+	assert(PlayerState.get_pending_story().get("story_id") == "north_road_open")
+	await LocationVisits.finish_overlay(host, world)
+	assert(bool(PlayerState.get_event_value("north_road_open_announced", false)))
+	assert(PlayerState.energy == energy and PlayerState.current_phase == phase)
+	world._close()
+	home._open_map()
+	await _settle(host)
+	assert(world.map_view.enabled and not world.hub_story_overlay.active, "The Day 8 announcement cannot repeat on another map opening")
+	host.get_tree().current_scene = null
+	home.free()
+	await _settle(host)
 
 
 static func _test_location_phases(host: Node) -> void:
@@ -245,8 +287,10 @@ static func _test_location_phases(host: Node) -> void:
 		var paid_arrivals := 3 if phase in ["night", "midnight"] else 2
 		original.energy -= paid_arrivals
 		original.stress -= 2
-		original.saves += paid_arrivals
-		assert(_snapshot() == original, "Hospital/Park/open Bar cost one energy each and Park relieves two stress; building entry, closure speech and free hubs preserve remaining state")
+		var actual := _snapshot()
+		actual.erase("saves")
+		original.erase("saves")
+		assert(actual == original, "Hospital/Park/open Bar cost one energy each and the daily Park story relieves two stress; building entry, closure speech and free hubs preserve remaining state")
 		host.get_tree().current_scene = null
 		home.free()
 		await _settle(host)
@@ -394,6 +438,8 @@ static func _travel(host: Node, world, location_id: String) -> void:
 	await _click(host, world.map_view.region_for(location_id).get_center())
 	if world.travel_confirmation.visible:
 		await _click(host, world.travel_confirmation.confirm_button.get_global_rect().get_center())
+	if world.hub_story_overlay.active:
+		await LocationVisits.finish_overlay(host, world)
 
 
 static func _click(host: Node, point: Vector2) -> void:

@@ -207,6 +207,7 @@ static func _test_audio_lifecycle(host: Node) -> void:
 		var screen = await _scene(host, scene_path)
 		var music: AudioStreamPlayer = screen.view.bgm_player if scene_path == STATION else screen.bgm_player
 		assert(music.playing)
+		PlayerState.set_current_stage_time("night")
 		_finish_night()
 		if scene_path == STATION:
 			screen._refresh_terminal()

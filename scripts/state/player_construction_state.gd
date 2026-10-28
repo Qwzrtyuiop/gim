@@ -54,7 +54,9 @@ static func begin_work(state) -> Dictionary:
 	var pay := work_pay(state)
 	state.set_event_value(PAY_EVENT, pay)
 	state.add_money(pay)
-	state.increment_unique_character_progress("benny", 1)
+	# Work always builds bond, even if an earlier choice closed Benny's story.
+	# Keep that narrative lock intact rather than reopening his route.
+	state.set_unique_character_progress("benny", state.get_unique_character_progress("benny") + 1)
 	if phase == "night":
 		# Non-driving activities can consume the evening without fabricating a
 		# completed ride or overwriting the player's last fare/result.
@@ -74,7 +76,7 @@ static func begin_work(state) -> Dictionary:
 	state.set_event_value(PENDING_EVENT, receipt)
 	state.set_resume_scene("res://scenes/day_start_scene.tscn")
 	state._end_state_batch()
-	return receipt
+	return receipt.duplicate(true)
 
 
 static func finish_presentation(state) -> void:
