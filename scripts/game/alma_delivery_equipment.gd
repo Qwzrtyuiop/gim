@@ -74,8 +74,6 @@ func press() -> void:
 	if not enabled or tutorial_active or _owner.game_state != "playing" or _owner.crash_repair_transition_active or _owner.get_tree().paused:
 		return
 	if _owner.truck_horn_cooldown > 0.0:
-		if _owner.passenger_dialogue_controller != null:
-			_owner.passenger_dialogue_controller.react_to_delivery(_owner, "horn_cooldown")
 		return
 	_owner.truck_horn_cooldown = _cooldown_seconds
 	_horn_player.play()
@@ -84,8 +82,6 @@ func press() -> void:
 		"origin": _owner.player.position / size,
 		"radius": 0.0,
 	}
-	if _owner.passenger_dialogue_controller != null:
-		_owner.passenger_dialogue_controller.react_to_delivery(_owner, "horn_activated")
 	_refresh_status()
 
 

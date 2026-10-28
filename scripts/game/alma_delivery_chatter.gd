@@ -28,8 +28,6 @@ const RANDOM_LINES: Array[String] = [
 	"If we survive this, drinks are on me!",
 ]
 const REACTIONS := {
-	"horn_activated": "HAHA! LOOK AT THEM GO!",
-	"horn_cooldown": "What?! It's not ready yet?!",
 	"collision": "JOHN! THE BEER ISN'T WORTH DYING FOR!",
 	"dodge": "Nice one!",
 	"timer_low": "Oh, we're SO getting fired!",
@@ -37,11 +35,9 @@ const REACTIONS := {
 }
 const PRIORITIES := {
 	"collision": 100,
-	"horn_activated": 70,
 	"destination": 60,
 	"timer_low": 50,
 	"dodge": 30,
-	"horn_cooldown": 20,
 }
 
 var _rng := RandomNumberGenerator.new()
@@ -93,7 +89,7 @@ func react(owner, controller, trigger: String) -> void:
 		return
 	if float(_reaction_cooldowns.get(trigger, 0.0)) > 0.0 or _pending.has(trigger):
 		return
-	_reaction_cooldowns[trigger] = 6.0 if trigger in ["horn_cooldown", "dodge"] else 1.5
+	_reaction_cooldowns[trigger] = 6.0 if trigger == "dodge" else 1.5
 	_pending.append(trigger)
 	_flush_reactions(owner, controller)
 
