@@ -448,6 +448,7 @@ static func _assert_repair_once(payload: Dictionary, encounter_seen := true) -> 
 	var repair := PlayerState.get_pending_crash_repair()
 	var result := PlayerState.get_last_stage_result()
 	assert(not repair.is_empty() and not result.completed and result.vehicle_collision_count == 1)
+	assert(int(repair.cost) == 200 and int(repair.hull_restore) == 4 and not bool(repair.free_repair), "Fatal Isidro interruptions use the fixed four-hull crash repair package")
 	assert(result.total == 0 and PlayerState.money == 500 - int(repair.cost) and PlayerState.hull == 0 and PlayerState.energy == 4, "Repairs charge once without consuming collision energy")
 	assert(PlayerState.get_unique_character_progress("ito") == 0 and PlayerState.character_completed_rides.is_empty())
 	assert(PlayerState.get_event_value(SEEN_EVENT, false) == encounter_seen and PlayerState.pending_story.is_empty())

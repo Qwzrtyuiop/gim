@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/repair_transition.tscn" id="1_panel"]
+[ext_resource type="Script" path="res://scripts/home/construction_work_overlay.gd" id="2_script"]
+
+[node name="ConstructionWorkOverlay" instance=ExtResource("1_panel")]
+script = ExtResource("2_script")

@@ -3,6 +3,7 @@ class_name PlayerStateSaveCodec
 
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
@@ -41,10 +42,12 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 		needs_migration_save = true
 	player_state._is_loading_save = true
 	player_state._begin_state_batch()
+	# Load earned capacity before restoring values above the base caps.
+	player_state.achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
 	player_state.money = int(save_data.get("money", player_state.money))
-	player_state.max_energy = player_state.DEFAULT_MAX_ENERGY
+	player_state.max_energy = AchievementService.energy_capacity(player_state.achievements)
 	player_state.energy = int(save_data.get("energy", player_state.DEFAULT_STARTING_ENERGY))
-	player_state.max_stress = player_state.DEFAULT_MAX_STRESS
+	player_state.max_stress = AchievementService.stress_capacity(player_state.achievements)
 	player_state.stress = int(save_data.get("stress", player_state.DEFAULT_STARTING_STRESS))
 	player_state.max_hull = player_state.DEFAULT_MAX_HULL
 	player_state.hull = int(save_data.get("hull", player_state.DEFAULT_STARTING_HULL))
@@ -146,7 +149,6 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	var needs_story_trigger_save := StoryTriggerService.ensure_required_story_triggers(player_state.story_triggers)
 	player_state.consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
 	player_state.upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
-	player_state.achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
@@ -320,9 +322,11 @@ static func _migrate_resource_data(source: Dictionary, version: int) -> Dictiona
 	var data := source.duplicate(true)
 	var old_max := maxi(1, int(data.get("max_energy", 10)))
 	var old_energy := clampi(int(data.get("energy", old_max)), 0, old_max)
-	data["max_energy"] = GameTuning.DEFAULT_MAX_ENERGY
-	data["energy"] = clampi(old_energy, 0, GameTuning.DEFAULT_MAX_ENERGY)
-	data["max_stress"] = 10
+	var earned := Dictionary(data.get("achievements", {}))
+	var energy_cap := AchievementService.energy_capacity(earned)
+	data["max_energy"] = energy_cap
+	data["energy"] = clampi(old_energy, 0, energy_cap)
+	data["max_stress"] = AchievementService.stress_capacity(earned)
 	data["stress"] = clampi(roundi((1.0 - float(old_energy) / float(old_max)) * 10.0), 0, 10)
 	data["max_hull"] = 10
 	data["hull"] = 0 if not Dictionary(data.get("pending_crash_repair", {})).is_empty() else 10

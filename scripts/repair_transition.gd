@@ -30,10 +30,15 @@ func _ready() -> void:
 		return
 	PlayerState.set_resume_scene(REPAIR_SCENE)
 	var days := int(repair["days"])
+	var restored_hull := clampi(int(repair.get("hull_restore", PlayerState.max_hull)), 1, PlayerState.max_hull)
+	var free_patch := bool(repair.get("free_repair", false))
 	duration_label.text = "%d %s OFF THE ROAD" % [days, "DAY" if days == 1 else "DAYS"]
 	bill_label.text = "REPAIR BILL: PhP %d" % int(repair["cost"])
+	if free_patch:
+		bill_label.text += " (FREE PATCH)"
 	balance_label.text = "Cash remaining: PhP %d" % int(repair["cash_after"])
-	next_day_label.text = "Hull will be restored to 10/10 on Day %d, morning.\nYour trip ended without a fare." % int(repair["target_day"])
+	var repair_note := "Not enough cash for a full repair.\n" if free_patch else ""
+	next_day_label.text = repair_note + "Hull will be restored to %d/%d on Day %d, morning.\nYour trip ended without a fare." % [restored_hull, PlayerState.max_hull, int(repair["target_day"])]
 	_start_repair_presentation()
 	continue_button.pressed.connect(_continue_repair)
 	ButtonGlow.attach(self, continue_button)

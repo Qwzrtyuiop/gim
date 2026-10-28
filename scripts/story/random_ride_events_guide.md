@@ -1,5 +1,38 @@
 # Random ride events
 
+## Repeatable generic passenger moments
+
+Ten short events in `payloads/events/generic/` use the same Day-3-and-later,
+Day-2-bill-completed gate as the existing random events. Scheduled/character
+stories (including the Day 2 bill), the due Malasakit epilogue, and selected
+Malasakit/Bayanihan events take priority. If none plays, generic passengers get
+`GENERIC_PASSENGER_EVENT_CHANCE` (25%) to roll one eligible minor event uniformly.
+Named passengers, failed rides and paid results cannot roll these scenes.
+
+| Event | Reward | Additional requirement |
+| --- | --- | --- |
+| Keep the Change | PhP 20, stress -1 | No overtime |
+| A Compliment | Stress -2 | None |
+| An Extra Tip | PhP 15, stress -1 | Completed ride was morning/noon |
+| Lucky Day | PhP 30, stress -1 | None |
+| A Quiet Ride | Stress -2 | No crashes/collisions |
+| Rounding Up | PhP 20 | None |
+| A Friendly Passenger | Stress -2 | None |
+| A Small Favor | PhP 25, stress -1 | None |
+| An Unexpected Conversation | Stress -2 | None |
+| A Generous Stranger | PhP 40, stress -1 | None |
+
+`generic_passenger_events.gd` owns eligibility. The completed result stores
+`had_crash` before achievement tracking resets ride flags; it also supplies the
+completed phase/overtime rather than the already-advanced live clock. Selection
+is cached in the result's existing random-event fields and is never rerolled for
+that ride. These story IDs have no run-wide consumed marker, so later rides can
+repeat them; each new occurrence resets its section cursor. Rewards are ordinary
+persistent actions on the final reward line, covered by the story checkpoint and
+suppressed in Memories. Tips add directly to cash in addition to the normal ride
+payout. Scenes use day/night street art, no added music, and aligned Tagalog
+"to be translated" placeholders. No save-version change is needed.
+
 ## Bayanihan
 
 Bayanihan uses `BAYANIHAN_EVENT_CHANCE` (default 10%) after a completed
@@ -11,6 +44,7 @@ If configured chances total more than 100%, their weights are normalized.
 `payloads/events/bayanihan.gd` contains the supplied English script, also used
 as the Tagalog fallback until a translation is supplied. It uses the shared
 background/music and the placeholder Driver portrait. Helping unlocks Bayanihan
+with its permanent +5% fare bonus (additive with Malasakit's +5%)
 and records `bayanihan_outcome = help`; declining records `decline`. Neither
 choice changes the ride payout, energy, or gas. Helping skips the phase following
 the completed ride, with a warning on the choice: after a morning ride it skips
@@ -43,7 +77,8 @@ The English and Tagalog dialogue live in `payloads/events/malasakit.gd` and
 `payloads/events/malasakit_tagalog.gd`. Both use the standard payload format from
 `story_payloads_guide.md`, with `StoryConstants.BACKGROUND_STATION` and
 `StoryConstants.STATION_MUSIC` for the shared presentation matching Day 2. Use
-those defaults for future random ride events too. Passenger dialogue uses
+those defaults for matching station scenes. The minor passenger moments instead
+use completed-phase street backgrounds without an added music cue. Passenger dialogue uses
 `assets/characters/placeholder.png` through the speaker portrait mapping.
 
 Register both language scripts in `story_payload_catalog.gd` and build events

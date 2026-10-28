@@ -212,7 +212,7 @@ static func build() -> Dictionary:
 			# 16 — RETURN_MONEY
 			{
 				"speaker": "John Toda",
-				"text": "Wait. Sir! You dropped this.",
+				"text": "Wait up! Hey! You dropped this.",
 			},
 			# 17
 			{

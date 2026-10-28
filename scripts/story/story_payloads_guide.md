@@ -110,6 +110,9 @@ static func build() -> Dictionary:
   same branches, conditions, actions, and presentation as the source language.
 - Conditions, camera, portraits, dialogue overrides, and story-specific metadata
   remain available. Normalization preserves them and does not rearrange branches.
+- A line's optional `choice_details` shows a compact information card above its
+  choices. Keep button text short; put costs, rewards and duration in that card.
+  Disabled choices can explain their requirement through `locked_reason` tooltips.
 - Resource paths and shared audio defaults live in `story_constants.gd`.
   Use `STATION_MUSIC` for Day 2 and station/random events, and
   `DRIVING_CHILL_MUSIC` for Elena's ride. Custom music and SFX settings use the

@@ -1,6 +1,7 @@
 extends Control
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const DrivingAudio := preload("res://scripts/game/game_audio_manager.gd")
 
 const STORE_SCENE := "res://scenes/store.tscn"
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
@@ -139,6 +140,10 @@ func _start_carried_result_music() -> void:
 func _play_carried_stage_music(music_state: Dictionary) -> void:
 	var path := str(music_state.get("stage_path", "")).strip_edges()
 	if path.is_empty():
+		return
+	# The live clock may already be night after completing a noon trip. Suppress
+	# its default playlist too, including carry data from saves made before this rule.
+	if PlayerState.get_current_time_of_day() == "night" and DrivingAudio.is_default_stage_bgm_path(path):
 		return
 
 	var stream = _load_looping_audio_stream(path)

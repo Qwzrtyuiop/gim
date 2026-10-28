@@ -3,6 +3,7 @@ extends Control
 # Authored rain masks follow the background through story camera movement.
 const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
 const LOCATIONS := "res://assets/story/backgrounds/locations/"
+const UNMASKED_INDOOR_BACKGROUNDS := ["res://assets/story/backgrounds/churchday.png"]
 const MARKERS := {
 	"bar.png": "barrain_indoor.png",
 	"barnight.png": "barnightrain.png",
@@ -14,6 +15,8 @@ const MARKERS := {
 	"parknight.png": "parkrain.png",
 	"market.png": "marketrain.png",
 	"marketnight.png": "marketrain.png",
+	"constructionday.png": "constructionrain.png",
+	"constructionnight.png": "constructionrain.png",
 }
 
 var _background: TextureRect
@@ -29,6 +32,8 @@ static func is_indoor_background(texture: Texture2D) -> bool:
 	if texture == null:
 		return false
 	var path := texture.resource_path
+	if path in UNMASKED_INDOOR_BACKGROUNDS:
+		return true
 	var marker_file: String = MARKERS.get(path.get_file(), "") if path.begins_with(LOCATIONS) else ""
 	return marker_file.get_basename().ends_with("_indoor")
 

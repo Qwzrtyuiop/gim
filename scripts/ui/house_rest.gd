@@ -54,7 +54,7 @@ func refresh() -> void:
 	var phase := PlayerState.get_current_time_of_day()
 	var sleeping := phase == "night"
 	title_label.text = "Sleep until morning?" if sleeping else "Take a short rest?"
-	recovery_label.text = "ENERGY TO %d / STRESS -%d" % [GameTuning.DEFAULT_MAX_ENERGY, GameTuning.NIGHT_SLEEP_STRESS_RELIEF] if sleeping else "+%d ENERGY / STRESS -%d" % [GameTuning.REST_ENERGY_RESTORE, GameTuning.REST_STRESS_RELIEF]
+	recovery_label.text = "ENERGY TO %d / STRESS -%d" % [PlayerState.max_energy, GameTuning.NIGHT_SLEEP_STRESS_RELIEF] if sleeping else "+%d ENERGY / STRESS -%d" % [GameTuning.REST_ENERGY_RESTORE, GameTuning.REST_STRESS_RELIEF]
 	if sleeping:
 		time_label.text = "DAY %d / MORNING" % (PlayerState.get_current_day() + 1)
 	else:

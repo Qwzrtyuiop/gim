@@ -179,7 +179,7 @@ static func _test_audio_lifecycle(host: Node) -> void:
 			var screen = await _scene(host, scene_path)
 			var audio: AudioStreamPlayer = screen.night_ambience
 			var music: AudioStreamPlayer = screen.view.bgm_player if scene_path == STATION else screen.bgm_player
-			assert(music.playing == (phase != "midnight"), "All hubs stop music at midnight; noon and ordinary night retain hub music")
+			assert(music.playing == (phase != "midnight" and not HubMusicManager.background_path(scene_path == HOME).is_empty()), "Daytime retains default music; night requires the rain trigger and midnight keeps background music silent")
 			assert(audio.playing == (phase != "noon"))
 			assert(audio.stream is AudioStreamMP3 and audio.stream.loop)
 			assert(audio.get_meta("audio_category") == "sfx")
@@ -203,7 +203,7 @@ static func _test_audio_lifecycle(host: Node) -> void:
 			screen.free()
 			assert(reference.get_ref() == AmbientAudioManager and audio.get_parent() == host.get_tree().root, "Hub ambience belongs to the persistent service, not the departing scene")
 	for scene_path in [HOME, STORE, STATION]:
-		_setup()
+		_setup("noon")
 		var screen = await _scene(host, scene_path)
 		var music: AudioStreamPlayer = screen.view.bgm_player if scene_path == STATION else screen.bgm_player
 		assert(music.playing)
@@ -241,10 +241,7 @@ static func _test_result_music(host: Node) -> void:
 		var music := results.get_node_or_null("StageResultsBGMPlayer") as AudioStreamPlayer
 		var rain: AudioStreamPlayer = AmbientAudioManager.rain_player
 		assert(results.get_node_or_null("StageResultsRainLoopPlayer") == null, "Results reuse the shared rain rather than duplicating it")
-		if completed_phase == "night":
-			assert(music == null, "A completed night trip is already midnight on the results screen, so its stage music must not carry")
-		else:
-			assert(music != null and music.playing, "Noon results reaching ordinary night keep their carried stage music")
+		assert(music == null, "Default stage music cannot carry into ordinary night or midnight results")
 		assert(rain != null and rain.playing, "Rain ambience carries into results even at midnight")
 		assert(PlayerState.pending_result_music.is_empty())
 		var player_count: int = results.carried_music_players.size()

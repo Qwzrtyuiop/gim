@@ -41,6 +41,26 @@ static func render_choices(owner, line: Dictionary) -> void:
 
 	owner.continue_label.visible = false
 	owner.choice_container.visible = true
+	var details := str(line.get("choice_details", "")).strip_edges()
+	if not details.is_empty():
+		var details_panel := PanelContainer.new()
+		details_panel.name = "ChoiceDetails"
+		details_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var style := make_panel_style(DIALOGUE_PANEL_COLOR, DIALOGUE_PANEL_BORDER, 7)
+		style.content_margin_left = 16.0
+		style.content_margin_right = 16.0
+		style.content_margin_top = 12.0
+		style.content_margin_bottom = 12.0
+		details_panel.add_theme_stylebox_override("panel", style)
+		var label := Label.new()
+		label.text = details
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		apply_label_theme(label, 12, Color(0.95, 0.84, 0.62), Color.BLACK, 1)
+		label.add_theme_constant_override("line_spacing", 8)
+		details_panel.add_child(label)
+		owner.choice_container.add_child(details_panel)
 
 	for choice_data_variant in raw_choices:
 		if not choice_data_variant is Dictionary:
@@ -58,6 +78,8 @@ static func render_choices(owner, line: Dictionary) -> void:
 			button.text = str(choice_data.get("locked_text", button.text))
 			button.tooltip_text = str(choice_data.get("locked_reason", "Requirements not met."))
 		var is_disabled := not is_available or bool(choice_data.get("disabled", not bool(choice_data.get("enabled", true))))
+		if is_disabled and choice_data.has("locked_reason"):
+			button.tooltip_text = str(choice_data["locked_reason"])
 		button.disabled = is_disabled
 		button.focus_mode = Control.FOCUS_NONE
 		apply_choice_button_theme(button)
@@ -93,6 +115,10 @@ static func clear_choice_buttons(owner) -> void:
 				button.get_parent().remove_child(button)
 			button.queue_free()
 	owner.choice_buttons.clear()
+	var details: Node = owner.choice_container.get_node_or_null("ChoiceDetails")
+	if details != null:
+		owner.choice_container.remove_child(details)
+		details.queue_free()
 
 
 static func apply_theme(owner) -> void:

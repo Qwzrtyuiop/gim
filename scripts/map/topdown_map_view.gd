@@ -79,7 +79,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	var cost := travel_energy_cost(hovered_location)
-	var relief := _park_stress_relief(hovered_location)
+	var relief := _visit_stress_relief(hovered_location)
 	energy_cursor.visible = enabled and is_visible_in_tree() and not highlight_mode.keyboard_active and not hovered_location.is_empty() and not Catalog.is_locked(hovered_location) and (cost > 0 or relief > 0)
 	if not energy_cursor.visible:
 		return
@@ -99,8 +99,16 @@ func travel_energy_cost(location_id: String) -> int:
 	return maxi(0, int(travel_cost_provider.call(location_id)))
 
 
-func _park_stress_relief(location_id: String) -> int:
-	return GameTuning.PARK_STRESS_RELIEF if location_id == "park" and current_location != "park" and _regions().has(location_id) and not Catalog.is_locked(location_id) else 0
+func _visit_stress_relief(location_id: String) -> int:
+	if location_id == current_location or not _regions().has(location_id) or Catalog.is_locked(location_id):
+		return 0
+	if PlayerState.has_visited_location_today(location_id):
+		return 0
+	if location_id == "park":
+		return GameTuning.PARK_STRESS_RELIEF
+	if location_id == "church":
+		return PlayerState.get_church_stress_relief()
+	return 0
 
 
 func _build_energy_cursor() -> void:
@@ -125,7 +133,7 @@ func _build_energy_cursor() -> void:
 	energy_cursor_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	energy_cursor.add_child(energy_cursor_icon)
 	stress_cursor = HBoxContainer.new()
-	stress_cursor.name = "ParkStressBenefit"
+	stress_cursor.name = "VisitStressBenefit"
 	stress_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stress_cursor.add_theme_constant_override("separation", 3)
 	energy_cursor.add_child(stress_cursor)
@@ -239,7 +247,7 @@ func _layout() -> void:
 		buttons[location_id].position = region.position
 		buttons[location_id].size = region.size
 	if info_panel != null:
-		var panel_height := 76.0 if _park_stress_relief(active_location()) > 0 else 54.0
+		var panel_height := 76.0 if _visit_stress_relief(active_location()) > 0 else 54.0
 		info_panel.size = Vector2(minf(600, maxf(180, size.x - 40)), panel_height)
 		info_panel.position = Vector2((size.x - info_panel.size.x) * 0.5, size.y - panel_height - 22)
 		if size.x < 1000:
@@ -275,10 +283,12 @@ func _refresh_info() -> void:
 			info_label.text = "Hover a location to travel"
 		elif Catalog.is_locked(active):
 			info_label.text = "HOSPITAL" if active == "hospital" else "NOT YET UNLOCKED"
+		elif active != current_location and PlayerState.has_visited_location_today(active):
+			info_label.text = str(Catalog.NAMES[active]).to_upper() + "\nAlready visited today"
 		else:
 			var cost := travel_energy_cost(active)
 			var instruction := "Click to travel (-%d energy)" % cost if cost > 0 else "Click to travel"
-			var relief := _park_stress_relief(active)
+			var relief := _visit_stress_relief(active)
 			if relief > 0:
 				instruction += "\nReduce stress by %d" % relief
 			info_label.text = str(Catalog.NAMES[active]).to_upper() + ("\nYou are here" if active == current_location else "\n" + instruction)

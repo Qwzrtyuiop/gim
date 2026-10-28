@@ -2,6 +2,7 @@ extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
+const GenericPassengerEvents := preload("res://scripts/story/generic_passenger_events.gd")
 const CONSUMED_KEY := "random_ride:malasakit"
 const BAYANIHAN_CONSUMED_KEY := "random_ride:bayanihan"
 const EPILOGUE_CONSUMED_KEY := "random_ride:malasakit_epilogue"
@@ -53,6 +54,13 @@ static func prepare(state) -> Dictionary:
 	elif selected_id == "bayanihan":
 		payload = StoryPayloadCatalog.build("bayanihan")
 		state.consumed_story_triggers[BAYANIHAN_CONSUMED_KEY] = true
+	elif is_generic:
+		var minor_story_id := GenericPassengerEvents.select(state, result)
+		if not minor_story_id.is_empty():
+			payload = StoryPayloadCatalog.build(minor_story_id)
+			# A new occurrence starts at its first section; a saved pending
+			# occurrence resumes through its existing checkpoint instead.
+			state.set_last_seen_story_section(minor_story_id, 0)
 	if not payload.is_empty():
 		result["random_story_id"] = payload["story_id"]
 		payload["return_scene"] = RESULTS_SCENE

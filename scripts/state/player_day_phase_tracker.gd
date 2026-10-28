@@ -33,6 +33,8 @@ static func is_midnight(player_state) -> bool:
 	# saved result also applies this rule to existing saves without a new field.
 	if get_current_phase(player_state) != "night":
 		return false
+	if int(player_state.get_event_value("night_phase_consumed_day", 0)) == get_current_day(player_state):
+		return true
 	var result: Dictionary = player_state.last_stage_result
 	if int(result.get("day", 0)) != get_current_day(player_state):
 		return false

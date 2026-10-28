@@ -82,6 +82,9 @@ func start_stage_bgm(stage_time_of_day: String, stage_traffic: String, rng: Rand
 
 	var bgm_pool := _get_stage_bgm_pool(stage_time_of_day, stage_traffic)
 	if bgm_pool.is_empty():
+		stage_bgm_player.stop()
+		stage_bgm_player.stream = null
+		current_stage_bgm_path = ""
 		return
 
 	current_stage_bgm_path = str(bgm_pool[rng.randi_range(0, bgm_pool.size() - 1)])
@@ -162,7 +165,12 @@ func get_result_music_carry_state() -> Dictionary:
 	return state
 
 
+static func is_default_stage_bgm_path(path: String) -> bool:
+	return path in STAGE_BGM_NORMAL_CHILL_PATHS or path in STAGE_BGM_SPEEDER_BUSY_PATHS or path == STAGE_BGM_TRAFFIC_JAM_PATH
+
+
 func _get_stage_bgm_pool(_stage_time_of_day: String, stage_traffic: String) -> Array:
+	# All rides use their traffic playlist, including nighttime rides.
 	match stage_traffic:
 		"speeders":
 			return STAGE_BGM_SPEEDER_BUSY_PATHS

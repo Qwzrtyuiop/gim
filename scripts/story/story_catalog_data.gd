@@ -187,6 +187,7 @@ const MOCK_CHARACTERS := [
 	{
 		"id": "alma",
 		"name": "Alma",
+		"phase_absence_event": "alma_bar_visit_absence",
 		"blurb": "Bartender from the city who knows you personally.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": 1.03},
 		"first_distance": "short",
@@ -220,6 +221,7 @@ const MOCK_CHARACTERS := [
 		"id": "cel",
 		"name": "Celina",
 		"name_unlock_event": "celina_name_revealed",
+		"phase_absence_event": "celina_hospital_visit_absence",
 		"blurb": "Clinic aide who is quietly very observant.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": 1.02},
 		"first_distance": "short",

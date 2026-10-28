@@ -4,6 +4,7 @@ extends TextureButton
 signal interacted(character_id: String)
 
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
+const CelinaHospitalDialogue := preload("res://scripts/home/celina_hospital_dialogue.gd")
 const ART_SIZE := Vector2(1672, 941)
 const POSES := {
 	"default1": {
@@ -33,6 +34,7 @@ static var _masks: Dictionary = {}
 
 var active := false
 var interaction_override: Callable
+var dialogue_pool := CelinaHospitalDialogue.new()
 var _background: TextureRect
 var _dialogue: HubDialogue
 var _pose := "default1"
@@ -101,19 +103,30 @@ func _process(delta: float) -> void:
 
 
 func _on_pressed() -> void:
-	if not active or not is_visible_in_tree() or _dialogue == null or _dialogue.blocks_input():
+	if not active or disabled or not is_visible_in_tree() or _dialogue == null or _dialogue.blocks_input():
 		return
 	_pose_elapsed = 0.0
 	_unattended_seconds = 0.0
 	_show_default()
 	if interaction_override.is_valid() and bool(interaction_override.call("cel")):
 		return
-	_dialogue.say("...", {
+	if not _dialogue.say(dialogue_pool.next_greeting(), {
 		"target": "hospital:cel",
 		"character_id": "cel",
-		"duration": 2.5,
-	})
+		"duration": 4.0,
+	}):
+		return
 	interacted.emit("cel")
+
+
+func say_shop_closing_line() -> void:
+	if not active or disabled or not is_visible_in_tree() or _dialogue == null or _dialogue.blocks_input():
+		return
+	_dialogue.say(dialogue_pool.next_closing(), {
+		"target": "hospital:cel",
+		"character_id": "cel",
+		"duration": 4.0,
+	})
 
 
 func _show_default() -> void:

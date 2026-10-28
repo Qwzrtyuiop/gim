@@ -461,7 +461,7 @@ static func build() -> Dictionary:
 			},
 			# 68
 			{
-				"text": "Before I can say anything else, she turns around and runs off, waving goodbye as though she hadn't done anything wrong in the first place.",
+				"text": "She turns around and runs off, waving goodbye as though she hadn't done anything wrong in the first place.",
 				"actions": [
 					{
 						"type": "play_sfx",

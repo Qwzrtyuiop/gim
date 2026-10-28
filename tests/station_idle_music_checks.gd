@@ -54,7 +54,7 @@ static func _test_ineligible_phase(host: Node, phase: String) -> void:
 	_exercise_terminal(station)
 	idle._on_idle_timeout()
 	assert(idle.idle_timer.is_stopped() and not idle.active and not idle.player.playing and idle.player.stream == null, "Passenger selection is eligible only during midnight")
-	assert(station.view.bgm_player.playing, "Other phases retain normal station music")
+	assert(station.view.bgm_player.playing == not HubMusicManager.background_path().is_empty(), "Ordinary night has no default music unless the rain trigger applies")
 	station._close_passengers()
 	station.free()
 

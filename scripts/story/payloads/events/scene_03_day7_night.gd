@@ -86,7 +86,7 @@ static func build() -> Dictionary:
 			},
 			# 6
 			{
-				"text": "The door opens before I can think of a better answer.",
+				"text": "The door opens with a silent creak.",
 				"actions": [
 					{
 						"type": "play_sfx",

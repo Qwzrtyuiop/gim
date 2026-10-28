@@ -160,7 +160,7 @@ static func _test_weather_priority(host: Node) -> void:
 	_assert_uninterrupted(player, source, playback)
 	assert(WeatherState.set_story_weather(PlayerState, "clear"))
 	store._refresh_header()
-	_assert_track(HubMusicManager.DEFAULT_PATH)
+	assert(not player.playing, "Clear nights have no default background music")
 	store._open_shop("tricycle")
 	_assert_track(HubMusicManager.MECHANIC_PATH)
 	assert(WeatherState.set_story_weather(PlayerState, "rain"))
@@ -176,12 +176,10 @@ static func _test_weather_priority(host: Node) -> void:
 static func _test_bar_and_midnight(host: Node) -> void:
 	_setup("night")
 	var home = await _scene(host, HOME)
+	var player: AudioStreamPlayer = HubMusicManager.player
+	assert(not player.playing, "Clear-night home interiors have no default music")
 	home._open_map()
-	var player := _assert_track(HubMusicManager.DEFAULT_PATH)
-	var source: AudioStream = player.stream
-	player.seek(1.0)
-	await host.get_tree().process_frame
-	var position: float = player.get_playback_position()
+	assert(not player.playing, "Clear-night maps and outdoor locations stay silent")
 	var world = home.home_map
 	world.map_view.buttons.bar.pressed.emit()
 	assert(world.travel_confirmation.visible)
@@ -190,8 +188,7 @@ static func _test_bar_and_midnight(host: Node) -> void:
 	assert(world.bar_audio.active and world.bar_audio.music_player.playing and not player.playing, "The bar track has priority over shared background music")
 	world.exit_button.pressed.emit()
 	assert(not world.bar_audio.active and not world.bar_audio.music_player.playing)
-	assert(_assert_track(HubMusicManager.DEFAULT_PATH) == player and player.stream == source)
-	assert(player.get_playback_position() + 0.02 >= position, "Exiting the bar restores the suspended outdoor theme")
+	assert(not player.playing, "Leaving the bar returns to nighttime ambience without background music")
 	await _scene(host, MENU)
 	_setup("night", "rain", true)
 	var station = await _scene(host, SELECTION)

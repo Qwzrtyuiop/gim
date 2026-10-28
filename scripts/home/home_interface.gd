@@ -101,7 +101,7 @@ static func render_day_start(owner) -> void:
 	if current_time == "noon":
 		rest_note = "Rest: +2 energy, -%d stress, then continue at night." % GameTuning.REST_STRESS_RELIEF
 	elif current_time == "night":
-		rest_note = "Sleep: restore energy to %d, reduce stress by %d, and start the next day at home." % [GameTuning.DEFAULT_MAX_ENERGY, GameTuning.NIGHT_SLEEP_STRESS_RELIEF]
+		rest_note = "Sleep: restore energy to %d, reduce stress by %d, and start the next day at home." % [PlayerState.max_energy, GameTuning.NIGHT_SLEEP_STRESS_RELIEF]
 	owner.house.buttons["rest"].tooltip_text = rest_note
 
 

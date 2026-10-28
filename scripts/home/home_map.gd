@@ -27,6 +27,16 @@ const HospitalCharacters := preload("res://scripts/home/hospital_characters.gd")
 const HospitalAudio := preload("res://scripts/home/hospital_audio.gd")
 const HospitalEncounter := preload("res://scripts/home/hospital_encounter.gd")
 const HospitalShop := preload("res://scripts/store/hospital_shop.gd")
+const ConstructionBennySpawn := preload("res://scripts/home/construction_benny_spawn.gd")
+const ConstructionAudio := preload("res://scripts/home/construction_audio.gd")
+const ConstructionState := preload("res://scripts/state/player_construction_state.gd")
+const HubStoryOverlay := preload("res://scripts/home/hub_story_overlay.gd")
+const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
+const ChurchPrayerEncounter := preload("res://scripts/home/church_prayer_encounter.gd")
+const ParkVisitEncounter := preload("res://scripts/home/park_visit_encounter.gd")
+const ChurchAudio := preload("res://scripts/home/church_audio.gd")
+const ConstructionWorkOverlay := preload("res://scripts/home/construction_work_overlay.gd")
+const WORK_OVERLAY_SCENE := preload("res://scenes/construction_work_overlay.tscn")
 const LOCATIONS := "res://assets/story/backgrounds/locations/"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const STATION_SCENE := "res://scenes/ride_selection.tscn"
@@ -34,8 +44,13 @@ const STORE_SCENE := "res://scenes/store.tscn"
 const BAR_ENTRANCE := Rect2(185, 12, 1275, 815)
 const BAR_CLOSED_MESSAGE := "It's closed. I should try again later."
 const HOSPITAL_LOCKED_MESSAGE := "I don't really have a reason to go there.."
+const ABANDONED_BUILDING_MESSAGE := "Why would I go there?"
 const NORTH_ROAD_UNLOCK_DAY := 8
-const FREE_TRAVEL_LOCATIONS := ["home", "station", "store", "market", "street"]
+const FREE_TRAVEL_LOCATIONS := ["home", "station", "store", "market", "street", "pier", "abandoned_building", "big_station", "school"]
+const LOCATION_PASSENGER_ABSENCES := {
+	"bar": "alma_bar_visit_absence",
+	"hospital": "celina_hospital_visit_absence",
+}
 const NORTH_ROAD_CLOSED_MESSAGE := "There's road construction ahead. I can't get through. It'll take about a week or so. I should check again later."
 const BACKGROUNDS := {
 	"market": ["market.png", "marketnight.png"],
@@ -43,6 +58,8 @@ const BACKGROUNDS := {
 	"park": ["park.png", "parknight.png"],
 	"hospital": ["hospitalday.png", "hospitalnight.png"],
 	"bar": ["barnight.png", "barnight.png"],
+	"construction_site": ["constructionday.png", "constructionnight.png"],
+	"church": ["res://assets/story/backgrounds/churchday.png", "res://assets/story/backgrounds/churchday.png"],
 }
 
 var map_view: MapView
@@ -52,6 +69,11 @@ var bar_characters: BarCharacters
 var celina_spawn: HospitalCelinaSpawn
 var hospital_characters: HospitalCharacters
 var hospital_audio: HospitalAudio
+var construction_spawn: ConstructionBennySpawn
+var construction_audio: ConstructionAudio
+var church_audio: ChurchAudio
+var hub_story_overlay: HubStoryOverlay
+var work_overlay: ConstructionWorkOverlay
 # Keep the scene's public node references for callers that inspect the bar cast.
 var alma_spawn: BarAlmaSpawn
 var benny_spawn: TextureButton
@@ -74,6 +96,7 @@ var travel_confirmation: TravelConfirmation
 var _pending_destination := ""
 var _shop_disabled_controls: Dictionary = {}
 var _suppress_shop_closing_dialogue := false
+var _suppress_hospital_shop_closing_dialogue := false
 
 
 func _ready() -> void:
@@ -98,6 +121,17 @@ func _ready() -> void:
 	bar_audio.active_changed.connect(bar_music_changed.emit)
 	hospital_audio = HospitalAudio.new()
 	add_child(hospital_audio)
+	construction_audio = ConstructionAudio.new()
+	add_child(construction_audio)
+	church_audio = ChurchAudio.new()
+	add_child(church_audio)
+	hub_story_overlay = HubStoryOverlay.new()
+	add_child(hub_story_overlay)
+	hub_story_overlay.setup(self)
+	work_overlay = WORK_OVERLAY_SCENE.instantiate() as ConstructionWorkOverlay
+	add_child(work_overlay)
+	work_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	work_overlay.finished.connect(_finish_construction_work)
 	resized.connect(_layout)
 	_layout()
 	hide()
@@ -105,6 +139,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _has_activity_overlay():
+		return
 	if not is_visible_in_tree() or not location_view.visible:
 		return
 	if bar_shop.visible:
@@ -143,11 +179,15 @@ func open(origin: String = "home") -> void:
 
 
 func _show_map() -> void:
+	if _has_activity_overlay():
+		return
+	church_audio.set_active(false)
 	_close_bar_shop()
 	_close_hospital_shop()
 	_dismiss_travel_confirmation()
 	_set_bar_active(false)
 	_set_hospital_active(false)
+	_set_construction_active(false)
 	AmbientAudioManager.set_rain_indoors(false)
 	hub_dialogue.clear()
 	entrance_highlight_mode.reset()
@@ -155,18 +195,25 @@ func _show_map() -> void:
 	inside_bar = false
 	shop_button.hide()
 	location_view.hide()
+	status_header.refresh()
 	background.texture = null
 	BackgroundWeather.apply(background)
 	for button in [map_button, store_button, entrance_button, exit_button, shop_button]:
 		button.release_focus()
 	map_view.set_current_location(current_location)
+	map_view.set_night(PlayerState.get_current_time_of_day() == "night")
 	map_view.set_weather(PlayerState.current_weather)
 	map_view.show()
 	map_view.set_enabled(true)
 	map_view.back_button.grab_focus()
+	_announce_north_road.call_deferred()
 
 
 func travel_energy_cost(location_id: String) -> int:
+	if _daily_visit_blocked(location_id):
+		return 0
+	if location_id == "construction_site" and bool(PlayerState.get_event_value(ConstructionState.UNLOCK_EVENT, false)):
+		return 0
 	if location_id == current_location or location_id in FREE_TRAVEL_LOCATIONS or location_id in ["north", "town"] or MapCatalog.is_locked(location_id):
 		return 0
 	if location_id == "bar" and PlayerState.get_current_time_of_day() != "night":
@@ -178,7 +225,7 @@ func travel_energy_cost(location_id: String) -> int:
 
 
 func _request_visit(location_id: String) -> void:
-	if not is_visible_in_tree() or not map_view.visible or not map_view.enabled or not _pending_destination.is_empty():
+	if _has_activity_overlay() or not is_visible_in_tree() or not map_view.visible or not map_view.enabled or not _pending_destination.is_empty():
 		return
 	var cost := travel_energy_cost(location_id)
 	if cost <= 0 or PlayerState.energy < cost:
@@ -218,9 +265,21 @@ func _dismiss_travel_confirmation() -> void:
 
 
 func _visit(location_id: String) -> void:
+	if _has_activity_overlay():
+		return
+	if _daily_visit_blocked(location_id):
+		if map_view.buttons.has(location_id):
+			hub_dialogue.register_control("map_destination", map_view.buttons[location_id])
+		_show_location_message("I've already been to the %s today. I should come back tomorrow." % location_id, "map_destination")
+		return
 	if MapCatalog.is_locked(location_id):
 		if location_id == "hospital":
 			_show_location_message(HOSPITAL_LOCKED_MESSAGE, "map_hospital")
+		return
+	if location_id == "abandoned_building":
+		if map_view.buttons.has(location_id):
+			hub_dialogue.register_control("map_destination", map_view.buttons[location_id])
+		_show_location_message(ABANDONED_BUILDING_MESSAGE, "map_destination")
 		return
 	_close_bar_shop()
 	_close_hospital_shop()
@@ -267,8 +326,9 @@ func _visit(location_id: String) -> void:
 	if not BACKGROUNDS.has(location_id) and not north_destination:
 		return
 	var energy_cost := travel_energy_cost(location_id)
+	var location_visit_story_id := ""
+	PlayerState._begin_state_batch()
 	if energy_cost > 0:
-		PlayerState._begin_state_batch()
 		if not PlayerState.spend_energy(energy_cost):
 			PlayerState._end_state_batch()
 			if map_view.buttons.has(location_id):
@@ -282,11 +342,19 @@ func _visit(location_id: String) -> void:
 			})
 			return
 		if location_id == "park":
-			PlayerState.relieve_stress(GameTuning.PARK_STRESS_RELIEF)
-		PlayerState._end_state_batch()
+			location_visit_story_id = ParkVisitEncounter.record_visit()
+			if not location_visit_story_id.is_empty():
+				PlayerState.relieve_stress(GameTuning.PARK_STRESS_RELIEF)
+		elif location_id == "church":
+			location_visit_story_id = ChurchPrayerEncounter.record_visit()
+			if not location_visit_story_id.is_empty():
+				PlayerState.relieve_stress(PlayerState.get_church_stress_relief())
+	_mark_location_passenger_absence(location_id)
+	PlayerState._end_state_batch()
 	current_location = location_id
 	_set_bar_active(false)
 	_set_hospital_active(false)
+	_set_construction_active(false)
 	entrance_highlight_mode.reset()
 	_update_entrance_focus()
 	inside_bar = false
@@ -294,7 +362,8 @@ func _visit(location_id: String) -> void:
 	map_view.set_enabled(false)
 	map_view.hide()
 	var night: bool = PlayerState.get_current_time_of_day() == "night"
-	if north_destination:
+	var map_crop := north_destination and not BACKGROUNDS.has(location_id)
+	if map_crop:
 		# Use the authored map area until this destination has its own background.
 		var map_texture: Texture2D = map_view.get_background_texture()
 		var source: Rect2 = MapCatalog.NORTH_REGIONS[location_id]
@@ -306,26 +375,52 @@ func _visit(location_id: String) -> void:
 	else:
 		var art: Array = BACKGROUNDS[location_id]
 		var phase_index := 2 if night and PlayerState.is_midnight() and art.size() > 2 else (1 if night else 0)
-		background.texture = load(LOCATIONS + str(art[phase_index])) as Texture2D
-	BackgroundWeather.apply(background, north_destination)
+		var art_path := str(art[phase_index])
+		background.texture = load(art_path if art_path.begins_with("res://") else LOCATIONS + art_path) as Texture2D
+	BackgroundWeather.apply(background, map_crop)
 	_refresh_rain_environment()
 	entrance_button.visible = location_id == "bar"
 	exit_button.hide()
-	shop_button.hide()
+	shop_button.visible = location_id == "hospital" and bool(PlayerState.get_event_value("celina_hospital_shop_unlocked", false))
 	store_button.visible = location_id == "market"
 	status_header.refresh()
 	location_view.show()
 	_set_hospital_active(location_id == "hospital")
+	_set_construction_active(location_id == "construction_site")
+	# The VN reader owns its own loop during prayer and slot/memory playback.
+	church_audio.set_active(location_id == "church" and location_visit_story_id.is_empty())
 	map_button.grab_focus()
 	_layout()
+	if not location_visit_story_id.is_empty():
+		_play_hub_story(location_visit_story_id)
+
+
+func _daily_visit_blocked(location_id: String) -> bool:
+	return location_id != current_location and PlayerState.has_visited_location_today(location_id)
+
+
+func _mark_location_passenger_absence(location_id: String) -> void:
+	var event_id := str(LOCATION_PASSENGER_ABSENCES.get(location_id, ""))
+	if event_id.is_empty():
+		return
+	var absence := {
+		"day": PlayerState.get_current_day(),
+		"phase": PlayerState.get_current_time_of_day(),
+	}
+	if PlayerState.get_event_value(event_id, {}) != absence:
+		PlayerState.set_event_value(event_id, absence)
 
 
 func _depart(scene_path: String) -> void:
+	if _has_activity_overlay():
+		return
+	church_audio.set_active(false)
 	_close_bar_shop()
 	_close_hospital_shop()
 	_dismiss_travel_confirmation()
 	_set_bar_active(false)
 	_set_hospital_active(false)
+	_set_construction_active(false)
 	hub_dialogue.clear()
 	map_view.set_enabled(false)
 	for button in [map_button, store_button, entrance_button, exit_button, shop_button]:
@@ -334,11 +429,15 @@ func _depart(scene_path: String) -> void:
 
 
 func _close() -> void:
+	if _has_activity_overlay():
+		return
+	church_audio.set_active(false)
 	_close_bar_shop()
 	_close_hospital_shop()
 	_dismiss_travel_confirmation()
 	_set_bar_active(false)
 	_set_hospital_active(false)
+	_set_construction_active(false)
 	AmbientAudioManager.set_rain_indoors(origin_location == "home")
 	hub_dialogue.clear()
 	map_view.set_enabled(false)
@@ -448,6 +547,13 @@ func _can_open_hospital_shop() -> bool:
 	return is_visible_in_tree() and location_view.visible and not map_view.visible and current_location == "hospital" and not bar_shop.visible and not hub_dialogue.blocks_input() and bool(PlayerState.get_event_value("celina_hospital_shop_unlocked", false))
 
 
+func _open_location_shop() -> void:
+	if current_location == "hospital":
+		_open_hospital_shop()
+	else:
+		_open_bar_shop()
+
+
 func _open_hospital_shop() -> void:
 	if not _can_open_hospital_shop() or hospital_shop.visible:
 		return
@@ -460,14 +566,18 @@ func _open_hospital_shop() -> void:
 
 func _close_hospital_shop() -> void:
 	if hospital_shop != null:
+		_suppress_hospital_shop_closing_dialogue = true
 		hospital_shop.close()
+		_suppress_hospital_shop_closing_dialogue = false
 
 
 func _on_hospital_shop_closed() -> void:
 	_restore_shop_controls()
 	celina_spawn.disabled = not celina_spawn.active
 	if location_view.is_visible_in_tree() and current_location == "hospital":
-		celina_spawn.grab_focus()
+		shop_button.grab_focus()
+		if not _suppress_hospital_shop_closing_dialogue:
+			celina_spawn.say_shop_closing_line()
 
 
 func _handle_hospital_celina_click(character_id: String) -> bool:
@@ -479,10 +589,6 @@ func _handle_hospital_celina_click(character_id: String) -> bool:
 		if HospitalEncounter.start():
 			_depart(HospitalEncounter.STORY_SCENE)
 		return true
-	if bool(PlayerState.get_event_value("celina_hospital_shop_unlocked", false)):
-		_on_hospital_character_interacted(character_id)
-		_open_hospital_shop()
-		return true
 	return false
 
 
@@ -490,6 +596,131 @@ func restore_hospital_after_story() -> void:
 	# The trip to the hospital was already paid before the story began.
 	current_location = "hospital"
 	_visit("hospital")
+
+
+func _has_activity_overlay() -> bool:
+	return (hub_story_overlay != null and hub_story_overlay.active) or (work_overlay != null and work_overlay.active)
+
+
+func _can_talk_to_construction_benny() -> bool:
+	return (
+		is_visible_in_tree()
+		and location_view.visible
+		and not map_view.visible
+		and current_location == "construction_site"
+		and not _has_activity_overlay()
+		and not hub_dialogue.blocks_input()
+	)
+
+
+func _on_construction_benny_interacted(_character_id: String) -> void:
+	if not _can_talk_to_construction_benny():
+		return
+	var story_id := "benny_construction_work_offer" if bool(PlayerState.get_event_value(ConstructionState.UNLOCK_EVENT, false)) else "benny_construction_introduction"
+	_play_hub_story(story_id)
+
+
+func _announce_north_road() -> void:
+	if not is_visible_in_tree() or not map_view.visible or not map_view.enabled or _has_activity_overlay():
+		return
+	if PlayerState.get_current_day() < NORTH_ROAD_UNLOCK_DAY or bool(PlayerState.get_event_value("north_road_open_announced", false)):
+		return
+	_play_hub_story("north_road_open")
+
+
+func _play_hub_story(story_id: String) -> void:
+	if _has_activity_overlay() or not PlayerState.pending_story.is_empty():
+		return
+	var payload := StoryPayloadCatalog.build(story_id)
+	if payload.is_empty():
+		return
+	# Standalone slot resumes return here through Home, which restores the
+	# recorded map/site without charging travel for a second time.
+	payload["return_scene"] = HOME_SCENE
+	payload["next_scene"] = HOME_SCENE
+	if story_id == "north_road_open":
+		payload["background"] = map_view.get_background_texture().resource_path
+	var context := {
+		"location": current_location,
+		"map_region": map_view.map_region,
+		"show_map": map_view.visible,
+		"story_id": story_id,
+	}
+	PlayerState._begin_state_batch()
+	PlayerState.set_event_value(ConstructionState.RETURN_EVENT, context)
+	PlayerState.set_event_value(ConstructionState.ACCEPTED_EVENT, false)
+	PlayerState._end_state_batch()
+	hub_dialogue.clear()
+	_lock_shop_controls()
+	map_view.set_enabled(false)
+	construction_spawn.set_interaction_enabled(false)
+	construction_audio.set_active(false)
+	church_audio.set_active(false)
+	if not hub_story_overlay.play(payload, _finish_hub_story):
+		PlayerState.set_event_value(ConstructionState.RETURN_EVENT, {})
+		_restore_activity_controls()
+
+
+func _finish_hub_story(_scene_path: String) -> void:
+	PlayerState.set_resume_scene(get_tree().current_scene.scene_file_path)
+	if bool(PlayerState.get_event_value(ConstructionState.ACCEPTED_EVENT, false)):
+		var receipt := PlayerState.begin_construction_work()
+		if not receipt.is_empty():
+			construction_audio.set_active(true)
+			work_overlay.present(receipt)
+			AmbientAudioManager.refresh()
+			bar_music_changed.emit()
+			return
+	PlayerState.set_event_value(ConstructionState.RETURN_EVENT, {})
+	_restore_activity_controls()
+
+
+func _restore_activity_controls() -> void:
+	_restore_shop_controls()
+	map_view.set_enabled(map_view.visible and is_visible_in_tree())
+	construction_spawn.set_interaction_enabled(true)
+	construction_audio.set_active(current_location == "construction_site" and location_view.visible and is_visible_in_tree())
+	church_audio.set_active(current_location == "church" and location_view.visible and is_visible_in_tree())
+	status_header.refresh()
+	if map_view.visible:
+		map_view.back_button.grab_focus()
+	elif construction_spawn.active:
+		construction_spawn.grab_focus()
+
+
+func _finish_construction_work() -> void:
+	PlayerState.finish_construction_work_presentation()
+	_restore_activity_controls()
+	# Refresh the site artwork and shared night audio after the consumed phase.
+	_visit("construction_site")
+	AmbientAudioManager.refresh()
+	bar_music_changed.emit()
+
+
+func restore_hub_story_return() -> void:
+	var context: Dictionary = PlayerState.get_event_value(ConstructionState.RETURN_EVENT, {})
+	if context.is_empty():
+		return
+	map_view.set_map_region(str(context.get("map_region", "north")))
+	current_location = str(context.get("location", "construction_site"))
+	if bool(context.get("show_map", false)):
+		_show_map()
+	else:
+		_visit(current_location)
+	var receipt: Dictionary = PlayerState.get_event_value(ConstructionState.PENDING_EVENT, {})
+	if receipt.is_empty() and bool(PlayerState.get_event_value(ConstructionState.ACCEPTED_EVENT, false)):
+		receipt = PlayerState.begin_construction_work()
+	if not receipt.is_empty():
+		_lock_shop_controls()
+		map_view.set_enabled(false)
+		construction_spawn.set_interaction_enabled(false)
+		work_overlay.present(receipt)
+	else:
+		PlayerState.set_event_value(ConstructionState.RETURN_EVENT, {})
+
+
+static func has_hub_story_return() -> bool:
+	return not Dictionary(PlayerState.get_event_value(ConstructionState.RETURN_EVENT, {})).is_empty()
 
 
 func _on_bar_character_interacted(character_id: String) -> void:
@@ -530,6 +761,12 @@ func _set_hospital_active(value: bool) -> void:
 	hospital_audio.set_active(value)
 
 
+func _set_construction_active(value: bool) -> void:
+	construction_spawn.set_active(value)
+	if construction_audio != null:
+		construction_audio.set_active(value)
+
+
 func _refresh_rain_environment() -> void:
 	AmbientAudioManager.set_rain_indoors(BackgroundWeather.is_indoor_background(background.texture))
 
@@ -565,6 +802,10 @@ func _build_location_view() -> void:
 	hospital_characters.interacted.connect(_on_hospital_character_interacted)
 	celina_spawn = hospital_characters.celina_spawn
 	celina_spawn.interaction_override = _handle_hospital_celina_click
+	construction_spawn = ConstructionBennySpawn.new()
+	background.add_child(construction_spawn)
+	construction_spawn.can_interact = _can_talk_to_construction_benny
+	construction_spawn.interacted.connect(_on_construction_benny_interacted)
 	entrance_button = Button.new()
 	entrance_button.name = "BarEntrance"
 	entrance_button.tooltip_text = "Enter"
@@ -583,12 +824,13 @@ func _build_location_view() -> void:
 	UIAudioManager.attach_button(entrance_button)
 	entrance_button.hide()
 	status_header = HubStatusHeader.new()
-	location_view.add_child(status_header)
+	# One header stays visible across the map and destination views.
+	add_child(status_header)
 	map_button = _button("MAP", _show_map)
 	store_button = _button("STORE", _depart.bind(STORE_SCENE))
 	exit_button = _button("OUTSIDE", _exit_bar)
 	exit_button.hide()
-	shop_button = _button("SHOP", _open_bar_shop)
+	shop_button = _button("SHOP", _open_location_shop)
 	shop_button.name = "BarShopButton"
 	shop_button.hide()
 	hub_dialogue = HubDialogue.new()
@@ -607,6 +849,7 @@ func _build_location_view() -> void:
 	bar_shop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	bar_shop.closed.connect(_on_bar_shop_closed)
 	hospital_shop = HospitalShop.new()
+	hospital_shop.dialogue_pool = celina_spawn.dialogue_pool
 	hospital_shop.can_shop = _can_open_hospital_shop
 	add_child(hospital_shop)
 	hospital_shop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

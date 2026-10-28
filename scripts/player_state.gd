@@ -12,8 +12,10 @@ const AchievementService := preload("res://scripts/achievement_service.gd")
 const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
 const PlayerCharacterProgressState := preload("res://scripts/state/player_character_progress_state.gd")
 const PlayerCrashRepairState := preload("res://scripts/state/player_crash_repair_state.gd")
+const PlayerConstructionState := preload("res://scripts/state/player_construction_state.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
+const PlayerLocationVisitState := preload("res://scripts/state/player_location_visit_state.gd")
 const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
 const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
 const PlayerStressShieldState := preload("res://scripts/state/player_stress_shield_state.gd")
@@ -151,13 +153,13 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 var last_stage_result: Dictionary = {}
 var max_stress := DEFAULT_MAX_STRESS:
 	set(_value):
-		max_stress = DEFAULT_MAX_STRESS
+		max_stress = AchievementService.stress_capacity(achievements)
 var max_hull := DEFAULT_MAX_HULL:
 	set(_value):
 		max_hull = DEFAULT_MAX_HULL
 var max_energy := DEFAULT_MAX_ENERGY:
 	set(_value):
-		max_energy = DEFAULT_MAX_ENERGY
+		max_energy = AchievementService.energy_capacity(achievements)
 var max_gas := DEFAULT_MAX_GAS_PERCENT
 var current_stage_type := FIRST_STAGE_TYPE
 var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
@@ -246,7 +248,7 @@ var money := 0:
 
 var stress := DEFAULT_STARTING_STRESS:
 	set(value):
-		stress = clampi(value, 0, DEFAULT_MAX_STRESS)
+		stress = clampi(value, 0, max_stress)
 		stress_changed.emit(stress)
 		save_progress()
 
@@ -258,7 +260,7 @@ var hull := DEFAULT_STARTING_HULL:
 
 var energy := DEFAULT_STARTING_ENERGY:
 	set(value):
-		energy = clampi(value, 0, DEFAULT_MAX_ENERGY)
+		energy = clampi(value, 0, max_energy)
 		energy_changed.emit(energy)
 		save_progress()
 
@@ -776,6 +778,18 @@ func relieve_stress(amount: int) -> int:
 	return PlayerResourceState.relieve_stress(self, amount)
 
 
+func get_church_stress_relief() -> int:
+	return AchievementService.get_church_stress_relief(self)
+
+
+func has_visited_location_today(location_id: String) -> bool:
+	return PlayerLocationVisitState.has_visited_today(self, location_id)
+
+
+func record_location_visit(location_id: String) -> int:
+	return PlayerLocationVisitState.record_visit(self, location_id)
+
+
 func get_stress_shield_points() -> int:
 	return PlayerStressShieldState.points(self)
 
@@ -819,6 +833,22 @@ func add_max_energy(amount: int) -> void:
 
 func spend_energy(amount: int) -> bool:
 	return PlayerResourceState.spend_energy(self, amount)
+
+
+func can_do_construction_work() -> bool:
+	return PlayerConstructionState.can_work(self)
+
+
+func get_construction_work_pay() -> int:
+	return PlayerConstructionState.work_pay(self)
+
+
+func begin_construction_work() -> Dictionary:
+	return PlayerConstructionState.begin_work(self)
+
+
+func finish_construction_work_presentation() -> void:
+	PlayerConstructionState.finish_presentation(self)
 
 
 func add_karma(amount: int) -> void:
@@ -1297,13 +1327,13 @@ func reset() -> void:
 		remove_meta("loaded_slot_runtime")
 	_is_loading_save = true
 	_begin_state_batch()
+	achievements.clear()
 	_reset_resource_state()
 	_apply_new_run_defaults()
 	last_stage_result.clear()
 	_reset_character_progress_state()
 	_reset_seeded_rider_state()
 	upgrades.clear()
-	achievements.clear()
 	_reset_story_progress_state()
 	resume_scene_path = ""
 	_reset_tutorial_state()

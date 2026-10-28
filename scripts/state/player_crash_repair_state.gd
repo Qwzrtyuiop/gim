@@ -15,17 +15,19 @@ static func begin(player_state) -> void:
 	player_state.finish_ride_stress_shield()
 	player_state.hull = 0
 	var cash: int = player_state.money
-	var cap := clampi(GameTuning.CRASH_REPAIR_MAX_PERCENT, 0, 50)
-	var base := clampi(GameTuning.CRASH_REPAIR_BASE_PERCENT, 0, cap)
-	var extra: int = player_state.rng.randi_range(0, maxi(0, GameTuning.CRASH_REPAIR_RANDOM_PERCENT))
-	var percent := mini(cap, base + extra)
-	var bill := floori(float(cash) * float(percent) / 100.0)
+	var hull_restore := clampi(GameTuning.CRASH_REPAIR_HULL_RESTORE, 1, player_state.max_hull)
+	var bill := hull_restore * GameTuning.HULL_REPAIR_COST_PER_POINT
+	var free_repair := cash < bill
+	if free_repair:
+		hull_restore = clampi(GameTuning.CRASH_REPAIR_FREE_HULL_RESTORE, 1, player_state.max_hull)
+		bill = 0
 	var days := maxi(1, GameTuning.CRASH_REPAIR_DAYS)
 	player_state.pending_crash_repair = {
 		"cash_before": cash,
 		"cost": bill,
-		"percent": percent,
 		"cash_after": cash - bill,
+		"hull_restore": hull_restore,
+		"free_repair": free_repair,
 		"days": days,
 		"crash_day": player_state.get_current_day(),
 		"target_day": player_state.get_current_day() + days,
@@ -69,7 +71,8 @@ static func prepare_recovery_day(player_state) -> void:
 		player_state.prepare_day_start(day)
 		if player_state.is_run_failed():
 			break
-	player_state.hull = player_state.max_hull
+	# Already-quoted legacy repairs keep their original full-hull recovery.
+	player_state.hull = int(player_state.pending_crash_repair.get("hull_restore", player_state.max_hull))
 	player_state.energy = player_state.max_energy
 	player_state.relieve_stress(GameTuning.NIGHT_SLEEP_STRESS_RELIEF)
 	player_state.pending_crash_repair["recovery_applied"] = true

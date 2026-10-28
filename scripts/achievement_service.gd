@@ -17,13 +17,14 @@ const ORDER := [
 	"maparaan",
 	"matiyaga",
 	"maingat",
+	"makadiyos",
 ]
 
 const DEFINITIONS := {
 	"bayanihan": {
 		"title": "Bayanihan",
 		"subtitle": "Community Spirit",
-		"description": "Bayanihan is the Filipino spirit of helping one another and sharing a burden.\n\nJohn stopped to help a stranded driver push his tricycle to the gas station.",
+		"description": "Bayanihan is the Filipino spirit of helping one another and sharing a burden.\n\nJohn stopped to help a stranded driver push his tricycle to the gas station.\n\nAll fares increase by %d%% for the rest of this run." % roundi(GameTuning.BAYANIHAN_FARE_BONUS * 100.0),
 	},
 	"malasakit": {
 		"title": "Malasakit",
@@ -68,22 +69,27 @@ const DEFINITIONS := {
 	"masipag": {
 		"title": "Masipag",
 		"subtitle": "Diligent",
-		"description": "Masipag is the admired Filipino work ethic of showing up and pushing through hardship for the family.\n\nJohn stayed on the road and finished three long rides in a single day.",
+		"description": "Masipag is the admired Filipino work ethic of showing up and pushing through hardship for the family.\n\nJohn stayed on the road and finished three long rides in a single day.\n\nMaximum energy increases by %d for this run." % GameTuning.MASIPAG_MAX_ENERGY_BONUS,
 	},
 	"maparaan": {
 		"title": "Maparaan",
 		"subtitle": "Resourceful",
-		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.\n\nJohn completed five rides while at 7 stress or more and 20% gas or less.",
+		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.\n\nJohn completed five rides while at 7 stress or more and 20%% gas or less.\n\nMaximum stress increases by %d for this run." % GameTuning.ACHIEVEMENT_MAX_STRESS_BONUS,
 	},
 	"matiyaga": {
 		"title": "Matiyaga",
 		"subtitle": "Persevering",
-		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.\n\nJohn completed five rides while dealing with either high stress (7 or more) or low gas (20% or less).",
+		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.\n\nJohn completed five rides while dealing with either high stress (7 or more) or low gas (20%% or less).\n\nMaximum stress increases by %d for this run." % GameTuning.ACHIEVEMENT_MAX_STRESS_BONUS,
 	},
 	"maingat": {
 		"title": "Maingat",
 		"subtitle": "Careful",
-		"description": "Being maingat means acting with care for safety, a practical virtue on Filipino roads.\n\nFive stages in a row, no crashes. John kept the tricycle steady.",
+		"description": "Being maingat means acting with care for safety, a practical virtue on Filipino roads.\n\nFive stages in a row, no crashes. John kept the tricycle steady.\n\nMaximum stress increases by %d for this run." % GameTuning.ACHIEVEMENT_MAX_STRESS_BONUS,
+	},
+	"makadiyos": {
+		"title": "Makadiyos",
+		"subtitle": "Religious",
+		"description": "Faith is part of everyday life for many Filipinos, offering a place to reflect and find comfort during difficult times.\n\nJohn visited the church and prayed five times.\n\nChurch visits now reduce stress by %d." % GameTuning.MAKADIYOS_CHURCH_STRESS_RELIEF,
 	},
 }
 
@@ -95,6 +101,32 @@ const TAMAD_REQUIRED_REST_TIMES := ["morning", "noon", "night"]
 const HIGH_STRESS_THRESHOLD := GameTuning.HIGH_STRESS_THRESHOLD
 const LOW_ENERGY_THRESHOLD := GameTuning.DEFAULT_MAX_STRESS - HIGH_STRESS_THRESHOLD
 const LOW_RESOURCE_STREAK_TARGET := 5
+const STRESS_CAP_ACHIEVEMENTS := ["maparaan", "matiyaga", "maingat"]
+
+
+static func energy_capacity(earned: Dictionary) -> int:
+	return GameTuning.DEFAULT_MAX_ENERGY + (GameTuning.MASIPAG_MAX_ENERGY_BONUS if bool(earned.get("masipag", false)) else 0)
+
+
+static func stress_capacity(earned: Dictionary) -> int:
+	var capacity := GameTuning.DEFAULT_MAX_STRESS
+	for achievement_id: String in STRESS_CAP_ACHIEVEMENTS:
+		if bool(earned.get(achievement_id, false)):
+			capacity += GameTuning.ACHIEVEMENT_MAX_STRESS_BONUS
+	return capacity
+
+
+static func refresh_resource_caps(player_state) -> void:
+	# Derive bonuses from earned IDs so loading/reapplying cannot stack them.
+	player_state.max_energy = energy_capacity(player_state.achievements)
+	player_state.max_stress = stress_capacity(player_state.achievements)
+	# Refresh values/signals without refilling energy or changing current stress.
+	player_state.energy = mini(player_state.energy, player_state.max_energy)
+	player_state.stress = mini(player_state.stress, player_state.max_stress)
+
+
+static func get_church_stress_relief(player_state) -> int:
+	return GameTuning.MAKADIYOS_CHURCH_STRESS_RELIEF if has_achievement(player_state, "makadiyos") else GameTuning.CHURCH_STRESS_RELIEF
 
 
 static func get_yosi_stress_relief(player_state) -> int:
@@ -194,10 +226,12 @@ static func unlock_achievement(player_state, achievement_id: String) -> void:
 	if player_state.achievements.get(safe_id, false):
 		return
 
+	player_state._begin_state_batch()
 	player_state.achievements[safe_id] = true
 	_apply_achievement_effects(player_state, safe_id)
 	player_state.achievement_unlocked.emit(safe_id)
 	player_state.save_progress()
+	player_state._end_state_batch()
 
 
 static func has_achievement(player_state, achievement_id: String) -> bool:
@@ -276,5 +310,7 @@ static func _has_all_tamad_rest_times(player_state) -> bool:
 
 static func _apply_achievement_effects(player_state, achievement_id: String) -> void:
 	match achievement_id:
+		"masipag", "maparaan", "matiyaga", "maingat":
+			refresh_resource_caps(player_state)
 		"maninigarilyo":
 			player_state.add_stress(SMOKER_STRESS_PENALTY)

@@ -117,3 +117,5 @@ func layout() -> void:
 		screen.tutorial._layout_for_targets(screen.tutorial.steps[screen.tutorial.step_index].get("targets", []))
 	if screen.station_tutorial != null and screen.station_tutorial.active:
 		screen.station_tutorial._layout_for_targets(screen.station_tutorial.steps[screen.station_tutorial.step_index].get("targets", []))
+	if screen.map_tutorial != null and screen.map_tutorial.active:
+		screen.map_tutorial._layout_for_targets()

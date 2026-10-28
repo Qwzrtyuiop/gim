@@ -80,6 +80,7 @@ static func store_stage_result(
 		"passenger_rule_violation_count": maxi(0, int(passenger_rule_violation_count)),
 		"peak_speed_kmh": maxf(0.0, float(driving_stats.get("peak_speed_kmh", 0.0))),
 		"vehicle_collision_count": maxi(0, int(driving_stats.get("vehicle_collision_count", 0))),
+		"had_crash": bool(PlayerState.current_trip_had_crash),
 		"passenger_penalty": rider_penalty,
 		"detail_lines": detail_lines,
 		"total": total,

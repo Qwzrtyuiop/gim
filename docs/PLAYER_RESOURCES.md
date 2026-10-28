@@ -1,13 +1,15 @@
 # Player resources
 
-Energy ranges from 0 to 5; stress and hull range from 0 to 10. New games start at 5 energy,
-0 stress and 10 hull. Fuel remains independent.
+Energy starts with a cap of 5; stress and hull start with caps of 10. Masipag adds
+1 maximum energy. Maparaan, Matiyaga and Maingat each add 2 maximum stress,
+stacking to 6 energy and 16 stress. New games start at 5 energy, 0 stress and
+10 hull. Fuel remains independent.
 
 | Resource | Changes | Recovery |
 | --- | --- | --- |
-| Energy | -1 per new ride/attempt or distinct paid map arrival | Food +1/+2; short rest +2; sleep restores to 5 |
-| Stress | +2 at ride entry; collisions add 1/2/3 | Short rest -2; sleep -4; Park arrival -2; food/cigarettes reduce it |
-| Hull | Collisions remove 1/2/3 | Mechanic repairs; crash recovery restores to 10 |
+| Energy | -1 per new ride/attempt or distinct paid map arrival | Food +1/+2; short rest +2; sleep restores to the current maximum |
+| Stress | +1 at ride entry; collisions add 1/2/3 | Short rest -2; sleep -4; Park arrival -2; food/cigarettes reduce it |
+| Hull | Collisions remove 1/2/3 | Mechanic repairs; crash repair restores 4, or 1 free if unaffordable |
 
 Home, Station/Terminal, Market/Store and Passenger Street are free to visit. Opening the map,
 navigating north/south, inspecting objects, menus, purchases, and crashes do not
@@ -22,16 +24,18 @@ Its hover cursor shows the energy cost and `+2` brain recovery icon. Hospital is
 locked until Celina's "Just a Scratch" event sets `celina_first_encounter_seen`;
 locked clicks and direct travel attempts spend nothing.
 
-Clicking an interactive character at Hospital, Bar or Park relieves 1 stress,
-once per location per day. The usage date is stored in the existing event ledger
+Clicking an interactive character at Hospital or Bar relieves 2 stress,
+once per location per day. Future Park character interactions retain 1 stress
+relief. The usage date is stored in the existing event ledger
 with the recovery in one save batch, so revisiting/loading cannot refresh it;
 midnight uses the same day. Calm interactions do not consume the daily relief.
 The current Hospital/Bar controls are connected; Park's hook awaits authored
 character spawns and is separate from its 2-stress arrival recovery.
 
 Stress affects driving immediately and never blocks entry by itself. Penalties
-scale with stress; at 10 they are -20% top speed, -25% acceleration, -15% braking,
-and -30% lane-change response, with more coasting and vehicle wiggle. Energy has
+scale linearly against the current stress capacity; at the cap they are -40% top speed, -50% acceleration,
+-30% braking and -60% lane-change response, with +40% coasting deceleration and
++60% vehicle wiggle. At half capacity each effect is half as strong. Energy has
 no handling modifier. Weather, upgrades and passenger/special modifiers apply
 before stress. Live saves record handling factors to avoid stacking penalties.
 
@@ -39,8 +43,11 @@ Light collisions add 1 stress and remove 1 hull; heavy impacts use 2/2 and head-
 impacts 3/3. Heavy same-direction impacts start at 45 km/h relative speed.
 Existing collision grace prevents repeated damage from a single contact.
 Zero hull immediately follows the crash/repair transition, ahead of passenger
-story interruptions. The existing bill/day/debt rules remain. Sleep alone never
-repairs hull.
+story interruptions. Crash repair restores 4 hull for PhP 200, using the normal
+PhP 50 per-hull mechanic rate. If the player cannot afford all PhP 200, a free
+emergency patch restores only 1 hull and leaves their cash untouched. The
+existing day/debt rules remain; sleep alone never repairs hull. Pending legacy
+repairs keep their already-paid bill and full-hull recovery promise.
 
 The mechanic offers 2 hull for PhP 100, or PhP 50 for the last missing point.
 Food retains stable IDs and offers energy recovery, stress relief, or both.
@@ -78,13 +85,18 @@ icon has a yellow border while protection remains. Existing event values persist
 daily first aid and pending/active protection; new runs reset both. Tuning lives in
 `GameTuning.HOSPITAL_ITEMS` / `BETA_BLOCKER_STRESS_SHIELD_POINTS`.
 
-Smoker unlock adds 2 stress instead of reducing the fixed energy cap.
+Malasakit and Bayanihan each add 5% to fares for the run, stacking additively to
+10%; time bonuses are unchanged. Capacity bonuses derive from earned achievement
+IDs, apply to existing saves, do not refill current resources, and cannot stack
+again when loading or reapplying an achievement. Smoker unlock adds 2 stress
+instead of reducing energy capacity.
 
 `PlayerState` owns resource values/signals/APIs; tuning and inventory live in
 `scripts/config/game_tuning.gd`. Save version 5 stores all three meters. Versions
-1-4 retain their old energy (clamped to 5), derive stress from the old depletion
+1-4 retain their old energy (clamped to the earned cap), derive stress from the old depletion
 ratio and start with full hull, except pending repairs which retain zero hull.
-Version-5 saves also clamp loaded energy to 5 without changing stress or hull.
+Version-5 saves derive energy/stress caps from saved achievements before restoring
+resource values; base caps remain 5/10 when those achievements are absent.
 Content IDs and completed effects remain stable. Legacy energy story commands
 still affect energy; new `add_stress`, `relieve_stress`, `damage_hull` and
 `repair_hull` commands are suppressed during gallery replay.

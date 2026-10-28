@@ -67,10 +67,10 @@ static func _test_resources_and_rest() -> void:
 	PlayerState.stress = 10
 	var modifiers := PlayerState.get_stress_vehicle_modifiers()
 	for pair in [
-		["player_max_speed", 0.8],
-		["player_acceleration_x", 0.75],
-		["player_brake_x", 0.85],
-		["player_lane_lerp_x", 0.7],
+		["player_max_speed", 0.6],
+		["player_acceleration_x", 0.5],
+		["player_brake_x", 0.7],
+		["player_lane_lerp_x", 0.4],
 	]:
 		assert(is_equal_approx(float(modifiers[pair[0]]), float(pair[1])))
 	PlayerState.stress = 0
@@ -132,12 +132,16 @@ static func _test_save_migration() -> void:
 	PlayerState.money = 1000
 	PlayerState.stress = 9
 	PlayerState.begin_crash_repair()
-	assert(PlayerState.hull == 0)
+	var repair := PlayerState.get_pending_crash_repair()
+	assert(PlayerState.hull == 0 and PlayerState.money == 800)
+	assert(int(repair.cost) == 200 and int(repair.hull_restore) == 4 and not bool(repair.free_repair), "An affordable crash repair charges the quoted four-hull package")
+	PlayerState.begin_crash_repair()
+	assert(PlayerState.get_pending_crash_repair() == repair and PlayerState.money == 800, "Re-entering a pending repair cannot charge or quote it again")
 	PlayerState.prepare_crash_repair_day()
-	assert(PlayerState.hull == 10 and PlayerState.stress == 5)
+	assert(PlayerState.hull == 4 and PlayerState.stress == 5 and PlayerState.energy == 5 and PlayerState.get_current_day() == 2)
 	var paid_cash: int = PlayerState.money
 	PlayerState.prepare_crash_repair_day()
-	assert(PlayerState.hull == 10 and PlayerState.stress == 5 and PlayerState.money == paid_cash, "Repair recovery and its bill must execute once")
+	assert(PlayerState.hull == 4 and PlayerState.stress == 5 and PlayerState.money == paid_cash, "Repair recovery and its bill must execute once")
 	PlayerState.finish_crash_repair()
 
 
@@ -313,8 +317,8 @@ static func _test_collisions(host: Node) -> void:
 	var energy_before: int = PlayerState.energy
 	_test_driving_snapshot(game, calm_speed)
 	PlayerState.stress = 10
-	assert(is_equal_approx(game.player_max_speed, calm_speed * 0.8))
-	assert(is_equal_approx(game.player_lane_lerp_x, calm_steering * 0.7), "Stress changes must affect the active drive immediately")
+	assert(is_equal_approx(game.player_max_speed, calm_speed * 0.6))
+	assert(is_equal_approx(game.player_lane_lerp_x, calm_steering * 0.4), "Stress changes must affect the active drive immediately")
 	Flow.handle_player_hit(game, "Light collision", 1, 1)
 	assert(PlayerState.energy == energy_before and PlayerState.hull == 9 and PlayerState.stress == 10 and game.game_state == "playing", "Crashes do not consume the action energy budget")
 	assert(PlayerState.pending_crash_repair.is_empty(), "Maximum stress alone cannot send the tricycle for repairs")
@@ -329,6 +333,8 @@ static func _test_collisions(host: Node) -> void:
 	assert(PlayerState.hull == 0 and game.game_state == "CRASH" and game.crash_repair_transition_active)
 	assert(PlayerState.energy == energy_before)
 	assert(not PlayerState.pending_crash_repair.is_empty() and not PlayerState.get_last_stage_result().get("completed", true))
+	var repair := PlayerState.get_pending_crash_repair()
+	assert(PlayerState.money == 0 and int(repair.cost) == 0 and int(repair.hull_restore) == 1 and bool(repair.free_repair), "An unaffordable crash repair grants one hull for free instead of taking remaining cash")
 	game.audio_manager.crash_sfx_player.stop()
 	game.audio_manager.stage_bgm_player.stop()
 	game.free()
@@ -348,7 +354,7 @@ static func _test_driving_snapshot(game, calm_speed: float) -> void:
 	assert(saved.has("stress_modifiers"))
 	PlayerState.stress = 10
 	assert(DrivingSnapshot.restore(game, saved))
-	assert(is_equal_approx(game.player_max_speed, calm_speed * 0.8), "Live loads must apply current stress without stacking saved stress penalties")
+	assert(is_equal_approx(game.player_max_speed, calm_speed * 0.6), "Live loads must apply current stress without stacking saved stress penalties")
 	PlayerState.stress = 0
 	assert(is_equal_approx(game.player_max_speed, calm_speed), "Restored base factors must support subsequent live stress changes")
 	var legacy := saved.duplicate(true)
@@ -358,7 +364,7 @@ static func _test_driving_snapshot(game, calm_speed: float) -> void:
 		legacy.values[key] = float(saved.values[key]) / float(saved.stress_modifiers[key]) * float(old_modifiers[key])
 	PlayerState.stress = 5
 	assert(DrivingSnapshot.restore(game, legacy))
-	assert(is_equal_approx(game.player_max_speed, calm_speed * 0.9), "Pre-stress driving slots remove old energy handling before applying stress")
+	assert(is_equal_approx(game.player_max_speed, calm_speed * 0.8), "Pre-stress driving slots remove old energy handling before applying stress")
 	var invalid := saved.duplicate(true)
 	invalid.stress_modifiers.player_max_speed = NAN
 	var distance: float = game.distance

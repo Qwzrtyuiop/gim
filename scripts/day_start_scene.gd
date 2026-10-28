@@ -50,11 +50,12 @@ var home_map: HomeMap
 
 func _ready() -> void:
 	var returning_to_hospital := HospitalEncounter.has_pending_return()
+	var returning_to_hub_story := HomeMap.has_hub_story_return()
 	PlayerState.set_resume_scene(DAY_START_SCENE)
 	if PlayerState.is_run_failed():
 		get_tree().change_scene_to_file(GAME_OVER_SCENE)
 		return
-	if not returning_to_hospital and PlayerState.get_current_day() <= 1 and PlayerState.get_pending_trip_selection().is_empty():
+	if not returning_to_hospital and not returning_to_hub_story and PlayerState.get_current_day() <= 1 and PlayerState.get_pending_trip_selection().is_empty():
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 		return
@@ -73,7 +74,10 @@ func _ready() -> void:
 	_render_day_start()
 	_build_tutorial()
 	_layout_ui()
-	if returning_to_hospital:
+	if returning_to_hub_story:
+		_open_map()
+		home_map.restore_hub_story_return()
+	elif returning_to_hospital:
 		_open_map()
 		home_map.restore_hospital_after_story()
 		HospitalEncounter.complete_return()
@@ -82,6 +86,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if home_map != null and home_map.visible:
+		return
 	if tutorial_active and _is_any_press(event):
 		get_viewport().set_input_as_handled()
 		_advance_tutorial()

@@ -116,7 +116,7 @@ static func boost_gas_is_available(player_state) -> bool:
 
 
 static func stress_vehicle_modifiers(player_state) -> Dictionary:
-	var stress_ratio := clampf(float(player_state.stress) / float(GameTuning.DEFAULT_MAX_STRESS), 0.0, 1.0)
+	var stress_ratio := clampf(float(player_state.stress) / float(maxi(1, player_state.max_stress)), 0.0, 1.0)
 	var modifiers: Dictionary = {}
 	for key in GameTuning.STRESS_MODIFIER_DELTAS:
 		modifiers[key] = 1.0 + stress_ratio * float(GameTuning.STRESS_MODIFIER_DELTAS[key])
@@ -228,7 +228,8 @@ static func relieve_character_interaction(player_state, location_id: String, cha
 	if recorded_day is int and recorded_day == current_day:
 		return 0
 	player_state._begin_state_batch()
-	var relieved := relieve_stress(player_state, GameTuning.CHARACTER_INTERACTION_STRESS_RELIEF)
+	var amount := int(GameTuning.CHARACTER_INTERACTION_STRESS_RELIEF_BY_LOCATION.get(location, GameTuning.CHARACTER_INTERACTION_STRESS_RELIEF))
+	var relieved := relieve_stress(player_state, amount)
 	if relieved > 0:
 		record[location] = current_day
 		player_state.set_event_value(CHARACTER_RELIEF_EVENT, record)
@@ -256,8 +257,8 @@ static func add_energy(player_state, amount: int) -> void:
 
 
 static func add_max_energy(player_state, amount: int) -> void:
-	# The action budget keeps its fixed cap from shared tuning.
-	player_state.max_energy = player_state.DEFAULT_MAX_ENERGY
+	# Capacity comes from earned achievements rather than repeatable story rewards.
+	player_state.max_energy = AchievementService.energy_capacity(player_state.achievements)
 	player_state.energy = mini(player_state.energy, player_state.max_energy)
 
 

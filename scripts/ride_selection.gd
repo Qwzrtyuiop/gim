@@ -17,6 +17,7 @@ const PassengerPool := preload("res://scripts/ride_selection/passenger_pool.gd")
 const SelectionView := preload("res://scripts/ride_selection/selection_view.gd")
 const SelectionTutorial := preload("res://scripts/ride_selection/selection_tutorial.gd")
 const StationTutorial := preload("res://scripts/ride_selection/station_tutorial.gd")
+const MapTutorial := preload("res://scripts/ride_selection/map_tutorial.gd")
 const STATION_TUTORIAL_EVENT := "tutorial_station_complete"
 const PassengerStory := preload("res://scripts/ride_selection/passenger_story.gd")
 const RideDeparture := preload("res://scripts/ride_selection/ride_departure.gd")
@@ -40,6 +41,7 @@ var passenger_pool: PassengerPool
 var view: SelectionView
 var tutorial: SelectionTutorial
 var station_tutorial: StationTutorial
+var map_tutorial: MapTutorial
 var is_departing := false
 var station: Control
 var passenger_overlay: ColorRect
@@ -64,6 +66,7 @@ func _ready() -> void:
 	view = SelectionView.new(self)
 	tutorial = SelectionTutorial.new(self)
 	station_tutorial = StationTutorial.new(self)
+	map_tutorial = MapTutorial.new(self)
 	pending_trip_selection = PlayerState.get_pending_trip_selection()
 	pickup_location = PlayerState.get_pending_pickup_location()
 	if _is_forced_first_day_ride():
@@ -104,15 +107,22 @@ func _ready() -> void:
 	tutorial.build()
 	station_tutorial.build()
 	_create_map()
+	map_tutorial.build()
 	var opening_tutorial := _is_forced_first_day_ride() and not PlayerState.has_ride_select_tutorial_shown() and not bool(PlayerState.get_event_value(STATION_TUTORIAL_EVENT, false))
 	if opening_tutorial:
 		PlayerState.set_pending_passengers_open(false)
 		call_deferred("_start_station_tutorial")
+	elif pickup_location == "station" and MapTutorial.is_eligible():
+		PlayerState.set_pending_passengers_open(false)
+		call_deferred("_start_map_tutorial")
 	elif pickup_location != "station" or bool(pending_trip_selection.get("passengers_open", false)) or not story_error.is_empty():
 		_open_passengers()
 
 
 func _input(event: InputEvent) -> void:
+	if map_tutorial != null and map_tutorial.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	if travel_map != null and travel_map.visible:
 		return
 	if station_tutorial != null and station_tutorial.handle_input(event):
@@ -342,7 +352,7 @@ func _on_terminal_object_pressed(object_id: String) -> void:
 
 
 func _open_passengers() -> void:
-	if _speech_is_blocking() or (station_tutorial != null and station_tutorial.active) or (travel_map != null and travel_map.visible):
+	if _speech_is_blocking() or _tutorial_active() or (travel_map != null and travel_map.visible):
 		return
 	hub_dialogue.clear()
 	station_ui.show_passengers()
@@ -378,7 +388,14 @@ func _finish_station_tutorial() -> void:
 
 
 func _tutorial_active() -> bool:
-	return (tutorial != null and tutorial.active) or (station_tutorial != null and station_tutorial.active)
+	return (tutorial != null and tutorial.active) or (station_tutorial != null and station_tutorial.active) or (map_tutorial != null and map_tutorial.active)
+
+
+func _start_map_tutorial() -> void:
+	if is_departing or _tutorial_active() or passenger_overlay.visible or confirmation.visible or travel_map.visible or pickup_location != "station" or not MapTutorial.is_eligible():
+		return
+	hub_dialogue.clear()
+	map_tutorial.start()
 
 
 func _create_map() -> void:
@@ -391,8 +408,8 @@ func _create_map() -> void:
 	travel_map.bar_music_changed.connect(_on_map_music_changed)
 
 
-func _open_map() -> void:
-	if is_departing or _tutorial_active() or confirmation.visible or passenger_overlay.visible or travel_map.visible or _speech_is_blocking():
+func _open_map(for_tutorial := false) -> void:
+	if is_departing or (_tutorial_active() and not for_tutorial) or confirmation.visible or passenger_overlay.visible or travel_map.visible or _speech_is_blocking():
 		return
 	hub_dialogue.clear()
 	station.set_enabled(false)
@@ -410,9 +427,12 @@ func _close_map() -> void:
 	status_header.show()
 	AmbientAudioManager.enter_hub(true)
 	station.buttons["map"].grab_focus()
-	view.refresh_bgm()
+	# Location visits can remove a passenger while this station scene stays alive.
+	_refresh_terminal()
 	if pickup_location != "station" and not is_departing:
 		_open_passengers()
+	elif MapTutorial.is_eligible() and not is_departing:
+		call_deferred("_start_map_tutorial")
 
 
 func _map_departure(scene_path: String) -> void:

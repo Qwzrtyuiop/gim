@@ -30,8 +30,11 @@ func _ready() -> void:
 
 
 static func background_path(home_interior := false) -> String:
-	if PlayerState.get_current_time_of_day() == "night" and not RainAudioProfile.path_for(PlayerState.current_weather).is_empty():
-		return RAINY_NIGHT_PATH
+	if PlayerState.get_current_time_of_day() == "night":
+		# Night is ambience-only unless an authored weather/location cue applies.
+		if not RainAudioProfile.path_for(PlayerState.current_weather).is_empty():
+			return RAINY_NIGHT_PATH
+		return ""
 	return HOME_PATH if home_interior else DEFAULT_PATH
 
 

@@ -162,7 +162,12 @@ static func apply_stage_earnings_modifiers(player_state, fare: int, bonus: int, 
 
 
 static func fare_buff_multiplier(player_state) -> float:
-	return 1.0 + GameTuning.MALASAKIT_FARE_BONUS if player_state.has_achievement("malasakit") else 1.0
+	var multiplier := 1.0
+	if player_state.has_achievement("malasakit"):
+		multiplier += GameTuning.MALASAKIT_FARE_BONUS
+	if player_state.has_achievement("bayanihan"):
+		multiplier += GameTuning.BAYANIHAN_FARE_BONUS
+	return multiplier
 
 
 static func estimate_stage_earnings(player_state, stage_type: String, character_id: String = "") -> int:

@@ -18,9 +18,13 @@ const ISIDRO_FIRST_EVENT_SPEED_KMH := 70.0
 # Random ride stories: probability per eligible unnamed-passenger ride (0..1).
 const MALASAKIT_EVENT_CHANCE := 0.10
 const BAYANIHAN_EVENT_CHANCE := 0.10
+const GENERIC_PASSENGER_EVENT_CHANCE := 0.25
 const MALASAKIT_EPILOGUE_DELAY_DAYS := 1 # Guaranteed on the next eligible ride from this day onward.
 # Permanent for the current run after waiving the fare; does not stack.
 const MALASAKIT_FARE_BONUS := 0.05
+const BAYANIHAN_FARE_BONUS := 0.05
+const MASIPAG_MAX_ENERGY_BONUS := 1
+const ACHIEVEMENT_MAX_STRESS_BONUS := 2
 
 # CENTRAL TRICYCLE / STORE / UPGRADE / MENU TRAFFIC TUNING
 # Edit this file, then restart the running game. No autoload is needed.
@@ -94,11 +98,11 @@ const CRASH_INVINCIBLE_SECONDS := 1.6
 const CRASH_FLICKER_INTERVAL := 0.08
 const CRASH_FLICKER_ALPHA := 0.35
 
-# Trip-ending crashes: lose a percentage of cash, then spend days in repair.
-# Bill = floor(cash * min(base + random(0..extra), cap) / 100).
-const CRASH_REPAIR_BASE_PERCENT := 25
-const CRASH_REPAIR_RANDOM_PERCENT := 25
-const CRASH_REPAIR_MAX_PERCENT := 50
+# Mechanic and trip-ending crash repairs share the same per-hull rate.
+const HULL_REPAIR_COST_PER_POINT := 50
+const HULL_REPAIR_AMOUNT := 2
+const CRASH_REPAIR_HULL_RESTORE := 4
+const CRASH_REPAIR_FREE_HULL_RESTORE := 1
 const CRASH_REPAIR_DAYS := 1
 const CRASH_REPAIR_ENERGY_RECOVERY_RATIO := 1.0 # 1.0 restores full energy.
 # Hold the crash frame until the sound finishes (at least this many seconds),
@@ -192,24 +196,25 @@ const WEATHER_HANDLING_MULTIPLIERS := {
 	},
 }
 
-# Stress and hull are both fixed 0..10 meters. Stress never prevents a ride.
+# Stress starts with a 10-point cap; achievements expand it. Hull stays at 10.
+# Stress never prevents a ride.
 const DEFAULT_STARTING_STRESS := 0
 const DEFAULT_MAX_STRESS := 10
 const DEFAULT_STARTING_HULL := 10
 const DEFAULT_MAX_HULL := 10
-const TRIP_STRESS_GAIN := 2
+const TRIP_STRESS_GAIN := 1
 const BETA_BLOCKER_STRESS_SHIELD_POINTS := 3
 const REST_STRESS_RELIEF := 2
 const NIGHT_SLEEP_STRESS_RELIEF := 4
 const STRESS_WARNING_THRESHOLD := 7
 const HIGH_STRESS_THRESHOLD := 7
 const STRESS_MODIFIER_DELTAS := {
-	"player_acceleration_x": -0.25,
-	"player_max_speed": -0.20,
-	"player_brake_x": -0.15,
-	"player_lane_lerp_x": -0.30,
-	"player_coast_x": 0.20,
-	"player_wiggle_intensity_x": 0.30,
+	"player_acceleration_x": -0.50,
+	"player_max_speed": -0.40,
+	"player_brake_x": -0.30,
+	"player_lane_lerp_x": -0.60,
+	"player_coast_x": 0.40,
+	"player_wiggle_intensity_x": 0.60,
 }
 const DEFAULT_STARTING_GAS_PERCENT := 100.0
 const DEFAULT_MAX_GAS_PERCENT := 100.0
@@ -221,8 +226,19 @@ const DEFAULT_STARTING_ENERGY := 5
 const DEFAULT_MAX_ENERGY := 5
 const TRIP_ENERGY_COST := 1
 const MAP_TRAVEL_ENERGY_COST := 1
+const CONSTRUCTION_WORK_ENERGY_COST := 2
+const CONSTRUCTION_WORK_BASE_PAY := 500
+# Tropa's higher rate is captured when construction work is unlocked.
+const CONSTRUCTION_WORK_PAY := 750
+const CONSTRUCTION_WORK_PRESENTATION_SECONDS := 3.0
 const PARK_STRESS_RELIEF := 2
+const CHURCH_STRESS_RELIEF := 2
+const MAKADIYOS_CHURCH_STRESS_RELIEF := 3
 const CHARACTER_INTERACTION_STRESS_RELIEF := 1
+const CHARACTER_INTERACTION_STRESS_RELIEF_BY_LOCATION := {
+	"hospital": 2,
+	"bar": 2,
+}
 const REST_ENERGY_RESTORE := 2
 const FOOD_MAX_ENERGY_RESTORE := 2
 const CRITICAL_ENERGY_WARNING_THRESHOLD := 2
@@ -277,9 +293,9 @@ const STORE_ITEMS := [
 		"id": "hull_repair",
 		"name": "Tricycle Repairs",
 		"description": "Restore {hull} hull",
-		"cost": 100,
+		"cost": HULL_REPAIR_COST_PER_POINT * HULL_REPAIR_AMOUNT,
 		"type": "repair",
-		"hull": 2,
+		"hull": HULL_REPAIR_AMOUNT,
 	},
 	{
 		"id": "engine_tune",
