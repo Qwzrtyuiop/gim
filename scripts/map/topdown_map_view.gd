@@ -153,12 +153,7 @@ func _build_energy_cursor() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not enabled or not is_visible_in_tree():
-		return
-	if event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		if not event is InputEventKey or not event.echo:
-			_close()
+	if event.is_action_pressed("ui_cancel") or not enabled or not is_visible_in_tree():
 		return
 	if highlight_mode.handle_input(event):
 		_refresh_info()

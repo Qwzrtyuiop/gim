@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b8cj2u0m5480u"
-path="res://.godot/imported/almaCg2.jpeg-0420ad8f727f677c5d3fb3bc72522716.ctex"
+uid="uid://cbhaorituxlfw"
+path="res://.godot/imported/BigHorn.png-94136aa801d32d9ba6a055cde6c4e893.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/story/specialCG/almaCg2.jpeg"
-dest_files=["res://.godot/imported/almaCg2.jpeg-0420ad8f727f677c5d3fb3bc72522716.ctex"]
+source_file="res://assets/story/items/BigHorn.png"
+dest_files=["res://.godot/imported/BigHorn.png-94136aa801d32d9ba6a055cde6c4e893.ctex"]
 
 [params]
 

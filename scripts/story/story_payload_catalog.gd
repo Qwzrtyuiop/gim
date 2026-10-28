@@ -218,8 +218,20 @@ const STORIES := {
 	"alma_first_encounter": {
 		"english": preload("res://scripts/story/payloads/characters/alma/alma_first_encounter.gd"),
 		"tagalog": preload("res://scripts/story/payloads/characters/alma/alma_first_encounter_tagalog.gd"),
-		"title": "Alma: First Event",
-		"subtitle": "Story placeholder.",
+		"title": "Small World",
+		"subtitle": "Alma recognizes a former customer from the city.",
+	},
+	"alma_special_delivery": {
+		"english": preload("res://scripts/story/payloads/characters/alma/alma_special_delivery.gd"),
+		"tagalog": preload("res://scripts/story/payloads/characters/alma/alma_special_delivery_tagalog.gd"),
+		"title": "Special Delivery",
+		"subtitle": "Alma asks John to rescue an important order.",
+	},
+	"alma_special_delivery_success": {
+		"english": preload("res://scripts/story/payloads/characters/alma/alma_special_delivery_success.gd"),
+		"tagalog": preload("res://scripts/story/payloads/characters/alma/alma_special_delivery_success_tagalog.gd"),
+		"title": "Special Delivery: Return",
+		"subtitle": "John and Alma bring the beer back to the bar.",
 	},
 	"dante_first_encounter": {
 		"english": preload("res://scripts/story/payloads/characters/dante/dante_first_encounter.gd"),

@@ -85,6 +85,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if PauseMenuManager.handle_input(event):
+		return
 	if travel_map != null and travel_map.visible:
 		return
 	if tutorial_active and _is_any_press(event):
@@ -94,16 +96,6 @@ func _input(event: InputEvent) -> void:
 		_advance_tutorial()
 	elif hub_dialogue != null and hub_dialogue.handle_input(event):
 		get_viewport().set_input_as_handled()
-	elif shop_overlay.visible and event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		_close_shop()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if tutorial_active or is_transitioning or _speech_is_blocking() or (travel_map != null and travel_map.visible):
-		return
-	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
-		return
 
 
 func _create_street() -> void:

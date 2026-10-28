@@ -73,16 +73,6 @@ func close() -> void:
 	closed.emit()
 
 
-# HomeMap returns early while the modal is visible. Only Escape is consumed
-# here; ordinary mouse/keyboard events still need to reach the GUI buttons.
-func handle_input(event: InputEvent) -> bool:
-	if not is_visible_in_tree() or not event.is_action_pressed("ui_cancel"):
-		return false
-	if not event.is_echo():
-		close()
-	return true
-
-
 func _shopping_allowed() -> bool:
 	return not can_shop.is_valid() or bool(can_shop.call())
 

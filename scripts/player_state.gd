@@ -689,12 +689,16 @@ func boost_gas_is_available() -> bool:
 	return PlayerResourceState.boost_gas_is_available(self)
 
 
+func stage_uses_gas(special_stage_id := "") -> bool:
+	return PlayerResourceState.stage_uses_gas(self, special_stage_id)
+
+
 func apply_night_rest_bonus() -> int:
 	return PlayerResourceState.apply_night_rest_bonus(self)
 
 
-func get_stage_start_error(stage_descriptor := "") -> String:
-	return PlayerResourceState.stage_start_error(self, stage_descriptor)
+func get_stage_start_error(stage_descriptor := "", special_stage_id := "") -> String:
+	return PlayerResourceState.stage_start_error(self, stage_descriptor, -1, special_stage_id)
 
 
 func get_stage_start_error_after_transition(stage_descriptor := "", transition_mode: String = TRANSITION_RIDE) -> String:

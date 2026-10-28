@@ -1,5 +1,7 @@
 extends RefCounted
 
+const SpecialStages := preload("res://scripts/config/special_stages.gd")
+
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 const AchievementService := preload("res://scripts/achievement_service.gd")
@@ -87,12 +89,20 @@ static func gas_capacity_text(player_state) -> String:
 	return "%.1f%%" % player_state.max_gas
 
 
-static func stage_start_error(player_state, _stage_descriptor: String = "", _projected_energy: int = -1) -> String:
+static func stage_uses_gas(player_state, special_stage_id: String = "") -> bool:
+	var stage_id := special_stage_id
+	if stage_id.is_empty() and not bool(player_state.active_event_special_stage.get("completed", false)):
+		stage_id = str(player_state.active_event_special_stage.get("id", ""))
+	# Read current tuning so already-saved Alma deliveries gain this rule too.
+	return SpecialStages.uses_gas(stage_id)
+
+
+static func stage_start_error(player_state, _stage_descriptor: String = "", _projected_energy: int = -1, special_stage_id: String = "") -> String:
 	if player_state.hull <= 0:
 		return "The tricycle needs repairs before another trip."
 	if not player_state.pending_stage_stress_applied and (player_state.energy if _projected_energy < 0 else _projected_energy) < GameTuning.TRIP_ENERGY_COST:
 		return "Not enough energy to start this trip."
-	if player_state.gas <= 0.0:
+	if stage_uses_gas(player_state, special_stage_id) and player_state.gas <= 0.0:
 		return "Not enough gas for this trip."
 	return ""
 
@@ -112,7 +122,7 @@ static func is_low_gas(player_state) -> bool:
 
 
 static func boost_gas_is_available(player_state) -> bool:
-	return player_state.gas > GameTuning.MIN_BOOST_GAS_PERCENT
+	return not stage_uses_gas(player_state) or player_state.gas > GameTuning.MIN_BOOST_GAS_PERCENT
 
 
 static func stress_vehicle_modifiers(player_state) -> Dictionary:
@@ -202,6 +212,10 @@ static func spend_money(player_state, amount: int) -> bool:
 
 
 static func add_stress(player_state, amount: int) -> int:
+	if amount > 0 and not bool(player_state.active_event_special_stage.get("completed", false)):
+		var stage_id := str(player_state.active_event_special_stage.get("id", ""))
+		if not SpecialStages.gains_stress(stage_id):
+			return 0
 	var before: int = player_state.stress
 	player_state._begin_state_batch()
 	var absorbed := StressShield.absorb(player_state, amount)
@@ -240,7 +254,15 @@ static func relieve_character_interaction(player_state, location_id: String, cha
 static func damage_hull(player_state, amount: int) -> int:
 	var before: int = player_state.hull
 	if amount > 0:
-		player_state.hull -= amount
+		player_state._begin_state_batch()
+		var protection := 0
+		if str(player_state.active_event_special_stage.get("id", "")) == "alma_special_delivery" and not bool(player_state.active_event_special_stage.get("completed", false)):
+			protection = mini(amount, maxi(0, int(player_state.active_event_special_stage.get("crash_protection_remaining", 0))))
+			player_state.active_event_special_stage["crash_protection_remaining"] = int(player_state.active_event_special_stage.get("crash_protection_remaining", 0)) - protection
+			if protection > 0:
+				player_state.save_progress()
+		player_state.hull -= amount - protection
+		player_state._end_state_batch()
 	return before - player_state.hull
 
 

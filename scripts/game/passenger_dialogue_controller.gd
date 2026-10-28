@@ -3,11 +3,13 @@ class_name PassengerDialogueController
 
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const DeliveryChatter := preload("res://scripts/game/alma_delivery_chatter.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const CATEGORY_GO_FASTER := "go_faster"
 const CATEGORY_HURRY_UP := "hurry_up"
 const CATEGORY_CAREFUL := "careful"
 const CATEGORY_SPECIAL := "special"
+const CATEGORY_DELIVERY := "alma_delivery"
 const BUBBLE_WIDTH := 300.0
 const BUBBLE_HEIGHT := 78.0
 const BUBBLE_MARGIN := 12.0
@@ -26,6 +28,7 @@ var special_cooldown_remaining: float = 11.0
 var recent_lane_change_timer: float = 0.0
 var last_player_lane: int = 1
 var current_text: String = ""
+var delivery_chatter := DeliveryChatter.new()
 
 
 func setup(owner, target_ui_root: CanvasLayer) -> void:
@@ -84,7 +87,8 @@ func setup(owner, target_ui_root: CanvasLayer) -> void:
 
 
 func update(owner, delta: float) -> void:
-	if not GameTuning.PASSENGER_MESSAGES_ENABLED:
+	var is_delivery: bool = DeliveryChatter.is_stage(owner)
+	if not GameTuning.PASSENGER_MESSAGES_ENABLED and not is_delivery:
 		clear()
 		return
 	if bubble_root == null:
@@ -102,6 +106,9 @@ func update(owner, delta: float) -> void:
 		return
 	if owner.stage_tutorial != null and (owner.stage_tutorial.active or owner.stage_tutorial.input_lock_active):
 		return
+	if is_delivery:
+		delivery_chatter.update(owner, self, delta)
+		return
 	if time_remaining > 0.0 or cooldown_remaining > 0.0:
 		return
 
@@ -115,6 +122,11 @@ func update(owner, delta: float) -> void:
 		return
 
 	_show_line(owner, category, line_data)
+
+
+func react_to_delivery(owner, trigger: String) -> void:
+	if DeliveryChatter.is_stage(owner) and owner.game_state == "playing":
+		delivery_chatter.react(owner, self, trigger)
 
 
 func layout(owner) -> void:
@@ -150,6 +162,7 @@ func layout(owner) -> void:
 func clear() -> void:
 	time_remaining = 0.0
 	current_text = ""
+	delivery_chatter.reset()
 	if bubble_root != null:
 		bubble_root.visible = false
 		bubble_root.modulate = Color(1.0, 1.0, 1.0, 0.0)
@@ -190,7 +203,7 @@ func _choose_category(owner) -> String:
 	var progress_ratio: float = clampf(owner.distance / maxf(1.0, owner.target_distance), 0.0, 2.0)
 	var is_behind_schedule: bool = progress_ratio + 0.14 < elapsed_ratio
 	var urgent_window: bool = owner.time_left <= maxf(7.0, owner.time_limit * 0.14) or owner.overtime_seconds > 0.25
-	var stage_special_type: String = PlayerState.normalize_stage_special_type(owner.stage_special_type)
+	var stage_special_type: String = _passenger_rule_type(owner)
 
 	if special_cooldown_remaining <= 0.0 and _has_dialogue(dialogue_pool, CATEGORY_SPECIAL) and owner.rng.randf() < 0.16:
 		return CATEGORY_SPECIAL
@@ -250,6 +263,9 @@ func _show_line(owner, category: String, line_data: Dictionary) -> void:
 	time_remaining = clampf(BASE_DISPLAY_SECONDS + float(line_text.length()) * 0.018, BASE_DISPLAY_SECONDS, MAX_DISPLAY_SECONDS)
 
 	match category:
+		CATEGORY_DELIVERY:
+			# Cosmetic delivery chatter must not change traffic's driving RNG.
+			cooldown_remaining = float(line_data.get("cooldown", 6.0))
 		CATEGORY_HURRY_UP:
 			cooldown_remaining = owner.rng.randf_range(6.0, 8.2)
 		CATEGORY_GO_FASTER, CATEGORY_CAREFUL:
@@ -284,7 +300,7 @@ func _has_dialogue(dialogue_pool: Dictionary, category: String) -> bool:
 
 
 func _is_rule_violation_category(owner, category: String) -> bool:
-	var stage_special_type: String = PlayerState.normalize_stage_special_type(owner.stage_special_type)
+	var stage_special_type: String = _passenger_rule_type(owner)
 	if stage_special_type == PlayerState.STAGE_SPECIAL_TYPE_URGENT:
 		return category == CATEGORY_GO_FASTER or category == CATEGORY_HURRY_UP
 	if stage_special_type == PlayerState.STAGE_SPECIAL_TYPE_CAREFUL:
@@ -319,3 +335,15 @@ func _has_ordered_session_entries(entries: Array) -> bool:
 		if entry is Dictionary and bool((entry as Dictionary).get("_session_dialogue_ordered", false)):
 			return true
 	return false
+
+
+func _passenger_rule_type(owner) -> String:
+	var rule: String = PlayerState.normalize_stage_special_type(owner.stage_special_type)
+	# Scripted trips retain their special-stage identity while using an
+	# authored passenger rule such as Alma's Rush delivery.
+	for property: Dictionary in owner.get_property_list():
+		if str(property.get("name", "")) == "special_stage_blueprint":
+			var blueprint: Dictionary = owner.get("special_stage_blueprint")
+			var metadata: Dictionary = blueprint.get("metadata", {})
+			return PlayerState.normalize_stage_special_type(str(metadata.get("passenger_trait", rule)))
+	return rule

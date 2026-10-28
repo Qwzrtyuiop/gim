@@ -4,6 +4,58 @@ extends RefCounted
 const Tuning := preload("res://scripts/config/game_tuning.gd")
 const Entities := preload("res://scripts/game/vehicle_traffic_entities.gd")
 const Geometry := preload("res://scripts/game/vehicle_geometry.gd")
+const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
+const TrafficSignals := preload("res://scripts/game/vehicle_traffic_signals.gd")
+
+
+static func truck_wave(owner, origin: Vector2, radius: float) -> void:
+	if owner.game_state != "playing" or not is_instance_valid(owner.player):
+		return
+	var viewport: Rect2 = owner.get_viewport_rect()
+	var affected := false
+	for entity: Dictionary in owner.active_entities:
+		if not Entities.is_entity_sprite_valid(entity) or bool(entity.get("truck_horn_yielding", false)):
+			continue
+		var sprite: Sprite2D = entity.sprite
+		var visible_bounds := sprite.get_transform() * sprite.get_rect()
+		if not viewport.intersects(visible_bounds):
+			continue
+		var bounds := Geometry.collision_rect(sprite, owner.VEHICLE_HITBOX_INSET, owner)
+		var nearest_point := Vector2(
+			clampf(origin.x, bounds.position.x, bounds.end.x),
+			clampf(origin.y, bounds.position.y, bounds.end.y)
+		)
+		if origin.distance_squared_to(nearest_point) > radius * radius:
+			continue
+		_truck_yield(owner, entity)
+		affected = true
+	if affected:
+		TrafficIndex.invalidate(owner)
+
+
+static func _truck_yield(owner, entity: Dictionary) -> void:
+	var sprite: Sprite2D = entity.sprite
+	var pullover_lane := 0 if int(entity.get("lane", -1)) == 0 else 2
+	if is_instance_valid(owner.pending_speeder_lane_change_sprite) and owner.pending_speeder_lane_change_sprite == sprite:
+		TrafficSignals.clear_speeder_lane_change_warning(owner)
+	Entities.cancel_entity_lane_change_warning(entity)
+	Entities.clear_overtake_state(entity)
+	entity.erase("lane_change_previous_lane")
+	entity.erase("lane_change_fault_grace_timer")
+	entity["truck_horn_yielding"] = true
+	entity["horn_yielding"] = true
+	# Contact is disabled only after the expanding wave reaches this car.
+	entity["horn_yield_clear"] = true
+	entity["is_parked"] = true
+	entity["lane"] = pullover_lane
+	entity["target_lane"] = pullover_lane
+	entity["kind"] = "traffic"
+	# Parked top-lane cars must retain a valid incoming-lane direction.
+	entity["moves_with_player"] = pullover_lane != 0
+	entity["world_speed"] = 0.0
+	entity["desired_world_speed"] = 0.0
+	entity["horn_speed_timer"] = 0.0
+	entity["speeder_bob_offset"] = 0.0
 
 
 static func press(owner) -> void:

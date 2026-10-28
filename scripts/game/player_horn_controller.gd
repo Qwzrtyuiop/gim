@@ -3,6 +3,7 @@ extends RefCounted
 const InputHelper := preload("res://scripts/game/game_input.gd")
 const Tuning := preload("res://scripts/config/game_tuning.gd")
 const HornTraffic := preload("res://scripts/game/vehicle_horn_response.gd")
+const DeliveryEquipment := preload("res://scripts/game/alma_delivery_equipment.gd")
 
 
 static func handle_input(owner, event: InputEvent) -> bool:
@@ -17,6 +18,10 @@ static func handle_input(owner, event: InputEvent) -> bool:
 	if owner.horn_held:
 		return true
 	owner.horn_held = true
+	var equipment = DeliveryEquipment.for_owner(owner)
+	if equipment != null and equipment.enabled:
+		equipment.press()
+		return true
 	owner.audio_manager.set_horn_active(true)
 	if owner.horn_press_cooldown <= 0.0:
 		owner.horn_press_cooldown = Tuning.HORN_PRESS_COOLDOWN
@@ -25,6 +30,9 @@ static func handle_input(owner, event: InputEvent) -> bool:
 
 
 static func allowed(owner) -> bool:
+	var equipment = DeliveryEquipment.for_owner(owner)
+	if equipment != null and equipment.tutorial_active:
+		return false
 	return (
 		owner.game_state == "playing"
 		and not owner.crash_repair_transition_active

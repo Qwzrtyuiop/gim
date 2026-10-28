@@ -25,6 +25,7 @@ const GameFlowController := preload("res://scripts/game/game_flow_controller.gd"
 const RideStoryInterruption := preload("res://scripts/game/ride_story_interruption.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const PlayerHorn := preload("res://scripts/game/player_horn_controller.gd")
+const AlmaDeliveryEquipment := preload("res://scripts/game/alma_delivery_equipment.gd")
 const GameRenderer := preload("res://scripts/game/game_renderer.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
 const PassengerDialogueController := preload("res://scripts/game/passenger_dialogue_controller.gd")
@@ -364,6 +365,10 @@ var game_hud
 var audio_manager
 var horn_held := false
 var horn_press_cooldown := 0.0
+var truck_horn_cooldown := 0.0
+var truck_horn_wave: Dictionary = {}
+var delivery_tutorial_seen := false
+var alma_delivery_equipment: AlmaDeliveryEquipment
 var fade_rect: ColorRect
 var stage_tutorial
 var passenger_dialogue_controller
@@ -462,6 +467,9 @@ func _ready() -> void:
 		PlayerState.remove_meta("loaded_slot_runtime")
 		DrivingSaveSnapshot.restore(self, loaded_runtime.driving)
 		GameStageSetup.restore_stress_modifier_base(self)
+	alma_delivery_equipment = AlmaDeliveryEquipment.new()
+	add_child(alma_delivery_equipment)
+	alma_delivery_equipment.setup(self)
 	set_process(true)
 
 
@@ -491,6 +499,9 @@ func _background_pool_tag() -> String:
 
 
 func _input(event: InputEvent) -> void:
+	if alma_delivery_equipment != null and alma_delivery_equipment.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
 	# Tutorial controls must be read before the focused overlay's GUI handling.
 	if not crash_repair_transition_active and stage_tutorial != null and stage_tutorial.handle_input(event):
 		get_viewport().set_input_as_handled()
@@ -526,9 +537,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _process(delta: float) -> void:
+	if alma_delivery_equipment != null:
+		alma_delivery_equipment.update(delta)
 	PlayerHorn.update(self, delta)
 	if crash_repair_transition_active:
 		GameFlowController.update_crash_repair_transition(self, delta)
+		return
+	if alma_delivery_equipment != null and alma_delivery_equipment.tutorial_active:
+		GameEnvironmentController.update_background(self)
+		GameEnvironmentController.update_weather_effects(self, delta)
+		GameEnvironmentController.update_night_visibility_mask(self)
+		GameEnvironmentController.update_ui(self, GameFlowController.current_speed_kmh(self), SPEEDOMETER_MAX_KMH)
 		return
 	if stage_tutorial != null and stage_tutorial.active:
 		stage_tutorial.update_positions(

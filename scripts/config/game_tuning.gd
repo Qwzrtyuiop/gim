@@ -146,6 +146,9 @@ const SPEEDER_BOB_CYCLES_PER_SECOND := 1.5
 
 # Player horn: separate taps persuade nearby bottom-lane drivers once per car.
 const HORN_PRESS_COOLDOWN := 0.15
+const ALMA_TRUCK_HORN_COOLDOWN := 5.0
+const ALMA_TRUCK_HORN_TOP_OFFSET := 32.0 # Upward shoulder offset at 720p.
+const ALMA_TRUCK_HORN_WAVE_SPEED := 1000.0 # Radius growth in pixels/second at 720p.
 const HORN_REPEAT_WINDOW := 2.5
 const HORN_MIN_PRESSES := 2
 const HORN_MAX_PRESSES := 5
@@ -389,6 +392,7 @@ const STORE_ITEMS := [
 
 # Nighttime bar drinks cost more than food, with better value for larger relief.
 # They are consumed immediately and restore stress only, never action energy.
+const BAR_DISCOUNT := 0.10
 const BAR_ITEMS := [
 	{
 		"id": "bar_beer",

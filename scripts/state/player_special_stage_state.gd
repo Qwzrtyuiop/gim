@@ -1,6 +1,7 @@
 extends RefCounted
 
 const SpecialStages := preload("res://scripts/config/special_stages.gd")
+const AlmaDelivery := preload("res://scripts/home/alma_delivery_encounter.gd")
 const GAME_SCENE := "res://scenes/main.tscn"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const RESULTS_SCENE := "res://scenes/stage_results.tscn"
@@ -21,6 +22,8 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 	var safe_id: String = state.normalize_special_stage_id(stage_id)
 	if not state.active_event_special_stage.is_empty():
 		return str(state.active_event_special_stage.get("id", "")) == safe_id
+	if safe_id == AlmaDelivery.STORY_ID and (state.is_midnight() or not bool(state.get_event_value("alma_first_encounter_seen", false))):
+		return false
 	var definition := SpecialStages.get_definition(safe_id)
 	var repeat_last_stage := bool(definition.get("repeat_last_stage", false))
 	if repeat_last_stage:
@@ -49,7 +52,7 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 		state.finish_crash_repair()
 	# Scripted driving still uses the daily activity budget and intact hull.
 	state.pending_stage_stress_applied = false
-	if not state.get_stage_start_error().is_empty():
+	if not state.get_stage_start_error(str(definition["stage_type"]), safe_id).is_empty():
 		state._end_state_batch()
 		return false
 	# Replacing an interrupted ride starts a new leg, never a second shielded ride.
@@ -83,8 +86,14 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 		"definition": definition,
 		"completed": false,
 	}
+	var metadata: Dictionary = definition.get("metadata", {})
+	if metadata.has("crash_protection"):
+		state.active_event_special_stage["crash_protection_remaining"] = maxi(0, int(metadata.crash_protection))
 	state.current_mock_character_id = str(definition.get("character_id", state.current_mock_character_id))
 	state.prepare_stage_start(str(definition["stage_type"]))
+	if safe_id == AlmaDelivery.STORY_ID:
+		# The bar return belongs to successful delivery, not a crash/abandonment.
+		state.set_event_value(AlmaDelivery.RETURN_EVENT, {})
 	state.pending_story.clear()
 	state.pending_result_music.clear()
 	state.pending_gameplay_entry_fade_duration = 0.35
@@ -101,7 +110,25 @@ static func finish(state) -> String:
 		return HOME_SCENE
 	state._begin_state_batch()
 	state.claim_last_stage_total()
+	var result: Dictionary = state.get_last_stage_result()
+	var delivered: bool = (
+		str(state.active_event_special_stage.get("id", "")) == AlmaDelivery.STORY_ID
+		and bool(state.active_event_special_stage.get("completed", false))
+		and bool(result.get("completed", false))
+		and str(result.get("special_stage_id", "")) == AlmaDelivery.STORY_ID
+	)
 	state.active_event_special_stage = {}
+	if delivered:
+		var payload: Dictionary = load("res://scripts/story/story_payload_catalog.gd").build(AlmaDelivery.SUCCESS_STORY_ID)
+		payload["return_scene"] = HOME_SCENE
+		payload["next_scene"] = HOME_SCENE
+		AlmaDelivery.prepare_bar_return()
+		state.set_last_seen_story_section(AlmaDelivery.SUCCESS_STORY_ID, 0)
+		state.set_pending_story(payload)
+		state.resume_scene_path = "res://scenes/story_scene.tscn"
+		state.save_progress()
+		state._end_state_batch()
+		return state.resume_scene_path
 	state.resume_scene_path = RESULTS_SCENE
 	state.save_progress()
 	state._end_state_batch()

@@ -21,6 +21,7 @@ const PHONE_IDLE_SECONDS := 30.0
 const IDLE_SECONDS := 120.0
 
 var active := false
+var pose_locked := false
 var image_rect := Rect2()
 var sprite_rect := Rect2()
 var _texture: Texture2D
@@ -64,11 +65,26 @@ func set_active(value: bool) -> void:
 	set_process(value and is_visible_in_tree())
 
 
+func set_pose_locked(value: bool) -> void:
+	if pose_locked == value:
+		return
+	pose_locked = value
+	_hovered = false
+	_pose_elapsed = 0.0
+	_unattended_seconds = 0.0
+	if value:
+		_set_sprite(IDLE_TEXTURE, IDLE_REGION)
+	elif active:
+		_show_default()
+
+
 func _process(delta: float) -> void:
 	var background := get_parent() as TextureRect
 	if background != null and _tint != background.self_modulate:
 		_tint = background.self_modulate
 		queue_redraw()
+	if pose_locked:
+		return
 	var pointer_over := get_viewport().gui_get_hovered_control() == self and _has_point(get_local_mouse_position())
 	if pointer_over:
 		if not _hovered:
@@ -99,7 +115,7 @@ func _process(delta: float) -> void:
 
 
 func _on_mouse_entered() -> void:
-	if active:
+	if active and not pose_locked:
 		_hovered = true
 		# Keep the distant idle pose in place so its next click still hits Alma.
 		_attend(_texture != IDLE_TEXTURE)
@@ -113,6 +129,8 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _attend(restore_default := true) -> void:
+	if pose_locked:
+		return
 	_unattended_seconds = 0.0
 	_pose_elapsed = 0.0
 	if restore_default:
@@ -120,7 +138,10 @@ func _attend(restore_default := true) -> void:
 
 
 func _show_default() -> void:
-	_set_sprite(DEFAULT_TEXTURES[_default_index], DEFAULT_REGION)
+	if pose_locked:
+		_set_sprite(IDLE_TEXTURE, IDLE_REGION)
+	else:
+		_set_sprite(DEFAULT_TEXTURES[_default_index], DEFAULT_REGION)
 
 
 func _set_sprite(texture: Texture2D, region: Rect2) -> void:

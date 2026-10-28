@@ -7,6 +7,7 @@ const VehicleBehaviors := preload("res://scripts/game/vehicle_behaviors.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const TrafficEntities := preload("res://scripts/game/vehicle_traffic_entities.gd")
 const TrafficJamGaps := preload("res://scripts/game/traffic_jam_gaps.gd")
+const Tuning := preload("res://scripts/config/game_tuning.gd")
 
 
 static func update_top_lane_evasive_offsets(owner) -> void:
@@ -303,6 +304,8 @@ static func update_entity_lane_position(owner, entity: Dictionary, delta: float)
 
 static func target_guide_y_for_entity(owner, entity: Dictionary, target_lane: int) -> float:
 	var size: Vector2 = owner.get_viewport_rect().size
+	if bool(entity.get("truck_horn_yielding", false)) and target_lane == 0:
+		return VehicleGeometry.entity_lane_y(owner, 0, size, false) - Tuning.ALMA_TRUCK_HORN_TOP_OFFSET * size.y / 720.0
 	if bool(entity.get("horn_yielding", false)) and target_lane == 2:
 		return VehicleGeometry.entity_lane_y(owner, 2, size, true)
 	if bool(entity.get("top_lane_evasive_offset_active", false)) and int(entity.get("lane", -1)) == 0 and target_lane == 0:

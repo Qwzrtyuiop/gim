@@ -81,6 +81,11 @@ func start_stage_bgm(stage_time_of_day: String, stage_traffic: String, rng: Rand
 		return
 
 	var bgm_pool := _get_stage_bgm_pool(stage_time_of_day, stage_traffic)
+	var stage_definition: Dictionary = PlayerState.active_event_special_stage.get("definition", {})
+	var stage_metadata: Dictionary = stage_definition.get("metadata", {})
+	var special_music := str(stage_metadata.get("music", ""))
+	if not special_music.is_empty():
+		bgm_pool = [special_music]
 	if bgm_pool.is_empty():
 		stage_bgm_player.stop()
 		stage_bgm_player.stream = null

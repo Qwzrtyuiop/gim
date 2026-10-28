@@ -35,6 +35,7 @@ const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.
 const ChurchPrayerEncounter := preload("res://scripts/home/church_prayer_encounter.gd")
 const ParkVisitEncounter := preload("res://scripts/home/park_visit_encounter.gd")
 const ChurchAudio := preload("res://scripts/home/church_audio.gd")
+const AlmaDelivery := preload("res://scripts/home/alma_delivery_encounter.gd")
 const ConstructionWorkOverlay := preload("res://scripts/home/construction_work_overlay.gd")
 const WORK_OVERLAY_SCENE := preload("res://scenes/construction_work_overlay.tscn")
 const LOCATIONS := "res://assets/story/backgrounds/locations/"
@@ -139,30 +140,20 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	# Escape belongs to the owning screen's pause menu, including inside shops.
+	if event.is_action_pressed("ui_cancel"):
+		return
 	if _has_activity_overlay():
 		return
 	if not is_visible_in_tree() or not location_view.visible:
 		return
-	if bar_shop.visible:
-		if bar_shop.handle_input(event):
-			get_viewport().set_input_as_handled()
-		return
-	if hospital_shop.visible:
-		if hospital_shop.handle_input(event):
-			get_viewport().set_input_as_handled()
+	if bar_shop.visible or hospital_shop.visible:
 		return
 	if hub_dialogue.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
 	if entrance_highlight_mode.handle_input(event):
 		_update_entrance_focus()
-	if event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		if not event.is_echo():
-			if inside_bar:
-				_exit_bar()
-			else:
-				_show_map()
 
 
 func open(origin: String = "home") -> void:
@@ -400,6 +391,8 @@ func _daily_visit_blocked(location_id: String) -> bool:
 
 
 func _mark_location_passenger_absence(location_id: String) -> void:
+	if location_id == "bar":
+		PlayerState.set_event_value("bar_visited", true)
 	var event_id := str(LOCATION_PASSENGER_ABSENCES.get(location_id, ""))
 	if event_id.is_empty():
 		return
@@ -592,6 +585,19 @@ func _handle_hospital_celina_click(character_id: String) -> bool:
 	return false
 
 
+func _handle_bar_character_click(character_id: String) -> bool:
+	if character_id != "alma" or not AlmaDelivery.is_available():
+		return false
+	if not _can_open_bar_shop() or _has_activity_overlay() or bar_shop.visible:
+		return true
+	var error := AlmaDelivery.entry_error()
+	if not error.is_empty():
+		_show_location_message(error, "bar:alma")
+		return true
+	_play_hub_story(AlmaDelivery.STORY_ID)
+	return true
+
+
 func restore_hospital_after_story() -> void:
 	# The trip to the hospital was already paid before the story began.
 	current_location = "hospital"
@@ -644,6 +650,7 @@ func _play_hub_story(story_id: String) -> void:
 		"location": current_location,
 		"map_region": map_view.map_region,
 		"show_map": map_view.visible,
+		"inside_bar": inside_bar,
 		"story_id": story_id,
 	}
 	PlayerState._begin_state_batch()
@@ -656,12 +663,20 @@ func _play_hub_story(story_id: String) -> void:
 	construction_spawn.set_interaction_enabled(false)
 	construction_audio.set_active(false)
 	church_audio.set_active(false)
+	if inside_bar:
+		bar_characters.set_interaction_enabled(false)
+		bar_audio.set_active(false)
 	if not hub_story_overlay.play(payload, _finish_hub_story):
 		PlayerState.set_event_value(ConstructionState.RETURN_EVENT, {})
 		_restore_activity_controls()
 
 
-func _finish_hub_story(_scene_path: String) -> void:
+func _finish_hub_story(scene_path: String) -> void:
+	if scene_path not in [HOME_SCENE, get_tree().current_scene.scene_file_path]:
+		# Authored local stories may hand off to a special ride. Preserve the
+		# destination/resume state already committed by the VN reader.
+		_depart(scene_path)
+		return
 	PlayerState.set_resume_scene(get_tree().current_scene.scene_file_path)
 	if bool(PlayerState.get_event_value(ConstructionState.ACCEPTED_EVENT, false)):
 		var receipt := PlayerState.begin_construction_work()
@@ -681,6 +696,10 @@ func _restore_activity_controls() -> void:
 	construction_spawn.set_interaction_enabled(true)
 	construction_audio.set_active(current_location == "construction_site" and location_view.visible and is_visible_in_tree())
 	church_audio.set_active(current_location == "church" and location_view.visible and is_visible_in_tree())
+	bar_characters.set_interaction_enabled(true)
+	if inside_bar and current_location == "bar":
+		bar_characters.set_alma_pose_locked(AlmaDelivery.is_available())
+		bar_audio.set_active(true)
 	status_header.refresh()
 	if map_view.visible:
 		map_view.back_button.grab_focus()
@@ -707,6 +726,8 @@ func restore_hub_story_return() -> void:
 		_show_map()
 	else:
 		_visit(current_location)
+		if current_location == "bar" and bool(context.get("inside_bar", false)):
+			_enter_bar()
 	var receipt: Dictionary = PlayerState.get_event_value(ConstructionState.PENDING_EVENT, {})
 	if receipt.is_empty() and bool(PlayerState.get_event_value(ConstructionState.ACCEPTED_EVENT, false)):
 		receipt = PlayerState.begin_construction_work()
@@ -753,6 +774,7 @@ func _relieve_character_stress(location_id: String, character_id: String) -> int
 
 func _set_bar_active(value: bool) -> void:
 	bar_characters.set_active(value)
+	bar_characters.set_alma_pose_locked(value and AlmaDelivery.is_available())
 	bar_audio.set_active(value)
 
 
@@ -793,6 +815,7 @@ func _build_location_view() -> void:
 	bar_characters = BarCharacters.new()
 	add_child(bar_characters)
 	bar_characters.setup(background)
+	bar_characters.interaction_override = _handle_bar_character_click
 	bar_characters.interacted.connect(_on_bar_character_interacted)
 	alma_spawn = bar_characters.alma_spawn
 	benny_spawn = bar_characters.benny_spawn

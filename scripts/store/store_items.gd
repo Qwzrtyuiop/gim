@@ -2,6 +2,7 @@ extends RefCounted
 
 # Builds shop item rows, refreshes their state, and applies purchases.
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const BarItemCatalog := preload("res://scripts/store/bar_item_catalog.gd")
 const FIRST_AID_DAY_EVENT := "hospital_first_aid_day"
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
@@ -91,6 +92,8 @@ static func item_text(owner, item: Dictionary) -> String:
 		else:
 			description = "Reduce stress by %d. May cause negative effects." % food_stress_relief(item)
 	var cost_text: String = "PhP %d" % item_cost(owner, item)
+	if owner.active_category == "bar" and item["type"] == "liquor" and BarItemCatalog.discount_active():
+		cost_text += " (%d%% OFF)" % roundi(GameTuning.BAR_DISCOUNT * 100.0)
 	if item["type"] == "gas":
 		cost_text = PlayerState.get_gas_price_text()
 	elif item["type"] == "repair" and repair_amount(item) == 0:
@@ -158,6 +161,8 @@ static func buy_item(owner, item: Dictionary, label: RichTextLabel, tier_contain
 		if relieved > 0:
 			effects.append("reduced stress by %d" % relieved)
 		owner.status_label.text = "Bought %s." % item["name"] if effects.is_empty() else "%s %s." % [item["name"], " and ".join(effects)]
+		if type == "liquor":
+			owner.status_label.text += " Paid PhP %d." % item_cost
 	elif type == "stress_shield":
 		if not PlayerState.grant_next_ride_stress_shield(int(item.get("stress_shield", GameTuning.BETA_BLOCKER_STRESS_SHIELD_POINTS))):
 			PlayerState.add_money(item_cost)
@@ -250,6 +255,8 @@ static func apply_button_font(owner, button: Button) -> void:
 
 
 static func item_cost(owner, item: Dictionary) -> int:
+	if owner.active_category == "bar" and item["type"] == "liquor":
+		return BarItemCatalog.item_cost(item)
 	if item["type"] == "gas":
 		return PlayerState.get_gas_price()
 	if item["type"] == "repair":

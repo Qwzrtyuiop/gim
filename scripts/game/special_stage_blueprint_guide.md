@@ -1,7 +1,7 @@
 ﻿# Special stages after story events
 
-Definitions live in `scripts/config/special_stages.gd`. Its `STAGES` registry is
-intentionally empty until actual stages are designed. Ordinary trips are unchanged.
+Definitions live in `scripts/config/special_stages.gd`. Its `STAGES` registry
+contains Gardo's extra lap and Alma's special delivery. Ordinary trips are unchanged.
 
 ## Define a stage
 

@@ -106,6 +106,8 @@ static func handle_speed(owner, delta: float) -> void:
 
 
 static func consume_boost_gas(owner, delta: float) -> void:
+	if not PlayerState.stage_uses_gas():
+		return
 	var gas_to_spend: float = owner.boost_gas_consumption_percent_per_second * PlayerState.get_boost_gas_consumption_multiplier() * delta
 	var gas_spent: float = PlayerState.drain_gas(gas_to_spend, false)
 	if gas_spent < gas_to_spend:

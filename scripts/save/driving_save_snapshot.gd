@@ -19,6 +19,7 @@ const OWNER_FIELDS := [
 	"speeder_warning_beeps_remaining", "speeder_warning_flash_timer", "oncoming_warning_elapsed", "oncoming_warning_beep_index",
 	"speeder_lane_change_warning_active", "speeder_lane_change_warning_target_lane",
 	"weather_effect_time", "rain_floor_drop_spawn_timer", "horn_press_cooldown",
+	"truck_horn_cooldown", "truck_horn_wave", "delivery_tutorial_seen",
 ]
 
 
@@ -88,6 +89,21 @@ static func restore(game, data: Dictionary) -> bool:
 	var pressure: Variant = values.get("top_lane_pressure", 0.0)
 	if not (pressure is int or pressure is float) or not is_finite(float(pressure)):
 		return false
+	var truck_cooldown: Variant = values.get("truck_horn_cooldown", 0.0)
+	if not (truck_cooldown is int or truck_cooldown is float) or not is_finite(float(truck_cooldown)):
+		return false
+	if not values.get("delivery_tutorial_seen", false) is bool:
+		return false
+	var wave: Variant = values.get("truck_horn_wave", {})
+	if not wave is Dictionary:
+		return false
+	if not wave.is_empty():
+		var wave_origin: Variant = wave.get("origin")
+		var wave_radius: Variant = wave.get("radius")
+		if not wave_origin is Vector2 or not wave_origin.is_finite():
+			return false
+		if not (wave_radius is int or wave_radius is float) or not is_finite(float(wave_radius)) or float(wave_radius) < 0.0:
+			return false
 	for key: String in OWNER_FIELDS:
 		if values.has(key):
 			game.set(key, _copy_value(values[key]))
@@ -97,6 +113,9 @@ static func restore(game, data: Dictionary) -> bool:
 	# Older live saves predate this ride-local field; do not retain a reused
 	# scene's pressure when loading one. Valid numeric input stays bounded.
 	game.top_lane_pressure = clampf(float(pressure), 0.0, 1.0)
+	game.truck_horn_cooldown = maxf(0.0, float(truck_cooldown))
+	game.truck_horn_wave = _copy_value(wave)
+	game.delivery_tutorial_seen = bool(values.get("delivery_tutorial_seen", false))
 	StageSetup.restore_stress_modifier_base(game, saved_modifiers)
 	var viewport: Vector2 = game.get_viewport_rect().size
 	var saved_viewport: Vector2 = data.get("viewport", viewport)

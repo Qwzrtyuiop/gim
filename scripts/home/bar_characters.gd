@@ -39,6 +39,7 @@ static var _benny_mask: BitMap
 var alma_spawn: BarAlmaSpawn
 var benny_spawn: TextureButton
 var active := false
+var interaction_override: Callable
 var _interaction_enabled := true
 var _background: TextureRect
 var _dialogue: HubDialogue
@@ -98,13 +99,19 @@ func set_interaction_enabled(value: bool) -> void:
 		benny_spawn.release_focus()
 
 
+func set_alma_pose_locked(value: bool) -> void:
+	alma_spawn.set_pose_locked(value)
+
+
 func _process(_delta: float) -> void:
 	if benny_spawn.self_modulate != _background.self_modulate:
 		benny_spawn.self_modulate = _background.self_modulate
 
 
 func _on_character_interacted(character_id: String) -> void:
-	if not _interaction_enabled or not active or not _background.is_visible_in_tree() or _dialogue.blocks_input():
+	if not _interaction_enabled or not active or not _background.is_visible_in_tree() or _dialogue == null or _dialogue.blocks_input():
+		return
+	if interaction_override.is_valid() and bool(interaction_override.call(character_id)):
 		return
 	var alma_lines: Array = ALMA_DEFAULT_LINES.duplicate()
 	if PlayerState.get_unique_character_progress("alma") >= ALMA_FAMILIAR_MIN_BOND:

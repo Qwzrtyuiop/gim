@@ -187,6 +187,8 @@ const MOCK_CHARACTERS := [
 	{
 		"id": "alma",
 		"name": "Alma",
+		"name_unlock_event": "alma_name_revealed",
+		"name_unlock_fallback_event": "alma_first_encounter_seen",
 		"phase_absence_event": "alma_bar_visit_absence",
 		"blurb": "Bartender from the city who knows you personally.",
 		"ride_modifiers": {"fare_php_per_meter_multiplier": 1.03},

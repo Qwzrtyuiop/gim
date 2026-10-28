@@ -44,6 +44,8 @@ static func distance_scale(owner) -> float:
 
 
 static func _drain_distance_gas(owner, distance_delta: float, delta: float) -> void:
+	if not PlayerState.stage_uses_gas():
+		return
 	var gas_to_spend: float = PlayerState.get_distance_gas_cost(distance_delta)
 	if gas_to_spend <= 0.0:
 		return
@@ -97,6 +99,8 @@ static func handle_player_hit(owner, detail: String, damage: int, stress_gain :=
 		return
 
 	owner.trip_vehicle_collision_count += 1
+	if owner.passenger_dialogue_controller != null:
+		owner.passenger_dialogue_controller.react_to_delivery(owner, "collision")
 	PlayerState.record_stage_crash()
 	owner.audio_manager.play_crash_sfx()
 	owner.player_speed = 0.0
@@ -210,6 +214,9 @@ static func reset_game(owner) -> void:
 	VehicleTrafficController.clear_speeder_lane_change_warning(owner)
 	owner.spawn_timers = [0.4, 0.8, 1.2]
 	owner.top_lane_pressure = 0.0
+	owner.truck_horn_cooldown = 0.0
+	owner.truck_horn_wave = {}
+	owner.horn_held = false
 	owner.traffic_jam_gaps.reset()
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	owner.player_lane = GameTuning.PLAYER_START_LANE

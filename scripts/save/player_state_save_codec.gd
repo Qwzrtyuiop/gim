@@ -152,6 +152,12 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
 	player_state.last_seen_story_id = str(save_data.get("last_seen_story_id", ""))
 	player_state.event_values = Dictionary(save_data.get("event_values", {})).duplicate(true)
+	# Existing saves already dated successful Bar arrivals for Alma's absence.
+	# Preserve that history for dialogue authored after those visits happened.
+	var bar_visit: Variant = player_state.event_values.get("alma_bar_visit_absence", {})
+	if not player_state.event_values.has("bar_visited") and bar_visit is Dictionary and int(bar_visit.get("day", 0)) > 0:
+		player_state.event_values["bar_visited"] = true
+		needs_migration_save = true
 	# Earlier builds had only one weekly goal, so successful collections kept index 0.
 	if not save_data.has("debt_carryover") and player_state.last_debt_collection_day >= 8 and not player_state.run_failed and player_state.debt_goal_index == 0:
 		player_state.debt_goal_index = mini(1, player_state.WEEKLY_DEBT_GOALS.size() - 1)

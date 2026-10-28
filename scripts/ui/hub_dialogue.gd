@@ -121,7 +121,7 @@ func blocks_input() -> bool:
 func handle_input(event: InputEvent) -> bool:
 	# Nonblocking speech never steals Enter, arrows or Escape from a menu.
 	# Screens call this after tutorial handling, before their normal menu input.
-	if not blocks_input():
+	if event.is_action_pressed("ui_cancel") or not blocks_input():
 		return false
 	# Let the balloon receive its own clicks and wheel scrolling. Only clicks
 	# outside it advance a blocking conversation through this screen-level path.
@@ -129,9 +129,6 @@ func handle_input(event: InputEvent) -> bool:
 		return false
 	if event.is_action_pressed("ui_accept") and not event.is_echo():
 		advance()
-	elif event.is_action_pressed("ui_cancel"):
-		if bool(active_line.get("closable", true)):
-			clear()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		advance()
 	return event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton or event is InputEventJoypadMotion

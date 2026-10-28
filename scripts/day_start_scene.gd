@@ -86,6 +86,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if PauseMenuManager.handle_input(event):
+		return
 	if home_map != null and home_map.visible:
 		return
 	if tutorial_active and _is_any_press(event):
@@ -93,9 +95,6 @@ func _input(event: InputEvent) -> void:
 		_advance_tutorial()
 	elif hub_dialogue != null and hub_dialogue.handle_input(event):
 		get_viewport().set_input_as_handled()
-	elif info_overlay != null and info_overlay.visible and event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		_close_info()
 
 
 func _on_house_action(action: String) -> void:

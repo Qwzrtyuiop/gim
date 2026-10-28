@@ -120,6 +120,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if PauseMenuManager.handle_input(event):
+		return
 	if map_tutorial != null and map_tutorial.handle_input(event):
 		get_viewport().set_input_as_handled()
 		return
@@ -133,21 +135,6 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif confirmation != null and confirmation.visible:
 		_confirmation_input.handle_input(event)
-		if event.is_action_pressed("ui_cancel"):
-			get_viewport().set_input_as_handled()
-			_cancel_passenger()
-	elif passenger_overlay != null and passenger_overlay.visible and event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		_close_passengers()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if _tutorial_active() or (confirmation != null and confirmation.visible) or (travel_map != null and travel_map.visible) or _speech_is_blocking():
-		return
-	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
-		return
-	if event.is_action_pressed("ui_cancel") and _allow_back():
-		_go_back()
 
 
 func _set_distance(difficulty: String) -> void:
@@ -421,6 +408,16 @@ func _open_map(for_tutorial := false) -> void:
 
 
 func _close_map() -> void:
+	# Work can advance time and clear saved offers while this scene stays alive.
+	# Reload its transition before rolling schedules for the newly reached phase.
+	pending_trip_selection = PlayerState.get_pending_trip_selection()
+	locked_character_pools = PlayerState.get_locked_pending_trip_character_pools()
+	if locked_character_pools.is_empty():
+		locked_character_pools = passenger_pool.roll()
+		passenger_pool.assign_pickup_locations(locked_character_pools)
+		_set_distance(selected_distance)
+	else:
+		displayed_characters = passenger_pool.for_distance(selected_distance)
 	station.set_enabled(not is_departing)
 	station_back_button.visible = not is_departing
 	status_header.refresh()

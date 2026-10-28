@@ -93,13 +93,6 @@ func _focus_cancel() -> void:
 		cancel_button.grab_focus()
 
 
-func _input(event: InputEvent) -> void:
-	if is_visible_in_tree() and event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		if not event.is_echo():
-			_cancel()
-
-
 func _confirm() -> void:
 	if not is_visible_in_tree() or _submitted:
 		return

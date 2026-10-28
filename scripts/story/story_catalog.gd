@@ -29,7 +29,9 @@ static func get_character_display_name(player_state, character_id: String) -> St
 	var safe_id: String = str(character.get("id", ""))
 	var name_unlock_event: String = str(character.get("name_unlock_event", ""))
 	if not name_unlock_event.is_empty():
-		return str(character.get("name", "???")) if bool(player_state.event_values.get(name_unlock_event, false)) else "???"
+		var fallback_event := str(character.get("name_unlock_fallback_event", ""))
+		var name_known := bool(player_state.event_values.get(name_unlock_event, false)) or bool(player_state.event_values.get(fallback_event, false))
+		return str(character.get("name", "???")) if name_known else "???"
 	var name_reveal_event: String = str(character.get("name_reveal_event", ""))
 	if not name_reveal_event.is_empty() and bool(player_state.event_values.get(name_reveal_event, false)):
 		return str(character.get("name", "???"))
