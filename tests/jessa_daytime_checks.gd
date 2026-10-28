@@ -44,9 +44,9 @@ static func run() -> void:
 	for phase in ["morning", "noon", "night"]:
 		PlayerState.set_current_stage_time(phase)
 		var jessa := Catalog.get_character_by_id(PlayerState, "jessa")
-		assert(jessa.eligible_times == ["night"])
+		assert(jessa.eligible_times == ["morning", "noon", "night"])
 		var picked := pool._pick_character_for_distance("short", used_ids, {"jessa": true}, true)
-		assert((picked.get("id", "") == "jessa") == (phase == "night"), "After her first story, Jessa retains her existing nighttime availability")
+		assert(picked.get("id", "") == "jessa", "After her first story, Jessa can appear during daytime pickups while retaining nighttime availability")
 	PlayerState.reset()
 	assert(Catalog.get_character_by_id(PlayerState, "jessa").eligible_times == ["morning", "noon"])
-	print("PASS: Jessa daytime first-offer availability, seen/progress independence, projected phase and later-night availability")
+	print("PASS: Jessa daytime first-offer availability, seen/progress independence, projected phase and post-intro daytime/night availability")

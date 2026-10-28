@@ -115,7 +115,7 @@ static func _setup() -> void:
 	PlayerState.clear_story_triggers()
 	PlayerState.set_pending_trip_selection("res://scenes/day_start_scene.tscn", PlayerState.TRANSITION_CURRENT_STAGE)
 	var rider: Dictionary = PlayerState.get_character_by_id("generic_guy")
-	rider.merge({"active_distance": "short", "stage_traffic": "chill", "stage_special_type": "", "special_stage_id": ""}, true)
+	rider.merge({"active_distance": "short", "stage_traffic": "chill", "stage_special_type": "", "special_stage_id": "", "pickup_location": "station", "pickup_variant": ""}, true)
 	PlayerState.lock_pending_trip_selection({"short": [rider], "medium": [], "long": []}, "short")
 
 

@@ -105,7 +105,7 @@ static func prepare_day_start(player_state, target_day: int) -> void:
 	player_state.current_stage_type = player_state.build_stage_type("short", "morning", "chill")
 	player_state.current_stage_special_type = player_state.STAGE_SPECIAL_TYPE_NONE
 	player_state.current_special_stage_id = ""
-	player_state.pending_stage_energy_cost = false
+	player_state.pending_stage_stress_applied = false
 	player_state._reset_daily_consumable_counters(player_state.current_day)
 	player_state._roll_daily_conditions_for_day(player_state.current_day)
 	player_state._resolve_debt_collection_for_day(player_state.current_day)
@@ -142,7 +142,7 @@ static func reset_daily_run_state(player_state) -> void:
 	player_state.non_gas_store_purchases_this_week = 0
 	player_state.clean_stage_streak = 0
 	player_state.current_trip_had_crash = false
-	player_state.current_trip_low_energy = false
+	player_state.current_trip_high_stress = false
 	player_state.current_trip_low_gas = false
 	player_state.low_resource_trip_count = 0
 	player_state.low_both_resource_trip_count = 0

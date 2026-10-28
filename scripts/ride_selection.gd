@@ -16,6 +16,8 @@ const TRASHCAN_LINES := [
 const PassengerPool := preload("res://scripts/ride_selection/passenger_pool.gd")
 const SelectionView := preload("res://scripts/ride_selection/selection_view.gd")
 const SelectionTutorial := preload("res://scripts/ride_selection/selection_tutorial.gd")
+const StationTutorial := preload("res://scripts/ride_selection/station_tutorial.gd")
+const STATION_TUTORIAL_EVENT := "tutorial_station_complete"
 const PassengerStory := preload("res://scripts/ride_selection/passenger_story.gd")
 const RideDeparture := preload("res://scripts/ride_selection/ride_departure.gd")
 const StationInterface := preload("res://scripts/ride_selection/station_interface.gd")
@@ -25,6 +27,7 @@ const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
 const StationIdleMusic := preload("res://scripts/ui/station_idle_music.gd")
 const MidnightEncounters := preload("res://scripts/ride_selection/midnight_encounters.gd")
 const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
+const HomeMap := preload("res://scripts/home/home_map.gd")
 
 var pending_trip_selection: Dictionary = {}
 var selected_distance := "short"
@@ -32,9 +35,11 @@ var locked_character_pools: Dictionary = {}
 var displayed_characters: Array[Dictionary] = []
 var terminal_offers: Array[Dictionary] = []
 var focused_offer: Dictionary = {}
+var pickup_location := "station"
 var passenger_pool: PassengerPool
 var view: SelectionView
 var tutorial: SelectionTutorial
+var station_tutorial: StationTutorial
 var is_departing := false
 var station: Control
 var passenger_overlay: ColorRect
@@ -49,6 +54,7 @@ var _confirmation_input := InputHighlightMode.new()
 var hub_dialogue: HubDialogue
 var night_ambience: HubNightAmbience
 var idle_music: StationIdleMusic
+var travel_map: HomeMap
 var _trashcan_line_index := 0
 
 
@@ -57,7 +63,12 @@ func _ready() -> void:
 	passenger_pool = PassengerPool.new(self)
 	view = SelectionView.new(self)
 	tutorial = SelectionTutorial.new(self)
+	station_tutorial = StationTutorial.new(self)
 	pending_trip_selection = PlayerState.get_pending_trip_selection()
+	pickup_location = PlayerState.get_pending_pickup_location()
+	if _is_forced_first_day_ride():
+		pickup_location = "station"
+		PlayerState.set_pending_pickup_location(pickup_location)
 	selected_distance = PlayerState.get_locked_pending_trip_distance()
 	if selected_distance.is_empty() or _is_forced_first_day_ride():
 		selected_distance = "short"
@@ -72,6 +83,7 @@ func _ready() -> void:
 		# A legacy locked pool can predate a character's current schedule. Repair
 		# only a wholly unusable selection, so the player always has a way forward.
 		locked_character_pools = passenger_pool.roll()
+	passenger_pool.assign_pickup_locations(locked_character_pools)
 	_set_distance(selected_distance)
 	station_ui = StationInterface.new(self)
 	station_ui.setup()
@@ -90,15 +102,23 @@ func _ready() -> void:
 	if not story_error.is_empty():
 		status_label.text = story_error
 	tutorial.build()
-	var opening_tutorial := _is_forced_first_day_ride() and not PlayerState.has_ride_select_tutorial_shown()
-	if opening_tutorial or bool(pending_trip_selection.get("passengers_open", false)) or not story_error.is_empty():
+	station_tutorial.build()
+	_create_map()
+	var opening_tutorial := _is_forced_first_day_ride() and not PlayerState.has_ride_select_tutorial_shown() and not bool(PlayerState.get_event_value(STATION_TUTORIAL_EVENT, false))
+	if opening_tutorial:
+		PlayerState.set_pending_passengers_open(false)
+		call_deferred("_start_station_tutorial")
+	elif pickup_location != "station" or bool(pending_trip_selection.get("passengers_open", false)) or not story_error.is_empty():
 		_open_passengers()
 
 
 func _input(event: InputEvent) -> void:
-	if tutorial != null and tutorial.active and tutorial.is_any_press(event):
+	if travel_map != null and travel_map.visible:
+		return
+	if station_tutorial != null and station_tutorial.handle_input(event):
 		get_viewport().set_input_as_handled()
-		tutorial.advance()
+	elif tutorial != null and tutorial.handle_input(event):
+		get_viewport().set_input_as_handled()
 	elif hub_dialogue != null and hub_dialogue.handle_input(event):
 		get_viewport().set_input_as_handled()
 	elif confirmation != null and confirmation.visible:
@@ -112,7 +132,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if (tutorial != null and tutorial.active) or (confirmation != null and confirmation.visible) or _speech_is_blocking():
+	if _tutorial_active() or (confirmation != null and confirmation.visible) or (travel_map != null and travel_map.visible) or _speech_is_blocking():
 		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
@@ -130,7 +150,7 @@ func _set_distance(difficulty: String) -> void:
 
 
 func _refresh_terminal() -> void:
-	terminal_offers = view.offers()
+	terminal_offers = view.offers(pickup_location)
 	view.refresh_terminal()
 	var weather := PlayerState.get_current_weather()
 	idle_music.set_weather(weather)
@@ -141,7 +161,7 @@ func _refresh_terminal() -> void:
 
 
 func _can_play_idle_music() -> bool:
-	return not is_departing and PlayerState.is_midnight() and passenger_overlay.is_visible_in_tree()
+	return pickup_location == "station" and not is_departing and PlayerState.is_midnight() and passenger_overlay.is_visible_in_tree() and (travel_map == null or not travel_map.visible)
 
 
 func _on_idle_music_changed(_active: bool) -> void:
@@ -161,7 +181,7 @@ func _choose_character(card_index: int) -> void:
 
 
 func _choose_offer(distance: String, slot: int) -> void:
-	if is_departing or tutorial.active or not passenger_overlay.visible or confirmation.visible or _speech_is_blocking():
+	if is_departing or _tutorial_active() or not passenger_overlay.visible or confirmation.visible or _speech_is_blocking():
 		return
 	for offer in terminal_offers:
 		if offer.distance == distance and int(offer.slot) == slot:
@@ -206,7 +226,7 @@ func _cancel_passenger() -> void:
 
 
 func _confirm_passenger() -> void:
-	if is_departing or tutorial.active or not confirmation.visible or _confirmation_offer.is_empty():
+	if is_departing or _tutorial_active() or not confirmation.visible or _confirmation_offer.is_empty():
 		return
 	var request := _confirmation_offer.duplicate(true)
 	var unchanged_time := (
@@ -270,7 +290,7 @@ func _depart_with_offer(offer: Dictionary) -> void:
 
 
 func _go_back() -> void:
-	if is_departing or confirmation.visible or not _allow_back() or _speech_is_blocking():
+	if is_departing or _tutorial_active() or confirmation.visible or not _allow_back() or _speech_is_blocking() or travel_map.visible:
 		return
 	hub_dialogue.clear()
 	is_departing = true
@@ -280,9 +300,9 @@ func _go_back() -> void:
 
 
 func _open_store() -> void:
-	if is_departing or tutorial.active or confirmation.visible or _speech_is_blocking():
+	if is_departing or _tutorial_active() or confirmation.visible or _speech_is_blocking() or travel_map.visible:
 		return
-	_close_passengers()
+	_close_passengers(false)
 	hub_dialogue.clear()
 	is_departing = true
 	station.set_enabled(false)
@@ -297,17 +317,19 @@ func _handle_back_button_pressed() -> void:
 
 
 func _on_station_action(action: String) -> void:
-	if is_departing or passenger_overlay.visible or tutorial.active or _speech_is_blocking():
+	if is_departing or passenger_overlay.visible or _tutorial_active() or _speech_is_blocking() or travel_map.visible:
 		return
 	match action:
 		"passengers":
 			_open_passengers()
+		"map":
+			_open_map()
 		"store":
 			_open_store()
 
 
 func _on_terminal_object_pressed(object_id: String) -> void:
-	if is_departing or tutorial.active or confirmation.visible or not passenger_overlay.visible or _speech_is_blocking():
+	if is_departing or _tutorial_active() or confirmation.visible or not passenger_overlay.visible or _speech_is_blocking():
 		return
 	if terminal_view.object_rect_for(object_id).has_area() and object_id == "trashcan":
 		if show_message(TRASHCAN_LINES[_trashcan_line_index], {
@@ -320,17 +342,90 @@ func _on_terminal_object_pressed(object_id: String) -> void:
 
 
 func _open_passengers() -> void:
-	if _speech_is_blocking():
+	if _speech_is_blocking() or (station_tutorial != null and station_tutorial.active) or (travel_map != null and travel_map.visible):
 		return
 	hub_dialogue.clear()
 	station_ui.show_passengers()
 
 
-func _close_passengers() -> void:
+func _close_passengers(return_to_map := true) -> void:
 	if confirmation.visible or _speech_is_blocking():
 		return
 	hub_dialogue.clear()
 	station_ui.hide_passengers()
+	if return_to_map and pickup_location != "station" and not passenger_overlay.visible:
+		_open_map()
+
+
+func _open_pickup_map() -> void:
+	if is_departing or _tutorial_active() or confirmation.visible or _speech_is_blocking() or travel_map.visible:
+		return
+	_close_passengers(false)
+	_open_map()
+
+
+func _start_station_tutorial() -> void:
+	if is_departing or passenger_overlay.visible or travel_map.visible or PlayerState.has_ride_select_tutorial_shown() or bool(PlayerState.get_event_value(STATION_TUTORIAL_EVENT, false)):
+		return
+	station_tutorial.start()
+
+
+func _finish_station_tutorial() -> void:
+	PlayerState._begin_state_batch()
+	PlayerState.set_event_value(STATION_TUTORIAL_EVENT, true)
+	_open_passengers()
+	PlayerState._end_state_batch()
+
+
+func _tutorial_active() -> bool:
+	return (tutorial != null and tutorial.active) or (station_tutorial != null and station_tutorial.active)
+
+
+func _create_map() -> void:
+	travel_map = HomeMap.new()
+	travel_map.name = "StationMap"
+	add_child(travel_map)
+	travel_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	travel_map.closed.connect(_close_map)
+	travel_map.destination_requested.connect(_map_departure)
+	travel_map.bar_music_changed.connect(_on_map_music_changed)
+
+
+func _open_map() -> void:
+	if is_departing or _tutorial_active() or confirmation.visible or passenger_overlay.visible or travel_map.visible or _speech_is_blocking():
+		return
+	hub_dialogue.clear()
+	station.set_enabled(false)
+	station_back_button.hide()
+	status_header.hide()
+	travel_map.open("station")
+	AmbientAudioManager.enter_hub(false)
+	idle_music.refresh_availability()
+
+
+func _close_map() -> void:
+	station.set_enabled(not is_departing)
+	station_back_button.visible = not is_departing
+	status_header.refresh()
+	status_header.show()
+	AmbientAudioManager.enter_hub(true)
+	station.buttons["map"].grab_focus()
+	view.refresh_bgm()
+	if pickup_location != "station" and not is_departing:
+		_open_passengers()
+
+
+func _map_departure(scene_path: String) -> void:
+	if is_departing:
+		return
+	hub_dialogue.clear()
+	is_departing = true
+	station.set_enabled(false)
+	get_tree().change_scene_to_file(scene_path)
+
+
+func _on_map_music_changed() -> void:
+	view.refresh_bgm()
 
 
 func _transition_mode() -> String:
@@ -371,9 +466,10 @@ func _create_hub_dialogue() -> void:
 	add_child(hub_dialogue)
 	hub_dialogue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hub_dialogue.set_gate(func() -> bool:
-		return not is_departing and not tutorial.active and not confirmation.visible
+		return not is_departing and not _tutorial_active() and not confirmation.visible and (travel_map == null or not travel_map.visible)
 	)
-	hub_dialogue.register_target("tricycle", _station_message_target.bind("passengers"))
+	hub_dialogue.register_target("tricycle", _station_message_target.bind("map"))
+	hub_dialogue.register_target("terminal", _station_message_target.bind("passengers"))
 	hub_dialogue.register_target("store", _station_message_target.bind("store"))
 	hub_dialogue.register_target("trashcan", _terminal_object_message_target.bind("trashcan"))
 	for character: Dictionary in PlayerState.get_mock_characters():
@@ -384,7 +480,7 @@ func _create_hub_dialogue() -> void:
 
 
 func _station_message_target(action: String) -> Rect2:
-	if passenger_overlay.visible:
+	if passenger_overlay.visible or (travel_map != null and travel_map.visible):
 		return Rect2()
 	return DialogueAnchors.control_rect(station.buttons.get(action) as Control)
 

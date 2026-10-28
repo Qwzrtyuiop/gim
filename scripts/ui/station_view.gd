@@ -12,7 +12,8 @@ const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/stationra
 const ART_SIZE := Vector2(1672, 941)
 const HIGHLIGHT_MARGIN_PIXELS := 12.0
 const TOOLTIPS := {
-	"passengers": "Tricycle: choose a passenger",
+	"map": "Tricycle: open map",
+	"passengers": "Terminal: choose a passenger",
 	"store": "Go to the store",
 }
 
@@ -20,7 +21,7 @@ const TOOLTIPS := {
 # in source pixels, then normalize for responsive hit testing and highlight UVs.
 # The store entrance is now the narrow outlined area at the left image edge.
 const HOTSPOT_POLYGONS := {
-	"passengers": [
+	"map": [
 		Vector2(1672, 63), Vector2(1564, 15), Vector2(1506, 12),
 		Vector2(1342, 37), Vector2(1214, 68), Vector2(1145, 90),
 		Vector2(1132, 100), Vector2(1131, 120), Vector2(1143, 133),
@@ -37,6 +38,16 @@ const HOTSPOT_POLYGONS := {
 		Vector2(823, 852), Vector2(824, 866), Vector2(832, 880),
 		Vector2(822, 892), Vector2(821, 907), Vector2(835, 941),
 		Vector2(1672, 941),
+	],
+	# Follow the terminal sign, roof and waiting area. The right edge stops
+	# short of the foreground tricycle; the left edge clears the store exit.
+	"passengers": [
+		Vector2(92, 132), Vector2(177, 151), Vector2(210, 69),
+		Vector2(698, 123), Vector2(702, 191), Vector2(984, 248),
+		Vector2(981, 267), Vector2(931, 278), Vector2(925, 323),
+		Vector2(912, 325), Vector2(904, 368), Vector2(884, 408),
+		Vector2(856, 475), Vector2(645, 490), Vector2(104, 501),
+		Vector2(94, 476),
 	],
 	"store": [
 		Vector2(59, 152), Vector2(0, 154),
@@ -204,12 +215,25 @@ func _draw() -> void:
 	var action := active_action()
 	if not enabled or not buttons.has(action):
 		return
+	if action == "passengers":
+		_draw_terminal_highlight()
+		return
 	var selected: Texture2D = NIGHT_SELECTED if is_night else DAY_SELECTED
 	for polygon: PackedVector2Array in _highlight_polygons(action):
 		var destination := PackedVector2Array()
 		for point in polygon:
 			destination.append(image_rect.position + point * image_rect.size)
 		draw_polygon(destination, PackedColorArray([weather_effects.background_tint()]), polygon, selected)
+
+
+func _draw_terminal_highlight() -> void:
+	var outline := PackedVector2Array()
+	for point in polygon_for("passengers"):
+		outline.append(image_rect.position + point * image_rect.size)
+	draw_colored_polygon(outline, Color(1.0, 0.88, 0.60, 0.055))
+	outline.append(outline[0])
+	draw_polyline(outline, Color(0.10, 0.075, 0.045, 0.60), 5.0, true)
+	draw_polyline(outline, Color(1.0, 0.88, 0.60, 0.82), 2.0, true)
 
 
 func _highlight_polygons(action: String) -> Array[PackedVector2Array]:

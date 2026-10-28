@@ -53,6 +53,7 @@ func _ready() -> void:
 	await load("res://tests/store_select_checks.gd").run(self)
 	await load("res://tests/station_navigation_checks.gd").run(self)
 	await load("res://tests/terminal_spawn_checks.gd").run(self)
+	await load("res://tests/passenger_pickup_checks.gd").run(self)
 	await load("res://tests/terminal_object_checks.gd").run(self)
 	await load("res://tests/passenger_count_checks.gd").run(self)
 	await load("res://tests/passenger_confirmation_checks.gd").run(self)
@@ -67,6 +68,7 @@ func _ready() -> void:
 	await load("res://tests/story_weather_checks.gd").run(self)
 	await load("res://tests/rain_audio_checks.gd").run(self)
 	await load("res://tests/ambient_continuity_checks.gd").run(self)
+	await load("res://tests/hub_music_checks.gd").run(self)
 	await load("res://tests/magda_daytime_checks.gd").run(self)
 	await load("res://tests/gardo_midnight_checks.gd").run(self)
 	await _test_library_modules()
@@ -75,11 +77,15 @@ func _ready() -> void:
 	await load("res://tests/incoming_group_checks.gd").run(self)
 	load("res://tests/horn_checks.gd").run(self)
 	await load("res://tests/input_bindings_checks.gd").run(self)
+	await load("res://tests/tutorial_controls_checks.gd").run(self)
 	await _test_checkpoints()
 	await _test_interrupted_step()
 	await _test_choice_event_resume()
 	await _test_authored_resume()
 	await load("res://tests/story_bug_checks.gd").run(self)
+	await load("res://tests/stress_hull_checks.gd").run(self)
+	await load("res://tests/stress_ui_checks.gd").run(self)
+	await load("res://tests/stress_travel_checks.gd").run(self)
 	load("res://tests/story_time_controls_checks.gd").run()
 	load("res://tests/story_game_effects_checks.gd").run(self)
 	load("res://tests/story_branch_tools_checks.gd").run(self)
@@ -320,7 +326,7 @@ func _test_scene_modules() -> void:
 			break
 		home._advance_tutorial()
 	assert(not home.tutorial_active)
-	for action in ["calendar", "radio", "outside", "rest"]:
+	for action in ["calendar", "radio", "rest"]:
 		home._show_info(action)
 		assert(home.info_overlay.visible and home.info_action == action)
 		home._close_info()
@@ -364,7 +370,12 @@ func _test_scene_modules() -> void:
 	var selection = load("res://scenes/ride_selection.tscn").instantiate()
 	get_tree().root.add_child(selection)
 	await get_tree().process_frame
-	assert(selection.passenger_overlay.visible and selection.tutorial.active, "The opening ride goes straight to passenger selection and its tutorial")
+	assert(not selection.passenger_overlay.visible and selection.station_tutorial.active, "The opening ride begins with the station-front tutorial")
+	for step in range(16):
+		if not selection.station_tutorial.active:
+			break
+		selection.station_tutorial.advance()
+	assert(not selection.station_tutorial.active and selection.passenger_overlay.visible and selection.tutorial.active, "Completing the station tutorial opens passenger onboarding")
 	selection._close_passengers()
 	assert(selection.passenger_overlay.visible and selection.tutorial.active, "The active tutorial keeps its targets visible")
 	for step in range(16):

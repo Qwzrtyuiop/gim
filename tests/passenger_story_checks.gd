@@ -70,6 +70,9 @@ static func _setup(mode: String = PlayerState.TRANSITION_RIDE) -> Dictionary:
 	character["special_stage_id"] = ""
 	var generic := PlayerState.get_character_by_id("generic_guy")
 	generic.merge({"active_distance": "short", "stage_traffic": "chill", "stage_special_type": PlayerState.STAGE_SPECIAL_TYPE_NONE, "special_stage_id": ""}, true)
+	for passenger: Dictionary in [character, generic]:
+		passenger["pickup_location"] = "station"
+		passenger["pickup_variant"] = ""
 	PlayerState.lock_pending_trip_selection({
 		"short": [character, {}, generic],
 		"medium": [{}, {}, {}],
@@ -534,7 +537,7 @@ static func _test_all_jessa_lock_repair(host: Node) -> void:
 	var station = load(SELECTION_SCENE).instantiate()
 	host.get_tree().root.add_child(station)
 	await host.get_tree().process_frame
-	assert(station.terminal_offers.size() >= 2 and not station.terminal_view.buttons.has("jessa"), "An unusable old all-Jessa lock repairs to eligible passengers without reviving her")
+	assert(station.view.offers().size() >= 2 and not station.terminal_view.buttons.has("jessa"), "An unusable old all-Jessa lock repairs to eligible passengers across pickup areas without reviving her")
 	assert(PlayerState.get_locked_pending_trip_character_pools() != only_jessa and _economy() == economy)
 	assert(PlayerState.get_event_value(ABSENCE_EVENT) == {"day": 3, "phase": "noon"})
 	station.free()

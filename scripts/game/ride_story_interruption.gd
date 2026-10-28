@@ -157,6 +157,7 @@ func _finish_inline(scene_path: String) -> void:
 		return
 	# A story-directed destination (including fatal collision repairs) abandons
 	# this paused instance and follows the ordinary scene handoff.
+	PlayerState.finish_ride_stress_shield()
 	dispose()
 	tree.change_scene_to_file.call_deferred(scene_path)
 
@@ -191,13 +192,15 @@ static func resolve_destination(payload: Dictionary, target_scene: String) -> St
 	if bool(payload.get("replay", payload.get("memory_replay", false))):
 		return target_scene
 	var context: Dictionary = payload.get("_driving_interruption", {})
+	if not context.is_empty() and target_scene not in [MAIN_SCENE, STORY_SCENE]:
+		PlayerState.finish_ride_stress_shield()
 	if context.is_empty() or target_scene != MAIN_SCENE or PlayerState.is_run_failed():
 		return target_scene
 	var resolved := str(payload.get("_driving_resolved_destination", ""))
 	if not resolved.is_empty():
 		return resolved
 	var detail := str(context.get("fatal_collision_detail", ""))
-	if not detail.is_empty() and PlayerState.energy <= 0:
+	if not detail.is_empty() and PlayerState.hull <= 0:
 		# Collision repair takes precedence over an authored early ride ending.
 		payload["_driving_resolved_destination"] = REPAIR_SCENE
 		if not PlayerState.pending_crash_repair.is_empty():

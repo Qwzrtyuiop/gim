@@ -2,6 +2,7 @@ extends RefCounted
 class_name PlayerStateSaveCodec
 
 const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
@@ -32,7 +33,8 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	if save_data.is_empty():
 		return false
 
-	var needs_migration_save := saved_version < 4
+	var needs_migration_save := saved_version < 5
+	save_data = _migrate_resource_data(save_data, saved_version)
 	var migrated_data: Dictionary = AssetPathMigration.migrate(save_data)
 	if migrated_data != save_data:
 		save_data = migrated_data
@@ -40,18 +42,12 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	player_state._is_loading_save = true
 	player_state._begin_state_batch()
 	player_state.money = int(save_data.get("money", player_state.money))
-	var saved_max_energy := int(save_data.get("max_energy", player_state.max_energy))
-	var saved_energy := int(save_data.get("energy", player_state.energy))
-	if saved_version < 2 and saved_max_energy <= 5:
-		player_state.max_energy = maxi(1, player_state.DEFAULT_MAX_ENERGY - maxi(0, 5 - saved_max_energy) * 2)
-		player_state.energy = clampi(
-			roundi(float(saved_energy) / maxf(1.0, float(saved_max_energy)) * float(player_state.max_energy)),
-			0,
-			player_state.max_energy
-		)
-	else:
-		player_state.max_energy = saved_max_energy
-		player_state.energy = saved_energy
+	player_state.max_energy = player_state.DEFAULT_MAX_ENERGY
+	player_state.energy = int(save_data.get("energy", player_state.DEFAULT_STARTING_ENERGY))
+	player_state.max_stress = player_state.DEFAULT_MAX_STRESS
+	player_state.stress = int(save_data.get("stress", player_state.DEFAULT_STARTING_STRESS))
+	player_state.max_hull = player_state.DEFAULT_MAX_HULL
+	player_state.hull = int(save_data.get("hull", player_state.DEFAULT_STARTING_HULL))
 	var saved_max_gas := float(save_data.get("max_gas", player_state.max_gas))
 	var saved_gas := float(save_data.get("gas", player_state.gas))
 	if saved_version < 2 and saved_max_gas <= 10.0:
@@ -84,7 +80,7 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	player_state.current_phase = PlayerDayPhaseTracker.normalize_phase(player_state, saved_current_phase)
 	PlayerDayPhaseTracker.sync_stage_type_to_phase(player_state)
 	player_state.stage_round = int(save_data.get("stage_round", player_state.stage_round))
-	player_state.pending_stage_energy_cost = bool(save_data.get("pending_stage_energy_cost", player_state.pending_stage_energy_cost))
+	player_state.pending_stage_stress_applied = bool(save_data.get("pending_stage_stress_applied", false))
 	player_state.pending_trip_selection = Dictionary(save_data.get("pending_trip_selection", {})).duplicate(true)
 	player_state.pending_story = Dictionary(save_data.get("pending_story", {})).duplicate(true)
 	player_state.active_event_special_stage = Dictionary(save_data.get("active_event_special_stage", {})).duplicate(true)
@@ -127,7 +123,7 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	player_state.non_gas_store_purchases_this_week = int(save_data.get("non_gas_store_purchases_this_week", player_state.non_gas_store_purchases_this_week))
 	player_state.clean_stage_streak = int(save_data.get("clean_stage_streak", player_state.clean_stage_streak))
 	player_state.current_trip_had_crash = bool(save_data.get("current_trip_had_crash", false))
-	player_state.current_trip_low_energy = bool(save_data.get("current_trip_low_energy", player_state.current_trip_low_energy))
+	player_state.current_trip_high_stress = bool(save_data.get("current_trip_high_stress", false))
 	player_state.current_trip_low_gas = bool(save_data.get("current_trip_low_gas", player_state.current_trip_low_gas))
 	player_state.low_resource_trip_count = int(save_data.get("low_resource_trip_count", player_state.low_resource_trip_count))
 	player_state.low_both_resource_trip_count = int(save_data.get("low_both_resource_trip_count", player_state.low_both_resource_trip_count))
@@ -190,6 +186,10 @@ static func build_snapshot(player_state, save_version: int) -> GameSaveResource:
 		"money": player_state.money,
 		"max_energy": player_state.max_energy,
 		"energy": player_state.energy,
+		"max_stress": player_state.max_stress,
+		"stress": player_state.stress,
+		"max_hull": player_state.max_hull,
+		"hull": player_state.hull,
 		"max_gas": player_state.max_gas,
 		"gas": player_state.gas,
 		"gas_price": player_state.gas_price,
@@ -206,7 +206,7 @@ static func build_snapshot(player_state, save_version: int) -> GameSaveResource:
 		"current_day": player_state.current_day,
 		"current_phase": player_state.current_phase,
 		"stage_round": player_state.stage_round,
-		"pending_stage_energy_cost": player_state.pending_stage_energy_cost,
+		"pending_stage_stress_applied": player_state.pending_stage_stress_applied,
 		"pending_trip_selection": player_state.pending_trip_selection.duplicate(true),
 		"pending_story": player_state.pending_story.duplicate(true),
 		"active_event_special_stage": player_state.active_event_special_stage.duplicate(true),
@@ -235,7 +235,7 @@ static func build_snapshot(player_state, save_version: int) -> GameSaveResource:
 		"non_gas_store_purchases_this_week": player_state.non_gas_store_purchases_this_week,
 		"clean_stage_streak": player_state.clean_stage_streak,
 		"current_trip_had_crash": player_state.current_trip_had_crash,
-		"current_trip_low_energy": player_state.current_trip_low_energy,
+		"current_trip_high_stress": player_state.current_trip_high_stress,
 		"current_trip_low_gas": player_state.current_trip_low_gas,
 		"low_resource_trip_count": player_state.low_resource_trip_count,
 		"low_both_resource_trip_count": player_state.low_both_resource_trip_count,
@@ -275,7 +275,10 @@ static func snapshot_error(snapshot: Resource, maximum_version: int, require_slo
 		return "This save is empty."
 	# Slots always contain a complete snapshot. Legacy checkpoints may omit fields
 	# introduced later, but a damaged slot must not inherit the currently active run.
-	for field in ["money", "max_energy", "energy", "max_gas", "gas", "gas_price", "gas_price_delta", "previous_gas_price", "daily_conditions_day", "karma", "current_day", "stage_round", "last_rest_day", "yosi_bought_today", "yosi_bought_day", "yosi_bought_total", "rests_taken_today", "rests_taken_day", "tamad_rest_day", "rides_completed_today", "rides_completed_day", "non_gas_store_purchases_this_week", "clean_stage_streak", "low_resource_trip_count", "low_both_resource_trip_count", "debt_goal_index", "debt_carryover", "last_debt_collection_day", "remaining_debt", "pending_gameplay_entry_fade_duration"]:
+	var resource_fields: Array = ["max_energy", "energy", "max_stress", "stress", "max_hull", "hull"] if save_resource.version >= 5 else ["max_energy", "energy"]
+	var numeric_fields: Array = ["money", "max_gas", "gas", "gas_price", "gas_price_delta", "previous_gas_price", "daily_conditions_day", "karma", "current_day", "stage_round", "last_rest_day", "yosi_bought_today", "yosi_bought_day", "yosi_bought_total", "rests_taken_today", "rests_taken_day", "tamad_rest_day", "rides_completed_today", "rides_completed_day", "non_gas_store_purchases_this_week", "clean_stage_streak", "low_resource_trip_count", "low_both_resource_trip_count", "debt_goal_index", "debt_carryover", "last_debt_collection_day", "remaining_debt", "pending_gameplay_entry_fade_duration"]
+	numeric_fields.append_array(resource_fields)
+	for field in numeric_fields:
 		if require_slot_fields and not data.has(field):
 			return "This save is missing progress data."
 		if data.has(field) and (not (data[field] is int or data[field] is float) or not is_finite(float(data[field]))):
@@ -297,12 +300,43 @@ static func snapshot_error(snapshot: Resource, maximum_version: int, require_slo
 			return "This save is missing progress data."
 		if data.has(field) and not data[field] is String:
 			return "This save contains invalid text data."
-	for field in ["pending_stage_energy_cost", "pending_skip_night_phase", "current_trip_had_crash", "current_trip_low_energy", "current_trip_low_gas", "run_failed", "gallery_image_unlocks_initialized", "ride_select_tutorial_shown", "store_tutorial_shown", "home_tutorial_shown"]:
+	var resource_flags: Array = ["pending_stage_stress_applied", "current_trip_high_stress"] if save_resource.version >= 5 else ["pending_stage_energy_cost", "current_trip_low_energy"]
+	var boolean_fields: Array = ["pending_skip_night_phase", "current_trip_had_crash", "current_trip_low_gas", "run_failed", "gallery_image_unlocks_initialized", "ride_select_tutorial_shown", "store_tutorial_shown", "home_tutorial_shown"]
+	boolean_fields.append_array(resource_flags)
+	for field in boolean_fields:
 		if require_slot_fields and not data.has(field):
 			return "This save is missing progress data."
 		if data.has(field) and not data[field] is bool:
 			return "This save contains invalid flag data."
 	return ""
+
+
+# Version 5 stores energy/stress/hull directly. Legacy energy ratios preserve John's
+# condition while newly introduced hull starts intact; saved paid-entry flags
+# retain their once-only semantics across a mid-transition load.
+static func _migrate_resource_data(source: Dictionary, version: int) -> Dictionary:
+	if version >= 5:
+		return source
+	var data := source.duplicate(true)
+	var old_max := maxi(1, int(data.get("max_energy", 10)))
+	var old_energy := clampi(int(data.get("energy", old_max)), 0, old_max)
+	data["max_energy"] = GameTuning.DEFAULT_MAX_ENERGY
+	data["energy"] = clampi(old_energy, 0, GameTuning.DEFAULT_MAX_ENERGY)
+	data["max_stress"] = 10
+	data["stress"] = clampi(roundi((1.0 - float(old_energy) / float(old_max)) * 10.0), 0, 10)
+	data["max_hull"] = 10
+	data["hull"] = 0 if not Dictionary(data.get("pending_crash_repair", {})).is_empty() else 10
+	data["pending_stage_stress_applied"] = bool(data.get("pending_stage_energy_cost", false))
+	data["current_trip_high_stress"] = bool(data.get("current_trip_low_energy", false))
+	if data.get("last_stage_result", null) is Dictionary:
+		var result: Dictionary = data.last_stage_result
+		if result.has("energy"):
+			result["stress"] = clampi(roundi((1.0 - float(result.energy) / float(old_max)) * 10.0), 0, 10)
+		if not result.is_empty():
+			result["hull"] = data["hull"]
+	for key in ["pending_stage_energy_cost", "current_trip_low_energy"]:
+		data.erase(key)
+	return data
 
 
 static func write_snapshot(save_resource: Resource, save_path: String) -> Error:

@@ -48,7 +48,7 @@ static func _setup(character_id := "ito", day := 1) -> void:
 	PlayerState.set_current_stage_time("morning")
 	PlayerState.current_stage_type = STAGE
 	PlayerState.money = 500
-	PlayerState.energy = 8
+	PlayerState.energy = 4
 	PlayerState.gas = 80
 	PlayerState.home_tutorial_shown = true
 	PlayerState.store_tutorial_shown = true
@@ -189,7 +189,7 @@ static func _test_authored_outcomes(host: Node) -> void:
 			reader.free()
 	# A fatal hit still takes the repair route even with the authored early ending.
 	_setup()
-	PlayerState.energy = 0
+	PlayerState.hull = 0
 	PlayerState.set_event_value(SEEN_EVENT, true)
 	var fatal_payload := PayloadCatalog.build(EVENT_ID)
 	fatal_payload["_driving_interruption"] = {"stage_type": STAGE, "time_of_day": "morning", "distance": 123.0, "target_distance": 1000.0, "vehicle_collision_count": 1, "fatal_collision_detail": "Authored fatal ending."}
@@ -235,16 +235,16 @@ static func _test_accepted_hits_and_reset(host: Node) -> void:
 	var game = _game(host)
 	game.player_hit_invincible_timer = 1.0
 	Flow.handle_player_hit(game, "Invincible contact.", 1)
-	assert(game.trip_vehicle_collision_count == 0 and PlayerState.energy == 8)
+	assert(game.trip_vehicle_collision_count == 0 and PlayerState.energy == 4 and PlayerState.stress == 0 and PlayerState.hull == 10)
 	game.player_hit_invincible_timer = 0.0
 	Flow.handle_player_hit(game, "Accepted vehicle collision.", 1)
-	assert(game.trip_vehicle_collision_count == 1 and PlayerState.energy == 7)
+	assert(game.trip_vehicle_collision_count == 1 and PlayerState.energy == 4 and PlayerState.stress == 1 and PlayerState.hull == 9, "Accepted collisions affect stress and hull, never the activity budget")
 	Flow.handle_player_hit(game, "Duplicate overlap.", 1)
-	assert(game.trip_vehicle_collision_count == 1 and PlayerState.energy == 7)
+	assert(game.trip_vehicle_collision_count == 1 and PlayerState.energy == 4 and PlayerState.stress == 1 and PlayerState.hull == 9, "Collision grace prevents duplicate resource damage")
 	game.player_hit_invincible_timer = 0.0
 	game.game_state = "YOU MADE IT"
 	Flow.handle_player_hit(game, "Contact after completion.", 1)
-	assert(game.trip_vehicle_collision_count == 1 and PlayerState.energy == 7)
+	assert(game.trip_vehicle_collision_count == 1 and PlayerState.energy == 4 and PlayerState.stress == 1 and PlayerState.hull == 9)
 	game.trip_peak_speed_kmh = 99.0
 	Flow.reset_game(game)
 	assert(is_zero_approx(game.trip_peak_speed_kmh) and game.trip_vehicle_collision_count == 0)
@@ -279,7 +279,8 @@ static func _test_live_resume(host: Node, language: String, cause: String) -> vo
 		assert(Flow.current_speed_kmh(game) == 70 and game.trip_peak_speed_kmh > 70.0)
 	else:
 		Flow.handle_player_hit(game, "Test vehicle collision.", 1)
-		before.energy -= 1
+		before.stress += 1
+		before.hull -= 1
 	var helper = game.ride_story_interruption
 	assert(helper.active and game.process_mode == Node.PROCESS_MODE_DISABLED and helper.overlay.layer == 600)
 	assert(bgm.stream_paused and paused_audio.stream_paused)
@@ -339,17 +340,28 @@ static func _test_fatal_live(host: Node) -> void:
 	_setup()
 	var game = _game(host)
 	host.get_tree().current_scene = game
-	PlayerState.energy = 1
+	PlayerState.hull = 1
+	var payload := {
+		"_driving_interruption": {
+			"stage_type": STAGE,
+			"time_of_day": "morning",
+			"distance": game.distance,
+			"target_distance": game.target_distance,
+			"vehicle_collision_count": 1,
+			"fatal_collision_detail": "Fatal test vehicle collision.",
+		},
+	}
 	Flow.handle_player_hit(game, "Fatal test vehicle collision.", 1)
-	assert(game.game_state == "story" and game.trip_vehicle_collision_count == 1 and PlayerState.energy == 0)
-	assert(PlayerState.pending_crash_repair.is_empty() and PlayerState.last_stage_result.is_empty() and PlayerState.money == 500, "Fatal hits show Isidro before charging the repair")
-	var reader = game.ride_story_interruption.reader
-	await _ready_reader(host, reader)
-	var payload: Dictionary = reader.story_payload.duplicate(true)
-	await reader._finish_story()
+	assert(game.game_state == "CRASH" and game.trip_vehicle_collision_count == 1 and PlayerState.hull == 0 and PlayerState.stress == 1 and PlayerState.energy == 4)
+	assert(not game.ride_story_interruption.active and PlayerState.pending_story.is_empty(), "Hull depletion takes priority before Isidro can interrupt the ride")
+	assert(not PlayerState.consumed_story_triggers.get(EVENT_ID, false) and not PlayerState.get_event_value(SEEN_EVENT, false), "A fatal collision cannot consume or complete the unseen encounter")
+	_assert_repair_once(payload, false)
+	game.audio_manager.crash_sfx_player.stop()
+	Flow.update_crash_repair_transition(game, Tuning.CRASH_REPAIR_HOLD_SECONDS + Tuning.CRASH_REPAIR_FADE_SECONDS)
+	Flow.update_crash_repair_transition(game, 0.0)
 	await host.get_tree().scene_changed
 	var repair = host.get_tree().current_scene
-	_assert_repair_once(payload)
+	_assert_repair_once(payload, false)
 	assert(repair.scene_file_path == REPAIR and not is_instance_valid(game))
 	host.get_tree().current_scene = null
 	repair.free()
@@ -360,8 +372,32 @@ static func _test_standalone_checkpoint(host: Node, fatal: bool, language: Strin
 	StoryLanguageManager.set_language(language)
 	var game = _game(host)
 	if fatal:
-		PlayerState.energy = 1
-		Flow.handle_player_hit(game, "Saved fatal test vehicle collision.", 1)
+		# Legacy saves can still contain an interrupted fatal story. New fatal
+		# collisions go directly to repairs, covered by _test_fatal_live above.
+		PlayerState.hull = 0
+		PlayerState.stress = 1
+		PlayerState.set_pending_story({
+			"story_id": "isidro_runtime_fixture",
+			"return_scene": MAIN,
+			"next_scene": MAIN,
+			"composition": [{
+				"speaker": "Isidro",
+				"text": "Runtime fixture.",
+				"actions": [{"type": "set_event_value", "id": SEEN_EVENT, "value": true}],
+			}],
+			"_driving_interruption": {
+				"stage_type": STAGE,
+				"difficulty": "short",
+				"time_of_day": "morning",
+				"traffic": "chill",
+				"distance": game.distance,
+				"target_distance": game.target_distance,
+				"vehicle_collision_count": 1,
+				"fatal_collision_detail": "Saved fatal test vehicle collision.",
+			},
+		})
+		PlayerState.consume_story_trigger({"id": EVENT_ID})
+		PlayerState.set_resume_scene(STORY)
 	else:
 		_speed(game, 71.0)
 		Flow.update_progress(game, 0.1)
@@ -371,7 +407,8 @@ static func _test_standalone_checkpoint(host: Node, fatal: bool, language: Strin
 	Codec.save_to_path(PlayerState, path, PlayerState.SAVE_VERSION)
 	# Keep the saved pre-line checkpoint, but let this disposable intro finish
 	# before freeing its reader so its awaited tween can release normally.
-	await _ready_reader(host, game.ride_story_interruption.reader)
+	if not fatal:
+		await _ready_reader(host, game.ride_story_interruption.reader)
 	_free_game(host, game)
 	PlayerState.reset()
 	assert(Codec.load_from_path(PlayerState, path))
@@ -407,13 +444,13 @@ static func _test_standalone_checkpoint(host: Node, fatal: bool, language: Strin
 	reader.free()
 
 
-static func _assert_repair_once(payload: Dictionary) -> void:
+static func _assert_repair_once(payload: Dictionary, encounter_seen := true) -> void:
 	var repair := PlayerState.get_pending_crash_repair()
 	var result := PlayerState.get_last_stage_result()
 	assert(not repair.is_empty() and not result.completed and result.vehicle_collision_count == 1)
-	assert(result.total == 0 and PlayerState.money == 500 - int(repair.cost) and PlayerState.energy == 0)
+	assert(result.total == 0 and PlayerState.money == 500 - int(repair.cost) and PlayerState.hull == 0 and PlayerState.energy == 4, "Repairs charge once without consuming collision energy")
 	assert(PlayerState.get_unique_character_progress("ito") == 0 and PlayerState.character_completed_rides.is_empty())
-	assert(PlayerState.get_event_value(SEEN_EVENT, false) and PlayerState.pending_story.is_empty())
+	assert(PlayerState.get_event_value(SEEN_EVENT, false) == encounter_seen and PlayerState.pending_story.is_empty())
 	var cash := PlayerState.money
 	assert(Interruption.resolve_destination(payload, MAIN) == REPAIR)
 	assert(PlayerState.get_pending_crash_repair() == repair and PlayerState.get_last_stage_result() == result and PlayerState.money == cash, "Repeated fatal resolution cannot create a second repair bill")
@@ -425,7 +462,7 @@ static func _test_replay(host: Node) -> void:
 		StoryLanguageManager.set_language(language)
 		var payload := MemoryCatalog.build_memory_payload(EVENT_ID, MAIN)
 		payload["_driving_interruption"] = {"fatal_collision_detail": "Replay only.", "vehicle_collision_count": 1}
-		PlayerState.energy = 0
+		PlayerState.hull = 0
 		var before := _economy()
 		var events := PlayerState.event_values.duplicate(true)
 		var consumed := PlayerState.consumed_story_triggers.duplicate(true)
@@ -464,4 +501,4 @@ static func _world(game, timer: Timer) -> Dictionary:
 
 
 static func _economy() -> Dictionary:
-	return {"money": PlayerState.money, "energy": PlayerState.energy, "gas": PlayerState.gas, "day": PlayerState.current_day, "phase": PlayerState.current_phase, "round": PlayerState.stage_round, "karma": PlayerState.karma, "progress": PlayerState.get_unique_character_progress("ito"), "rides": PlayerState.character_completed_rides.duplicate(true)}
+	return {"money": PlayerState.money, "energy": PlayerState.energy, "stress": PlayerState.stress, "hull": PlayerState.hull, "gas": PlayerState.gas, "day": PlayerState.current_day, "phase": PlayerState.current_phase, "round": PlayerState.stage_round, "karma": PlayerState.karma, "progress": PlayerState.get_unique_character_progress("ito"), "rides": PlayerState.character_completed_rides.duplicate(true)}

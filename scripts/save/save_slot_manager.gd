@@ -5,6 +5,7 @@ signal slots_changed
 
 const Codec := preload("res://scripts/save/player_state_save_codec.gd")
 const SaveResource := preload("res://scripts/save/game_save_resource.gd")
+const AssetPathMigration := preload("res://scripts/save/asset_path_migration.gd")
 const SLOT_COUNT := 10
 const AUTOSAVE_SLOT := 1
 const SAVE_DIRECTORY := "user://saves"
@@ -132,6 +133,7 @@ func load_slot(slot: int) -> bool:
 	var snapshot := _read_slot(slot)
 	if snapshot == null or not Codec.load_snapshot(PlayerState, snapshot):
 		return false
+	HubMusicManager.stop_all()
 	var metadata: Dictionary = snapshot.metadata
 	_run_id = str(metadata.get("run_id", run_id()))
 	# Loading starts a new arrival history. Previously visited future days must
@@ -240,6 +242,7 @@ func _read_slot(slot: int) -> SaveResource:
 	var scene := str(snapshot.metadata.get("scene", snapshot.data.get("resume_scene_path", "")))
 	if not scene.is_empty() and not _valid_scene(scene):
 		return null
+	snapshot.metadata = AssetPathMigration.migrate(snapshot.metadata)
 	return snapshot
 
 

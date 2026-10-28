@@ -117,14 +117,15 @@ static func transition_display_day(player_state, transition_mode: String) -> int
 	return maxi(1, display_day)
 
 
+static func transition_stress_relief(player_state, transition_mode: String) -> int:
+	var safe_mode: String = player_state.normalize_transition_mode(str(transition_mode))
+	# Sleep applies its four-point relief once at the existing sleep midpoint.
+	return int(player_state.REST_STRESS_RELIEF.get(safe_mode, 0))
+
+
 static func transition_energy_bonus(player_state, transition_mode: String) -> int:
-	var safe_transition_mode: String = player_state.normalize_transition_mode(str(transition_mode))
-	if safe_transition_mode == player_state.TRANSITION_SLEEP_TO_NEXT_DAY:
-		return 0
-	var energy_bonus: int = int(player_state.REST_ENERGY_BONUSES.get(safe_transition_mode, 0))
-	if will_advance_day(player_state, safe_transition_mode):
-		energy_bonus += player_state.END_OF_DAY_ENERGY_BONUS
-	return energy_bonus
+	var safe_mode: String = player_state.normalize_transition_mode(str(transition_mode))
+	return int(player_state.REST_ENERGY_BONUSES.get(safe_mode, 0))
 
 
 static func home_ride_transition_mode(player_state) -> String:

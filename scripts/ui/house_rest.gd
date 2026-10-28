@@ -3,6 +3,7 @@ extends Control
 signal closed
 signal confirmed
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const DESIGN_SIZE := Vector2(768, 512)
 const TEXTURE := preload("res://assets/ui/frames/pillow.png")
 const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
@@ -31,7 +32,7 @@ func _ready() -> void:
 	add_child(background)
 	# The pillow's flat center is the writing area; leave its folded edges clear.
 	title_label = _label(Rect2(154, 145, 460, 44), 36, INK)
-	recovery_label = _label(Rect2(154, 205, 460, 40), 30, Color("7a512b"))
+	recovery_label = _label(Rect2(154, 205, 460, 40), 24, Color("7a512b"))
 	time_label = _label(Rect2(154, 258, 460, 32), 24, Color("625648"))
 	cancel_button = _button("Not Yet", Vector2(204, 318))
 	cancel_button.name = "CancelRest"
@@ -53,7 +54,7 @@ func refresh() -> void:
 	var phase := PlayerState.get_current_time_of_day()
 	var sleeping := phase == "night"
 	title_label.text = "Sleep until morning?" if sleeping else "Take a short rest?"
-	recovery_label.text = "UP TO +%d ENERGY" % (3 if sleeping else 2)
+	recovery_label.text = "ENERGY TO %d / STRESS -%d" % [GameTuning.DEFAULT_MAX_ENERGY, GameTuning.NIGHT_SLEEP_STRESS_RELIEF] if sleeping else "+%d ENERGY / STRESS -%d" % [GameTuning.REST_ENERGY_RESTORE, GameTuning.REST_STRESS_RELIEF]
 	if sleeping:
 		time_label.text = "DAY %d / MORNING" % (PlayerState.get_current_day() + 1)
 	else:

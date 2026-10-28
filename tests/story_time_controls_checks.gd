@@ -40,7 +40,7 @@ static func _test_phase_and_day_rules() -> void:
 	assert(PlayerState.get_meta("test_save_count", 0) - saves == 1)
 	assert(PlayerState.advance_story_time({"phases": 2, "recover_energy": 2}))
 	assert(PlayerState.get_current_day() == 2 and PlayerState.get_current_time_of_day() == "morning")
-	assert(PlayerState.energy == 6 and PlayerState.money == 275 and PlayerState.stage_round == 9)
+	assert(PlayerState.energy == 5 and PlayerState.money == 275 and PlayerState.stage_round == 9, "Explicit recovery is capped at the five-point daily energy budget")
 	assert(PlayerState.daily_conditions_day == 2)
 	assert(PlayerState.advance_story_time({"days": 2, "restore_energy": true}))
 	assert(PlayerState.get_current_day() == 4 and PlayerState.get_current_time_of_day() == "morning")

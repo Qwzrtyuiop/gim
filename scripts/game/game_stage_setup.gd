@@ -87,13 +87,34 @@ static func apply_player_upgrades(owner) -> void:
 	owner.player_brake_x *= float(modifiers["player_brake_x"])
 	owner.player_lane_lerp_x *= float(modifiers["player_lane_lerp_x"])
 
-	var energy_modifiers: Dictionary = PlayerState.get_energy_vehicle_modifiers()
-	owner.player_acceleration_x *= float(energy_modifiers["player_acceleration_x"])
-	owner.player_max_speed *= float(energy_modifiers["player_max_speed"])
-	owner.player_brake_x *= float(energy_modifiers["player_brake_x"])
-	owner.player_lane_lerp_x *= float(energy_modifiers["player_lane_lerp_x"])
-	owner.player_coast_x *= float(energy_modifiers["player_coast_x"])
-	owner.player_wiggle_intensity_x *= float(energy_modifiers["player_wiggle_intensity_x"])
+
+
+static func apply_stress_modifiers(owner) -> void:
+	var modifiers: Dictionary = PlayerState.get_stress_vehicle_modifiers()
+	var base: Dictionary = {}
+	for key in modifiers:
+		base[key] = float(owner.get(key))
+	owner.set_meta("stress_vehicle_base", base)
+	refresh_stress_modifiers(owner)
+
+
+static func refresh_stress_modifiers(owner) -> void:
+	if not owner.has_meta("stress_vehicle_base"):
+		return
+	var base: Dictionary = owner.get_meta("stress_vehicle_base")
+	var modifiers: Dictionary = PlayerState.get_stress_vehicle_modifiers()
+	for key in base:
+		owner.set(key, float(base[key]) * float(modifiers.get(key, 1.0)))
+
+
+static func restore_stress_modifier_base(owner, saved_modifiers: Dictionary = {}) -> void:
+	# Divide out the saved handling effect, then apply the current stress once.
+	var base: Dictionary = {}
+	var modifiers: Dictionary = PlayerState.get_stress_vehicle_modifiers()
+	for key in modifiers:
+		base[key] = float(owner.get(key)) / maxf(0.001, float(saved_modifiers.get(key, modifiers[key])))
+	owner.set_meta("stress_vehicle_base", base)
+	refresh_stress_modifiers(owner)
 
 
 static func apply_character_modifiers(owner) -> void:

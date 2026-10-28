@@ -9,7 +9,7 @@ const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const ResultsView := preload("res://scripts/results/results_view.gd")
 const ResultPassenger := preload("res://scripts/results/result_passenger.gd")
-const LAST_ENERGY_WARNING := "Start this trip with critically low energy?\nYour vehicle will handle worse until John recovers."
+const HIGH_STRESS_WARNING := "Start this trip with high stress?\nYour vehicle will handle worse until John recovers."
 
 @onready var rest_button: BaseButton = $BreakButtons/RestButton
 @onready var store_button: BaseButton = $BreakButtons/StoreButton
@@ -112,7 +112,7 @@ func _refresh_status(note := "") -> void:
 func _attempt_next_stage() -> void:
 	if is_transitioning or not ride_button.visible:
 		return
-	if PlayerState.get_current_time_of_day() == "night" and PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
+	if PlayerState.get_current_time_of_day() == "night" and PlayerState.stress >= GameTuning.STRESS_WARNING_THRESHOLD:
 		ride_confirm_dialog.popup_centered()
 		return
 
@@ -121,8 +121,8 @@ func _attempt_next_stage() -> void:
 
 func _create_dialogs() -> void:
 	ride_confirm_dialog = ConfirmationDialog.new()
-	ride_confirm_dialog.title = "Low Energy"
-	ride_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
+	ride_confirm_dialog.title = "High Stress"
+	ride_confirm_dialog.dialog_text = HIGH_STRESS_WARNING
 	ride_confirm_dialog.get_ok_button().text = "START DAY"
 	ride_confirm_dialog.get_cancel_button().text = "BACK"
 	ride_confirm_dialog.confirmed.connect(_next_stage)

@@ -118,6 +118,8 @@ static func create_ui(owner, gameplay_entry_fade_seconds: float) -> void:
 	owner.footer_stats_row = hud_refs.get("footer_stats_row") as HBoxContainer
 	owner.footer_money_label = hud_refs.get("footer_money_label") as Label
 	owner.footer_energy_label = hud_refs.get("footer_energy_label") as Label
+	owner.footer_stress_label = hud_refs.get("footer_stress_label") as Label
+	owner.footer_hull_label = hud_refs.get("footer_hull_label") as Label
 	owner.footer_gas_label = hud_refs.get("footer_gas_label") as Label
 	owner.status_label = hud_refs.get("status_label") as Label
 	owner.top_right_info_panel = hud_refs.get("top_right_info_panel") as TextureRect

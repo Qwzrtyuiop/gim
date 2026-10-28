@@ -5,7 +5,7 @@ extends RefCounted
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const PlayerUpgradeState := preload("res://scripts/state/player_upgrade_state.gd")
 const MAX_CONDITION_DEPTH := 16
-const NUMERIC_CONDITION_FIELDS := ["energy", "gas", "karma", "day", "week", "remaining_debt", "character_progress"]
+const NUMERIC_CONDITION_FIELDS := ["stress", "hull", "energy", "gas", "karma", "day", "week", "remaining_debt", "character_progress"]
 const EVENT_RANGE_KEYS := ["equals", "min", "max", "less_than", "more_than"]
 
 
@@ -88,6 +88,8 @@ static func _matches_condition_source(condition_source: Dictionary, allow_plain_
 
 static func _matches_game_values(source: Dictionary, allow_plain: bool) -> bool:
 	var values := {
+		"stress": PlayerState.stress,
+		"hull": PlayerState.hull,
 		"energy": PlayerState.energy,
 		"gas": PlayerState.gas,
 		"karma": PlayerState.karma,

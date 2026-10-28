@@ -24,11 +24,11 @@ func setup() -> void:
 	screen.status_header = HubStatusHeader.new()
 	screen.add_child(screen.status_header)
 	screen.station_back_button = Button.new()
-	screen.station_back_button.name = "StationBack"
-	screen.station_back_button.text = "BACK"
+	screen.station_back_button.name = "StationMapButton"
+	screen.station_back_button.text = "MAP"
+	screen.station_back_button.tooltip_text = "Open the town map"
 	DashboardTheme.apply_button(screen.station_back_button)
-	screen.station_back_button.visible = screen._allow_back()
-	screen.station_back_button.pressed.connect(screen._go_back)
+	screen.station_back_button.pressed.connect(screen._open_map)
 	screen.add_child(screen.station_back_button)
 	UIAudioManager.attach_button(screen.station_back_button)
 	screen.passenger_overlay = ColorRect.new()
@@ -45,11 +45,13 @@ func setup() -> void:
 	screen.terminal_view.offer_pressed.connect(screen._choose_offer)
 	screen.terminal_view.offer_focused.connect(screen._focus_offer)
 	screen.terminal_view.object_pressed.connect(screen._on_terminal_object_pressed)
-	screen.terminal_view.close_button.pressed.connect(screen._close_passengers)
+	screen.terminal_view.close_button.pressed.connect(screen._open_pickup_map)
 	screen.terminal_view.store_button.pressed.connect(screen._open_store)
 	screen.passenger_overlay.hide()
 	screen.terminal_view.hide()
 	screen.terminal_view.set_enabled(false)
+	# Keep status above the passenger view and below modal confirmations.
+	screen.move_child(screen.status_header, screen.get_child_count() - 1)
 	screen.confirmation = PassengerConfirmation.new()
 	screen.confirmation.name = "PassengerConfirmation"
 	screen.confirmation.z_index = 80
@@ -62,7 +64,7 @@ func setup() -> void:
 
 
 func show_passengers() -> void:
-	if screen.is_departing or screen.passenger_overlay.visible:
+	if screen.is_departing or screen.passenger_overlay.visible or (screen.station_tutorial != null and screen.station_tutorial.active):
 		return
 	var keyboard_navigation: bool = screen.station.is_keyboard_navigation()
 	screen.passenger_overlay.show()
@@ -81,7 +83,7 @@ func show_passengers() -> void:
 
 
 func hide_passengers() -> void:
-	if screen.is_departing or screen.tutorial.active or not screen.passenger_overlay.visible:
+	if screen.is_departing or screen._tutorial_active() or not screen.passenger_overlay.visible:
 		return
 	var keyboard_navigation: bool = screen.terminal_view.is_keyboard_navigation()
 	screen.terminal_view.set_enabled(false)
@@ -89,7 +91,7 @@ func hide_passengers() -> void:
 	screen.passenger_overlay.hide()
 	screen.station.set_enabled(true)
 	screen.station.set_keyboard_navigation(keyboard_navigation)
-	screen.station_back_button.visible = screen._allow_back()
+	screen.station_back_button.visible = not screen.is_departing
 	screen.status_header.set_display_time()
 	screen.status_header.show()
 	PlayerState.set_pending_passengers_open(false)
@@ -109,7 +111,9 @@ func layout() -> void:
 	if screen.station == null:
 		return
 	screen.status_header.layout_in(screen.size)
-	screen.station_back_button.position = Vector2(24, screen.size.y - 66)
+	screen.station_back_button.position = Vector2(20, screen.size.y - 60)
 	screen.station_back_button.size = DashboardTheme.BUTTON_SIZE
 	if screen.tutorial != null and screen.tutorial.active:
 		screen.tutorial._layout_for_targets(screen.tutorial.steps[screen.tutorial.step_index].get("targets", []))
+	if screen.station_tutorial != null and screen.station_tutorial.active:
+		screen.station_tutorial._layout_for_targets(screen.station_tutorial.steps[screen.station_tutorial.step_index].get("targets", []))

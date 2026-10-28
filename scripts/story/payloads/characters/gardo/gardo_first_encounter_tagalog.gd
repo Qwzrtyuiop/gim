@@ -166,6 +166,12 @@ static func build() -> Dictionary:
 				"choices": [
 					{
 						"text": "Accept his offer.",
+						"conditions": {
+							"min_energy": 1,
+							"min_hull": 1,
+							"min_gas": 0.001,
+						},
+						"locked_text": "Needs energy, fuel and hull for another lap.",
 						"next_index": ACCEPT,
 						"actions": [
 							{

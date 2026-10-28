@@ -24,6 +24,8 @@ static func _setup(completed_phase: String, day := 3) -> void:
 	PlayerState.stage_round = 4
 	PlayerState.money = 500
 	PlayerState.energy = 2
+	PlayerState.stress = 8
+	PlayerState.hull = 6
 	PlayerState.gas = 63.0
 	PlayerState.home_tutorial_shown = true
 	PlayerState.store_tutorial_shown = true
@@ -57,6 +59,8 @@ static func _snapshot() -> Dictionary:
 	return {
 		"money": PlayerState.money,
 		"energy": PlayerState.energy,
+		"stress": PlayerState.stress,
+		"hull": PlayerState.hull,
 		"gas": PlayerState.gas,
 		"day": PlayerState.current_day,
 		"phase": PlayerState.current_phase,
@@ -107,6 +111,7 @@ static func _test_daytime_home_rest(host: Node) -> void:
 	home.rest_confirm.pressed.emit()
 	await host.get_tree().create_timer(0.7).timeout
 	assert(PlayerState.energy == 4 and PlayerState.current_phase == "night")
+	assert(PlayerState.stress == 6 and PlayerState.hull == 6, "Short rest relieves stress without repairing hull")
 	assert(PlayerState.current_day == 3 and PlayerState.stage_round == 4)
 	assert(PlayerState.rests_taken_today == 1, "Confirmed home rest recovers and records once")
 	host.get_tree().current_scene = null
@@ -120,14 +125,14 @@ static func _test_night_home_sleep(host: Node) -> void:
 		assert(PlayerState.current_phase == "night" and PlayerState.current_day == 3 and PlayerState.energy == 2)
 		home.house.buttons.rest.pressed.emit()
 		home.rest_confirm.pressed.emit()
-		assert(PlayerState.energy == 5 and PlayerState.rests_taken_today == 1, "The home confirmation, not results navigation, grants the nightly recovery")
+		assert(PlayerState.energy == 5 and PlayerState.stress == 4 and PlayerState.hull == 6 and PlayerState.rests_taken_today == 1, "The home confirmation refills the daily energy budget and relieves stress without repairing hull")
 		await host.get_tree().scene_changed
 		var sleep = host.get_tree().current_scene
 		assert(sleep.scene_file_path == SLEEP_SCENE)
 		await host.get_tree().scene_changed
 		var next_home = host.get_tree().current_scene
 		assert(next_home.scene_file_path == HOME_SCENE and PlayerState.current_day == 4 and PlayerState.current_phase == "morning")
-		assert(PlayerState.energy == 5 and PlayerState.money == 600 and PlayerState.gas == 63.0)
+		assert(PlayerState.energy == 5 and PlayerState.stress == 4 and PlayerState.hull == 6 and PlayerState.money == 600 and PlayerState.gas == 63.0, "Sleep recovery applies once while money, gas and hull retain their independent rules")
 		assert(PlayerState.get_locked_pending_trip_character_pools().is_empty(), "A real new day clears the previous day's offers")
 		host.get_tree().current_scene = null
 		next_home.free()

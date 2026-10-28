@@ -310,7 +310,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "medium",
 		"first_appearance_chance": 0.60,
 		"eligible_distances": ["medium", "long"],
-		"eligible_times": ["morning", "night"],
+		"eligible_times": ["morning", "noon", "night"],
 		"story_stage_set": DEFAULT_UNIQUE_STORY_STAGE_SET_ID,
 		"story_stage_overrides": {
 			"introduction": {"title": "Notebook Ready"},
@@ -344,7 +344,7 @@ const MOCK_CHARACTERS := [
 		"first_distance": "short",
 		"first_appearance_chance": 0.75,
 		"eligible_distances": ["short", "medium"],
-		"eligible_times": ["night"],
+		"eligible_times": ["morning", "noon", "night"],
 		"intro_eligible_times": ["morning", "noon"],
 		"intro_completion_event": "jessa_runaway_fare_seen",
 		"intro_absence_day_event": "jessa_runaway_fare_earnings",

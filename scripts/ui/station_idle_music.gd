@@ -14,6 +14,10 @@ const TRACKS := [
 		"stream": preload("res://assets/audio/music/story/midnight.mp3"),
 		"base_db": 0.0,
 	},
+	{
+		"stream": preload("res://assets/audio/music/story/midnight2.mp3"),
+		"base_db": 0.0,
+	},
 ]
 
 var player: AudioStreamPlayer

@@ -5,9 +5,10 @@ const PlayerResourceState := preload("res://scripts/state/player_resource_state.
 const PlayerUpgradeState := preload("res://scripts/state/player_upgrade_state.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const PlayerWeatherState := preload("res://scripts/state/player_weather_state.gd")
-const RESOURCES := ["money", "energy", "gas", "karma"]
+const RESOURCES := ["money", "stress", "hull", "energy", "gas", "karma"]
 const ACTIONS := [
 	"set_resource", "change_resource", "add_gas", "spend_gas", "restore_energy",
+	"add_stress", "relieve_stress", "damage_hull", "repair_hull",
 	"set_upgrade_level", "add_upgrade_level", "increment_event_value",
 	"pay_debt", "forgive_debt", "set_weather",
 ]
@@ -33,7 +34,7 @@ static func validate(action_data: Dictionary) -> PackedStringArray:
 		"set_resource", "change_resource":
 			var resource := str(action_data.get("resource", "")).strip_edges().to_lower()
 			if resource not in RESOURCES:
-				errors.append("resource must be money, energy, gas, or karma")
+				errors.append("resource must be money, energy, stress, hull, gas, or karma")
 			var key := "value" if action_type == "set_resource" else "amount"
 			if not _is_number(action_data.get(key), resource != "gas"):
 				errors.append("%s must be a finite %snumber" % [key, "whole " if resource != "gas" else ""])
@@ -53,9 +54,9 @@ static func validate(action_data: Dictionary) -> PackedStringArray:
 			if weather not in PlayerState.WEATHER_TYPES:
 				errors.append("weather must be clear, cloudy, rain, or heavy rain")
 		_:
-			if action_type == "restore_energy" and not action_data.has("amount"):
+			if action_type in ["restore_energy", "relieve_stress", "repair_hull"] and not action_data.has("amount"):
 				return errors
-			var whole := action_type in ["restore_energy", "pay_debt", "forgive_debt"]
+			var whole := action_type in ["restore_energy", "add_stress", "relieve_stress", "damage_hull", "repair_hull", "pay_debt", "forgive_debt"]
 			var amount = action_data.get("amount")
 			if not _is_number(amount, whole) or (amount != null and _is_number(amount) and amount < 0):
 				errors.append("amount must be a finite nonnegative %snumber" % ("whole " if whole else ""))
@@ -79,9 +80,15 @@ static func run(owner, action_data: Dictionary) -> void:
 			if not PlayerState.spend_gas(float(action_data.amount)):
 				push_warning("Story spend_gas rejected: not enough fuel")
 		"restore_energy":
-			var missing: int = maxi(0, PlayerState.max_energy - PlayerState.energy)
-			var restored := mini(int(action_data.get("amount", missing)), missing)
-			PlayerState.add_energy(restored)
+			PlayerState.add_energy(int(action_data.get("amount", PlayerState.max_energy - PlayerState.energy)))
+		"relieve_stress":
+			PlayerState.relieve_stress(int(action_data.get("amount", PlayerState.stress)))
+		"add_stress":
+			PlayerState.add_stress(int(action_data.amount))
+		"damage_hull":
+			PlayerState.damage_hull(int(action_data.amount))
+		"repair_hull":
+			PlayerState.repair_hull(int(action_data.get("amount", PlayerState.max_hull - PlayerState.hull)))
 		"set_upgrade_level", "add_upgrade_level":
 			_apply_upgrade(action_type, action_data)
 		"increment_event_value":
@@ -110,6 +117,8 @@ static func _apply_resource(action_type: String, action_data: Dictionary) -> voi
 static func _resource_value(resource: String):
 	match resource:
 		"money": return PlayerState.money
+		"stress": return PlayerState.stress
+		"hull": return PlayerState.hull
 		"energy": return PlayerState.energy
 		"gas": return PlayerState.gas
 		"karma": return PlayerState.karma

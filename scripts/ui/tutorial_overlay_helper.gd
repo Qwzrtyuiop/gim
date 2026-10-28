@@ -70,13 +70,15 @@ static func make_label(font: Font, font_size := 12) -> Label:
 
 static func layout_for_targets(owner: Control, highlight: Panel, text_panel: Panel, text_label: Label, targets: Array, require_visible := true) -> void:
 	var rect := union_global_rect(targets, require_visible)
-	var label_size := Vector2(620.0, 88.0)
+	var bounds := owner.get_global_transform() * Rect2(Vector2.ZERO, owner.size)
+	var label_size := Vector2(minf(480.0, maxf(1.0, bounds.size.x - 32.0)), 88.0)
 	if text_label != null:
 		var text_len := text_label.text.length()
 		if text_len > 180:
-			label_size.y = 170.0
+			label_size.y = 150.0
 		elif text_len > 120:
-			label_size.y = 140.0
+			label_size.y = 120.0
+	label_size.y = minf(label_size.y, maxf(1.0, bounds.size.y - 24.0))
 
 	if rect.size == Vector2.ZERO:
 		if highlight != null:
@@ -84,24 +86,25 @@ static func layout_for_targets(owner: Control, highlight: Panel, text_panel: Pan
 		if text_panel != null:
 			text_panel.size = label_size
 			text_panel.global_position = Vector2(
-				(owner.get_viewport_rect().size.x - label_size.x) * 0.5,
-				120.0
+				bounds.position.x + (bounds.size.x - label_size.x) * 0.5,
+				bounds.position.y + minf(100.0, maxf(12.0, (bounds.size.y - label_size.y) * 0.5))
 			)
 		return
 
 	var padding := 14.0
 	rect.position -= Vector2(padding, padding)
 	rect.size += Vector2(padding * 2.0, padding * 2.0)
+	rect = rect.intersection(bounds)
 	if highlight != null:
 		highlight.visible = true
 		highlight.global_position = rect.position
 		highlight.size = rect.size
 
 	var label_pos := rect.position + Vector2((rect.size.x - label_size.x) * 0.5, rect.size.y + 16.0)
-	if label_pos.y + label_size.y > owner.get_viewport_rect().size.y - 12.0:
+	if label_pos.y + label_size.y > bounds.end.y - 12.0:
 		label_pos.y = rect.position.y - label_size.y - 16.0
-	label_pos.y = maxf(label_pos.y, 12.0)
-	label_pos.x = clampf(label_pos.x, 20.0, owner.get_viewport_rect().size.x - label_size.x - 20.0)
+	label_pos.y = clampf(label_pos.y, bounds.position.y + 12.0, maxf(bounds.position.y + 12.0, bounds.end.y - label_size.y - 12.0))
+	label_pos.x = clampf(label_pos.x, bounds.position.x + 16.0, maxf(bounds.position.x + 16.0, bounds.end.x - label_size.x - 16.0))
 	if text_panel != null:
 		text_panel.size = label_size
 		text_panel.global_position = label_pos

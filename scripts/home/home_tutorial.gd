@@ -14,11 +14,11 @@ static func build_tutorial(owner) -> void:
 	owner.tutorial_text_label = refs.text_label
 
 	owner.tutorial_steps.assign([
-		{"text": "This is home. Hover over objects to see what you can use.", "targets": [owner.header_label]},
-		{"text": "Click the radio for today's news, gas prices and weather forecast.", "targets": [owner.house.buttons["radio"]]},
-		{"text": "Click the calendar to check your weekly goal, remaining debt and due date.", "targets": [owner.house.buttons["calendar"]]},
-		{"text": "Click the curtained sleeping area to rest. Hover over it to see the energy recovery and time change.", "targets": [owner.house.buttons["rest"]]},
-		{"text": "Click the bottom-right exit, then choose Ride or Shop.", "targets": [owner.house.buttons["ride"]]},
+		{"text": "This is home. The room's objects let you check information or rest.", "targets": [owner.header_label]},
+		{"text": "The radio reports today's news, gas prices and weather forecast.", "targets": [owner.house.buttons["radio"]]},
+		{"text": "The calendar shows your weekly payment target and the next collection date.", "targets": [owner.house.buttons["calendar"]]},
+		{"text": "Rest gives +2 energy and -2 stress. At night, sleep restores energy and starts a new day.", "targets": [owner.house.buttons["rest"]]},
+		{"text": "Use MAP when you're ready to leave home.", "targets": [owner.map_button]},
 	])
 
 

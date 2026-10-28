@@ -28,7 +28,7 @@ static func run(host: Node) -> void:
 	await _test_replay_isolation(host)
 	PlayerState.reset()
 	StoryLanguageManager.set_language(previous_language)
-	print("PASS: Jessa first-event same-day absence in both languages/branches, later-night return, projected and seeded availability, saved locks/history and replay isolation")
+	print("PASS: Jessa first-event same-day absence in both languages/branches, later-day return, projected and seeded availability, saved locks/history and replay isolation")
 
 
 static func _prepare_first_ride(daytime: String) -> Dictionary:
@@ -86,17 +86,18 @@ static func _assert_day_and_seeded_availability() -> void:
 			used_ids[character.id] = true
 	PlayerState.set_current_stage_time("night")
 	var jessa := Catalog.get_character_by_id(PlayerState, "jessa")
-	assert(jessa.eligible_times == ["night"] and int(jessa.unavailable_day) == 3)
+	assert(jessa.eligible_times == ["morning", "noon", "night"] and int(jessa.unavailable_day) == 3)
 	assert(pool._pick_character_for_distance("short", used_ids, {"jessa": true}, true).is_empty(), "Jessa cannot return on the first encounter's night")
-	assert(not Seeded.supports_character_time(PlayerState, jessa, "night", 3))
-	assert(Seeded.supports_character_time(PlayerState, jessa, "night", 4), "Projected future-day eligibility cannot depend only on the live day")
+	for phase in ["morning", "noon", "night"]:
+		assert(not Seeded.supports_character_time(PlayerState, jessa, phase, 3), "Completing the first encounter blocks every remaining phase of that date")
+		assert(Seeded.supports_character_time(PlayerState, jessa, phase, 4), "Projected future-day eligibility cannot depend only on the live day")
 	Seeded.add_rule(PlayerState, {"id": "jessa_absence_seed", "character_id": "jessa", "distance": "short", "min_day": 3, "repeatable": true})
 	var blocked_setup := PlayerState.get_seeded_rider_pool_setup({"day": 3, "time_of_day": "night"})
 	assert(not _has_seeded_jessa(blocked_setup) and blocked_setup.rule_ids.is_empty(), "Blocked same-day seeds cannot consume their rule")
 	var next_setup := PlayerState.get_seeded_rider_pool_setup({"day": 4, "time_of_day": "night"})
 	assert(_has_seeded_jessa(next_setup) and next_setup.rule_ids.has("jessa_absence_seed"))
 	selection.mode = PlayerState.TRANSITION_RIDE
-	assert(not pool._supports_time_in_selection(jessa), "The next day's morning still follows Jessa's later-night schedule")
+	assert(pool._supports_time_in_selection(jessa), "The next day's projected morning restores Jessa's daytime pickup schedule")
 	PlayerState.current_day = 4
 	PlayerState.set_current_stage_time("noon")
 	assert(pool._supports_time_in_selection(Catalog.get_character_by_id(PlayerState, "jessa")), "The next day's projected night restores her normal schedule")
@@ -104,7 +105,7 @@ static func _assert_day_and_seeded_availability() -> void:
 	PlayerState.set_current_stage_time("night")
 	assert(pool._pick_character_for_distance("short", used_ids, {"jessa": true}, true).get("id", "") == "jessa")
 	PlayerState.set_current_stage_time("morning")
-	assert(not pool._supports_time_in_selection(Catalog.get_character_by_id(PlayerState, "jessa")))
+	assert(pool._supports_time_in_selection(Catalog.get_character_by_id(PlayerState, "jessa")), "Later-day morning offers remain eligible after the first encounter's absence ends")
 
 
 static func _has_seeded_jessa(setup: Dictionary) -> bool:
@@ -150,6 +151,8 @@ static func _test_locked_offers_and_resume(host: Node) -> void:
 		character["stage_traffic"] = "chill"
 		character["active_distance"] = "short"
 		character["stage_special_type"] = PlayerState.STAGE_SPECIAL_TYPE_NONE
+		character["pickup_location"] = "station"
+		character["pickup_variant"] = ""
 	PlayerState.lock_pending_trip_selection({"short": [jessa, generic, {}], "medium": [], "long": []}, "short")
 	PlayerState.set_event_value("jessa_runaway_fare_seen", true)
 	PlayerState.set_event_value(FareEvent.EARNINGS_KEY, {"day": 3, "total": 220})

@@ -27,7 +27,7 @@ const VEHICLE_TEXTURES := {
 const ROAD_ACTOR_Z_BASE := 10
 const ROAD_ACTOR_Z_STEP := 10
 const RESET_HOLD_SECONDS := 1.4
-const LAST_ENERGY_WARNING := "Start the day with critically low energy?\nYour vehicle will handle worse until John recovers."
+const HIGH_STRESS_WARNING := "Start the day with high stress?\nYour vehicle will handle worse until John recovers."
 const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
@@ -143,7 +143,7 @@ func _start_game() -> void:
 
 	PlayerState.reset()
 	PlayerState.begin_stage_sequence()
-	if PlayerState.energy <= GameTuning.CRITICAL_ENERGY_WARNING_THRESHOLD:
+	if PlayerState.stress >= GameTuning.STRESS_WARNING_THRESHOLD:
 		start_confirm_dialog.popup_centered()
 		return
 
@@ -300,8 +300,8 @@ func _debug_unlock_all() -> void:
 
 func _create_dialogs() -> void:
 	start_confirm_dialog = ConfirmationDialog.new()
-	start_confirm_dialog.title = "Low Energy"
-	start_confirm_dialog.dialog_text = LAST_ENERGY_WARNING
+	start_confirm_dialog.title = "High Stress"
+	start_confirm_dialog.dialog_text = HIGH_STRESS_WARNING
 	start_confirm_dialog.get_ok_button().text = "START"
 	start_confirm_dialog.get_cancel_button().text = "BACK"
 	start_confirm_dialog.confirmed.connect(_confirm_start_game)
@@ -418,7 +418,7 @@ func _update_reset_progress(delta: float) -> void:
 			hint_label.text = debug_unlock_message_text
 		elif blocked_start_message_time > 0.0:
 			blocked_start_message_time -= delta
-			hint_label.text = _default_hint_text() if PlayerState.is_run_failed() else "No energy left. Hold R to reset progress"
+			hint_label.text = _default_hint_text() if PlayerState.is_run_failed() else "%s" % PlayerState.get_stage_start_error()
 		else:
 			hint_label.text = _default_hint_text()
 

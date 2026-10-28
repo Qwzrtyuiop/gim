@@ -29,9 +29,13 @@ static func collision_data(owner) -> Dictionary:
 				VehicleTrafficController.deflect_lane_change_fault(owner, entity)
 				continue
 			var head_on := not bool(entity.get("is_parked", false)) and not VehicleTrafficController.entity_moves_with_player(entity, int(entity["lane"]))
+			var relative_speed: float = owner.player_speed + absf(float(entity.get("world_speed", 0.0))) if head_on else absf(owner.player_speed - float(entity.get("world_speed", 0.0)))
+			var relative_kmh: float = relative_speed / owner.SPEEDOMETER_REFERENCE_MAX_SPEED * owner.SPEEDOMETER_BASE_MAX_KMH
+			var heavy: bool = relative_kmh >= GameTuning.HEAVY_CRASH_MIN_RELATIVE_KMH
 			return {
 				"detail": "Collision in the %s lane." % owner.LANE_NAMES[entity["lane"]],
-				"energy_loss": GameTuning.HEAD_ON_CRASH_ENERGY_LOSS if head_on else owner.crash_energy_loss,
+				"hull_damage": GameTuning.HEAD_ON_CRASH_HULL_DAMAGE if head_on else (GameTuning.HEAVY_CRASH_HULL_DAMAGE if heavy else owner.crash_hull_damage),
+				"stress_gain": GameTuning.HEAD_ON_CRASH_STRESS_GAIN if head_on else (GameTuning.HEAVY_CRASH_STRESS_GAIN if heavy else GameTuning.CRASH_STRESS_GAIN),
 			}
 	return {}
 

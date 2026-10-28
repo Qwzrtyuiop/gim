@@ -9,6 +9,8 @@ component is one character, ordered from left to right. Disconnected details
 (smoke, soft shadows, antialiased pieces) follow the nearest character bounds.
 The game keeps each crop's original canvas rectangle in terminal_spawn_catalog.gd.
 Use --layout generic2 to extract only the second generic placement sheet.
+Market and street keep their own authored placements; repeated street characters
+are separate poses, never additional passenger identities.
 """
 
 from argparse import ArgumentParser
@@ -28,8 +30,22 @@ CHARACTERS = {
     "night": ("dante", "gardo", "cel", "hana", "jessa", "alma", "faye"),
     "generic": tuple(f"slot_{index}" for index in range(8)),
     "generic2": tuple(f"slot_{index}" for index in (0, 2, 3, 5, 6, 7)),
+    "market": ("slot_0", "ely", "slot_1", "benny", "slot_2"),
+    "street": (
+        "jessa_left",
+        "hana_arms_crossed",
+        "cel_front",
+        "cel_back",
+        "hana_reading",
+        "ito",
+        "jessa_right",
+    ),
 }
-LAYOUT_FILES = {"generic2": "genericspawns2.png"}
+LAYOUT_FILES = {
+    "generic2": "genericspawns2.png",
+    "market": "marketspawns/marketday.png",
+    "street": "passengerstreetspawns/passengerstreetday.png",
+}
 MAJOR_COMPONENT_PIXELS = 1000
 
 
@@ -128,7 +144,10 @@ def main():
     catalog = (ROOT / "scripts/ride_selection/terminal_spawn_catalog.gd").read_text(encoding="utf-8")
     for phase in args.layout or CHARACTERS:
         if args.check:
-            if phase == "generic":
+            if phase in ("market", "street"):
+                area_catalog = (ROOT / "scripts/ride_selection/passenger_area_spawn_catalog.gd").read_text(encoding="utf-8")
+                catalog_entries = area_catalog.split(f"const {phase.upper()}_ENTRIES := {{", 1)[1].split("\n}\n", 1)[0]
+            elif phase == "generic":
                 catalog_entries = catalog.split("const GENERIC_ENTRIES := [", 1)[1].split("\n]", 1)[0]
                 generic_regions = re.findall(r'"region": Rect2\(([^)]+)\)', catalog_entries)
             elif phase == "generic2":

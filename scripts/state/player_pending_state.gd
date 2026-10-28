@@ -12,6 +12,7 @@ static func set_pending_trip_selection(player_state, return_scene: String, trans
 	var locked_character_pools: Dictionary = {}
 	var locked_distance: String = ""
 	var passengers_open := false
+	var pickup_location := get_pending_pickup_location(player_state)
 	if should_preserve_locked_selection:
 		locked_characters = player_state.pending_trip_selection.get("locked_characters", [])
 		locked_characters = locked_characters.duplicate(true)
@@ -23,6 +24,8 @@ static func set_pending_trip_selection(player_state, return_scene: String, trans
 		"transition_mode": safe_transition_mode,
 		"allow_back": bool(allow_back),
 	}
+	if pickup_location != "station":
+		player_state.pending_trip_selection["pickup_location"] = pickup_location
 	if not locked_character_pools.is_empty():
 		player_state.pending_trip_selection["locked_character_pools"] = locked_character_pools
 	if not locked_characters.is_empty():
@@ -36,6 +39,22 @@ static func set_pending_trip_selection(player_state, return_scene: String, trans
 
 static func get_pending_trip_selection(player_state) -> Dictionary:
 	return player_state.pending_trip_selection.duplicate(true)
+
+
+static func get_pending_pickup_location(player_state) -> String:
+	var location := str(player_state.pending_trip_selection.get("pickup_location", "station"))
+	return location if location in ["market", "street"] else "station"
+
+
+static func set_pending_pickup_location(player_state, location: String) -> void:
+	var safe_location := location if location in ["market", "street"] else "station"
+	if str(player_state.pending_trip_selection.get("pickup_location", "station")) == safe_location:
+		return
+	if safe_location != "station":
+		player_state.pending_trip_selection["pickup_location"] = safe_location
+	else:
+		player_state.pending_trip_selection.erase("pickup_location")
+	player_state.save_progress()
 
 
 static func has_locked_pending_trip_selection(player_state) -> bool:
@@ -206,7 +225,7 @@ static func get_sleep_transition_resume_step(player_state) -> String:
 
 static func reset_pending_runtime_state(player_state) -> void:
 	player_state.active_event_special_stage.clear()
-	player_state.pending_stage_energy_cost = false
+	player_state.pending_stage_stress_applied = false
 	player_state.pending_trip_selection.clear()
 	player_state.pending_story.clear()
 	player_state.pending_memory_replay.clear()

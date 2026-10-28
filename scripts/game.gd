@@ -265,7 +265,7 @@ var player_lane_change_prediction_seconds := GameTuning.PLAYER_LANE_CHANGE_PREDI
 @export_range(0.0, 20.0, 0.25) var overtime_fare_penalty_php_per_second := 1.25
 
 # Crash Recovery: edit scripts/config/game_tuning.gd.
-var crash_energy_loss := GameTuning.CRASH_ENERGY_LOSS
+var crash_hull_damage := GameTuning.CRASH_HULL_DAMAGE
 var crash_recovery_seconds := GameTuning.CRASH_RECOVERY_SECONDS
 var crash_invincible_seconds := GameTuning.CRASH_INVINCIBLE_SECONDS
 var crash_flicker_interval := GameTuning.CRASH_FLICKER_INTERVAL
@@ -351,6 +351,8 @@ var distance_label: Label
 var footer_stats_row: HBoxContainer
 var footer_money_label: Label
 var footer_energy_label: Label
+var footer_stress_label: Label
+var footer_hull_label: Label
 var footer_gas_label: Label
 var status_label: Label
 var top_right_info_panel: TextureRect
@@ -429,6 +431,8 @@ func _ready() -> void:
 	GameStageSetup.apply_player_upgrades(self)
 	GameStageSetup.apply_character_modifiers(self)
 	GameStageSetup.apply_special_stage_blueprint(self)
+	GameStageSetup.apply_stress_modifiers(self)
+	PlayerState.stress_changed.connect(_on_stress_changed)
 	VehicleTrafficController.reset_speeder_timer(self)
 	time_left = time_limit
 	overtime_seconds = 0.0
@@ -457,7 +461,12 @@ func _ready() -> void:
 	if loaded_runtime is Dictionary and str(loaded_runtime.get("scene", "")) == scene_file_path and loaded_runtime.get("driving") is Dictionary:
 		PlayerState.remove_meta("loaded_slot_runtime")
 		DrivingSaveSnapshot.restore(self, loaded_runtime.driving)
+		GameStageSetup.restore_stress_modifier_base(self)
 	set_process(true)
+
+
+func _on_stress_changed(_value: int) -> void:
+	GameStageSetup.refresh_stress_modifiers(self)
 
 
 func _notification(what: int) -> void:
@@ -481,6 +490,12 @@ func _background_pool_tag() -> String:
 	return GameEnvironmentController.background_pool_tag(self)
 
 
+func _input(event: InputEvent) -> void:
+	# Tutorial controls must be read before the focused overlay's GUI handling.
+	if not crash_repair_transition_active and stage_tutorial != null and stage_tutorial.handle_input(event):
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if crash_repair_transition_active:
 		return
@@ -496,9 +511,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if stage_tutorial != null and stage_tutorial.input_lock_active:
-		return
-
-	if stage_tutorial != null and stage_tutorial.handle_input(event):
 		return
 
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -568,7 +580,7 @@ func _process(delta: float) -> void:
 			passenger_dialogue_controller.update(self, delta)
 		var collision: Dictionary = VehicleCollisionController.collision_data(self)
 		if not collision.is_empty():
-			GameFlowController.handle_player_hit(self, collision["detail"], collision["energy_loss"])
+			GameFlowController.handle_player_hit(self, collision["detail"], collision["hull_damage"], collision["stress_gain"])
 			if game_state == "story":
 				return
 	elif game_state == "YOU MADE IT":

@@ -2,9 +2,12 @@ extends RefCounted
 
 # Builds terminal presentation from existing locked passenger pools.
 const RIDE_SELECT_BGM_PATH := "res://assets/audio/music/driving/normalstage1.mp3"
+const RAINY_NIGHT_BGM_PATH := "res://assets/audio/music/driving/night_station.mp3"
 const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
 const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
 const MidnightEncounters := preload("res://scripts/ride_selection/midnight_encounters.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const PickupAssignment := preload("res://scripts/ride_selection/passenger_pickup_assignment.gd")
 const RISK_DISTANCE_SCORES := {"short": 1, "medium": 2, "long": 3}
 const RISK_TIME_SCORES := {"morning": 1, "noon": 2, "night": 3}
 const RISK_TRAFFIC_SCORES := {"chill": 1, "normal": 2, "traffic-jam": 2, "trafficjam": 2, "speeders": 3, "speeder": 3, "busy": 4}
@@ -17,12 +20,14 @@ func _init(selection_screen) -> void:
 	screen = selection_screen
 
 
-func offers() -> Array[Dictionary]:
+func offers(location_id := "") -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if not PlayerState.are_passengers_available():
-		return MidnightEncounters.offers(PlayerState)
+		return MidnightEncounters.offers(PlayerState) if location_id in ["", "station"] else result
 	var seen: Dictionary = {}
 	var phase: String = PlayerState.get_next_stage_time(screen._transition_mode())
+	if phase == "night" and location_id in ["market", "street"]:
+		return result
 	for distance: String in PlayerState.STAGE_DIFFICULTIES:
 		if screen._is_forced_first_day_ride() and distance != "short":
 			continue
@@ -33,6 +38,8 @@ func offers() -> Array[Dictionary]:
 			var character: Dictionary = pool[slot]
 			var id := str(character.get("id", ""))
 			if character.is_empty() or id.is_empty() or seen.has(id):
+				continue
+			if not location_id.is_empty() and PickupAssignment.location(character) != location_id:
 				continue
 			# Live schedules cover older locked saves and Jessa's intro gate.
 			var live: Dictionary = PlayerState.get_character_by_id(id)
@@ -75,52 +82,44 @@ func summary(character: Dictionary, distance: String) -> Dictionary:
 		"fare": "PHP %d" % PlayerState.estimate_stage_earnings(stage, id),
 		"fuel": "~%.1f%%" % PlayerState.estimate_stage_gas_usage(stage),
 		"risk": risk,
+		"energy_cost": GameTuning.TRIP_ENERGY_COST,
+		"stress_gain": GameTuning.TRIP_STRESS_GAIN,
 	}
 
 
 func details(character: Dictionary, distance: String) -> String:
 	var trip := summary(character, distance)
-	return "%s\n%s / %s / %s%s\nEstimated fare: %s   Fuel: %s   Risk: %s" % [
+	return "%s\n%s / %s / %s%s\nEstimated fare: %s   Fuel: %s   Risk: %s\nEnergy -%d / Stress +%d" % [
 		trip.name, trip.distance, trip.phase, trip.traffic,
 		" / " + str(trip.badge) if not str(trip.badge).is_empty() else "",
 		trip.fare, trip.fuel, trip.risk,
+		trip.energy_cost, trip.stress_gain,
 	]
 
 
 func refresh_terminal() -> void:
 	refresh_bgm()
+	screen.terminal_view.set_pickup_location(screen.pickup_location)
 	screen.terminal_view.set_offers(screen.terminal_offers, PlayerState.get_next_stage_time(screen._transition_mode()) == "night")
 	if screen.passenger_overlay.visible:
 		screen.status_header.set_display_time(screen._display_day(), PlayerState.get_next_stage_time(screen._transition_mode()))
-	if not PlayerState.are_passengers_available():
-		screen.status_label.text = "It's midnight. No passengers are waiting. Head home and sleep until morning." if PlayerState.is_midnight() else "No more trips tonight. Head home to continue your evening plans."
-		if not screen.terminal_offers.is_empty():
-			screen.status_label.text = "It's midnight. Someone is still here. Click them to interact."
-	elif screen._needs_refuel():
+	if PlayerState.are_passengers_available() and screen._needs_refuel():
 		screen.status_label.text = "Not enough gas. Visit the store to refuel."
-	elif screen.terminal_offers.is_empty():
-		screen.status_label.text = "No passengers are waiting for this trip."
 	else:
-		screen.status_label.text = "Hover or focus a passenger for trip details. Click to review and confirm."
+		screen.status_label.text = ""
 
 
 func start_ride_select_bgm() -> void:
 	if bgm_player != null and is_instance_valid(bgm_player):
 		return
-	bgm_player = AudioStreamPlayer.new()
-	bgm_player.name = "RideSelectBGMPlayer"
-	bgm_player.stream = load(RIDE_SELECT_BGM_PATH)
-	bgm_player.bus = &"Master"
-	screen.add_child(bgm_player)
-	AudioSettingsManager.register_player(bgm_player, "music")
+	bgm_player = HubMusicManager.player
 	refresh_bgm()
 
 
 func refresh_bgm() -> void:
 	if bgm_player == null or not is_instance_valid(bgm_player):
 		return
-	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
-	if PlayerState.is_midnight() or (screen.idle_music != null and screen.idle_music.active):
-		bgm_player.stop()
-	elif not bgm_player.playing:
-		bgm_player.play()
+	var weather := PlayerState.get_current_weather()
+	var bar_active: bool = screen.travel_map != null and screen.travel_map.bar_audio != null and screen.travel_map.bar_audio.active
+	var blocked: bool = PlayerState.is_midnight() or bar_active or (screen.idle_music != null and screen.idle_music.active)
+	bgm_player = HubMusicManager.request_track(HubMusicManager.background_path(), RainAudioProfile.music_duck_db(weather), blocked)

@@ -17,7 +17,7 @@ trigger system. The example template is deliberately unregistered.
 	{
 		"type": "advance_time",
 		"days": 2,
-		"restore_energy": true,
+		"clear_stress": true,
 	},
 ]
 ```
@@ -27,10 +27,12 @@ slots: morning -> noon -> night -> next morning. Specify exactly one positive
 whole count, at most 365 days or 1095 phases. `skip_days` and `skip_phases` are
 shortcuts with `amount` (default 1).
 
-Skipping time does not charge trip energy, create completed rides, roll passenger
-offers, or award rest achievements. Recovery is explicit: use `restore_energy:
-true` for full recovery or `recover_energy: 3` for a capped increase. Without
-either, energy is unchanged. Do not combine full and partial recovery.
+Skipping time does not charge trip energy or stress, create completed rides, roll passenger
+offers, or award rest achievements. Recovery is explicit: use `clear_stress:
+true` to clear stress or `relieve_stress: 3` for a capped reduction. Without
+either, stress is unchanged. Use `restore_energy: true` to refill the independent
+energy budget or `recover_energy: 3` for partial energy recovery. Do not combine
+full and partial recovery of the same resource.
 
 Every crossed date runs daily resets, weather/gas-price setup and debt collection.
 An unpaid later collection still ends the run, and advancement stops at that date.
@@ -42,7 +44,7 @@ An unresolved random-fare choice, active crash repair, active special trip, fail
 run, or invalid arguments reject the action without changing time. Resolve the
 fare before skipping. A payable completed fare is settled once before advancement.
 Old passenger offers/sleep setup are cleared; the active story and rider identity
-remain available to later lines. Already-paid entry energy is not refunded.
+remain available to later lines. Already-paid entry energy and stress are not refunded.
 
 Skipping dates does not play every intervening scheduled cutscene. Those trigger
 rules keep their existing eligibility semantics; use `queue_story` when a specific
@@ -52,10 +54,13 @@ follow-up scene must play.
 
 | Action | Parameters and result |
 | --- | --- |
-| `set_resource` | `resource`, `value`: set money, energy, gas, or karma |
+| `set_resource` | `resource`, `value`: set money, energy, stress, hull, gas, or karma |
 | `change_resource` | `resource`, `amount`: add or subtract one of those resources |
 | `add_gas` / `spend_gas` | Nonnegative `amount` in gas percentage points; spending rejects insufficient fuel |
-| `restore_energy` | Optional nonnegative whole `amount`; omit for full energy |
+| `restore_energy` | Optional nonnegative whole `amount`; omit to refill energy to 5 |
+| `relieve_stress` | Optional nonnegative whole `amount`; omit to clear stress |
+| `add_stress` | Nonnegative whole `amount`; caps at 10 |
+| `damage_hull` / `repair_hull` | Nonnegative whole `amount`; hull stays within 0-10 |
 | `set_upgrade_level` | Configured upgrade `id`, whole `level`; capped at its purchase limit |
 | `add_upgrade_level` | Configured upgrade `id`, signed whole `amount`; capped between zero and its limit |
 | `increment_event_value` | Counter `id`, optional numeric `amount` (default 1); creates missing counters at zero |
@@ -63,8 +68,8 @@ follow-up scene must play.
 | `forgive_debt` | Nonnegative whole `amount`; reduces principal without spending money |
 | `set_weather` | `weather`: clear, cloudy, rain, or heavy rain, for the current phase |
 
-Resources retain their normal bounds: money/energy/gas cannot become negative,
-energy and gas cannot exceed capacity, and karma can be negative. Whole units
+Resources retain their normal bounds: money/energy/stress/hull/gas cannot become negative,
+energy is capped at 5, stress and hull at 10; gas cannot exceed capacity, and karma can be negative. Whole units
 are required except for gas and event counters. Unknown resources/upgrades,
 nonnumeric counters, infinite values and malformed parameters reject without
 partial mutation. Legacy `tire_grip` resolves to fuel efficiency.
@@ -74,7 +79,7 @@ paid or reset its history/carryover. The next collection remains due and is capp
 by the remaining principal. Weather overrides are saved for the current phase;
 they do not rewrite the day's forecast or future phases.
 
-Existing actions still work, including money/energy/karma rewards, achievements,
+Existing actions still work, including money/energy/stress/hull/karma effects, achievements,
 character progress/locks, event values, seeded riders, trigger insertion and
 `start_special_stage`. See [special stages](../game/special_stage_blueprint_guide.md)
 for explicit scripted driving scenarios.
@@ -102,7 +107,7 @@ or `weather` are never accidentally treated as eligibility checks.
 }
 ```
 
-- Exact, `min_`, and `max_` checks: money, energy, gas, karma, day, week,
+- Exact, `min_`, and `max_` checks: money, energy, stress, hull, gas, karma, day, week,
   remaining_debt and character_progress. Progress also requires `character_id`.
 - Exact text checks: `phase` (or `time_of_day`) and `weather`.
 - Upgrade maps: `upgrade_levels`, `min_upgrade_levels`, `max_upgrade_levels`,
@@ -178,3 +183,5 @@ Run the isolated regression suite from the root. New checks cover time/debt
 boundaries, resources, upgrades, counters, weather, locked choices, boolean
 conditions, save/resume, chaining through the actual story reader, and replay
 isolation. The example template is validated but does not enable a game event.
+
+Energy is an independent daily activity budget alongside stress and hull. Use `restore_energy` or `add_energy` for energy, `relieve_stress` for stress, and `repair_hull` for hull. Gallery replays suppress these persistent changes. Older saves retain their energy while deriving initial stress from their old energy ratio.

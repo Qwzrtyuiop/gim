@@ -14,19 +14,15 @@ const TOOLTIPS := {
 	"radio": "Radio: news and weather forecast",
 	"calendar": "Calendar: weekly goal, debt and due date",
 	"rest": "Rest",
-	"ride": "Go outside: Ride or Shop",
 }
 
 class HotspotButton:
 	extends Button
 	var alpha_image: Image
-	var exit_shape := false
 
 	func _has_point(point: Vector2) -> bool:
 		if not Rect2(Vector2.ZERO, size).has_point(point):
 			return false
-		if exit_shape:
-			return Geometry2D.is_point_in_polygon(point, exit_polygon(size))
 		if alpha_image == null or size.x <= 0 or size.y <= 0:
 			return false
 		var pixel := Vector2i(point / size * Vector2(alpha_image.get_size()))
@@ -40,14 +36,6 @@ class HotspotButton:
 				if alpha_image.get_pixelv(sample).a >= 0.7:
 					return true
 		return false
-
-	static func exit_polygon(area: Vector2) -> PackedVector2Array:
-		return PackedVector2Array([
-			Vector2(0, area.y),
-			Vector2(area.x * 0.42, area.y * 0.10),
-			Vector2(area.x, area.y * 0.27),
-			area,
-		])
 
 var buttons: Dictionary = {}
 var is_night := false
@@ -66,7 +54,6 @@ func _ready() -> void:
 	for action: String in REGIONS:
 		var button := HotspotButton.new()
 		button.name = action.capitalize() + "Hotspot"
-		button.exit_shape = action == "ride"
 		button.alpha_image = Selectables.alpha_image(action)
 		button.disabled = not enabled
 		button.tooltip_text = TOOLTIPS[action]
@@ -162,22 +149,9 @@ func _draw() -> void:
 	var action := active_action()
 	if not REGIONS.has(action):
 		return
-	if action == "ride":
-		_draw_exit_highlight()
-		return
 	# Draw the selected object last, once, above the room artwork. Hit testing
 	# keeps its resting mask so enlarged edges cannot toggle hover repeatedly.
 	draw_texture_rect(Selectables.texture_for(action, is_night), sprite_rect_for(action, true), false, weather_effects.background_tint())
-
-
-func _draw_exit_highlight() -> void:
-	var rect := sprite_rect_for("ride")
-	var polygon := HotspotButton.exit_polygon(rect.size)
-	for index in polygon.size():
-		polygon[index] += rect.position
-	draw_colored_polygon(polygon, Color(0.9, 0.75, 0.4, 0.08))
-	polygon.append(polygon[0])
-	draw_polyline(polygon, Color(0.9, 0.75, 0.4, 0.7), 1.5, true)
 
 
 func _on_hovered(action: String) -> void:

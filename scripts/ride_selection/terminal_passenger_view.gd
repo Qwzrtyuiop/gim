@@ -7,6 +7,7 @@ signal offer_focused(distance: String, slot: int)
 signal object_pressed(object_id: String)
 
 const SpawnCatalog := preload("res://scripts/ride_selection/terminal_spawn_catalog.gd")
+const AreaSpawnCatalog := preload("res://scripts/ride_selection/passenger_area_spawn_catalog.gd")
 const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
@@ -14,6 +15,7 @@ const PassengerTripCard := preload("res://scripts/ride_selection/passenger_trip_
 const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
 const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
 const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/terminalrain.png")
+const MARKET_RAIN_MARKER := preload("res://assets/story/backgrounds/locations/marketrain.png")
 const HOVER_SCALE := 1.06
 const PLACEHOLDER_AREA := Rect2(375, 710, 1030, 70)
 const DAY_OBJECT_REGIONS := {
@@ -54,6 +56,7 @@ var store_button: Button
 var info_panel: PanelContainer
 var enabled := true
 var is_night := false
+var pickup_location := "station"
 var weather := "clear"
 var weather_effects: HubWeatherEffects
 var hovered_id := ""
@@ -99,7 +102,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func object_rect_for(object_id: String) -> Rect2:
-	if is_night or not is_visible_in_tree() or not DAY_OBJECT_REGIONS.has(object_id):
+	if pickup_location != "station" or is_night or not is_visible_in_tree() or not DAY_OBJECT_REGIONS.has(object_id):
 		return Rect2()
 	var region: Rect2 = DAY_OBJECT_REGIONS[object_id]
 	return Rect2(image_rect.position + region.position / SpawnCatalog.ART_SIZE * image_rect.size, region.size / SpawnCatalog.ART_SIZE * image_rect.size)
@@ -125,6 +128,22 @@ func active_offer_id() -> String:
 	return _highlight_mode.active(hovered_id, focused_id)
 
 
+func get_background_texture() -> Texture2D:
+	if pickup_location != "station":
+		return AreaSpawnCatalog.background(pickup_location, is_night, is_night and PlayerState.is_midnight())
+	return SpawnCatalog.NIGHT_BACKGROUND if is_night else SpawnCatalog.DAY_BACKGROUND
+
+
+func set_pickup_location(location_id: String) -> void:
+	pickup_location = location_id if location_id in ["market", "street"] else "station"
+	close_button.text = "MAP"
+	close_button.tooltip_text = "Open the town map"
+	if weather_effects != null:
+		var marker: Texture2D = RAIN_MARKER if pickup_location == "station" else (MARKET_RAIN_MARKER if pickup_location == "market" else null)
+		weather_effects.configure(marker)
+		weather_effects.set_weather(weather)
+
+
 func set_offers(offers: Array, night: bool) -> void:
 	_build_interface()
 	is_night = night
@@ -144,13 +163,21 @@ func set_offers(offers: Array, night: bool) -> void:
 			continue
 		seen_ids[character_id] = true
 		var presentation: Dictionary = SpawnCatalog.midnight_entry(character_id) if str(offer.get("presentation", "")) == "midnight" else SpawnCatalog.entry(character_id, night)
+		if pickup_location != "station":
+			var variant := str(character.get("pickup_variant", ""))
+			if bool(character.get("is_generic", false)) or character_id.begins_with("generic_"):
+				presentation = AreaSpawnCatalog.generic_entry(pickup_location, variant.trim_prefix("slot_").to_int(), night)
+			else:
+				presentation = AreaSpawnCatalog.entry(pickup_location, character_id, night, variant)
+			if presentation.is_empty():
+				continue
 		var record := offer.duplicate(true)
 		record["character_id"] = character_id
 		record["presentation"] = presentation
 		prepared.append(record)
-		if SpawnCatalog.GENERIC_IDS.has(character_id):
+		if pickup_location == "station" and SpawnCatalog.GENERIC_IDS.has(character_id):
 			generic_ids.append(character_id)
-		elif not presentation.is_empty():
+		elif pickup_location == "station" and not presentation.is_empty():
 			var slot := int(SpawnCatalog.GENERIC_SLOT_BY_CHARACTER.get(character_id, -1))
 			if slot >= 0:
 				occupied_slots[slot] = true
@@ -389,11 +416,10 @@ func _build_interface() -> void:
 	if _interface_built:
 		return
 	_interface_built = true
-	status_label = _label(11)
+	status_label = _label(10)
 	status_label.name = "TerminalStatus"
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.text = "Hover over a passenger to see their trip."
 	add_child(status_label)
 	info_panel = PassengerTripCard.new()
 	info_panel.name = "PassengerInformation"
@@ -401,13 +427,13 @@ func _build_interface() -> void:
 	info_panel.set_summary({})
 	info_label = info_panel.route_label
 	info_panel.hide()
-	close_button = _button("CLOSE")
-	close_button.name = "ClosePassengers"
-	close_button.tooltip_text = "Return to the station"
+	close_button = _button("MAP")
+	close_button.name = "PassengerMap"
+	close_button.tooltip_text = "Open the town map"
 	add_child(close_button)
 	store_button = _button("STORE")
 	store_button.name = "TerminalStore"
-	store_button.tooltip_text = "Store: upgrades, energy and gas"
+	store_button.tooltip_text = "Store: stress relief, hull repairs, upgrades and gas"
 	add_child(store_button)
 	UIAudioManager.attach_button(close_button)
 	UIAudioManager.attach_button(store_button)
@@ -450,13 +476,14 @@ func _layout() -> void:
 		var button: PassengerButton = buttons[character_id]
 		button.position = image_rect.position + button.source_region.position * ratio
 		button.size = button.source_region.size * ratio
-	status_label.position = Vector2(180, HubStatusHeader.CONTENT_TOP)
-	status_label.size = Vector2(maxf(0, size.x - 360), 40)
+	var navigation := DashboardTheme.layout_button_row([close_button, store_button], size)
+	var status_left := navigation.end.x + 16.0
+	status_label.position = Vector2(status_left, size.y - 52)
+	status_label.size = Vector2(maxf(0.0, size.x - status_left - 24.0), 40)
+	if status_label.size.x < 200.0:
+		status_label.position = Vector2(24, navigation.position.y - 48.0)
+		status_label.size = Vector2(maxf(0.0, size.x - 48.0), 40)
 	_layout_information()
-	close_button.position = Vector2(20, size.y - 60)
-	close_button.size = DashboardTheme.BUTTON_SIZE
-	store_button.position = Vector2(size.x - DashboardTheme.BUTTON_SIZE.x - 20, size.y - 60)
-	store_button.size = DashboardTheme.BUTTON_SIZE
 	if weather_effects != null:
 		weather_effects.set_art_rect(image_rect)
 	queue_redraw()
@@ -465,25 +492,28 @@ func _layout() -> void:
 func _layout_information() -> void:
 	if info_panel == null:
 		return
-	var width := image_rect.size.x * 1000.0 / SpawnCatalog.ART_SIZE.x
-	var height := maxf(150.0, info_panel.get_combined_minimum_size().y)
+	var minimum := info_panel.get_combined_minimum_size()
+	var available_width := maxf(1.0, size.x - 40.0)
+	var width := maxf(minimum.x, minf(image_rect.size.x * 1000.0 / SpawnCatalog.ART_SIZE.x, available_width))
+	var height := maxf(150.0, minimum.y)
+	var top := HubStatusHeader.CONTENT_TOP + 24.0
+	# Keep the preview above both the status strip and horizontal navigation.
+	var bottom := minf(image_rect.end.y - 16.0, minf(status_label.position.y - 12.0, close_button.position.y - 12.0))
+	var available_height := maxf(1.0, bottom - top)
+	var fit := minf(1.0, minf(available_width / width, available_height / height))
+	var left := (size.x - width * fit) * 0.5
 	info_panel.size = Vector2(width, height)
-	var left := image_rect.position.x + image_rect.size.x * 420.0 / SpawnCatalog.ART_SIZE.x
-	var bottom := image_rect.end.y - 16.0
-	# On narrow screens the card shares the corner buttons' horizontal space.
-	# Keep its bottom above navigation instead of covering either button.
-	if left < 20.0 + DashboardTheme.BUTTON_SIZE.x or left + info_panel.size.x > size.x - 20.0 - DashboardTheme.BUTTON_SIZE.x:
-		bottom = minf(bottom, size.y - 72.0)
+	info_panel.scale = Vector2.ONE * fit
 	info_panel.position = Vector2(
 		left,
-		bottom - info_panel.size.y,
+		bottom - height * fit,
 	)
-	status_label.visible = not info_panel.visible or not info_panel.get_rect().intersects(status_label.get_rect())
+	status_label.show()
 
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("17110b"))
-	var background: Texture2D = SpawnCatalog.NIGHT_BACKGROUND if is_night else SpawnCatalog.DAY_BACKGROUND
+	var background := get_background_texture()
 	draw_texture_rect(background, image_rect, false, weather_effects.background_tint())
 	var selected_id := active_offer_id()
 	for character_id: String in _draw_order:

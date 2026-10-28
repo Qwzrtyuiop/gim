@@ -226,9 +226,9 @@ static func _test_sparse_lock_resume(host: Node) -> void:
 	_setup()
 	_all_seen()
 	var short_rider := PlayerState.get_character_by_id("generic_guy")
-	short_rider.merge({"active_distance": "short", "stage_traffic": "chill"}, true)
+	short_rider.merge({"active_distance": "short", "stage_traffic": "chill", "pickup_location": "station", "pickup_variant": ""}, true)
 	var long_rider := PlayerState.get_character_by_id("generic_student")
-	long_rider.merge({"active_distance": "long", "stage_traffic": "speeders"}, true)
+	long_rider.merge({"active_distance": "long", "stage_traffic": "speeders", "pickup_location": "station", "pickup_variant": ""}, true)
 	var sparse := {"short": [{}, short_rider, {}], "medium": [{}, {}, {}], "long": [{}, {}, long_rider]}
 	PlayerState.lock_pending_trip_selection(sparse, "long")
 	var unused_rule := _seed("benny", "medium", 0, "busy")

@@ -16,6 +16,7 @@ const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tra
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
 const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
+const PlayerStressShieldState := preload("res://scripts/state/player_stress_shield_state.gd")
 const PlayerRunState := preload("res://scripts/state/player_run_state.gd")
 const PlayerStoryTimeState := preload("res://scripts/state/player_story_time_state.gd")
 const PlayerStageState := preload("res://scripts/state/player_stage_state.gd")
@@ -27,6 +28,10 @@ const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
 
 # Signals
 signal money_changed(amount: int)
+signal stress_changed(amount: int)
+signal stress_shield_changed(points: int)
+signal hull_changed(amount: int)
+# Compatibility notification for legacy consumers.
 signal energy_changed(amount: int)
 signal gas_changed(amount: float)
 signal karma_changed(amount: int)
@@ -50,6 +55,10 @@ const STAGE_SPECIAL_TYPES := [
 const DEBT_COLLECTION_INTERVAL_DAYS := 7
 const TOTAL_DEBT_GOAL := 50000
 const WEEKLY_DEBT_GOALS := GameTuning.WEEKLY_DEBT_GOALS
+const DEFAULT_STARTING_STRESS := GameTuning.DEFAULT_STARTING_STRESS
+const DEFAULT_MAX_STRESS := GameTuning.DEFAULT_MAX_STRESS
+const DEFAULT_STARTING_HULL := GameTuning.DEFAULT_STARTING_HULL
+const DEFAULT_MAX_HULL := GameTuning.DEFAULT_MAX_HULL
 const DEFAULT_STARTING_ENERGY := GameTuning.DEFAULT_STARTING_ENERGY
 const DEFAULT_MAX_ENERGY := GameTuning.DEFAULT_MAX_ENERGY
 const DEFAULT_STARTING_GAS_PERCENT := GameTuning.DEFAULT_STARTING_GAS_PERCENT
@@ -81,8 +90,10 @@ const STORY_TRIGGER_DAY_START := "day_start"
 const STORY_TRIGGER_STAGE_COMPLETE := "stage_complete"
 const STORY_TRIGGER_PASSENGER_SELECTED := "passenger_selected"
 const STORY_TRIGGER_DRIVING := "driving"
-const END_OF_DAY_ENERGY_BONUS := 2
-const NIGHT_SLEEP_ENERGY_BONUS := 3
+const END_OF_DAY_STRESS_RELIEF := 0
+const NIGHT_SLEEP_STRESS_RELIEF := GameTuning.NIGHT_SLEEP_STRESS_RELIEF
+const END_OF_DAY_ENERGY_BONUS := END_OF_DAY_STRESS_RELIEF
+const NIGHT_SLEEP_ENERGY_BONUS := NIGHT_SLEEP_STRESS_RELIEF
 const ESTIMATED_BONUS_TIME_RATIO := 0.35
 const STAGE_DISTANCE_RANGES := {
 	"short": Vector2(400.0, 650.0),
@@ -90,11 +101,17 @@ const STAGE_DISTANCE_RANGES := {
 	"long": Vector2(1150.0, 1650.0),
 }
 const SAVE_PATH := "user://progress_save.tres"
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
+const REST_STRESS_RELIEF := {
+	TRANSITION_RIDE: 0,
+	TRANSITION_REST_TO_NIGHT: GameTuning.REST_STRESS_RELIEF,
+	TRANSITION_REST_TO_NEXT_DAY: GameTuning.REST_STRESS_RELIEF,
+	TRANSITION_SLEEP_TO_NEXT_DAY: 0,
+}
 const REST_ENERGY_BONUSES := {
 	TRANSITION_RIDE: 0,
-	TRANSITION_REST_TO_NIGHT: 2,
-	TRANSITION_REST_TO_NEXT_DAY: 3,
+	TRANSITION_REST_TO_NIGHT: GameTuning.REST_ENERGY_RESTORE,
+	TRANSITION_REST_TO_NEXT_DAY: GameTuning.REST_ENERGY_RESTORE,
 	TRANSITION_SLEEP_TO_NEXT_DAY: 0,
 }
 const ESTIMATED_STAGE_PROFILES := {
@@ -132,7 +149,15 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 
 # Persistent run state
 var last_stage_result: Dictionary = {}
-var max_energy := DEFAULT_MAX_ENERGY
+var max_stress := DEFAULT_MAX_STRESS:
+	set(_value):
+		max_stress = DEFAULT_MAX_STRESS
+var max_hull := DEFAULT_MAX_HULL:
+	set(_value):
+		max_hull = DEFAULT_MAX_HULL
+var max_energy := DEFAULT_MAX_ENERGY:
+	set(_value):
+		max_energy = DEFAULT_MAX_ENERGY
 var max_gas := DEFAULT_MAX_GAS_PERCENT
 var current_stage_type := FIRST_STAGE_TYPE
 var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
@@ -140,7 +165,12 @@ var current_special_stage_id := ""
 var current_day := 1
 var current_phase := "morning"
 var stage_round := 0
-var pending_stage_energy_cost := false
+var pending_stage_stress_applied := false
+var pending_stage_energy_cost: bool:
+	get:
+		return pending_stage_stress_applied
+	set(value):
+		pending_stage_stress_applied = value
 var pending_trip_selection: Dictionary = {}
 var pending_story: Dictionary = {}
 var active_event_special_stage: Dictionary = {}
@@ -170,7 +200,12 @@ var rides_completed_day := 1
 var non_gas_store_purchases_this_week := 0
 var clean_stage_streak := 0
 var current_trip_had_crash := false
-var current_trip_low_energy := false
+var current_trip_high_stress := false
+var current_trip_low_energy: bool:
+	get:
+		return current_trip_high_stress
+	set(value):
+		current_trip_high_stress = value
 var current_trip_low_gas := false
 var low_resource_trip_count := 0
 var low_both_resource_trip_count := 0
@@ -209,9 +244,21 @@ var money := 0:
 		money_changed.emit(money)
 		save_progress()
 
+var stress := DEFAULT_STARTING_STRESS:
+	set(value):
+		stress = clampi(value, 0, DEFAULT_MAX_STRESS)
+		stress_changed.emit(stress)
+		save_progress()
+
+var hull := DEFAULT_STARTING_HULL:
+	set(value):
+		hull = clampi(value, 0, DEFAULT_MAX_HULL)
+		hull_changed.emit(hull)
+		save_progress()
+
 var energy := DEFAULT_STARTING_ENERGY:
 	set(value):
-		energy = clampi(value, 0, max_energy)
+		energy = clampi(value, 0, DEFAULT_MAX_ENERGY)
 		energy_changed.emit(energy)
 		save_progress()
 
@@ -628,8 +675,12 @@ func is_low_gas() -> bool:
 	return PlayerResourceState.is_low_gas(self)
 
 
+func get_stress_vehicle_modifiers() -> Dictionary:
+	return PlayerResourceState.stress_vehicle_modifiers(self)
+
+
 func get_energy_vehicle_modifiers() -> Dictionary:
-	return PlayerResourceState.energy_vehicle_modifiers(self)
+	return get_stress_vehicle_modifiers()
 
 
 func boost_gas_is_available() -> bool:
@@ -664,12 +715,20 @@ func will_advance_day(transition_mode: String = TRANSITION_RIDE) -> bool:
 	return PlayerDayPhaseTracker.will_advance_day(self, transition_mode)
 
 
+func get_transition_stress_relief(transition_mode: String = TRANSITION_RIDE) -> int:
+	return PlayerDayPhaseTracker.transition_stress_relief(self, transition_mode)
+
+
+func apply_transition_stress_relief(transition_mode: String = TRANSITION_RIDE) -> int:
+	return PlayerResourceState.apply_transition_stress_relief(self, transition_mode)
+
+
 func get_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
 	return PlayerDayPhaseTracker.transition_energy_bonus(self, transition_mode)
 
 
 func apply_transition_energy_bonus(transition_mode: String = TRANSITION_RIDE) -> int:
-	return PlayerResourceState.apply_transition_energy_bonus(self, transition_mode)
+	return apply_transition_stress_relief(transition_mode)
 
 
 # Stage flow and transitions
@@ -709,6 +768,47 @@ func spend_money(amount: int) -> bool:
 	return PlayerResourceState.spend_money(self, amount)
 
 
+func add_stress(amount: int) -> int:
+	return PlayerResourceState.add_stress(self, amount)
+
+
+func relieve_stress(amount: int) -> int:
+	return PlayerResourceState.relieve_stress(self, amount)
+
+
+func get_stress_shield_points() -> int:
+	return PlayerStressShieldState.points(self)
+
+
+func has_stress_shield() -> bool:
+	return PlayerStressShieldState.has_shield(self)
+
+
+func has_pending_stress_shield() -> bool:
+	return PlayerStressShieldState.is_pending(self)
+
+
+func grant_next_ride_stress_shield(points: int = GameTuning.BETA_BLOCKER_STRESS_SHIELD_POINTS) -> bool:
+	return PlayerStressShieldState.grant(self, points)
+
+
+func finish_ride_stress_shield() -> void:
+	PlayerStressShieldState.finish_ride(self)
+
+
+func relieve_character_interaction(location_id: String, character_id: String) -> int:
+	return PlayerResourceState.relieve_character_interaction(self, location_id, character_id)
+
+
+func damage_hull(amount: int) -> int:
+	return PlayerResourceState.damage_hull(self, amount)
+
+
+func repair_hull(amount: int) -> int:
+	return PlayerResourceState.repair_hull(self, amount)
+
+
+# Legacy resource actions are inverted into the stress meter.
 func add_energy(amount: int) -> void:
 	PlayerResourceState.add_energy(self, amount)
 
@@ -752,6 +852,14 @@ func set_pending_trip_selection(return_scene: String, transition_mode: String = 
 
 func set_pending_passengers_open(value: bool) -> void:
 	PlayerPendingState.set_pending_passengers_open(self, value)
+
+
+func get_pending_pickup_location() -> String:
+	return PlayerPendingState.get_pending_pickup_location(self)
+
+
+func set_pending_pickup_location(location: String) -> void:
+	PlayerPendingState.set_pending_pickup_location(self, location)
 
 
 func set_pending_trip_selection_error(message: String) -> void:
@@ -1083,8 +1191,12 @@ func get_upgrade_level(upgrade_id: String) -> int:
 	return PlayerUpgradeState.get_upgrade_level(self, upgrade_id)
 
 
+func get_yosi_stress_relief() -> int:
+	return AchievementService.get_yosi_stress_relief(self)
+
+
 func get_yosi_energy_restore() -> int:
-	return AchievementService.get_yosi_energy_restore(self)
+	return get_yosi_stress_relief()
 
 
 func record_yosi_purchase(amount := 1) -> int:
@@ -1115,7 +1227,10 @@ func record_stage_crash() -> void:
 
 
 func record_stage_failure() -> void:
+	_begin_state_batch()
+	finish_ride_stress_shield()
 	AchievementService.record_stage_failure(self)
+	_end_state_batch()
 
 
 func unlock_achievement(achievement_id: String) -> void:

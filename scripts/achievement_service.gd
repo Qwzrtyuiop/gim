@@ -73,12 +73,12 @@ const DEFINITIONS := {
 	"maparaan": {
 		"title": "Maparaan",
 		"subtitle": "Resourceful",
-		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.\n\nJohn completed five rides while at 5 energy or less and 20% gas or less.",
+		"description": "Maparaan is the Filipino knack for finding a way to survive when resources run thin.\n\nJohn completed five rides while at 7 stress or more and 20% gas or less.",
 	},
 	"matiyaga": {
 		"title": "Matiyaga",
 		"subtitle": "Persevering",
-		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.\n\nJohn completed five rides while running low on either energy (5 or less) or gas (20% or less).",
+		"description": "Matiyaga reflects the Filipino value of patience and steady endurance through long struggles.\n\nJohn completed five rides while dealing with either high stress (7 or more) or low gas (20% or less).",
 	},
 	"maingat": {
 		"title": "Maingat",
@@ -88,15 +88,21 @@ const DEFINITIONS := {
 }
 
 const SMOKER_YOSI_GOAL := GameTuning.SMOKER_YOSI_GOAL
-const SMOKER_MAX_ENERGY_PENALTY := GameTuning.SMOKER_MAX_ENERGY_PENALTY
+const SMOKER_STRESS_PENALTY := GameTuning.SMOKER_STRESS_PENALTY
+const SMOKER_MAX_ENERGY_PENALTY := SMOKER_STRESS_PENALTY
 const SMOKER_DANGER_YOSI_TOTAL := GameTuning.SMOKER_DANGER_YOSI_TOTAL
 const TAMAD_REQUIRED_REST_TIMES := ["morning", "noon", "night"]
-const LOW_ENERGY_THRESHOLD := 5
+const HIGH_STRESS_THRESHOLD := GameTuning.HIGH_STRESS_THRESHOLD
+const LOW_ENERGY_THRESHOLD := GameTuning.DEFAULT_MAX_STRESS - HIGH_STRESS_THRESHOLD
 const LOW_RESOURCE_STREAK_TARGET := 5
 
 
+static func get_yosi_stress_relief(player_state) -> int:
+	return GameTuning.SMOKER_YOSI_STRESS_RELIEF if has_achievement(player_state, "maninigarilyo") else GameTuning.YOSI_STRESS_RELIEF
+
+
 static func get_yosi_energy_restore(player_state) -> int:
-	return GameTuning.SMOKER_YOSI_ENERGY_RESTORE if has_achievement(player_state, "maninigarilyo") else GameTuning.YOSI_ENERGY_RESTORE
+	return get_yosi_stress_relief(player_state)
 
 
 static func record_yosi_purchase(player_state, amount := 1) -> int:
@@ -150,19 +156,19 @@ static func record_stage_completion(player_state) -> void:
 	if player_state.clean_stage_streak >= 5:
 		unlock_achievement(player_state, "maingat")
 
-	var ended_low_energy: bool = player_state.current_trip_low_energy or player_state.energy <= LOW_ENERGY_THRESHOLD
+	var ended_high_stress: bool = player_state.current_trip_high_stress or player_state.stress >= HIGH_STRESS_THRESHOLD
 	var ended_low_gas: bool = player_state.current_trip_low_gas or player_state.is_low_gas()
-	if ended_low_energy or ended_low_gas:
+	if ended_high_stress or ended_low_gas:
 		player_state.low_resource_trip_count += 1
 		if player_state.low_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
 			unlock_achievement(player_state, "matiyaga")
-	if ended_low_energy and ended_low_gas:
+	if ended_high_stress and ended_low_gas:
 		player_state.low_both_resource_trip_count += 1
 		if player_state.low_both_resource_trip_count >= LOW_RESOURCE_STREAK_TARGET:
 			unlock_achievement(player_state, "maparaan")
 
 	player_state.current_trip_had_crash = false
-	player_state.current_trip_low_energy = false
+	player_state.current_trip_high_stress = false
 	player_state.current_trip_low_gas = false
 	player_state.save_progress()
 
@@ -176,7 +182,7 @@ static func record_stage_crash(player_state) -> void:
 static func record_stage_failure(player_state) -> void:
 	player_state.clean_stage_streak = 0
 	player_state.current_trip_had_crash = false
-	player_state.current_trip_low_energy = false
+	player_state.current_trip_high_stress = false
 	player_state.current_trip_low_gas = false
 	player_state.save_progress()
 
@@ -271,5 +277,4 @@ static func _has_all_tamad_rest_times(player_state) -> bool:
 static func _apply_achievement_effects(player_state, achievement_id: String) -> void:
 	match achievement_id:
 		"maninigarilyo":
-			player_state.max_energy = maxi(1, player_state.max_energy - SMOKER_MAX_ENERGY_PENALTY)
-			player_state.energy = mini(player_state.energy, player_state.max_energy)
+			player_state.add_stress(SMOKER_STRESS_PENALTY)

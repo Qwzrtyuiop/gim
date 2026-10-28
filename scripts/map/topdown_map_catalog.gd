@@ -12,6 +12,7 @@ const REGIONS := {
 	"home": Rect2(0, 536, 55, 61),
 	"station": Rect2(81, 204, 320, 193),
 	"market": Rect2(529, 114, 366, 253),
+	"street": Rect2(531, 514, 398, 152),
 	"park": Rect2(939, 103, 237, 262),
 	"hospital": Rect2(1281, 0, 284, 258),
 	"bar": Rect2(1308, 406, 249, 133),
@@ -36,6 +37,7 @@ const NAMES := {
 	"home": "Home",
 	"station": "Station",
 	"market": "Market",
+	"street": "Street",
 	"park": "Park",
 	"hospital": "Hospital",
 	"bar": "Bar",
@@ -55,4 +57,6 @@ const NAMES := {
 
 
 static func is_locked(location_id: String) -> bool:
+	if location_id == "hospital":
+		return not bool(PlayerState.get_event_value("celina_first_encounter_seen", false))
 	return location_id.begins_with("locked_")

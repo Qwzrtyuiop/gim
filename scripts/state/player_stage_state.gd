@@ -3,9 +3,12 @@ extends RefCounted
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 static func set_last_stage_result(player_state, result: Dictionary) -> void:
+	player_state._begin_state_batch()
+	player_state.finish_ride_stress_shield()
 	player_state.last_stage_result = result.duplicate(true)
 	player_state.last_stage_result["paid_out"] = false
 	player_state.save_progress()
+	player_state._end_state_batch()
 
 
 static func get_last_stage_result(player_state) -> Dictionary:

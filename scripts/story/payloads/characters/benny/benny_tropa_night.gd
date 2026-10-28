@@ -284,18 +284,18 @@ static func build() -> Dictionary:
 						"id": "tropa",
 					},
 					{
-						"type": "add_max_energy",
+						"type": "relieve_stress",
 						"amount": 1,
 					},
 					{
-						"type": "add_energy",
+						"type": "relieve_stress",
 						"amount": 5,
 					},
 				],
 			},
 			# 50
 			{
-				"text": "Energy +5\nMax Energy +1",
+				"text": "Stress -6",
 				"actions": [
 					{
 						"type": "set_event_value",

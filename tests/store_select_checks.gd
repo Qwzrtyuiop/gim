@@ -5,7 +5,7 @@ const Migration := preload("res://scripts/save/asset_path_migration.gd")
 const SOURCE_RECTS := {
 	"tricycle": Rect2(203, 352, 653, 470),
 	"food": Rect2(1089, 409, 448, 236),
-	"home": Rect2(1, 353, 89, 495),
+	"map": Rect2(1, 353, 89, 495),
 	"station": Rect2(1592, 410, 103, 453),
 }
 
@@ -99,9 +99,11 @@ static func _test_store_actions(host: Node) -> void:
 		for category in ["tricycle", "food"]:
 			await _click(host, store.street.buttons[category].get_global_rect().get_center())
 			assert(store.shop_overlay.visible and store.active_category == category and not store.street.enabled)
+			assert(not store.map_button.visible, "Shop overlays hide the store's MAP button")
 			assert(store.owner_portrait.texture != null and store.hub_dialogue.is_active())
 			store._close_shop()
 			assert(not store.shop_overlay.visible and store.street.enabled)
+			assert(store.map_button.visible)
 			assert(_snapshot() == original, "Walking into and closing either store consumes no resources, time or saves")
 		store.StoreTutorial.set_tutorial_active(store, true)
 		store.street.buttons.tricycle.pressed.emit()
@@ -154,7 +156,7 @@ static func _test_midnight_rectangles(host: Node) -> void:
 	assert(street.buttons.tricycle.disabled and street.buttons.food.disabled)
 	street.set_enabled(true)
 	assert(not street.buttons.tricycle.disabled and not street.buttons.food.disabled, "Closing a modal restores midnight shop interaction")
-	for action in ["home", "station"]:
+	for action in ["map", "station"]:
 		var button: Button = street.buttons[action]
 		assert(not button.disabled and button.focus_mode != Control.FOCUS_NONE and button.mouse_filter != Control.MOUSE_FILTER_IGNORE)
 		await _click(host, button.get_global_rect().get_center())
@@ -186,7 +188,7 @@ static func _setup_midnight_store(midnight := true) -> void:
 
 
 static func _test_midnight_store(host: Node) -> void:
-	for exit_action in ["home", "station"]:
+	for exit_action in ["map", "station"]:
 		_setup_midnight_store()
 		var store = load("res://scenes/store.tscn").instantiate()
 		host.get_tree().root.add_child(store)
@@ -205,14 +207,20 @@ static func _test_midnight_store(host: Node) -> void:
 			assert(not store.hub_dialogue.blocks_input())
 		assert(_snapshot() == original, "Closed shop entry attempts do not change state or save")
 		var resources := _travel_resources()
+		host.get_tree().current_scene = store
+		var old_store: WeakRef = weakref(store)
 		await _click(host, store.street.buttons[exit_action].get_global_rect().get_center())
-		if host.get_tree().current_scene == null:
+		if exit_action == "map":
+			assert(store.travel_map.visible and store.travel_map.map_view.visible and store.travel_map.origin_location == "store")
+			assert(store.travel_map.current_location == "market" and not store.street.enabled and not store.map_button.visible)
+			assert(_travel_resources() == resources, "Opening Store's map is free and keeps the midnight state")
+			await _click(host, store.travel_map.map_view.region_for("home").get_center())
+		var expected := "res://scenes/day_start_scene.tscn" if exit_action == "map" else "res://scenes/ride_selection.tscn"
+		if host.get_tree().current_scene == null or host.get_tree().current_scene.scene_file_path != expected:
 			await host.get_tree().scene_changed
 		var destination = host.get_tree().current_scene
-		var expected := "res://scenes/day_start_scene.tscn" if exit_action == "home" else "res://scenes/ride_selection.tscn"
-		assert(destination.scene_file_path == expected and _travel_resources() == resources)
+		assert(destination.scene_file_path == expected and old_store.get_ref() == null and _travel_resources() == resources)
 		assert(PlayerState.is_midnight() and not PlayerState.has_store_tutorial_shown())
-		store.free()
 		host.get_tree().current_scene = null
 		destination.free()
 	# A shop may already be open when an external event finishes the night.
@@ -235,7 +243,7 @@ static func _test_midnight_store(host: Node) -> void:
 	PlayerState.set_last_stage_result({"day": 3, "time_of_day": "night", "completed": true})
 	live_store._refresh_header()
 	assert(not live_store.shop_overlay.visible and live_store.active_category.is_empty() and live_store.street.enabled)
-	assert(live_store.street.is_midnight and not live_store.street.buttons.home.disabled and not live_store.street.buttons.station.disabled)
+	assert(live_store.street.is_midnight and not live_store.street.buttons.map.disabled and not live_store.street.buttons.station.disabled)
 	var before_purchase := _snapshot()
 	var buy_button: Button = purchase_args[3]
 	buy_button.pressed.emit()
@@ -245,7 +253,7 @@ static func _test_midnight_store(host: Node) -> void:
 
 
 static func _travel_resources() -> Dictionary:
-	return {"money": PlayerState.money, "energy": PlayerState.energy, "gas": PlayerState.gas, "day": PlayerState.current_day, "phase": PlayerState.current_phase, "round": PlayerState.stage_round}
+	return {"money": PlayerState.money, "energy": PlayerState.energy, "stress": PlayerState.stress, "hull": PlayerState.hull, "gas": PlayerState.gas, "day": PlayerState.current_day, "phase": PlayerState.current_phase, "round": PlayerState.stage_round}
 
 
 static func _snapshot() -> Dictionary:

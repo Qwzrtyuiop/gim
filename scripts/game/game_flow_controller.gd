@@ -17,6 +17,9 @@ const GAS_SAVE_INTERVAL := 0.75
 
 
 static func update_progress(owner, delta: float) -> void:
+	if PlayerState.hull <= 0:
+		end_game(owner, "CRASH", "The tricycle hull has failed.")
+		return
 	# Capture driving conditions before reaching the destination saves the result.
 	owner.trip_peak_speed_kmh = maxf(owner.trip_peak_speed_kmh, current_speed_kmh_exact(owner))
 	if owner.ride_story_interruption.try_start(owner):
@@ -71,17 +74,14 @@ static func end_game(owner, title: String, detail: String) -> void:
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()
 	if title == "CRASH":
+		PlayerState.add_stress(GameTuning.HEAD_ON_CRASH_STRESS_GAIN)
 		owner.audio_manager.play_crash_sfx()
 		send_to_crash_repair(owner, detail)
 		return
 	if title == "TIME OUT":
 		PlayerState.record_stage_failure()
-	if title == "TIME OUT" and PlayerState.energy <= 0:
-		owner.game_state = "GAME OVER"
-		owner.end_message = "Out of energy. Press any key to return to menu."
-	else:
-		owner.game_state = title
-		owner.end_message = detail
+	owner.game_state = title
+	owner.end_message = detail
 	if owner.speeder_warning_label:
 		owner.speeder_warning_label.visible = false
 	owner.speeder_warning_active = false
@@ -92,7 +92,7 @@ static func end_game(owner, title: String, detail: String) -> void:
 		VehicleCollisionController.remove_vehicles_behind_player(owner)
 
 
-static func handle_player_hit(owner, detail: String, damage: int) -> void:
+static func handle_player_hit(owner, detail: String, damage: int, stress_gain := -1) -> void:
 	if owner.game_state != "playing" or owner.player_hit_invincible_timer > 0.0:
 		return
 
@@ -107,17 +107,15 @@ static func handle_player_hit(owner, detail: String, damage: int) -> void:
 	owner.player_hit_flicker_timer = owner.crash_flicker_interval
 	owner.player_hit_flicker_visible = false
 
-	var energy_loss := mini(PlayerState.energy, damage)
-	if energy_loss > 0:
-		PlayerState.spend_energy(energy_loss)
-		PlayerState.save_progress()
+	PlayerState._begin_state_batch()
+	PlayerState.add_stress(damage if stress_gain < 0 else stress_gain)
+	PlayerState.damage_hull(damage)
+	PlayerState._end_state_batch()
 
-	if owner.ride_story_interruption.try_start(owner, detail if PlayerState.energy <= 0 else ""):
+	if PlayerState.hull <= 0:
+		send_to_crash_repair(owner, detail)
 		return
-	if PlayerState.energy > 0:
-		return
-
-	send_to_crash_repair(owner, detail)
+	owner.ride_story_interruption.try_start(owner)
 
 
 static func send_to_crash_repair(owner, detail: String) -> void:
@@ -128,6 +126,7 @@ static func send_to_crash_repair(owner, detail: String) -> void:
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()
 	PlayerState._begin_state_batch()
+	PlayerState.damage_hull(PlayerState.hull)
 	PlayerState.record_stage_failure()
 	GameEconomyManager.store_failed_stage_result(
 		owner.stage_type,
@@ -140,6 +139,10 @@ static func send_to_crash_repair(owner, detail: String) -> void:
 		owner.target_distance,
 		detail
 	)
+	var failed_result := PlayerState.get_last_stage_result()
+	failed_result["peak_speed_kmh"] = owner.trip_peak_speed_kmh
+	failed_result["vehicle_collision_count"] = owner.trip_vehicle_collision_count
+	PlayerState.set_last_stage_result(failed_result)
 	# A fatal crash abandons the event interruption and follows normal repairs.
 	PlayerState.active_event_special_stage.clear()
 	PlayerState.begin_crash_repair()
@@ -179,16 +182,26 @@ static func update_crash_repair_transition(owner, delta: float) -> void:
 static func try_retry_stage(owner) -> void:
 	if owner.crash_repair_transition_active:
 		return
-	if owner.use_player_state_stage_sequence and PlayerState.active_event_special_stage.is_empty() and not PlayerState.spend_energy(GameTuning.TRIP_ENERGY_COST):
-		owner.end_message = "No energy left. Visit the store or reset progress."
-		return
+	if owner.use_player_state_stage_sequence:
+		var error: String = PlayerState.get_stage_start_error(owner.stage_type)
+		if not error.is_empty():
+			owner.end_message = error
+			return
+		if not PlayerState.spend_energy(GameTuning.TRIP_ENERGY_COST):
+			owner.end_message = "Not enough energy. Head home to rest."
+			return
+		PlayerState.finish_ride_stress_shield()
+		PlayerState.add_stress(GameTuning.TRIP_STRESS_GAIN)
 	reset_game(owner)
 
 
 static func reset_game(owner) -> void:
 	GameStageSetup.apply_stage_profile(owner)
+	GameStageSetup.apply_weather_modifiers(owner)
 	GameStageSetup.apply_player_upgrades(owner)
+	GameStageSetup.apply_character_modifiers(owner)
 	GameStageSetup.apply_special_stage_blueprint(owner)
+	GameStageSetup.apply_stress_modifiers(owner)
 	for entity in owner.active_entities:
 		if entity.has("sprite") and entity["sprite"] != null and is_instance_valid(entity["sprite"]):
 			entity["sprite"].queue_free()

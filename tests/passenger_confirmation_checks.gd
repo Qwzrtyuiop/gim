@@ -31,6 +31,8 @@ static func _setup() -> void:
 		"stage_traffic": "chill",
 		"stage_special_type": PlayerState.STAGE_SPECIAL_TYPE_NONE,
 		"special_stage_id": "",
+		"pickup_location": "station",
+		"pickup_variant": "",
 	}, true)
 	var long_rider := PlayerState.get_character_by_id("generic_student")
 	long_rider.merge({
@@ -38,6 +40,8 @@ static func _setup() -> void:
 		"stage_traffic": "speeders",
 		"stage_special_type": PlayerState.STAGE_SPECIAL_TYPE_URGENT,
 		"special_stage_id": "",
+		"pickup_location": "station",
+		"pickup_variant": "",
 	}, true)
 	PlayerState.lock_pending_trip_selection({
 		"short": [short_rider, {}, {}],

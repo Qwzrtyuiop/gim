@@ -66,8 +66,16 @@ const PLAYER_LANE_CHANGE_FRONT_PADDING := 120.0
 const PLAYER_LANE_CHANGE_BACK_PADDING := 150.0
 const PLAYER_LANE_CHANGE_SIDE_PADDING := 36.0
 const PLAYER_LANE_CHANGE_PREDICTION_SECONDS := 1.2
-const CRASH_ENERGY_LOSS := 1
-const HEAD_ON_CRASH_ENERGY_LOSS := 3
+const CRASH_STRESS_GAIN := 1
+const HEAD_ON_CRASH_STRESS_GAIN := 3
+const CRASH_HULL_DAMAGE := 1
+const HEAD_ON_CRASH_HULL_DAMAGE := 3
+const HEAVY_CRASH_HULL_DAMAGE := 2
+const HEAVY_CRASH_STRESS_GAIN := 2
+const HEAVY_CRASH_MIN_RELATIVE_KMH := 45.0
+# Compatibility names for old driving snapshots and authored actions.
+const CRASH_ENERGY_LOSS := CRASH_STRESS_GAIN
+const HEAD_ON_CRASH_ENERGY_LOSS := HEAD_ON_CRASH_STRESS_GAIN
 const ONCOMING_WARNING_ENABLED := true
 const ONCOMING_WARNING_FLASH_INTERVAL := 0.28 # Seconds per flash cycle.
 const ONCOMING_WARNING_BEEPS := 3 # Spawn only after this many warning pulses.
@@ -184,41 +192,40 @@ const WEATHER_HANDLING_MULTIPLIERS := {
 	},
 }
 
-# Fuel and energy. Trip cost must be at least 1; defaults <= capacities.
-const DEFAULT_STARTING_ENERGY := 10
-const DEFAULT_MAX_ENERGY := 10
+# Stress and hull are both fixed 0..10 meters. Stress never prevents a ride.
+const DEFAULT_STARTING_STRESS := 0
+const DEFAULT_MAX_STRESS := 10
+const DEFAULT_STARTING_HULL := 10
+const DEFAULT_MAX_HULL := 10
+const TRIP_STRESS_GAIN := 2
+const BETA_BLOCKER_STRESS_SHIELD_POINTS := 3
+const REST_STRESS_RELIEF := 2
+const NIGHT_SLEEP_STRESS_RELIEF := 4
+const STRESS_WARNING_THRESHOLD := 7
+const HIGH_STRESS_THRESHOLD := 7
+const STRESS_MODIFIER_DELTAS := {
+	"player_acceleration_x": -0.25,
+	"player_max_speed": -0.20,
+	"player_brake_x": -0.15,
+	"player_lane_lerp_x": -0.30,
+	"player_coast_x": 0.20,
+	"player_wiggle_intensity_x": 0.30,
+}
 const DEFAULT_STARTING_GAS_PERCENT := 100.0
 const DEFAULT_MAX_GAS_PERCENT := 100.0
-const TRIP_ENERGY_COST := 1
 const LOW_GAS_PERCENT_THRESHOLD := 20.0
 const MIN_BOOST_GAS_PERCENT := 0.05
 const GAS_DRAIN_PERCENT_PER_1000_UNITS := 5.0
+# Energy is an independent action budget; stress alone affects handling.
+const DEFAULT_STARTING_ENERGY := 5
+const DEFAULT_MAX_ENERGY := 5
+const TRIP_ENERGY_COST := 1
+const MAP_TRAVEL_ENERGY_COST := 1
+const PARK_STRESS_RELIEF := 2
+const CHARACTER_INTERACTION_STRESS_RELIEF := 1
+const REST_ENERGY_RESTORE := 2
+const FOOD_MAX_ENERGY_RESTORE := 2
 const CRITICAL_ENERGY_WARNING_THRESHOLD := 2
-const HIGH_ENERGY_THRESHOLD := 7
-const FATIGUE_ENERGY_BOUNDARY := 6
-const FATIGUE_REFERENCE_POINTS := 6.0 # Positive denominator for fatigue strength.
-const HIGH_ENERGY_BASE_MODIFIERS := {
-	"player_acceleration_x": 1.0,
-	"player_max_speed": 1.0,
-	"player_brake_x": 1.0,
-	"player_lane_lerp_x": 1.0,
-	"player_coast_x": 1.0,
-	"player_wiggle_intensity_x": 0.92,
-}
-const HIGH_ENERGY_BONUS_PER_POINT := {
-	"player_acceleration_x": 0.05,
-	"player_max_speed": 0.035,
-	"player_brake_x": 0.04,
-	"player_lane_lerp_x": 0.04,
-}
-const FATIGUE_MODIFIER_DELTAS := {
-	"player_acceleration_x": -0.45,
-	"player_max_speed": -0.30,
-	"player_brake_x": -0.35,
-	"player_lane_lerp_x": -0.40,
-	"player_coast_x": 0.35,
-	"player_wiggle_intensity_x": 0.45,
-}
 
 # Upgrade effects. Price / price step / maximum level are in STORE_ITEMS.
 # Engine speed preserves the existing +90% PER LEVEL (5.5x at level 5).
@@ -235,10 +242,13 @@ const MIN_BOOST_FUEL_MULTIPLIER := 0.60
 const GAS_CAN_PERCENT := 10.0
 const DEFAULT_GAS_PRICE := 70
 const DAILY_GAS_PRICE_MAX_PERCENT_CHANGE := 30.0
-const YOSI_ENERGY_RESTORE := 1
-const SMOKER_YOSI_ENERGY_RESTORE := 3
+const YOSI_STRESS_RELIEF := 1
+const SMOKER_YOSI_STRESS_RELIEF := 3
+const YOSI_ENERGY_RESTORE := YOSI_STRESS_RELIEF
+const SMOKER_YOSI_ENERGY_RESTORE := SMOKER_YOSI_STRESS_RELIEF
 const SMOKER_YOSI_GOAL := 10 # Purchases in one day to unlock smoker.
-const SMOKER_MAX_ENERGY_PENALTY := 2
+const SMOKER_STRESS_PENALTY := 2
+const SMOKER_MAX_ENERGY_PENALTY := SMOKER_STRESS_PENALTY
 const SMOKER_DANGER_YOSI_TOTAL := 50 # Lifetime purchases causing run failure.
 
 # Optional owner portraits. Use a res:// image path; empty paths leave the
@@ -246,14 +256,15 @@ const SMOKER_DANGER_YOSI_TOTAL := 50 # Lifetime purchases causing run failure.
 const STORE_OWNER_PORTRAITS := {
 	"tricycle": {"path": "res://assets/characters/mechanic_store.png", "flip_h": false},
 	"food": {"path": "res://assets/characters/Karen_lady.png", "flip_h": false},
+	"bar": {"path": "res://assets/characters/almashop.png", "flip_h": false},
+	"hospital": {"path": "res://assets/characters/celinashop.png", "flip_h": false},
 }
 
 # Store inventory, in display order.
 # Upgrade price = cost + current_level * cost_step. max_level controls purchase
-# limits and the tier display. Energy and gas descriptions interpolate their
-# values, so changing an amount also changes its displayed effect.
-# Food costs less per energy in larger portions (30, 27.5, 25, 23.75, 22,
-# and about 20.83 PHP). Warlboro is the cheaper, risky recovery option.
+# limits and the tier display. Consumables can restore energy, relieve stress,
+# or do both. Energy-restoring food costs more than the stress-only snacks;
+# FOOD_MAX_ENERGY_RESTORE caps each purchase. Warlboro remains risky stress relief.
 const STORE_ITEMS := [
 	{
 		"id": "gas_can",
@@ -261,6 +272,14 @@ const STORE_ITEMS := [
 		"description": "Add {gas}% gas",
 		"type": "gas",
 		"gas": GAS_CAN_PERCENT,
+	},
+	{
+		"id": "hull_repair",
+		"name": "Tricycle Repairs",
+		"description": "Restore {hull} hull",
+		"cost": 100,
+		"type": "repair",
+		"hull": 2,
 	},
 	{
 		"id": "engine_tune",
@@ -292,58 +311,113 @@ const STORE_ITEMS := [
 	{
 		"id": "yosi",
 		"name": "Warlboro Blue",
-		"description": "Restore energy. May cause negative effects",
+		"description": "Reduce stress. May cause negative effects",
 		"cost": 15,
-		"type": "energy",
-		"energy": YOSI_ENERGY_RESTORE,
+		"type": "stress_relief",
+		"stress_relief": YOSI_STRESS_RELIEF,
 	},
 
 	{
 		"id": "turon",
 		"name": "Turon",
-		"description": "Sweet banana snack. Restore {energy} energy",
+		"description": "Sweet banana snack. Reduce {stress_relief} stress",
 		"cost": 30,
-		"type": "energy",
-		"energy": 1,
+		"type": "stress_relief",
+		"stress_relief": 1,
 	},
 	{
 		"id": "energy_snack",
-		"name": "Energy Bar",
-		"description": "Restore {energy} energy",
-		"cost": 55,
-		"type": "energy",
-		"energy": 2,
+		"name": "Snack Bar",
+		"description": "A quick energy boost. Restore {energy_restore} energy",
+		"cost": 80,
+		"type": "stress_relief",
+		"energy_restore": 1,
+		"stress_relief": 0,
 	},
 	{
 		"id": "lugaw",
 		"name": "Lugaw",
-		"description": "Warm rice porridge. Restore {energy} energy",
+		"description": "Warm rice porridge. Reduce {stress_relief} stress",
 		"cost": 75,
-		"type": "energy",
-		"energy": 3,
+		"type": "stress_relief",
+		"stress_relief": 3,
 	},
 	{
 		"id": "pancit",
 		"name": "Pancit",
-		"description": "A plate of stir-fried noodles. Restore {energy} energy",
-		"cost": 95,
-		"type": "energy",
-		"energy": 4,
+		"description": "Stir-fried noodles. Restore {energy_restore} energy and reduce {stress_relief} stress",
+		"cost": 120,
+		"type": "stress_relief",
+		"energy_restore": 1,
+		"stress_relief": 2,
 	},
 	{
 		"id": "full_meal",
 		"name": "Budget Meal",
-		"description": "Restore {energy} energy",
-		"cost": 110,
-		"type": "energy",
-		"energy": 5,
+		"description": "A filling rice meal. Restore {energy_restore} energy",
+		"cost": 150,
+		"type": "stress_relief",
+		"energy_restore": 2,
+		"stress_relief": 0,
 	},
 	{
 		"id": "lomi",
 		"name": "Lomi",
-		"description": "Hearty noodle soup. Restore {energy} energy",
-		"cost": 125,
-		"type": "energy",
-		"energy": 6,
+		"description": "Hearty noodle soup. Restore {energy_restore} energy and reduce {stress_relief} stress",
+		"cost": 180,
+		"type": "stress_relief",
+		"energy_restore": 2,
+		"stress_relief": 4,
+	},
+]
+
+# Nighttime bar drinks cost more than food, with better value for larger relief.
+# They are consumed immediately and restore stress only, never action energy.
+const BAR_ITEMS := [
+	{
+		"id": "bar_beer",
+		"name": "San Mig Right",
+		"description": "A legally distinct brand. Reduce up to {stress_relief} stress",
+		"cost": 120,
+		"type": "liquor",
+		"stress_relief": 3,
+	},
+	{
+		"id": "bar_rum",
+		"name": "Lead Horse",
+		"description": "Stronger than your average beer. Reduce up to {stress_relief} stress",
+		"cost": 220,
+		"type": "liquor",
+		"stress_relief": 6,
+	},
+	{
+		"id": "bar_whiskey",
+		"name": "Antonov Vodka",
+		"description": "Forget all your problems. Reduce up to {stress_relief} stress",
+		"cost": 350,
+		"type": "liquor",
+		"stress_relief": 10,
+	},
+]
+
+# First aid shares the action-resource caps; its daily claim is per calendar day.
+# Beta blockers protect the next ride only and cannot stack with an existing dose.
+const HOSPITAL_ITEMS := [
+	{
+		"id": "hospital_first_aid",
+		"name": "Basic First Aid",
+		"description": "Restore {energy_restore} energy and reduce {stress_relief} stress. Once per day",
+		"cost": 150,
+		"type": "first_aid",
+		"energy_restore": 1,
+		"stress_relief": 3,
+	},
+	{
+		"id": "hospital_beta_blockers",
+		"name": "Beta Blockers",
+		"description": "Block the next {stress_shield} stress gained during your next ride only. Applies immediately; does not stack",
+		"cost": 180,
+		"type": "stress_shield",
+		"stress_shield": BETA_BLOCKER_STRESS_SHIELD_POINTS,
 	},
 ]

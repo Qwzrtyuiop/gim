@@ -6,6 +6,8 @@ const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
 const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
 const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
 const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
+const HomeMap := preload("res://scripts/home/home_map.gd")
+const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
@@ -35,6 +37,7 @@ var status_header: PanelContainer
 var bgm_player: AudioStreamPlayer
 var night_ambience: HubNightAmbience
 var store_item_rows: Array[Control] = []
+var store_item_labels: Array[RichTextLabel] = []
 var store_buy_buttons: Array[BaseButton] = []
 var tutorial_overlay: Control
 var tutorial_highlight: Panel
@@ -51,6 +54,8 @@ var owner_portrait: TextureRect
 var active_category := ""
 var is_transitioning := false
 var hub_dialogue: HubDialogue
+var travel_map: HomeMap
+var map_button: Button
 
 
 func _ready() -> void:
@@ -59,12 +64,18 @@ func _ready() -> void:
 	_create_stats_row()
 	_create_street()
 	_create_hub_dialogue()
+	_create_map()
 	night_ambience = AmbientAudioManager
 	AmbientAudioManager.enter_hub()
 	back_button.pressed.connect(_close_shop)
 	ButtonGlow.attach(self, back_button)
 	_start_store_bgm()
 	_build_items()
+	PlayerState.money_changed.connect(_on_store_resources_changed)
+	PlayerState.energy_changed.connect(_on_store_resources_changed)
+	PlayerState.stress_changed.connect(_on_store_resources_changed)
+	PlayerState.hull_changed.connect(_on_store_resources_changed)
+	PlayerState.gas_changed.connect(_on_store_resources_changed)
 	_refresh_header()
 	_build_tutorial()
 	resized.connect(_layout_store)
@@ -74,6 +85,8 @@ func _ready() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if travel_map != null and travel_map.visible:
+		return
 	if tutorial_active and _is_any_press(event):
 		# The overlay consumes GUI clicks before they reach _unhandled_input.
 		# Consume the press here so the final step cannot also buy or navigate.
@@ -87,7 +100,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if tutorial_active or is_transitioning or _speech_is_blocking():
+	if tutorial_active or is_transitioning or _speech_is_blocking() or (travel_map != null and travel_map.visible):
 		return
 	if event.is_action_pressed("ui_cancel") and PauseMenuManager.request_toggle():
 		return
@@ -139,12 +152,13 @@ func _create_street() -> void:
 
 func _layout_store() -> void:
 	status_header.layout_in(size)
+	_layout_map_button()
 	var margin := size.x * 0.04
 	var gap := size.x * 0.025
 	var available_width := size.x - margin * 2 - gap
 	var owner_width := available_width * 0.28
 	owner_panel.position = Vector2(margin, HubStatusHeader.CONTENT_TOP)
-	owner_panel.size = Vector2(owner_width, size.y - HubStatusHeader.CONTENT_TOP - 32)
+	owner_panel.size = Vector2(owner_width, maxf(48.0, size.y - HubStatusHeader.CONTENT_TOP - 32.0))
 	owner_portrait.position = Vector2(12, 12)
 	owner_portrait.size = owner_panel.size - Vector2(24, 24)
 	var panel_rect := Rect2(margin + owner_width + gap, HubStatusHeader.CONTENT_TOP, available_width - owner_width, size.y - HubStatusHeader.CONTENT_TOP - 32)
@@ -171,16 +185,16 @@ func _layout_store() -> void:
 
 
 func _on_street_action(action: String) -> void:
-	if tutorial_active or shop_overlay.visible or is_transitioning or _speech_is_blocking():
+	if tutorial_active or shop_overlay.visible or is_transitioning or _speech_is_blocking() or (travel_map != null and travel_map.visible):
 		return
 	match action:
-		"home": _go_home()
+		"home", "map": _open_map()
 		"station": _ride()
 		"tricycle", "food": _open_shop(action)
 
 
 func _open_shop(category: String) -> void:
-	if _speech_is_blocking():
+	if _speech_is_blocking() or (travel_map != null and travel_map.visible):
 		return
 	if PlayerState.is_midnight():
 		show_message("It's closed.", {
@@ -195,14 +209,17 @@ func _open_shop(category: String) -> void:
 	active_category = category
 	for index in range(store_item_rows.size()):
 		var item: Dictionary = StoreItemCatalog.ITEMS[index]
-		store_item_rows[index].visible = (item["type"] in ["upgrade", "gas"]) if category == "tricycle" else item["type"] == "energy"
+		store_item_rows[index].visible = (item["type"] in ["upgrade", "gas", "repair"]) if category == "tricycle" else item["type"] == "stress_relief"
 	shop_overlay.get_node("Title").text = "LITO'S AUTO SUPPLY" if category == "tricycle" else "MANG EDDIE'S"
 	_refresh_owner_portrait()
 	(shop_overlay.get_node("ItemScroll") as ScrollContainer).scroll_vertical = 0
 	status_label.text = "Choose an item."
+	StoreItems.refresh_items(self)
 	_refresh_header()
 	street.set_enabled(false)
 	shop_overlay.show()
+	_layout_map_button()
+	_refresh_store_bgm()
 	AmbientAudioManager.set_rain_indoors(true)
 	_layout_store()
 	back_button.grab_focus()
@@ -230,10 +247,17 @@ func _close_shop() -> void:
 		button.release_focus()
 	active_category = ""
 	street.set_enabled(not tutorial_active and not is_transitioning)
+	_layout_map_button()
+	if is_instance_valid(bgm_player):
+		_refresh_store_bgm()
 
 
 func _build_items() -> void:
 	StoreItems.build_items(self)
+
+
+func _on_store_resources_changed(_value) -> void:
+	StoreItems.refresh_items(self)
 
 
 func _buy_item(item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
@@ -262,47 +286,101 @@ func _refresh_header() -> void:
 		String.num(PlayerState.GAS_CAN_PERCENT).trim_suffix(".0"),
 	]
 	if active_category == "food":
-		money_label.text = "Food and energy"
+		money_label.text = "Food and stress relief"
 
 
 func _start_store_bgm() -> void:
-	bgm_player = AudioStreamPlayer.new()
-	bgm_player.name = "StoreBGMPlayer"
-	bgm_player.stream = load(STORE_BGM_PATH)
-	bgm_player.bus = "Master"
-	bgm_player.autoplay = false
-	add_child(bgm_player)
-	AudioSettingsManager.register_player(bgm_player, "music")
 	_refresh_store_bgm()
 
 
 func _refresh_store_bgm() -> void:
-	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
-	if PlayerState.is_midnight():
-		bgm_player.stop()
-	elif not bgm_player.playing:
-		bgm_player.play()
+	var path: String = HubMusicManager.background_path()
+	if path != HubMusicManager.RAINY_NIGHT_PATH and shop_overlay.visible and active_category == "tricycle":
+		path = STORE_BGM_PATH
+	var bar_active: bool = travel_map != null and travel_map.bar_audio != null and travel_map.bar_audio.active
+	bgm_player = HubMusicManager.request_track(
+		path,
+		RainAudioProfile.music_duck_db(PlayerState.get_current_weather()),
+		PlayerState.is_midnight() or bar_active,
+	)
 
 
 func _ride() -> void:
-	if is_transitioning or _speech_is_blocking():
+	if is_transitioning or _speech_is_blocking() or (travel_map != null and travel_map.visible):
 		return
 	hub_dialogue.clear()
 	is_transitioning = true
 	street.set_enabled(false)
+	map_button.hide()
 	PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
+	PlayerState.set_pending_pickup_location("station")
 	get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 
 
 func _go_home() -> void:
-	if is_transitioning or _speech_is_blocking():
+	_open_map()
+
+
+func _create_map() -> void:
+	map_button = Button.new()
+	map_button.name = "StoreMapButton"
+	map_button.text = "MAP"
+	DashboardTheme.apply_button(map_button)
+	map_button.pressed.connect(_open_map)
+	add_child(map_button)
+	UIAudioManager.attach_button(map_button)
+	travel_map = HomeMap.new()
+	travel_map.name = "StoreMap"
+	add_child(travel_map)
+	travel_map.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	travel_map.closed.connect(_close_map)
+	travel_map.destination_requested.connect(_map_departure)
+	travel_map.bar_music_changed.connect(_refresh_store_bgm)
+	shop_overlay.visibility_changed.connect(_layout_map_button)
+	_layout_map_button()
+
+
+func _open_map() -> void:
+	if is_transitioning or tutorial_active or shop_overlay.visible or travel_map.visible or _speech_is_blocking():
+		return
+	hub_dialogue.clear()
+	street.set_enabled(false)
+	map_button.hide()
+	status_header.hide()
+	travel_map.open("store")
+	AmbientAudioManager.enter_hub(false)
+	_refresh_store_bgm()
+
+
+func _close_map() -> void:
+	street.set_enabled(not is_transitioning and not tutorial_active and not shop_overlay.visible)
+	status_header.refresh()
+	status_header.show()
+	_layout_map_button()
+	if not is_transitioning and map_button.visible:
+		map_button.grab_focus()
+	AmbientAudioManager.enter_hub(false)
+	_refresh_store_bgm()
+
+
+func _map_departure(scene_path: String) -> void:
+	if is_transitioning:
 		return
 	hub_dialogue.clear()
 	is_transitioning = true
 	street.set_enabled(false)
-	# Visiting home does not consume the current time slot or reroll its passengers.
-	PlayerState.set_pending_trip_selection(HOME_SCENE, PlayerState.get_home_ride_transition_mode())
-	get_tree().change_scene_to_file(HOME_SCENE)
+	map_button.hide()
+	# The map has already chosen the pickup area; keep its locked offers.
+	PlayerState.set_pending_trip_selection(STORE_SCENE, _selection_transition_mode())
+	get_tree().change_scene_to_file(scene_path)
+
+
+func _layout_map_button() -> void:
+	if map_button == null:
+		return
+	map_button.position = Vector2(20.0, size.y - DashboardTheme.BUTTON_SIZE.y - 16.0)
+	map_button.size = DashboardTheme.BUTTON_SIZE
+	map_button.visible = not is_transitioning and not shop_overlay.visible and (travel_map == null or not travel_map.visible)
 
 
 func _item_cost(item: Dictionary) -> int:
@@ -351,6 +429,7 @@ func _fade_to_scene(scene_path: String) -> void:
 	hub_dialogue.clear()
 	is_transitioning = true
 	street.set_enabled(false)
+	map_button.hide()
 	var tween := create_tween()
 	tween.tween_property(fade_overlay, "color:a", 1.0, FAIL_FADE_SECONDS)
 	await tween.finished
@@ -363,12 +442,12 @@ func _create_hub_dialogue() -> void:
 	add_child(hub_dialogue)
 	hub_dialogue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hub_dialogue.set_gate(func() -> bool:
-		return not tutorial_active and not is_transitioning
+		return not tutorial_active and not is_transitioning and (travel_map == null or not travel_map.visible)
 	)
 	hub_dialogue.register_target("lito", _store_message_target.bind("tricycle"))
 	hub_dialogue.register_target("eddie", _store_message_target.bind("food"))
 	hub_dialogue.register_target("shopkeeper", _active_shop_message_target)
-	for action in ["home", "station", "tricycle", "food"]:
+	for action in ["map", "station", "tricycle", "food"]:
 		hub_dialogue.register_target(action, _street_message_target.bind(action))
 
 
@@ -388,8 +467,8 @@ func _street_message_target(action: String) -> Rect2:
 
 func _show_shop_greeting() -> void:
 	var greeting := {
-		"english": "Need gas or parts? Take a look.",
-		"tagalog": "Kailangan mo ng gasolina o piyesa? Tingin ka lang.",
+		"english": "Need gas, parts, or repairs? Take a look.",
+		"tagalog": "Kailangan mo ng gasolina, piyesa, o pagkukumpuni? Tingin ka lang.",
 	} if active_category == "tricycle" else {
 		"english": "Take a break. What would you like?",
 		"tagalog": "Pahinga ka muna. Ano ang sa iyo?",

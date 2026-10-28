@@ -16,7 +16,7 @@ are rectangle selections, so the background objects do not enlarge.
 | --- | --- |
 | `tricycle` — Lito's parts/gas | 203, 352, 653, 470 |
 | `food` — food/energy counter | 1089, 409, 448, 236 |
-| `home` — left exit | 1, 353, 89, 495 |
+| `map` — left exit | 1, 353, 89, 495 |
 | `station` — right exit | 1592, 410, 103, 453 |
 
 The rectangles scale together with the letterboxed image. Changing the phase
@@ -30,11 +30,16 @@ screen-specific helpers.
 At midnight, Lito's and Mang Eddie's are closed but remain selectable with mouse,
 keyboard or controller. Clicking either shows John's floating "It's closed."
 message at that shop, without opening its panel or blocking navigation.
-Home and Station remain available, using the same exit rectangles. Shop entry
+Map and Station remain available, using the same exit rectangles. Shop entry
 and purchase handlers also reject stale callbacks at midnight, and refreshing
 an already-open shop closes its overlay. Unseen shop tutorials wait until the
 shops reopen, so they cannot block midnight navigation or be marked completed.
 Ordinary night and daytime keep both shops open.
+
+A bottom-left MAP button opens town navigation from Store. The left exit also
+opens Map; choose Home there. Back/Escape returns to Store, while travel keeps
+locked passenger offers, resources and the clock. Map input is blocked during
+shop overlays, tutorials and blocking dialogue.
 
 When replacing the art, keep the backgrounds and selector aligned to the shared canvas,
 update `ART_SIZE` and `REGIONS` if necessary, then reimport the images in Godot.

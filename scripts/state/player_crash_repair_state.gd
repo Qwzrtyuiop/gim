@@ -12,6 +12,8 @@ static func begin(player_state) -> void:
 	if not player_state.pending_crash_repair.is_empty():
 		return
 	player_state._begin_state_batch()
+	player_state.finish_ride_stress_shield()
+	player_state.hull = 0
 	var cash: int = player_state.money
 	var cap := clampi(GameTuning.CRASH_REPAIR_MAX_PERCENT, 0, 50)
 	var base := clampi(GameTuning.CRASH_REPAIR_BASE_PERCENT, 0, cap)
@@ -31,7 +33,7 @@ static func begin(player_state) -> void:
 		"recovery_applied": false,
 	}
 	player_state.money = cash - bill
-	player_state.pending_stage_energy_cost = false
+	player_state.pending_stage_stress_applied = false
 	player_state.pending_trip_selection.clear()
 	player_state.pending_sleep_transition_state.clear()
 	player_state.pending_story.clear()
@@ -67,8 +69,9 @@ static func prepare_recovery_day(player_state) -> void:
 		player_state.prepare_day_start(day)
 		if player_state.is_run_failed():
 			break
-	var recovery := ceili(player_state.max_energy * clampf(GameTuning.CRASH_REPAIR_ENERGY_RECOVERY_RATIO, 0.0, 1.0))
-	player_state.energy = maxi(player_state.energy, recovery)
+	player_state.hull = player_state.max_hull
+	player_state.energy = player_state.max_energy
+	player_state.relieve_stress(GameTuning.NIGHT_SLEEP_STRESS_RELIEF)
 	player_state.pending_crash_repair["recovery_applied"] = true
 	player_state.pending_skip_night_phase = false
 	player_state._end_state_batch()

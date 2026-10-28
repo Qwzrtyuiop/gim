@@ -1,8 +1,11 @@
 extends Control
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+
 const HomeInterface := preload("res://scripts/home/home_interface.gd")
 const HomeTutorial := preload("res://scripts/home/home_tutorial.gd")
 const HomeMap := preload("res://scripts/home/home_map.gd")
+const HospitalEncounter := preload("res://scripts/home/hospital_encounter.gd")
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
 const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
 const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
@@ -10,7 +13,6 @@ const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 
 const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
-const STORE_SCENE := "res://scenes/store.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
@@ -28,17 +30,11 @@ var is_transitioning := false
 var bgm_player: AudioStreamPlayer
 var night_ambience: HubNightAmbience
 var info_overlay: ColorRect
-var info_panel: PanelContainer
-var info_panel_style: StyleBoxFlat
 var calendar_background: TextureRect
 var calendar_content: Control
 var radio_content: Control
 var rest_content: Control
-var info_title: Label
-var info_body: Label
-var info_close: Button
 var rest_confirm: Button
-var outside_buttons: Array[TextureButton] = []
 var info_action := ""
 var tutorial_overlay: Control
 var tutorial_highlight: Panel
@@ -53,11 +49,12 @@ var home_map: HomeMap
 
 
 func _ready() -> void:
+	var returning_to_hospital := HospitalEncounter.has_pending_return()
 	PlayerState.set_resume_scene(DAY_START_SCENE)
 	if PlayerState.is_run_failed():
 		get_tree().change_scene_to_file(GAME_OVER_SCENE)
 		return
-	if PlayerState.get_current_day() <= 1 and PlayerState.get_pending_trip_selection().is_empty():
+	if not returning_to_hospital and PlayerState.get_current_day() <= 1 and PlayerState.get_pending_trip_selection().is_empty():
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
 		get_tree().change_scene_to_file(RIDE_SELECTION_SCENE)
 		return
@@ -76,7 +73,11 @@ func _ready() -> void:
 	_render_day_start()
 	_build_tutorial()
 	_layout_ui()
-	if not PlayerState.has_home_tutorial_shown():
+	if returning_to_hospital:
+		_open_map()
+		home_map.restore_hospital_after_story()
+		HospitalEncounter.complete_return()
+	elif not PlayerState.has_home_tutorial_shown():
 		call_deferred("_start_tutorial")
 
 
@@ -99,8 +100,6 @@ func _on_house_action(action: String) -> void:
 			_show_info(action)
 		"rest":
 			_show_info("rest")
-		"ride":
-			_show_info("outside")
 
 
 func _create_hud() -> void:
@@ -124,6 +123,7 @@ func _open_map() -> void:
 	map_button.hide()
 	status_header.hide()
 	home_map.open()
+	_refresh_home_bgm()
 
 
 func _close_map() -> void:
@@ -131,10 +131,7 @@ func _close_map() -> void:
 	map_button.show()
 	status_header.show()
 	map_button.grab_focus()
-
-
-func _label(font_size: int) -> Label:
-	return HomeInterface.label(self, font_size)
+	_refresh_home_bgm()
 
 
 func _create_info_overlay() -> void:
@@ -153,7 +150,7 @@ func _render_day_start() -> void:
 
 
 func _show_info(action: String) -> void:
-	if _speech_is_blocking():
+	if _speech_is_blocking() or action not in ["calendar", "radio", "rest"]:
 		return
 	HomeInterface.show_info(self, action)
 
@@ -168,18 +165,6 @@ func _confirm_rest() -> void:
 	hub_dialogue.clear()
 	_close_info()
 	_rest_then_noon()
-
-
-func _ride_now() -> void:
-	_leave_home(RIDE_SELECTION_SCENE)
-
-
-func _choose_outside_destination(scene_path: String) -> void:
-	if is_transitioning or not info_overlay.visible or info_action != "outside":
-		return
-	hub_dialogue.clear()
-	_close_info()
-	_leave_home(scene_path)
 
 
 func _leave_home(scene_path: String) -> void:
@@ -213,7 +198,8 @@ func _transition_home_rest(next_time: String) -> void:
 	house.set_enabled(false)
 	await _fade_overlay_to(1.0, HOME_REST_FADE_SECONDS)
 	PlayerState.record_rest()
-	PlayerState.add_energy(2)
+	PlayerState.add_energy(GameTuning.REST_ENERGY_RESTORE)
+	PlayerState.relieve_stress(GameTuning.REST_STRESS_RELIEF)
 	PlayerState.set_current_stage_time(next_time)
 	PlayerState.clear_pending_trip_selection()
 	_render_day_start()
@@ -231,31 +217,20 @@ func _fade_overlay_to(alpha_value: float, duration: float) -> void:
 func _start_home_bgm() -> void:
 	if bgm_player != null and is_instance_valid(bgm_player):
 		return
-	bgm_player = AudioStreamPlayer.new()
-	bgm_player.name = "HomeBGMPlayer"
-	bgm_player.bus = "Master"
-	bgm_player.stream = _load_looping_audio_stream(HOME_BGM_PATH)
-	add_child(bgm_player)
-	AudioSettingsManager.register_player(bgm_player, "music")
+	bgm_player = HubMusicManager.player
 	_refresh_home_bgm()
 
 
 func _refresh_home_bgm() -> void:
 	if not is_instance_valid(bgm_player):
 		return
-	AudioSettingsManager.set_player_base_db(bgm_player, RainAudioProfile.music_duck_db(PlayerState.get_current_weather()))
-	if PlayerState.is_midnight() or (home_map != null and home_map.bar_audio != null and home_map.bar_audio.active):
-		bgm_player.stop()
-	elif not bgm_player.playing:
-		bgm_player.play()
-
-
-func _load_looping_audio_stream(path: String):
-	var stream = load(path)
-	if stream is AudioStreamMP3:
-		stream = stream.duplicate()
-		stream.loop = true
-	return stream
+	var indoors := home_map == null or not home_map.visible
+	var bar_active: bool = home_map != null and home_map.bar_audio != null and home_map.bar_audio.active
+	bgm_player = HubMusicManager.request_track(
+		HubMusicManager.background_path(indoors),
+		RainAudioProfile.music_duck_db(PlayerState.get_current_weather()),
+		PlayerState.is_midnight() or bar_active,
+	)
 
 
 func _create_hub_dialogue() -> void:

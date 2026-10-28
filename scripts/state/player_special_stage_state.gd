@@ -47,6 +47,13 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 	if not state.pending_crash_repair.is_empty():
 		state.prepare_crash_repair_day()
 		state.finish_crash_repair()
+	# Scripted driving still uses the daily activity budget and intact hull.
+	state.pending_stage_stress_applied = false
+	if not state.get_stage_start_error().is_empty():
+		state._end_state_batch()
+		return false
+	# Replacing an interrupted ride starts a new leg, never a second shielded ride.
+	state.finish_ride_stress_shield()
 	var parts: Dictionary = state._parse_stage_type(str(definition["stage_type"]))
 	var phase := str(parts["time"])
 	var current_phase: String = state.get_current_time_of_day()
@@ -77,16 +84,13 @@ static func begin(state, stage_id: String, _continuation: String) -> bool:
 		"completed": false,
 	}
 	state.current_mock_character_id = str(definition.get("character_id", state.current_mock_character_id))
-	state.current_trip_had_crash = false
-	state.current_trip_low_energy = false
-	state.current_trip_low_gas = false
-	state.pending_stage_energy_cost = false
+	state.prepare_stage_start(str(definition["stage_type"]))
 	state.pending_story.clear()
 	state.pending_result_music.clear()
 	state.pending_gameplay_entry_fade_duration = 0.35
 	state.resume_scene_path = GAME_SCENE
 	# A repeated leg continues its spent slot; normal special stages replace one.
-	# Both enter without an energy/fuel check or rider roll.
+	# Each new driving leg pays entry energy and stress once, without a rider roll.
 	state.save_progress()
 	state._end_state_batch()
 	return true

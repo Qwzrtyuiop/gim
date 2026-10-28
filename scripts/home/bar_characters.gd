@@ -9,6 +9,29 @@ const BENNY_TEXTURE := preload("res://assets/characters/sprites/bennybar.png")
 const BENNY_REGION := Rect2(735, 328, 250, 470)
 const BENNY_MIN_BOND := 2
 const BENNY_SPAWN_CHANCE := 0.30
+const ALMA_DEFAULT_LINES := [
+	"Welcome. What'll it be?",
+	"Here for a drink?",
+	"Take a seat. I'll be with you in a moment.",
+	"Looking for something?",
+	"What can I get you?",
+	"You ordering, or just looking?",
+	"Hm? Need anything?",
+]
+const ALMA_FAMILIAR_MIN_BOND := 2
+const ALMA_FAMILIAR_LINES := [
+	"Oh, it's you. What'll it be?",
+	"Welcome back. Need something to drink?",
+]
+const ALMA_SHOP_CLOSING_LINES := [
+	"Not ordering anything?",
+	"You can sit. Just don't cause trouble.",
+	"Are you buying something or not?",
+	"Just here to pass the time?",
+	"You know this is a bar, right?",
+	"Well, let me know if you need anything.",
+	"If you're not buying, at least don't block the counter.",
+]
 
 static var _benny_atlas: AtlasTexture
 static var _benny_mask: BitMap
@@ -16,9 +39,12 @@ static var _benny_mask: BitMap
 var alma_spawn: BarAlmaSpawn
 var benny_spawn: TextureButton
 var active := false
+var _interaction_enabled := true
 var _background: TextureRect
 var _dialogue: HubDialogue
 var _rng := RandomNumberGenerator.new()
+var _alma_line_index := 0
+var _alma_shop_closing_index := 0
 
 
 func _ready() -> void:
@@ -63,20 +89,47 @@ func layout_in(view_size: Vector2) -> void:
 	benny_spawn.size = BENNY_REGION.size * fit
 
 
+func set_interaction_enabled(value: bool) -> void:
+	_interaction_enabled = value
+	alma_spawn.mouse_filter = Control.MOUSE_FILTER_STOP if value else Control.MOUSE_FILTER_IGNORE
+	benny_spawn.disabled = not value or not active or not benny_spawn.visible
+	if not value:
+		alma_spawn.release_focus()
+		benny_spawn.release_focus()
+
+
 func _process(_delta: float) -> void:
 	if benny_spawn.self_modulate != _background.self_modulate:
 		benny_spawn.self_modulate = _background.self_modulate
 
 
 func _on_character_interacted(character_id: String) -> void:
-	if not active or not _background.is_visible_in_tree() or _dialogue.blocks_input():
+	if not _interaction_enabled or not active or not _background.is_visible_in_tree() or _dialogue.blocks_input():
 		return
-	_dialogue.say("...", {
+	var alma_lines: Array = ALMA_DEFAULT_LINES.duplicate()
+	if PlayerState.get_unique_character_progress("alma") >= ALMA_FAMILIAR_MIN_BOND:
+		alma_lines.append_array(ALMA_FAMILIAR_LINES)
+	var line: String = alma_lines[_alma_line_index % alma_lines.size()] if character_id == "alma" else "..."
+	if not _dialogue.say(line, {
 		"target": "bar:" + character_id,
 		"character_id": character_id,
-		"duration": 2.5,
-	})
+		"duration": 4.0 if character_id == "alma" else 2.5,
+	}):
+		return
+	if character_id == "alma":
+		_alma_line_index = (_alma_line_index + 1) % alma_lines.size()
 	interacted.emit(character_id)
+
+
+func say_shop_closing_line() -> void:
+	if _dialogue == null or not _interaction_enabled or not active or not _background.is_visible_in_tree() or _dialogue.blocks_input():
+		return
+	if _dialogue.say(ALMA_SHOP_CLOSING_LINES[_alma_shop_closing_index], {
+		"target": "bar:alma",
+		"character_id": "alma",
+		"duration": 4.0,
+	}):
+		_alma_shop_closing_index = (_alma_shop_closing_index + 1) % ALMA_SHOP_CLOSING_LINES.size()
 
 
 func _alma_message_target() -> Rect2:

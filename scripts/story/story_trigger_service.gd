@@ -8,6 +8,8 @@ const StoryTriggerRules := preload("res://scripts/story/story_trigger_rules.gd")
 const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
 const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
 const NUMERIC_TRIGGER_FIELDS := [
+	"stress",
+	"hull",
 	"energy",
 	"gas",
 	"gas_price",

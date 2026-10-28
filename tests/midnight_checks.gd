@@ -95,7 +95,7 @@ static func _test_stale_confirmation(host: Node) -> void:
 static func _test_empty_terminal(host: Node) -> void:
 	_setup()
 	var rider := PlayerState.get_character_by_id("generic_guy")
-	rider.merge({"active_distance": "short", "stage_traffic": "chill"}, true)
+	rider.merge({"active_distance": "short", "stage_traffic": "chill", "pickup_location": "station", "pickup_variant": ""}, true)
 	var pools := {"short": [rider], "medium": [], "long": []}
 	PlayerState.lock_pending_trip_selection(pools, "short")
 	PlayerState.seed_rider_for_stage("hana", 3, "night", "short")
@@ -109,7 +109,7 @@ static func _test_empty_terminal(host: Node) -> void:
 	station._open_passengers()
 	assert(station.terminal_view.buttons.is_empty() and station.terminal_offers.is_empty())
 	assert(station.status_header.day_label.text.contains("Midnight"))
-	assert(station.status_label.text.to_lower().contains("midnight"))
+	assert(station.status_label.text.is_empty(), "The phase stays in the status bar without a routine passenger prompt")
 	assert(PlayerState.get_locked_pending_trip_character_pools() == pools)
 	assert(PlayerState.consumed_seeded_rider_rules == consumed and PlayerState.seen_mock_characters == seen)
 	var original := _snapshot()
@@ -129,11 +129,11 @@ static func _test_midnight_walk_and_sleep(host: Node) -> void:
 	var original := _resources()
 	var home = await _scene(host, HOME)
 	assert(home.status_header.day_label.text.contains("Midnight"))
-	home._show_info("outside")
-	home.outside_buttons[0].pressed.emit()
+	home._open_map()
+	home.home_map.map_view.buttons.station.pressed.emit()
 	await host.get_tree().scene_changed
 	var station = host.get_tree().current_scene
-	assert(station.scene_file_path == STATION, "Home Ride goes to the station street, even at midnight")
+	assert(station.scene_file_path == STATION, "Home Map goes to the station street, even at midnight")
 	home.free()
 	station._open_passengers()
 	assert(station.terminal_view.buttons.is_empty() and station.passenger_overlay.visible)
@@ -144,7 +144,9 @@ static func _test_midnight_walk_and_sleep(host: Node) -> void:
 	assert(store.status_header.day_label.text.contains("Midnight"))
 	store._open_shop("food")
 	assert(not store.shop_overlay.visible and store.street.is_midnight, "Midnight stores remain closed while their exits stay available")
-	store.street.buttons.home.pressed.emit()
+	store.map_button.pressed.emit()
+	assert(store.travel_map.visible and store.travel_map.origin_location == "store")
+	store.travel_map.map_view.buttons.home.pressed.emit()
 	await host.get_tree().scene_changed
 	home = host.get_tree().current_scene
 	assert(home.scene_file_path == HOME and PlayerState.is_midnight())
@@ -158,12 +160,12 @@ static func _test_midnight_walk_and_sleep(host: Node) -> void:
 	assert(home.scene_file_path == HOME and PlayerState.get_current_day() == 4)
 	assert(PlayerState.are_passengers_available() and not PlayerState.is_midnight())
 	assert(not home.night_ambience.playing)
-	home._show_info("outside")
-	home.outside_buttons[0].pressed.emit()
+	home._open_map()
+	home.home_map.map_view.buttons.station.pressed.emit()
 	await host.get_tree().scene_changed
 	station = host.get_tree().current_scene
 	station._open_passengers()
-	assert(not station.terminal_view.buttons.is_empty(), "Sleeping reopens the terminal in the new morning")
+	assert(not station.view.offers().is_empty(), "Sleeping restores passenger offers across pickup areas in the new morning")
 	host.get_tree().current_scene = null
 	station.free()
 

@@ -274,6 +274,8 @@ static func _lock(ids: Array) -> void:
 		character["stage_traffic"] = "chill"
 		character["stage_special_type"] = PlayerState.STAGE_SPECIAL_TYPE_NONE
 		character["special_stage_id"] = ""
+		character["pickup_location"] = "station"
+		character["pickup_variant"] = ""
 		pools[distance].append(character)
 	PlayerState.lock_pending_trip_selection(pools, "short")
 
@@ -407,10 +409,10 @@ static func _test_schedules(host: Node) -> void:
 				"morning":
 					expected = ["alma", "hana", "benny", "cel", "ely", "ito"]
 				"noon":
-					expected = ["benny", "cel", "ely", "ito"]
+					expected = ["hana", "benny", "cel", "ely", "ito"]
 				"night":
 					expected = ["alma", "hana", "cel", "dante", "faye"]
-			if (phase == "night") == completed:
+			if completed or phase != "night":
 				expected.append("jessa")
 			var actual: Array = selection.terminal_view.buttons.keys()
 			expected.sort()

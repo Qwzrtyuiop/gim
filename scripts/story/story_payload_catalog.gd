@@ -70,6 +70,12 @@ const STORIES := {
 		"title": "Just a Scratch",
 		"subtitle": "An observant passenger insists John take care of a cut.",
 	},
+	"celina_hospital_introduction": {
+		"english": preload("res://scripts/story/payloads/characters/celina/celina_hospital_introduction.gd"),
+		"tagalog": preload("res://scripts/story/payloads/characters/celina/celina_hospital_introduction_tagalog.gd"),
+		"title": "A Familiar Face",
+		"subtitle": "John meets the girl who gave him a bandage at the hospital counter.",
+	},
 	"alma_first_encounter": {
 		"english": preload("res://scripts/story/payloads/characters/alma/alma_first_encounter.gd"),
 		"tagalog": preload("res://scripts/story/payloads/characters/alma/alma_first_encounter_tagalog.gd"),

@@ -72,6 +72,10 @@ static func capture(scene: Node = null, preview_image: Image = null) -> Dictiona
 			var at_terminal: bool = is_instance_valid(scene.passenger_overlay) and scene.passenger_overlay.visible
 			context.location = "Terminal" if at_terminal else "Station"
 			context.preview_path = LOCATIONS + (("terminalnight.png" if night else "terminalday.png") if at_terminal else ("Updated_night.png" if night else "Updated_day.png"))
+			var pickup: String = PlayerState.get_pending_pickup_location()
+			if pickup in ["market", "street"]:
+				context.location = pickup.capitalize()
+				context.preview_path = scene.terminal_view.get_background_texture().resource_path
 		STORE:
 			context.location = "Store"
 			context.preview_path = LOCATIONS + ("storemidnight.png" if PlayerState.is_midnight() else ("storenight.png" if night else "store.png"))

@@ -7,7 +7,10 @@ const Catalog := preload("res://scripts/map/topdown_map_catalog.gd")
 const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
+const STRESS_ICON := preload("res://assets/ui/icons/stress_brain.png")
 
 var buttons: Dictionary = {}
 var image_rect := Rect2()
@@ -22,6 +25,12 @@ var info_panel: PanelContainer
 var info_label: Label
 var highlight_mode := InputHighlightMode.new()
 var weather_effects: HubWeatherEffects
+var travel_cost_provider: Callable
+var energy_cursor: HBoxContainer
+var energy_cursor_label: Label
+var energy_cursor_icon: TextureRect
+var stress_cursor: HBoxContainer
+var stress_cursor_label: Label
 
 
 func _ready() -> void:
@@ -37,7 +46,7 @@ func _ready() -> void:
 		var button := Button.new()
 		button.name = location_id.to_pascal_case() + "MapLocation"
 		button.tooltip_text = Catalog.NAMES[location_id]
-		button.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN if Catalog.is_locked(location_id) else Control.CURSOR_POINTING_HAND
+		button.mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN if Catalog.is_locked(location_id) and location_id != "hospital" else Control.CURSOR_POINTING_HAND
 		button.disabled = not enabled
 		for state in ["normal", "hover", "pressed", "focus", "disabled"]:
 			button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
@@ -60,11 +69,79 @@ func _ready() -> void:
 	back_button.pressed.connect(_close)
 	add_child(back_button)
 	UIAudioManager.attach_button(back_button)
+	_build_energy_cursor()
 	resized.connect(_layout)
 	visibility_changed.connect(_on_visibility_changed)
 	_refresh_info()
 	_sync_region_buttons()
 	_layout()
+
+
+func _process(_delta: float) -> void:
+	var cost := travel_energy_cost(hovered_location)
+	var relief := _park_stress_relief(hovered_location)
+	energy_cursor.visible = enabled and is_visible_in_tree() and not highlight_mode.keyboard_active and not hovered_location.is_empty() and not Catalog.is_locked(hovered_location) and (cost > 0 or relief > 0)
+	if not energy_cursor.visible:
+		return
+	energy_cursor_label.text = "-%d" % cost
+	energy_cursor_label.visible = cost > 0
+	energy_cursor_icon.visible = cost > 0
+	stress_cursor.visible = relief > 0
+	stress_cursor_label.text = "+%d" % relief
+	energy_cursor.size = energy_cursor.get_combined_minimum_size()
+	var cursor_at := get_local_mouse_position() + Vector2(18, 22)
+	energy_cursor.position = cursor_at.clamp(Vector2(4, 4), (size - energy_cursor.size - Vector2(4, 4)).max(Vector2(4, 4)))
+
+
+func travel_energy_cost(location_id: String) -> int:
+	if not _regions().has(location_id) or not travel_cost_provider.is_valid():
+		return 0
+	return maxi(0, int(travel_cost_provider.call(location_id)))
+
+
+func _park_stress_relief(location_id: String) -> int:
+	return GameTuning.PARK_STRESS_RELIEF if location_id == "park" and current_location != "park" and _regions().has(location_id) and not Catalog.is_locked(location_id) else 0
+
+
+func _build_energy_cursor() -> void:
+	energy_cursor = HBoxContainer.new()
+	energy_cursor.name = "TravelEnergyCursor"
+	energy_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	energy_cursor.z_index = 30
+	energy_cursor.add_theme_constant_override("separation", 3)
+	energy_cursor_label = Label.new()
+	energy_cursor_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	energy_cursor_label.add_theme_font_override("font", FONT)
+	energy_cursor_label.add_theme_font_size_override("font_size", 14)
+	energy_cursor_label.add_theme_color_override("font_color", Color("ffe28a"))
+	energy_cursor_label.add_theme_color_override("font_outline_color", Color("201409"))
+	energy_cursor_label.add_theme_constant_override("outline_size", 3)
+	energy_cursor.add_child(energy_cursor_label)
+	energy_cursor_icon = TextureRect.new()
+	energy_cursor_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	energy_cursor_icon.texture = ENERGY_ICON
+	energy_cursor_icon.custom_minimum_size = Vector2(22, 26)
+	energy_cursor_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	energy_cursor_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	energy_cursor.add_child(energy_cursor_icon)
+	stress_cursor = HBoxContainer.new()
+	stress_cursor.name = "ParkStressBenefit"
+	stress_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stress_cursor.add_theme_constant_override("separation", 3)
+	energy_cursor.add_child(stress_cursor)
+	stress_cursor_label = energy_cursor_label.duplicate() as Label
+	stress_cursor_label.add_theme_color_override("font_color", Color("f2b4cc"))
+	stress_cursor.add_child(stress_cursor_label)
+	var stress_icon := TextureRect.new()
+	stress_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	stress_icon.texture = STRESS_ICON
+	stress_icon.custom_minimum_size = Vector2(24, 26)
+	stress_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	stress_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stress_cursor.add_child(stress_icon)
+	stress_cursor.hide()
+	add_child(energy_cursor)
+	energy_cursor.hide()
 
 
 func _input(event: InputEvent) -> void:
@@ -91,6 +168,8 @@ func set_enabled(value: bool) -> void:
 		back_button.disabled = not value
 	if not value:
 		_clear_focus()
+		if energy_cursor != null:
+			energy_cursor.hide()
 	_refresh_info()
 
 
@@ -144,8 +223,10 @@ func _sync_region_buttons() -> void:
 	var regions := _regions()
 	for location_id: String in buttons:
 		var active := regions.has(location_id)
+		var locked := Catalog.is_locked(location_id)
 		buttons[location_id].visible = active
 		buttons[location_id].disabled = not enabled or not active
+		buttons[location_id].mouse_default_cursor_shape = Control.CURSOR_FORBIDDEN if locked and location_id != "hospital" else Control.CURSOR_POINTING_HAND
 
 
 func _layout() -> void:
@@ -158,8 +239,9 @@ func _layout() -> void:
 		buttons[location_id].position = region.position
 		buttons[location_id].size = region.size
 	if info_panel != null:
-		info_panel.size = Vector2(minf(600, maxf(180, size.x - 40)), 54)
-		info_panel.position = Vector2((size.x - info_panel.size.x) * 0.5, size.y - 76)
+		var panel_height := 76.0 if _park_stress_relief(active_location()) > 0 else 54.0
+		info_panel.size = Vector2(minf(600, maxf(180, size.x - 40)), panel_height)
+		info_panel.position = Vector2((size.x - info_panel.size.x) * 0.5, size.y - panel_height - 22)
 		if size.x < 1000:
 			info_panel.position.y -= DashboardTheme.BUTTON_SIZE.y + 12
 	if back_button != null:
@@ -192,9 +274,15 @@ func _refresh_info() -> void:
 		if not Catalog.NAMES.has(active):
 			info_label.text = "Hover a location to travel"
 		elif Catalog.is_locked(active):
-			info_label.text = "NOT YET UNLOCKED"
+			info_label.text = "HOSPITAL" if active == "hospital" else "NOT YET UNLOCKED"
 		else:
-			info_label.text = str(Catalog.NAMES[active]).to_upper() + ("\nYou are here" if active == current_location else "\nClick to travel")
+			var cost := travel_energy_cost(active)
+			var instruction := "Click to travel (-%d energy)" % cost if cost > 0 else "Click to travel"
+			var relief := _park_stress_relief(active)
+			if relief > 0:
+				instruction += "\nReduce stress by %d" % relief
+			info_label.text = str(Catalog.NAMES[active]).to_upper() + ("\nYou are here" if active == current_location else "\n" + instruction)
+		_layout()
 	queue_redraw()
 
 
@@ -223,7 +311,7 @@ func _on_unfocused(location_id: String) -> void:
 
 
 func _on_location_pressed(location_id: String) -> void:
-	if enabled and is_visible_in_tree() and _regions().has(location_id) and not Catalog.is_locked(location_id):
+	if enabled and is_visible_in_tree() and _regions().has(location_id) and (location_id == "hospital" or not Catalog.is_locked(location_id)):
 		if map_region == "north" and location_id == "town":
 			set_map_region("town")
 			return

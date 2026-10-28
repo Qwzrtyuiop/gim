@@ -20,6 +20,8 @@ const BACKGROUND_PARK_DAY := "res://assets/story/backgrounds/locations/park.png"
 const BACKGROUND_PARK_NIGHT := "res://assets/story/backgrounds/locations/parknight.png"
 const BACKGROUND_MARKET_DAY := "res://assets/story/backgrounds/locations/market.png"
 const BACKGROUND_MARKET_NIGHT := "res://assets/story/backgrounds/locations/marketnight.png"
+const BACKGROUND_HOSPITAL_DAY := "res://assets/story/backgrounds/locations/hospitalday.png"
+const BACKGROUND_HOSPITAL_NIGHT := "res://assets/story/backgrounds/locations/hospitalnight.png"
 const BACKGROUND_ROAD_1 := "res://assets/story/backgrounds/roads/bg1_loop.png"
 const CG_TROPA := "res://assets/story/specialCG/tropaCg.png"
 const ITEM_JESSA_WALLET := "res://assets/story/items/jessawallet.png"
@@ -44,6 +46,7 @@ const SFX_KNOCK := "res://assets/audio/sfx/story/knock.mp3"
 const SFX_DOOR_OPEN := "res://assets/audio/sfx/story/door_open.mp3"
 const SFX_HIT := "res://assets/audio/sfx/story/hit.mp3"
 const SFX_ENGINE := "res://assets/audio/sfx/driving/engine_loop.mp3"
+const SFX_HOSPITAL_AMBIENCE := "res://assets/audio/ambience/hospital ambience.mp3"
 
 # Shared presentation used by Day 2, station stories, and random ride events.
 # Payload normalization copies these dictionaries before the reader uses them.
@@ -68,3 +71,7 @@ const DRIVING_CHILL_MUSIC := {
 
 static func street_background(time_of_day: String) -> String:
 	return BACKGROUND_STREET_NIGHT if time_of_day.strip_edges().to_lower() in ["night", "midnight"] else BACKGROUND_STREET_DAY
+
+
+static func hospital_background(time_of_day: String) -> String:
+	return BACKGROUND_HOSPITAL_NIGHT if time_of_day.strip_edges().to_lower() in ["night", "midnight"] else BACKGROUND_HOSPITAL_DAY

@@ -33,7 +33,7 @@ func _ready() -> void:
 	duration_label.text = "%d %s OFF THE ROAD" % [days, "DAY" if days == 1 else "DAYS"]
 	bill_label.text = "REPAIR BILL: PhP %d" % int(repair["cost"])
 	balance_label.text = "Cash remaining: PhP %d" % int(repair["cash_after"])
-	next_day_label.text = "Repairs will be finished on Day %d, morning.\nYour trip ended without a fare." % int(repair["target_day"])
+	next_day_label.text = "Hull will be restored to 10/10 on Day %d, morning.\nYour trip ended without a fare." % int(repair["target_day"])
 	_start_repair_presentation()
 	continue_button.pressed.connect(_continue_repair)
 	ButtonGlow.attach(self, continue_button)

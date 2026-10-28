@@ -58,10 +58,13 @@ Gallery/memory replays ignore this action and cannot launch a real trip.
 
 ## Entry and completion
 
-- No energy or fuel entry requirement, and no trip-start energy deduction.
-  Even zero energy and zero fuel do not block the handoff.
-- Normal driving rules still apply: fatigue, fuel use/boost restrictions, and
-  collision energy loss. Entering at zero energy means a collision ends the trip.
+- Each new scripted driving leg requires fuel, positive hull and 1 energy.
+  Entry spends 1 energy and adds 1 stress once; reloading the paid leg is free.
+- Normal stress handling penalties, fuel/boost restrictions and collision damage
+  apply. Collisions raise stress and damage hull without spending energy.
+  Hull reaching zero ends the trip and starts repairs; maximum stress is playable.
+- Gate optional extra-ride choices on energy, hull and fuel so an exhausted player
+  can choose the non-driving branch instead.
 - The stage replaces the next trip, using the explicit time in `stage_type` as
   its calendar slot. Morning completion advances to noon; noon advances to night;
   night completion offers the normal overnight rest, not another night trip.

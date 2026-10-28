@@ -1,6 +1,7 @@
 extends RefCounted
 
 # Slot-only live driving state. Normal cross-scene checkpoints retain their own flow.
+const StageSetup := preload("res://scripts/game/game_stage_setup.gd")
 const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
 const Visuals := preload("res://scripts/game/vehicle_visuals.gd")
 const Wheels := preload("res://scripts/game/vehicle_wheel_animation.gd")
@@ -59,6 +60,7 @@ static func capture(game) -> Dictionary:
 			background_path = texture.resource_path
 	return {
 		"version": 1,
+		"stress_modifiers": PlayerState.get_stress_vehicle_modifiers(),
 		"values": values,
 		"player": _sprite_state(game.player),
 		"entities": saved_entities,
@@ -74,6 +76,9 @@ static func capture(game) -> Dictionary:
 
 static func restore(game, data: Dictionary) -> bool:
 	if int(data.get("version", 0)) != 1 or not data.get("values") is Dictionary or not data.get("entities") is Array:
+		return false
+	var saved_modifiers := _saved_handling_modifiers(data)
+	if saved_modifiers.is_empty():
 		return false
 	var saved_entities: Array = data.entities
 	for entry in saved_entities:
@@ -92,6 +97,7 @@ static func restore(game, data: Dictionary) -> bool:
 	# Older live saves predate this ride-local field; do not retain a reused
 	# scene's pressure when loading one. Valid numeric input stays bounded.
 	game.top_lane_pressure = clampf(float(pressure), 0.0, 1.0)
+	StageSetup.restore_stress_modifier_base(game, saved_modifiers)
 	var viewport: Vector2 = game.get_viewport_rect().size
 	var saved_viewport: Vector2 = data.get("viewport", viewport)
 	var ratio := Vector2(viewport.x / maxf(1.0, saved_viewport.x), viewport.y / maxf(1.0, saved_viewport.y))
@@ -195,3 +201,41 @@ static func _copy_value(value: Variant) -> Variant:
 				result.append(_copy_value(item))
 		return result
 	return value
+
+
+static func _saved_handling_modifiers(data: Dictionary) -> Dictionary:
+	var current: Dictionary = PlayerState.get_stress_vehicle_modifiers()
+	if data.has("stress_modifiers"):
+		var saved: Variant = data.stress_modifiers
+		if not saved is Dictionary:
+			return {}
+		for key in current:
+			var value: Variant = saved.get(key)
+			if not (value is int or value is float) or not is_finite(float(value)) or float(value) <= 0.0:
+				return {}
+		return saved
+	# Pre-v5 runtime snapshots baked energy bonuses/fatigue into these values.
+	var energy: int = PlayerState.energy
+	var result: Dictionary = {}
+	if energy > 7:
+		result = {
+			"player_acceleration_x": 1.0 + (energy - 7) * 0.05,
+			"player_max_speed": 1.0 + (energy - 7) * 0.035,
+			"player_brake_x": 1.0 + (energy - 7) * 0.04,
+			"player_lane_lerp_x": 1.0 + (energy - 7) * 0.04,
+			"player_coast_x": 1.0,
+			"player_wiggle_intensity_x": 0.92,
+		}
+	else:
+		var fatigue: float = float(maxi(0, 6 - energy)) / 6.0
+		var deltas := {
+			"player_acceleration_x": -0.45,
+			"player_max_speed": -0.30,
+			"player_brake_x": -0.35,
+			"player_lane_lerp_x": -0.40,
+			"player_coast_x": 0.35,
+			"player_wiggle_intensity_x": 0.45,
+		}
+		for key in deltas:
+			result[key] = 1.0 + fatigue * float(deltas[key])
+	return result

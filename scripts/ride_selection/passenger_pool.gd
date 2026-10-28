@@ -5,6 +5,7 @@ extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
+const PickupAssignment := preload("res://scripts/ride_selection/passenger_pickup_assignment.gd")
 const CARDS_PER_DISTANCE := 3
 
 var screen
@@ -98,8 +99,18 @@ func _lock_pools(candidates: Dictionary) -> Dictionary:
 			if not rule_id.is_empty() and not rule_ids.has(rule_id):
 				rule_ids.append(rule_id)
 		locked_pools[distance] = locked
+	assign_pickup_locations(locked_pools)
 	PlayerState.consume_seeded_rider_rules(rule_ids)
 	return locked_pools
+
+
+func assign_pickup_locations(pools: Dictionary) -> bool:
+	return PickupAssignment.assign(
+		pools,
+		PlayerState.get_next_stage_time(screen._transition_mode()),
+		PlayerState.get_transition_display_day(screen._transition_mode()),
+		screen._is_forced_first_day_ride(),
+	)
 
 
 func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool) -> Dictionary:

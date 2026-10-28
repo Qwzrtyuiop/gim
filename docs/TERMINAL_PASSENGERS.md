@@ -1,7 +1,9 @@
 # Terminal passenger selection
 
-Click the station tricycle to enter the terminal. All currently locked passenger
-offers appear together, including short, medium and long trips. Hover or keyboard
+Click the station building to enter the terminal; its tricycle opens the map.
+Market and Street map destinations open their own passenger selection screens.
+All three destinations are free to visit. One shared locked lineup is distributed
+between them, including short, medium and long trips. Hover or keyboard
 focus shows a passenger's trip details. Clicking opens a confirmation with the
 same trip summary; Confirm uses the existing story trigger and ride-entry path.
 Fresh lineups roll a total from two passengers up to the nine available slots;
@@ -9,7 +11,11 @@ individual distance pools can be empty. Scripted riders reserve their places
 before random filling. The opening tutorial uses two or three short-trip riders,
 and low fuel keeps at least one short-trip offer. Only retained passengers are
 marked seen. Reopening the terminal, visiting the store, or saving/loading keeps
-the same locked lineup, including older saves with fewer passengers.
+the same locked lineup, location assignments and sprite variants, including older
+saves with fewer passengers. A passenger can appear at only one pickup location.
+Hana, Celina and Jessa each use just one of their alternate street placements.
+Market and Street have daytime passengers only. Street residents favor morning;
+Elena and Benny favor the market at noon. At night, passengers wait at the station.
 Cancel, Escape or a backdrop click returns to the same passengers without saving,
 changing the selected distance, charging resources or consuming a story event.
 Generic passengers use the faceless sprites from
@@ -32,11 +38,11 @@ enlargement or information panel visible. Tab, arrow keys and controller
 navigation show keyboard focus; moving or clicking the mouse returns to pointer
 hover. The same rule applies to the station tricycle and store entrance.
 
-The terminal uses the same bordered `HubStatusHeader` as the station, including
-the money label, energy and fuel icons, energy capacity and fuel percentage.
+Each pickup screen uses the shared single-line black `HubStatusHeader`, including
+money, energy, stress, condition and gas values/icons.
 Its day/time previews the selected trip while the resource values remain live.
-Passenger instructions sit below the header; closing the terminal restores the
-station's current day/time display.
+Closing the terminal restores the station front; MAP on Market/Street returns
+to the town map. The station front restores the current day/time display.
 
 Trip previews use a padded card with a passenger heading, route/time, traffic,
 optional Rush/Careful/Special badge and three aligned columns for estimated fare,
@@ -72,8 +78,21 @@ the rain/night players, and menus, sleep and story scenes stop the shared mix.
 Mix levels, excerpt offsets, interval and
 chance live in `scripts/ui/hub_night_ambience.gd`.
 
+During rainy nights, the pickup screens replace their normal background music
+with the looping `music/driving/night_station.mp3`. Both rain and heavy rain
+qualify, with the existing music ducking. Opening/closing passengers retains the
+same playback. Midnight silence and its later AFK shuffle keep their own rules.
+
+`HubMusicManager` owns one persistent player for Home, Store and all pickup areas.
+Map travel retains the current stream and playback when the same theme applies.
+When a theme changes, its position is remembered and restored on return. Home
+interiors use peace; maps, outdoor hubs and food shopping use the normal theme.
+The old store track belongs only to the mechanic shop, with rainy-night background
+music taking priority. Bar and AFK music temporarily suppress the background;
+successful save loads and leaving the hubs clear its remembered positions.
+
 After spending 60 seconds with passenger selection open at midnight, a random
-`music/story/jazz.mp3` or `midnight.mp3` track starts. Each
+track from `music/story/jazz.mp3`, `midnight.mp3` or `midnight2.mp3` starts. Each
 finished track is followed by another, avoiding immediate repeats. Mouse movement and other interaction do not
 reset the timer or stop the track. Closing passenger selection stops playback and
 resets the countdown; reopening starts a fresh 60 seconds. No AFK music plays on
@@ -84,7 +103,11 @@ track. Pause freezes the timer and playback; leaving the station frees them.
 ## Art and positions
 
 The empty backgrounds are `terminalday.png` and `terminalnight.png` in
-`assets/story/backgrounds/locations/`. The transparent placement sheets are
+`assets/story/backgrounds/locations/`. Street uses `passengerstreetday.png` for
+morning/noon, `passengerstreetnight.png` at night and `passengerstreetmidnight.png`
+after the night trip. Saved references and slot previews using the former
+`passengerstreet.png` path resolve to the renamed day asset.
+The transparent placement sheets are
 `terminalspawns/dayspawns.png`, `terminalspawns/nightspawns.png`, and
 `terminalspawns/genericspawns.png` / `genericspawns2.png`. All use the same
 1672x941 canvas. Keep
@@ -112,9 +135,9 @@ sprites also requires updating its placement sheet to change the rendered art.
 Placement availability and story availability are separate. For example, Jessa
 has both poses, but her live schedule remains morning/noon before her first event
 is completed. She is absent for the remainder of that event's day, then can appear
-on later nights. The saved unpaid-fare history supplies the date, so reloads and
-gallery replays cannot restart the absence. Alma and Hana have day placements but are not
-eligible at noon. The projected trip phase determines which background and
+on later days or nights. The saved unpaid-fare history supplies the date, so reloads and
+gallery replays cannot restart the absence. Hana is available at noon as well;
+Alma remains unavailable at noon. The projected trip phase determines which background and
 schedule apply.
 
 To regenerate crops after changing a placement sheet, use Python with Pillow:
@@ -122,6 +145,7 @@ To regenerate crops after changing a placement sheet, use Python with Pillow:
 ```powershell
 python tools/extract_terminal_spawns.py
 python tools/extract_terminal_spawns.py --check
+python tools/extract_terminal_spawns.py --layout market --layout street
 ```
 
 The tool preserves each visible source pixel exactly once, including disconnected
@@ -135,8 +159,12 @@ in Godot before running the isolated regression suite.
 ## Ownership and saves
 
 - `passenger_pool.gd` retains offer rolls, distances, seeded riders and traffic.
+- `passenger_pickup_assignment.gd` distributes that lineup across the three areas
+  without consuming gameplay RNG; saved assignments and alternate poses stay fixed.
 - `selection_view.gd` gathers eligible locked offers and formats trip details.
 - `terminal_spawn_catalog.gd` owns character IDs, textures and source rectangles.
+- `passenger_area_spawn_catalog.gd` owns the separate market/street backgrounds,
+  crop rectangles, generic spots and named sprite variants.
 - `terminal_passenger_view.gd` owns rendering, hit testing, hover and focus.
 - `passenger_trip_card.gd` owns the shared trip-details layout;
   `passenger_confirmation.gd` owns the confirmation dialog's presentation/input.
@@ -147,5 +175,8 @@ Hovering is read-only. Closing, shopping, saving and returning from a passenger
 story preserve usable locked offers. Older saved pools whose passengers are all
 ineligible at the projected phase are repaired once with fresh eligible offers
 while passengers are available,
-without spending time or resources. Existing version-4 selection dictionaries
-and scene paths remain valid.
+without spending time or resources. Existing version-4/5 selection dictionaries
+and scene paths remain valid. Each locked character stores `pickup_location` and
+`pickup_variant`; the pending selection also stores its active `pickup_location`.
+The existing dictionary codec preserves these fields and old saves acquire stable
+assignments when their selection opens. No save-version change is needed.

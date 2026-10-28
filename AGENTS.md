@@ -14,7 +14,7 @@ Gulong (Windows product name: Gulong ng Buhay) is a Godot 4.6 / GDScript 2D tric
 
 - Keep `scripts/game.gd` as the gameplay coordinator. Extend the relevant helpers in `scripts/game/` and preserve setup/frame-update order and shared `owner` fields.
 - Put shared driving, resource, upgrade, and store tuning in `scripts/config/game_tuning.gd`. Traffic profiles belong in `scripts/game/stage_profiles.gd`. Check modifier ordering before changing balance.
-- `PlayerState` owns cross-scene state; use its APIs and domain helpers in `scripts/state/`. New persisted fields also need codec/resource fields, defaults, reset behavior, and migration. Save version is currently 4; inspect it before making persistence changes.
+- `PlayerState` owns cross-scene state; use its APIs and domain helpers in `scripts/state/`. New persisted fields also need codec/resource fields, defaults, reset behavior, and migration. Save version is currently 5; inspect it before making persistence changes.
 - Keep content IDs stable. Story, event, character, achievement, upgrade, and memory IDs are save contracts; display names may differ from IDs (Elena is `ely`).
 - Stage descriptors can contain `traffic-jam`; use existing parsing helpers. Current phase can differ from the just-completed result's time.
 - Hidden `EditorPreview` nodes in `scenes/main.tscn` provide runtime geometry. Preserve them when editing the scene.

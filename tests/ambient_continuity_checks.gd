@@ -12,6 +12,7 @@ const MENU := "res://scenes/main_menu.tscn"
 static func run(host: Node) -> void:
 	assert(ProjectSettings.get_setting("testing/isolated", false))
 	AmbientAudioManager.stop_all()
+	HubMusicManager.stop_all()
 	PlayerState.reset()
 	PlayerState.current_day = 3
 	PlayerState.set_current_stage_time("night")
@@ -45,11 +46,16 @@ static func run(host: Node) -> void:
 	var dog_playback = AmbientAudioManager.dogs_player.get_stream_playback()
 	var dog_remaining: float = AmbientAudioManager.dog_stop_timer.time_left
 	var home_music: WeakRef = weakref(home.bgm_player)
-	home._show_info("outside")
-	home.outside_buttons[0].pressed.emit()
+	var music_source: AudioStream = home.bgm_player.stream
+	var music_playback = home.bgm_player.get_stream_playback()
+	var music_position: float = home.bgm_player.get_playback_position()
+	assert(home.bgm_player == HubMusicManager.player and HubMusicManager.current_path == HubMusicManager.RAINY_NIGHT_PATH)
+	home._open_map()
+	home.home_map.map_view.buttons.station.pressed.emit()
 	await host.get_tree().scene_changed
 	var station = host.get_tree().current_scene
-	assert(station.scene_file_path == STATION and home_music.get_ref() == null)
+	assert(station.scene_file_path == STATION and station.view.bgm_player == home_music.get_ref(), "The shared music player survives home disposal")
+	_assert_shared_music(home_music, music_source, music_playback, music_position)
 	_assert_shared(manager_id, night_playback, rain_playback, rain_source, previous_position)
 	assert(AmbientAudioManager.cars_player.playing)
 	assert(AmbientAudioManager.dog_check_timer.time_left <= dog_deadline)
@@ -63,21 +69,30 @@ static func run(host: Node) -> void:
 	assert(AmbientAudioManager.cars_player.get_stream_playback() == cars_playback)
 	_assert_no_local_ambience(station)
 	var station_music: WeakRef = weakref(station.view.bgm_player)
+	music_position = station.view.bgm_player.get_playback_position()
 	previous_position = Vector2(AmbientAudioManager.get_playback_position(), rain.get_playback_position())
 	station._open_store()
 	await host.get_tree().scene_changed
 	var store = host.get_tree().current_scene
-	assert(store.scene_file_path == STORE and station_music.get_ref() == null)
+	assert(store.scene_file_path == STORE and store.bgm_player == station_music.get_ref(), "Store entry reuses the persistent music player")
+	_assert_shared_music(home_music, music_source, music_playback, music_position)
 	_assert_shared(manager_id, night_playback, rain_playback, rain_source, previous_position)
 	assert(not AmbientAudioManager.cars_player.playing)
 	_assert_no_local_ambience(store)
 	store._refresh_header()
 	var store_music: WeakRef = weakref(store.bgm_player)
+	music_position = store.bgm_player.get_playback_position()
 	previous_position = Vector2(AmbientAudioManager.get_playback_position(), rain.get_playback_position())
-	store.street.buttons.home.pressed.emit()
+	store.map_button.pressed.emit()
+	assert(store.travel_map.visible and store.travel_map.map_view.visible and store.travel_map.origin_location == "store")
+	assert(host.get_tree().current_scene == store and _snapshot() == original, "Opening Store's map preserves the current scene and all resources")
+	_assert_shared_music(home_music, music_source, music_playback, music_position)
+	_assert_shared(manager_id, night_playback, rain_playback, rain_source, previous_position)
+	store.travel_map.map_view.buttons.home.pressed.emit()
 	await host.get_tree().scene_changed
 	home = host.get_tree().current_scene
-	assert(home.scene_file_path == HOME and store_music.get_ref() == null)
+	assert(home.scene_file_path == HOME and home.bgm_player == store_music.get_ref(), "Returning home does not rebuild the shared music player")
+	_assert_shared_music(home_music, music_source, music_playback, music_position)
 	_assert_shared(manager_id, night_playback, rain_playback, rain_source, previous_position)
 	_assert_no_local_ambience(home)
 	assert(_snapshot() == original, "Walking between hubs only changes navigation state, never resources, weather, progress, events or preferences")
@@ -85,6 +100,7 @@ static func run(host: Node) -> void:
 	var remaining: float = AmbientAudioManager.dog_check_timer.time_left
 	await host.get_tree().process_frame
 	assert(AmbientAudioManager.stream_paused and rain.stream_paused)
+	assert(HubMusicManager.player.stream_paused, "Pause also suspends the shared hub music")
 	assert(is_equal_approx(AmbientAudioManager.dog_check_timer.time_left, remaining))
 	host.get_tree().paused = false
 	assert(WeatherState.set_story_weather(PlayerState, "heavy rain"))
@@ -105,6 +121,7 @@ static func run(host: Node) -> void:
 	host.get_tree().change_scene_to_file(MENU)
 	await host.get_tree().scene_changed
 	assert(host.get_tree().current_scene.scene_file_path == MENU)
+	assert(home_music.get_ref() == HubMusicManager.player and not HubMusicManager.player.playing, "Unsupported scenes stop shared hub playback while retaining the autoload player")
 	assert(not AmbientAudioManager.playing and not rain.playing and not AmbientAudioManager.dogs_player.playing and not AmbientAudioManager.cars_player.playing)
 	assert(AmbientAudioManager.dog_check_timer.is_stopped() and AmbientAudioManager.dog_stop_timer.is_stopped())
 	assert(AmbientAudioManager.get_instance_id() == manager_id and AmbientAudioManager.get_parent() == host.get_tree().root)
@@ -112,8 +129,16 @@ static func run(host: Node) -> void:
 	host.get_tree().current_scene = null
 	menu.free()
 	AmbientAudioManager.stop_all()
+	HubMusicManager.stop_all()
 	PlayerState.reset()
-	print("PASS: shared ambience playback and dog cadence across actual home/station/store navigation, local music ownership, changed-weather replacement only, driving/results reuse, pause and unsupported-scene shutdown")
+	print("PASS: persistent hub music/ambience and dog cadence across actual home/station/store navigation, changed-weather replacement only, driving/results ambience reuse, pause and unsupported-scene shutdown")
+
+
+static func _assert_shared_music(reference: WeakRef, source: AudioStream, playback, position: float) -> void:
+	var player: AudioStreamPlayer = HubMusicManager.player
+	assert(reference.get_ref() == player and player.playing)
+	assert(player.stream == source and player.get_stream_playback() == playback, "Matching background tracks preserve their stream and exact playback object")
+	assert(player.get_playback_position() + 0.02 >= position, "Walking between hubs cannot seek the shared music back to its start")
 
 
 static func _assert_shared(manager_id: int, night_playback, rain_playback, rain_source: AudioStream, previous_position: Vector2) -> void:
@@ -144,6 +169,8 @@ static func _snapshot() -> Dictionary:
 	return {
 		"money": PlayerState.money,
 		"energy": PlayerState.energy,
+		"stress": PlayerState.stress,
+		"hull": PlayerState.hull,
 		"gas": PlayerState.gas,
 		"day": PlayerState.current_day,
 		"phase": PlayerState.current_phase,

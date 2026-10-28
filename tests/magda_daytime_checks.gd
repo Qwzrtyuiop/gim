@@ -104,6 +104,9 @@ static func _test_save_and_cached_offers(host: Node) -> void:
 		stale["stage_traffic"] = "chill"
 		var generic := PlayerState.get_character_by_id("generic_guy")
 		generic["stage_traffic"] = "chill"
+		for character: Dictionary in [stale, generic]:
+			character["pickup_location"] = "station"
+			character["pickup_variant"] = ""
 		var pools := {"short": [generic], "medium": [stale], "long": []}
 		PlayerState.lock_pending_trip_selection(pools, "medium")
 		var path := "res://test_user/magda_daytime_%d.tres" % int(state[1])

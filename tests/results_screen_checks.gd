@@ -87,7 +87,7 @@ static func _setup(result: Dictionary) -> void:
 	PlayerState.current_phase = "night"
 	PlayerState.current_stage_type = "short-night-chill"
 	PlayerState.money = 500
-	PlayerState.energy = 6
+	PlayerState.energy = 4
 	PlayerState.gas = 87.9
 	PlayerState.set_current_mock_character("benny")
 	PlayerState.set_last_stage_result(result)
@@ -232,6 +232,7 @@ static func _test_actions(host: Node) -> void:
 static func _test_low_energy_cancel(host: Node) -> void:
 	_setup(_result("noon"))
 	PlayerState.energy = 1
+	PlayerState.stress = 8
 	var screen = await _screen(host)
 	var original := {
 		"money": PlayerState.money,
@@ -247,14 +248,14 @@ static func _test_low_energy_cancel(host: Node) -> void:
 	assert(screen.ride_button.visible)
 	screen._attempt_next_stage()
 	await host.get_tree().process_frame
-	assert(screen.ride_confirm_dialog.visible, "A low-energy trip still opens the warning instead of departing")
+	assert(screen.ride_confirm_dialog.visible, "A high-stress trip opens a warning while one energy still permits departure")
 	screen.ride_confirm_dialog.get_cancel_button().pressed.emit()
 	await host.get_tree().process_frame
 	assert(not screen.ride_confirm_dialog.visible)
 	assert(PlayerState.money == original.money and PlayerState.energy == original.energy and PlayerState.gas == original.gas)
 	assert(PlayerState.current_day == original.day and PlayerState.current_phase == original.phase and PlayerState.stage_round == original.round)
 	assert(PlayerState.get_pending_trip_selection() == original.pending and PlayerState.get_last_stage_result() == original.result)
-	assert(int(PlayerState.get_meta("test_save_count", 0)) == original.saves, "Cancelling the low-energy warning cannot save, charge or change the clock")
+	assert(int(PlayerState.get_meta("test_save_count", 0)) == original.saves, "Cancelling the high-stress warning cannot save, charge or change the clock")
 	screen.free()
 
 

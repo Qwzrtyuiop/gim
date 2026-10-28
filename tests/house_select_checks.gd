@@ -3,7 +3,7 @@ extends RefCounted
 const HouseView := preload("res://scripts/ui/house_view.gd")
 const CATALOG_PATH := "res://scripts/ui/house_selectable_catalog.gd"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
-const ACTIONS := ["radio", "calendar", "rest", "ride"]
+const ACTIONS := ["radio", "calendar", "rest"]
 const ITEM_ACTIONS := ["radio", "calendar", "rest"]
 
 
@@ -21,6 +21,7 @@ static func _test_shared_geometry(host: Node) -> void:
 	assert(catalog.ART_SIZE == Vector2(1698, 926))
 	assert(HouseView.DAY.get_size() == catalog.ART_SIZE and HouseView.NIGHT.get_size() == catalog.ART_SIZE)
 	assert(HouseView.REGIONS.size() == ACTIONS.size())
+	assert(not HouseView.REGIONS.has("ride"), "The old home exit must not remain clickable or keyboard-selectable")
 	var house := HouseView.new()
 	host.get_tree().root.add_child(house)
 	var pressed: Array[String] = []
@@ -147,15 +148,13 @@ static func _test_home_interactions(host: Node) -> void:
 		for action: String in ACTIONS:
 			await _click(host, _body_point(home.house.buttons[action]))
 			assert(home.info_overlay.visible and not home.house.enabled, "Selecting an item opens its existing modal and gates the room")
-			assert(home.info_action == ("outside" if action == "ride" else action))
+			assert(home.info_action == action)
 			if action == "calendar":
 				assert(home.calendar_content.visible and not home.radio_content.visible)
 			elif action == "radio":
 				assert(home.radio_content.visible and not home.calendar_content.visible)
 			elif action == "rest":
 				assert(home.rest_confirm.visible)
-			else:
-				assert(home.outside_buttons[0].visible and home.outside_buttons[1].visible)
 			home._close_info()
 			await _settle(host)
 			assert(not home.info_overlay.visible and home.house.enabled)

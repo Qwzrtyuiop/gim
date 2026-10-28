@@ -2,6 +2,7 @@ extends RefCounted
 
 # Compatibility for asset paths stored before folder cleanup or art replacement.
 const LEGACY_PATHS := {
+	"res://assets/story/backgrounds/locations/passengerstreet.png": "res://assets/story/backgrounds/locations/passengerstreetday.png",
 	"res://assets/story/backgrounds/locations/houserain.png": "res://assets/story/backgrounds/locations/houserain_indoor.png",
 	"res://assets/background/backgroundfishing.png": "res://assets/story/backgrounds/roads/backgroundfishing.png",
 	"res://assets/background/bg1_loop.png": "res://assets/story/backgrounds/roads/bg1_loop.png",

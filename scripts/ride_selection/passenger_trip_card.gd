@@ -2,6 +2,9 @@ extends PanelContainer
 
 # Shared presentation for a passenger's hover preview and confirmation summary.
 const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
+const STRESS_ICON := preload("res://assets/ui/icons/stress_brain.png")
 const CREAM := Color("faefd5")
 const MUTED := Color("b8ab92")
 const GOLD := Color("dfba78")
@@ -13,9 +16,12 @@ var badge_label: Label
 var fare_label: Label
 var fuel_label: Label
 var risk_label: Label
+var energy_cost_label: Label
+var stress_gain_label: Label
 var _badge_panel: PanelContainer
 var _metrics: HBoxContainer
 var _divider: HSeparator
+var _resource_costs: HBoxContainer
 var _built := false
 
 
@@ -41,6 +47,7 @@ func set_summary(summary: Dictionary) -> void:
 	var encounter := str(summary.get("kind", "")) == "encounter"
 	_metrics.visible = not encounter
 	_divider.visible = not encounter
+	_resource_costs.visible = not encounter and not summary.is_empty()
 	traffic_label.visible = not encounter
 	if encounter:
 		route_label.text = phase.capitalize() + " / " + str(summary.get("description", ""))
@@ -56,6 +63,8 @@ func set_summary(summary: Dictionary) -> void:
 		"HIGH":
 			risk_color = Color("f19a86")
 	risk_label.add_theme_color_override("font_color", risk_color)
+	energy_cost_label.text = "Energy -%d" % int(summary.get("energy_cost", GameTuning.TRIP_ENERGY_COST))
+	stress_gain_label.text = "Stress +%d" % int(summary.get("stress_gain", GameTuning.TRIP_STRESS_GAIN))
 
 
 func _build() -> void:
@@ -132,6 +141,50 @@ func _build() -> void:
 	fare_label = _metric(metrics, "EST. FARE", "EstimatedFare")
 	fuel_label = _metric(metrics, "EST. FUEL", "EstimatedFuel")
 	risk_label = _metric(metrics, "RISK", "TripRisk")
+	var cost_refs := create_resource_cost_row()
+	_resource_costs = cost_refs.row
+	_resource_costs.name = "TripResourceCosts"
+	energy_cost_label = cost_refs.energy_label
+	stress_gain_label = cost_refs.stress_label
+	content.add_child(_resource_costs)
+
+
+static func create_resource_cost_row(with_caption := false) -> Dictionary:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 20)
+	if with_caption:
+		var caption := _label(9, MUTED)
+		caption.text = "Per ride:"
+		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		caption.add_theme_color_override("font_outline_color", Color("181008"))
+		caption.add_theme_constant_override("outline_size", 2)
+		row.add_child(caption)
+	var refs := {"row": row}
+	for entry in [
+		{"id": "energy", "texture": ENERGY_ICON, "text": "Energy -%d" % GameTuning.TRIP_ENERGY_COST, "color": GOLD},
+		{"id": "stress", "texture": STRESS_ICON, "text": "Stress +%d" % GameTuning.TRIP_STRESS_GAIN, "color": Color("eea4b6")},
+	]:
+		var pair := HBoxContainer.new()
+		pair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pair.add_theme_constant_override("separation", 6)
+		row.add_child(pair)
+		var icon := TextureRect.new()
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.texture = entry.texture
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.custom_minimum_size = Vector2(18, 18)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pair.add_child(icon)
+		var value := _label(10, entry.color)
+		value.text = entry.text
+		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		value.add_theme_color_override("font_outline_color", Color("181008"))
+		value.add_theme_constant_override("outline_size", 2)
+		pair.add_child(value)
+		refs[entry.id + "_label"] = value
+	return refs
 
 
 func _metric(parent: HBoxContainer, caption: String, value_name: String) -> Label:
@@ -150,7 +203,7 @@ func _metric(parent: HBoxContainer, caption: String, value_name: String) -> Labe
 	return value
 
 
-func _label(font_size: int, color: Color) -> Label:
+static func _label(font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_override("font", FONT)

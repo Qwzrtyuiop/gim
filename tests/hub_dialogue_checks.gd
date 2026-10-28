@@ -352,7 +352,7 @@ static func _test_screen_integration(host: Node) -> void:
 	store.free()
 	_setup_screen_state()
 	var rider := PlayerState.get_character_by_id("generic_guy")
-	rider.merge({"active_distance": "short", "stage_traffic": "chill", "stage_special_type": PlayerState.STAGE_SPECIAL_TYPE_NONE}, true)
+	rider.merge({"active_distance": "short", "stage_traffic": "chill", "stage_special_type": PlayerState.STAGE_SPECIAL_TYPE_NONE, "pickup_location": "station", "pickup_variant": ""}, true)
 	PlayerState.lock_pending_trip_selection({"short": [rider, {}, {}], "medium": [{}, {}, {}], "long": [{}, {}, {}]}, "short")
 	var station = load("res://scenes/ride_selection.tscn").instantiate()
 	host.get_tree().root.add_child(station)

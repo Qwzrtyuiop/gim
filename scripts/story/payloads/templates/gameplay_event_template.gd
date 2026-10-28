@@ -51,7 +51,7 @@ static func build() -> Dictionary:
 					{
 						"type": "advance_time",
 						"days": 1,
-						"restore_energy": true,
+						"clear_stress": true,
 					},
 					{
 						"type": "increment_event_value",
@@ -73,7 +73,7 @@ static func build() -> Dictionary:
 						"amount": 10,
 					},
 					{
-						"type": "restore_energy",
+						"type": "relieve_stress",
 						"amount": 2,
 					},
 					{

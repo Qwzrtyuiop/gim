@@ -64,7 +64,7 @@ Use a line or choice action; the handoff waits until dialogue finishes:
 | Outcome | Behavior |
 | --- | --- |
 | `return` | Return to the existing passenger selection. This is the default. |
-| `ride` | Start the clicked passenger's stored ride, with its distance, traffic and special type. Apply normal entry checks, recovery and energy cost once. |
+| `ride` | Start the clicked passenger's stored ride, with its distance, traffic and special type. Apply normal entry checks, stress relief and trip stress once. |
 | `skip` | Spend one calendar phase without a ride or entry cost, then return to fresh offers in the reached phase. Daily resets and debt collection still apply. |
 
 `skip` advances the live clock by one phase, even when a selection screen is

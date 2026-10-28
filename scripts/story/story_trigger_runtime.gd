@@ -33,6 +33,8 @@ static func build_context(player_state, effective_day: int, context: Dictionary 
 		"current_day": effective_day,
 		"week": player_state.get_week_number(effective_day),
 		"money": player_state.money,
+		"stress": player_state.stress,
+		"hull": player_state.hull,
 		"energy": player_state.energy,
 		"gas": player_state.gas,
 		"gas_price": player_state.get_gas_price(),

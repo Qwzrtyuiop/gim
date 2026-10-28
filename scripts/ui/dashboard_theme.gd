@@ -48,6 +48,41 @@ static func apply_button(button: Button) -> void:
 	button.add_theme_constant_override("outline_size", 0)
 
 
+# Bottom navigation keeps its reading order and scales as one row when needed.
+static func layout_button_row(buttons: Array, viewport_size: Vector2) -> Rect2:
+	var visible_buttons: Array[Button] = []
+	var button_size := BUTTON_SIZE
+	for candidate in buttons:
+		var button := candidate as Button
+		if button == null:
+			continue
+		button.scale = Vector2.ONE
+		if button.visible:
+			visible_buttons.append(button)
+			button_size = button_size.max(button.get_combined_minimum_size())
+	if visible_buttons.is_empty():
+		return Rect2()
+	var gap := 12.0
+	var row_width := button_size.x * visible_buttons.size() + gap * (visible_buttons.size() - 1)
+	var available := (viewport_size - Vector2(40, 32)).max(Vector2.ONE)
+	var fit := minf(1.0, minf(available.x / row_width, available.y / button_size.y))
+	var row_size := Vector2(row_width, button_size.y) * fit
+	var origin := Vector2(20.0, maxf(0.0, viewport_size.y - 16.0 - row_size.y))
+	for index in range(visible_buttons.size()):
+		var button := visible_buttons[index]
+		button.pivot_offset = Vector2.ZERO
+		button.size = button_size
+		button.scale = Vector2.ONE * fit
+		button.position = origin + Vector2(index * (button_size.x + gap) * fit, 0.0)
+		var previous := visible_buttons[posmod(index - 1, visible_buttons.size())]
+		var next := visible_buttons[(index + 1) % visible_buttons.size()]
+		button.focus_neighbor_left = button.get_path_to(previous)
+		button.focus_neighbor_right = button.get_path_to(next)
+		button.focus_previous = button.focus_neighbor_left
+		button.focus_next = button.focus_neighbor_right
+	return Rect2(origin, row_size)
+
+
 static func _texture_style(texture: Texture2D) -> StyleBoxTexture:
 	var style := StyleBoxTexture.new()
 	style.texture = texture
