@@ -88,6 +88,7 @@ func _ready() -> void:
 	await load("res://tests/stress_travel_checks.gd").run(self)
 	await load("res://tests/construction_work_checks.gd").run(self)
 	await load("res://tests/location_visit_checks.gd").run(self)
+	await load("res://tests/fishing_checks.gd").run(self)
 	await load("res://tests/achievement_reward_checks.gd").run(self)
 	await load("res://tests/generic_passenger_event_checks.gd").run(self)
 	await load("res://tests/local_hub_audio_checks.gd").run(self)

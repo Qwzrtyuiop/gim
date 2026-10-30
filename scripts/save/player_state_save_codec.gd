@@ -5,6 +5,7 @@ const GameSaveResourceData := preload("res://scripts/save/game_save_resource.gd"
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const AchievementServiceData := preload("res://scripts/achievement_service.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
+const PlayerFishingState := preload("res://scripts/state/player_fishing_state.gd")
 const SeededRiderRuntimeData := preload("res://scripts/seeded_rider_runtime.gd")
 const StoryTriggerServiceData := preload("res://scripts/story/story_trigger_service.gd")
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
@@ -138,6 +139,8 @@ static func load_snapshot(player_state, save_resource: GameSaveResourceData) -> 
 	player_state.run_failed = bool(save_data.get("run_failed", player_state.run_failed))
 	player_state.run_fail_reason = str(save_data.get("run_fail_reason", player_state.run_fail_reason))
 	player_state.last_stage_result = Dictionary(save_data.get("last_stage_result", {})).duplicate(true)
+	# Fishing is additive within version 5; older slots begin with an empty creel.
+	player_state.fish_catches = PlayerFishingState.normalize_catches(save_data.get("fish_catches", []))
 	player_state.story_triggers.clear()
 	var saved_story_triggers: Array = save_data.get("story_triggers", [])
 	for trigger_data in saved_story_triggers:
@@ -255,6 +258,7 @@ static func build_snapshot(player_state, save_version: int) -> GameSaveResourceD
 		"run_failed": player_state.run_failed,
 		"run_fail_reason": player_state.run_fail_reason,
 		"last_stage_result": player_state.last_stage_result.duplicate(true),
+		"fish_catches": player_state.fish_catches.duplicate(true),
 		"story_triggers": player_state.story_triggers.duplicate(true),
 		"consumed_story_triggers": player_state.consumed_story_triggers.duplicate(true),
 		"upgrades": player_state.upgrades.duplicate(true),
@@ -301,6 +305,9 @@ static func snapshot_error(snapshot: Resource, maximum_version: int, require_slo
 			return "This save is missing progress data."
 		if data.has(field) and not data[field] is Array:
 			return "This save contains invalid event data."
+	# Optional for existing version-5 slots made before fishing inventory was added.
+	if data.has("fish_catches") and not data.fish_catches is Array:
+		return "This save contains invalid fishing data."
 	if data.has("current_day") and int(data.current_day) < 1:
 		return "This save contains an invalid day."
 	for field in ["resume_scene_path", "current_stage_type", "current_stage_special_type", "current_special_stage_id", "current_phase", "current_weather", "current_mock_character_id", "last_seen_story_id", "run_fail_reason"]:

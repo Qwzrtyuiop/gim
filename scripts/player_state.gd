@@ -15,6 +15,7 @@ const PlayerCrashRepairState := preload("res://scripts/state/player_crash_repair
 const PlayerConstructionState := preload("res://scripts/state/player_construction_state.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
+const PlayerFishingState := preload("res://scripts/state/player_fishing_state.gd")
 const PlayerLocationVisitState := preload("res://scripts/state/player_location_visit_state.gd")
 const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
 const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
@@ -157,6 +158,7 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 
 # Persistent run state
 var last_stage_result: Dictionary = {}
+var fish_catches: Array[Dictionary] = []
 var max_stress := DEFAULT_MAX_STRESS:
 	set(_value):
 		max_stress = AchievementServiceData.stress_capacity(achievements)
@@ -798,6 +800,18 @@ func has_visited_location_today(location_id: String) -> bool:
 
 func record_location_visit(location_id: String) -> int:
 	return PlayerLocationVisitState.record_visit(self, location_id)
+
+
+func record_fish_catch(catch_data: Dictionary) -> Dictionary:
+	return PlayerFishingState.record_catch(self, catch_data)
+
+
+func get_fish_catches() -> Array[Dictionary]:
+	return PlayerFishingState.get_catches(self)
+
+
+func get_fish_size_records(fish_id: String) -> Dictionary:
+	return PlayerFishingState.size_records(self, fish_id)
 
 
 func get_stress_shield_points() -> int:

@@ -148,7 +148,7 @@ func _position_markers() -> void:
 
 
 func _update_status() -> void:
-	_status.text = "CLICKS %d/%d    CONDITION %d/%d" % [_clicks, GameTuning.GARAGE_REPAIR_MAX_ATTEMPTS, PlayerState.hull, PlayerState.max_hull]
+	_status.text = "ATTEMPTS %d/%d    CONDITION %d/%d" % [_clicks, GameTuning.GARAGE_REPAIR_MAX_ATTEMPTS, PlayerState.hull, PlayerState.max_hull]
 
 
 func _show_feedback(success: bool) -> void:

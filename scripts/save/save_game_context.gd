@@ -42,6 +42,10 @@ static func save_block_reason(scene: Node = null) -> String:
 		var repairs: Variant = hub_map.get("garage_repair_overlay")
 		if is_instance_valid(repairs) and bool(repairs.active):
 			return "Finish the garage repairs before saving."
+	if hub_map != null and _has_property(hub_map, "fishing_overlay"):
+		var fishing: Variant = hub_map.get("fishing_overlay")
+		if is_instance_valid(fishing) and bool(fishing.active):
+			return "Close fishing before saving."
 	var reader := _story_reader(scene)
 	if reader != null:
 		if bool(reader.story_payload.get("replay", false)) or bool(reader.story_payload.get("memory_replay", false)):

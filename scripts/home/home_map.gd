@@ -39,6 +39,8 @@ const AlmaDelivery := preload("res://scripts/home/alma_delivery_encounter.gd")
 const ConstructionWorkOverlay := preload("res://scripts/home/construction_work_overlay.gd")
 const GarageTricycleHotspot := preload("res://scripts/home/garage_tricycle_hotspot.gd")
 const GarageRepairOverlay := preload("res://scripts/home/garage_repair_overlay.gd")
+const FishingOverlay := preload("res://scripts/home/fishing_overlay.gd")
+const PierDockHotspot := preload("res://scripts/home/pier_dock_hotspot.gd")
 const WORK_OVERLAY_SCENE := preload("res://scenes/construction_work_overlay.tscn")
 const LOCATIONS := "res://assets/story/backgrounds/locations/"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
@@ -81,6 +83,11 @@ var hub_story_overlay: HubStoryOverlay
 var work_overlay: ConstructionWorkOverlay
 var garage_tricycle: GarageTricycleHotspot
 var garage_repair_overlay: GarageRepairOverlay
+var fishing_overlay: FishingOverlay
+var pier_dock: PierDockHotspot
+var pier_shop: PierDockHotspot
+var fishing_confirmation: TravelConfirmation
+var fishing_shop: TravelConfirmation
 var _repair_shake: Tween
 # Keep the scene's public node references for callers that inspect the bar cast.
 var alma_spawn: BarAlmaSpawn
@@ -153,6 +160,15 @@ func _ready() -> void:
 	garage_repair_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	garage_repair_overlay.finished.connect(_finish_garage_repairs)
 	garage_repair_overlay.attempt_resolved.connect(_shake_garage_repairs)
+	fishing_overlay = FishingOverlay.new()
+	add_child(fishing_overlay)
+	fishing_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	fishing_overlay.finished.connect(_finish_fishing)
+	fishing_confirmation = _build_pier_dialog("FishingConfirmation")
+	fishing_confirmation.confirmed.connect(_confirm_fishing)
+	fishing_confirmation.cancelled.connect(_cancel_fishing)
+	fishing_shop = _build_pier_dialog("FishingShopPlaceholder")
+	fishing_shop.cancelled.connect(_close_fishing_shop)
 	resized.connect(_layout)
 	_layout()
 	hide()
@@ -399,6 +415,8 @@ func _visit(location_id: String) -> void:
 	BackgroundWeather.apply(background, map_crop)
 	_refresh_rain_environment()
 	garage_tricycle.visible = location_id == "garage"
+	pier_dock.visible = location_id == "pier"
+	pier_shop.visible = location_id == "pier"
 	entrance_button.visible = location_id == "bar"
 	exit_button.text = "BACK" if location_id == "garage" else "OUTSIDE"
 	exit_button.visible = location_id == "garage"
@@ -595,6 +613,76 @@ func _stop_repair_shake() -> void:
 	position = Vector2.ZERO
 
 
+func _open_fishing(confirmed: bool = false) -> void:
+	if _has_activity_overlay() or current_location != "pier" or not is_visible_in_tree() or not location_view.visible or map_view.visible or hub_dialogue.blocks_input():
+		return
+	hub_dialogue.clear()
+	_lock_shop_controls()
+	if not confirmed:
+		fishing_confirmation.present("fishing", 0)
+		fishing_confirmation.heading_label.text = "Start fishing?"
+		fishing_confirmation.cost_label.hide()
+		fishing_confirmation.confirm_button.text = "YES"
+		fishing_confirmation.cancel_button.text = "NO"
+		fishing_confirmation.call_deferred("_layout")
+		return
+	fishing_overlay.present()
+	pier_dock.release_focus()
+
+
+func _confirm_fishing() -> void:
+	if not fishing_confirmation.visible:
+		return
+	fishing_confirmation.dismiss()
+	_restore_shop_controls()
+	_open_fishing(true)
+
+
+func _cancel_fishing() -> void:
+	if not fishing_confirmation.visible:
+		return
+	fishing_confirmation.dismiss()
+	_restore_shop_controls()
+	pier_dock.grab_focus()
+
+
+func _finish_fishing() -> void:
+	_restore_shop_controls()
+	status_header.refresh()
+	pier_dock.grab_focus()
+
+
+func _open_fishing_shop() -> void:
+	if _has_activity_overlay() or current_location != "pier" or not is_visible_in_tree() or not location_view.visible or map_view.visible or hub_dialogue.blocks_input():
+		return
+	hub_dialogue.clear()
+	_lock_shop_controls()
+	fishing_shop.present("fishing shop", 0)
+	fishing_shop.heading_label.text = "FISHING SHOP"
+	fishing_shop.cost_label.text = "Fishing supplies coming soon."
+	fishing_shop.confirm_button.hide()
+	fishing_shop.cancel_button.text = "CLOSE"
+	fishing_shop.call_deferred("_layout")
+	pier_shop.release_focus()
+
+
+func _close_fishing_shop() -> void:
+	if not fishing_shop.visible:
+		return
+	fishing_shop.dismiss()
+	_restore_shop_controls()
+	pier_shop.grab_focus()
+
+
+func _build_pier_dialog(dialog_name: String) -> TravelConfirmation:
+	var dialog := TravelConfirmation.new()
+	add_child(dialog)
+	dialog.name = dialog_name
+	dialog.z_index = 350
+	dialog.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	return dialog
+
+
 func _can_open_bar_shop() -> bool:
 	return is_visible_in_tree() and location_view.visible and current_location == "bar" and inside_bar and PlayerState.get_current_time_of_day() == "night" and not hub_dialogue.blocks_input() and not hospital_shop.visible
 
@@ -611,7 +699,7 @@ func _open_bar_shop() -> void:
 
 func _lock_shop_controls() -> void:
 	_shop_disabled_controls.clear()
-	for button: BaseButton in [map_button, store_button, entrance_button, exit_button, shop_button, garage_tricycle]:
+	for button: BaseButton in [map_button, store_button, entrance_button, exit_button, shop_button, garage_tricycle, pier_dock, pier_shop]:
 		_shop_disabled_controls[button] = button.disabled
 		button.disabled = true
 
@@ -708,7 +796,15 @@ func restore_hospital_after_story() -> void:
 
 
 func _has_activity_overlay() -> bool:
-	return (hub_story_overlay != null and hub_story_overlay.active) or (work_overlay != null and work_overlay.active) or (garage_repair_overlay != null and garage_repair_overlay.active) or (repair_confirmation != null and repair_confirmation.visible)
+	return (
+		(hub_story_overlay != null and hub_story_overlay.active)
+		or (work_overlay != null and work_overlay.active)
+		or (garage_repair_overlay != null and garage_repair_overlay.active)
+		or (repair_confirmation != null and repair_confirmation.visible)
+		or (fishing_overlay != null and fishing_overlay.active)
+		or (fishing_confirmation != null and fishing_confirmation.visible)
+		or (fishing_shop != null and fishing_shop.visible)
+	)
 
 
 func _can_talk_to_construction_benny() -> bool:
@@ -923,6 +1019,15 @@ func _build_location_view() -> void:
 	background.add_child(garage_tricycle)
 	garage_tricycle.pressed.connect(_open_garage_repairs)
 	UIAudioManager.attach_button(garage_tricycle)
+	pier_dock = PierDockHotspot.new()
+	background.add_child(pier_dock)
+	pier_dock.pressed.connect(_open_fishing)
+	UIAudioManager.attach_button(pier_dock)
+	pier_shop = PierDockHotspot.new()
+	pier_shop.selection_id = "shop"
+	background.add_child(pier_shop)
+	pier_shop.pressed.connect(_open_fishing_shop)
+	UIAudioManager.attach_button(pier_shop)
 	bar_characters = BarCharacters.new()
 	add_child(bar_characters)
 	bar_characters.setup(background)
@@ -1013,6 +1118,7 @@ func _layout() -> void:
 		var fit := minf(size.x / art_size.x, size.y / art_size.y)
 		entrance_button.position = (size - art_size * fit) * 0.5 + BAR_ENTRANCE.position * fit
 		entrance_button.size = BAR_ENTRANCE.size * fit
-		garage_tricycle.position = (size - art_size * fit) * 0.5
-		garage_tricycle.size = art_size * fit
+		for hotspot: Control in [garage_tricycle, pier_dock, pier_shop]:
+			hotspot.position = (size - art_size * fit) * 0.5
+			hotspot.size = art_size * fit
 	bar_characters.layout_in(size)

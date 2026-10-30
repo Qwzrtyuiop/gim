@@ -149,6 +149,7 @@ static func reset_daily_run_state(player_state) -> void:
 
 
 static func apply_new_run_defaults(player_state) -> void:
+	player_state.fish_catches.clear()
 	player_state.stage_round = 0
 	player_state.current_stage_type = player_state.FIRST_STAGE_TYPE
 	player_state.current_stage_special_type = player_state.STAGE_SPECIAL_TYPE_NONE
