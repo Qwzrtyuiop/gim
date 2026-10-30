@@ -86,12 +86,12 @@ static func normalize_rule(player_state, rule_data: Dictionary) -> Dictionary:
 static func consume_rules(consumed_seeded_rider_rules: Dictionary, rule_ids: Array) -> bool:
 	var consumed_any := false
 	for rule_id_variant in rule_ids:
-		var rule_id := str(rule_id_variant).strip_edges()
-		if rule_id.is_empty():
+		var consumed_rule_id := str(rule_id_variant).strip_edges()
+		if consumed_rule_id.is_empty():
 			continue
-		if bool(consumed_seeded_rider_rules.get(rule_id, false)):
+		if bool(consumed_seeded_rider_rules.get(consumed_rule_id, false)):
 			continue
-		consumed_seeded_rider_rules[rule_id] = true
+		consumed_seeded_rider_rules[consumed_rule_id] = true
 		consumed_any = true
 	return consumed_any
 

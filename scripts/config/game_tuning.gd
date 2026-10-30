@@ -101,6 +101,15 @@ const CRASH_FLICKER_ALPHA := 0.35
 # Mechanic and trip-ending crash repairs share the same per-hull rate.
 const HULL_REPAIR_COST_PER_POINT := 50
 const HULL_REPAIR_AMOUNT := 2
+# Garage repairs: one energy buys a session of up to three timed clicks.
+const GARAGE_REPAIR_ENERGY_COST := 1
+const GARAGE_REPAIR_MAX_ATTEMPTS := 3
+const GARAGE_REPAIR_HULL_PER_SUCCESS := 1
+const GARAGE_REPAIR_SLIDER_SPEED := 0.75
+const GARAGE_REPAIR_CLICK_COOLDOWN_SECONDS := 0.2
+const GARAGE_REPAIR_FEEDBACK_SECONDS := 0.8
+const GARAGE_REPAIR_SHAKE_PIXELS := 3.0
+const GARAGE_REPAIR_SHAKE_SECONDS := 0.16
 const CRASH_REPAIR_HULL_RESTORE := 4
 const CRASH_REPAIR_FREE_HULL_RESTORE := 1
 const CRASH_REPAIR_DAYS := 1

@@ -37,6 +37,8 @@ const ParkVisitEncounter := preload("res://scripts/home/park_visit_encounter.gd"
 const ChurchAudio := preload("res://scripts/home/church_audio.gd")
 const AlmaDelivery := preload("res://scripts/home/alma_delivery_encounter.gd")
 const ConstructionWorkOverlay := preload("res://scripts/home/construction_work_overlay.gd")
+const GarageTricycleHotspot := preload("res://scripts/home/garage_tricycle_hotspot.gd")
+const GarageRepairOverlay := preload("res://scripts/home/garage_repair_overlay.gd")
 const WORK_OVERLAY_SCENE := preload("res://scenes/construction_work_overlay.tscn")
 const LOCATIONS := "res://assets/story/backgrounds/locations/"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
@@ -47,13 +49,15 @@ const BAR_CLOSED_MESSAGE := "It's closed. I should try again later."
 const HOSPITAL_LOCKED_MESSAGE := "I don't really have a reason to go there.."
 const ABANDONED_BUILDING_MESSAGE := "Why would I go there?"
 const NORTH_ROAD_UNLOCK_DAY := 8
-const FREE_TRAVEL_LOCATIONS := ["home", "station", "store", "market", "street", "pier", "abandoned_building", "big_station", "school"]
+const FREE_TRAVEL_LOCATIONS := ["home", "garage", "station", "store", "market", "street", "pier", "abandoned_building", "big_station", "school"]
 const LOCATION_PASSENGER_ABSENCES := {
 	"bar": "alma_bar_visit_absence",
 	"hospital": "celina_hospital_visit_absence",
 }
 const NORTH_ROAD_CLOSED_MESSAGE := "There's road construction ahead. I can't get through. It'll take about a week or so. I should check again later."
 const BACKGROUNDS := {
+	"garage": ["garagenormal.png", "garagenight.png"],
+	"pier": ["pier.png", "piernight.png"],
 	"market": ["market.png", "marketnight.png"],
 	"street": ["passengerstreetday.png", "passengerstreetnight.png", "passengerstreetmidnight.png"],
 	"park": ["park.png", "parknight.png"],
@@ -75,6 +79,9 @@ var construction_audio: ConstructionAudio
 var church_audio: ChurchAudio
 var hub_story_overlay: HubStoryOverlay
 var work_overlay: ConstructionWorkOverlay
+var garage_tricycle: GarageTricycleHotspot
+var garage_repair_overlay: GarageRepairOverlay
+var _repair_shake: Tween
 # Keep the scene's public node references for callers that inspect the bar cast.
 var alma_spawn: BarAlmaSpawn
 var benny_spawn: TextureButton
@@ -94,6 +101,7 @@ var inside_bar := false
 var entrance_highlight_mode := InputHighlightMode.new()
 var entrance_focus_style: StyleBoxFlat
 var travel_confirmation: TravelConfirmation
+var repair_confirmation: TravelConfirmation
 var _pending_destination := ""
 var _shop_disabled_controls: Dictionary = {}
 var _suppress_shop_closing_dialogue := false
@@ -117,6 +125,13 @@ func _ready() -> void:
 	travel_confirmation.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	travel_confirmation.confirmed.connect(_confirm_travel)
 	travel_confirmation.cancelled.connect(_cancel_travel)
+	repair_confirmation = TravelConfirmation.new()
+	add_child(repair_confirmation)
+	repair_confirmation.name = "GarageRepairConfirmation"
+	repair_confirmation.z_index = 350
+	repair_confirmation.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	repair_confirmation.confirmed.connect(_confirm_garage_repairs)
+	repair_confirmation.cancelled.connect(_cancel_garage_repairs)
 	bar_audio = BarAudio.new()
 	add_child(bar_audio)
 	bar_audio.active_changed.connect(bar_music_changed.emit)
@@ -133,6 +148,11 @@ func _ready() -> void:
 	add_child(work_overlay)
 	work_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	work_overlay.finished.connect(_finish_construction_work)
+	garage_repair_overlay = GarageRepairOverlay.new()
+	add_child(garage_repair_overlay)
+	garage_repair_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	garage_repair_overlay.finished.connect(_finish_garage_repairs)
+	garage_repair_overlay.attempt_resolved.connect(_shake_garage_repairs)
 	resized.connect(_layout)
 	_layout()
 	hide()
@@ -156,7 +176,7 @@ func _input(event: InputEvent) -> void:
 		_update_entrance_focus()
 
 
-func open(origin: String = "home") -> void:
+func open(origin: String = "home", initial_location: String = "") -> void:
 	origin_location = origin if origin in ["home", "station", "store"] else "home"
 	current_location = "market" if origin_location == "store" else origin_location
 	if origin_location == "station":
@@ -166,7 +186,10 @@ func open(origin: String = "home") -> void:
 	map_view.set_map_region("town")
 	map_view.set_night(PlayerState.get_current_time_of_day() == "night")
 	show()
-	_show_map()
+	if initial_location == "garage" and origin_location == "home":
+		_visit("garage")
+	else:
+		_show_map()
 
 
 func _show_map() -> void:
@@ -201,6 +224,8 @@ func _show_map() -> void:
 
 
 func travel_energy_cost(location_id: String) -> int:
+	if location_id == "church" and PlayerState.get_current_time_of_day() == "night":
+		return 0
 	if _daily_visit_blocked(location_id):
 		return 0
 	if location_id == "construction_site" and bool(PlayerState.get_event_value(ConstructionState.UNLOCK_EVENT, false)):
@@ -257,6 +282,9 @@ func _dismiss_travel_confirmation() -> void:
 
 func _visit(location_id: String) -> void:
 	if _has_activity_overlay():
+		return
+	if location_id == "church" and PlayerState.get_current_time_of_day() == "night":
+		_show_location_message("It's closed.", "map_church")
 		return
 	if _daily_visit_blocked(location_id):
 		if map_view.buttons.has(location_id):
@@ -370,8 +398,10 @@ func _visit(location_id: String) -> void:
 		background.texture = load(art_path if art_path.begins_with("res://") else LOCATIONS + art_path) as Texture2D
 	BackgroundWeather.apply(background, map_crop)
 	_refresh_rain_environment()
+	garage_tricycle.visible = location_id == "garage"
 	entrance_button.visible = location_id == "bar"
-	exit_button.hide()
+	exit_button.text = "BACK" if location_id == "garage" else "OUTSIDE"
+	exit_button.visible = location_id == "garage"
 	shop_button.visible = location_id == "hospital" and bool(PlayerState.get_event_value("celina_hospital_shop_unlocked", false))
 	store_button.visible = location_id == "market"
 	status_header.refresh()
@@ -492,6 +522,79 @@ func _exit_bar() -> void:
 	_layout()
 
 
+func _exit_location() -> void:
+	if current_location == "garage":
+		_close()
+	else:
+		_exit_bar()
+
+
+func _open_garage_repairs(confirmed: bool = false) -> void:
+	if _has_activity_overlay() or current_location != "garage" or not is_visible_in_tree() or not location_view.visible or map_view.visible or hub_dialogue.blocks_input():
+		return
+	if PlayerState.hull >= PlayerState.max_hull:
+		_show_location_message("The tricycle is already in good condition.", "garage_tricycle")
+		return
+	if PlayerState.energy < GameTuning.GARAGE_REPAIR_ENERGY_COST:
+		_show_location_message("I'm too tired to work on the tricycle. I should rest first.", "garage_tricycle")
+		return
+	hub_dialogue.clear()
+	if not confirmed:
+		_lock_shop_controls()
+		repair_confirmation.present("repairs", GameTuning.GARAGE_REPAIR_ENERGY_COST)
+		repair_confirmation.heading_label.text = "Spend %d energy to attempt repairs?" % GameTuning.GARAGE_REPAIR_ENERGY_COST
+		repair_confirmation.cost_label.hide()
+		repair_confirmation.confirm_button.text = "YES"
+		repair_confirmation.cancel_button.text = "NO"
+		repair_confirmation.call_deferred("_layout")
+		return
+	if not PlayerState.spend_energy(GameTuning.GARAGE_REPAIR_ENERGY_COST):
+		return
+	_lock_shop_controls()
+	garage_repair_overlay.present()
+	garage_tricycle.release_focus()
+
+
+func _confirm_garage_repairs() -> void:
+	if not repair_confirmation.visible:
+		return
+	repair_confirmation.dismiss()
+	_restore_shop_controls()
+	_open_garage_repairs(true)
+
+
+func _cancel_garage_repairs() -> void:
+	if not repair_confirmation.visible:
+		return
+	repair_confirmation.dismiss()
+	_restore_shop_controls()
+	garage_tricycle.grab_focus()
+
+
+func _finish_garage_repairs() -> void:
+	_stop_repair_shake()
+	_restore_shop_controls()
+	status_header.refresh()
+	garage_tricycle.grab_focus()
+
+
+func _shake_garage_repairs(_success: bool) -> void:
+	_stop_repair_shake()
+	var strength := GameTuning.GARAGE_REPAIR_SHAKE_PIXELS * size.y / 720.0
+	var step := GameTuning.GARAGE_REPAIR_SHAKE_SECONDS / 4.0
+	_repair_shake = create_tween()
+	_repair_shake.tween_property(self, "position", Vector2(strength, -strength * 0.5), step)
+	_repair_shake.tween_property(self, "position", Vector2(-strength, strength * 0.5), step)
+	_repair_shake.tween_property(self, "position", Vector2(strength * 0.5, 0), step)
+	_repair_shake.tween_property(self, "position", Vector2.ZERO, step)
+
+
+func _stop_repair_shake() -> void:
+	if _repair_shake != null and _repair_shake.is_valid():
+		_repair_shake.kill()
+	position = Vector2.ZERO
+
+
 func _can_open_bar_shop() -> bool:
 	return is_visible_in_tree() and location_view.visible and current_location == "bar" and inside_bar and PlayerState.get_current_time_of_day() == "night" and not hub_dialogue.blocks_input() and not hospital_shop.visible
 
@@ -508,7 +611,7 @@ func _open_bar_shop() -> void:
 
 func _lock_shop_controls() -> void:
 	_shop_disabled_controls.clear()
-	for button: BaseButton in [map_button, store_button, entrance_button, exit_button, shop_button]:
+	for button: BaseButton in [map_button, store_button, entrance_button, exit_button, shop_button, garage_tricycle]:
 		_shop_disabled_controls[button] = button.disabled
 		button.disabled = true
 
@@ -605,7 +708,7 @@ func restore_hospital_after_story() -> void:
 
 
 func _has_activity_overlay() -> bool:
-	return (hub_story_overlay != null and hub_story_overlay.active) or (work_overlay != null and work_overlay.active)
+	return (hub_story_overlay != null and hub_story_overlay.active) or (work_overlay != null and work_overlay.active) or (garage_repair_overlay != null and garage_repair_overlay.active) or (repair_confirmation != null and repair_confirmation.visible)
 
 
 func _can_talk_to_construction_benny() -> bool:
@@ -794,7 +897,10 @@ func _refresh_rain_environment() -> void:
 
 
 func _update_entrance_focus() -> void:
-	entrance_button.add_theme_stylebox_override("focus", entrance_focus_style if entrance_highlight_mode.keyboard_active else StyleBoxEmpty.new())
+	var focus_style: StyleBox = entrance_focus_style
+	if not entrance_highlight_mode.keyboard_active:
+		focus_style = StyleBoxEmpty.new()
+	entrance_button.add_theme_stylebox_override("focus", focus_style)
 
 
 func _build_location_view() -> void:
@@ -812,6 +918,11 @@ func _build_location_view() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	location_view.add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	garage_tricycle = GarageTricycleHotspot.new()
+	garage_tricycle.tooltip_text = "Attempt repairs: -%d energy, up to +%d condition" % [GameTuning.GARAGE_REPAIR_ENERGY_COST, GameTuning.GARAGE_REPAIR_MAX_ATTEMPTS * GameTuning.GARAGE_REPAIR_HULL_PER_SUCCESS]
+	background.add_child(garage_tricycle)
+	garage_tricycle.pressed.connect(_open_garage_repairs)
+	UIAudioManager.attach_button(garage_tricycle)
 	bar_characters = BarCharacters.new()
 	add_child(bar_characters)
 	bar_characters.setup(background)
@@ -851,7 +962,7 @@ func _build_location_view() -> void:
 	add_child(status_header)
 	map_button = _button("MAP", _show_map)
 	store_button = _button("STORE", _depart.bind(STORE_SCENE))
-	exit_button = _button("OUTSIDE", _exit_bar)
+	exit_button = _button("OUTSIDE", _exit_location)
 	exit_button.hide()
 	shop_button = _button("SHOP", _open_location_shop)
 	shop_button.name = "BarShopButton"
@@ -861,8 +972,10 @@ func _build_location_view() -> void:
 	hub_dialogue.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hub_dialogue.safe_top = HubStatusHeader.CONTENT_TOP
 	hub_dialogue.register_control("entrance", entrance_button)
+	hub_dialogue.register_control("garage_tricycle", garage_tricycle)
 	hub_dialogue.register_control("map_bar", map_view.buttons.bar)
 	hub_dialogue.register_control("map_hospital", map_view.buttons.hospital)
+	hub_dialogue.register_control("map_church", map_view.buttons.church)
 	hub_dialogue.register_control("map_north", map_view.buttons.north)
 	bar_characters.setup_dialogue(hub_dialogue)
 	hospital_characters.setup_dialogue(hub_dialogue)
@@ -900,4 +1013,6 @@ func _layout() -> void:
 		var fit := minf(size.x / art_size.x, size.y / art_size.y)
 		entrance_button.position = (size - art_size * fit) * 0.5 + BAR_ENTRANCE.position * fit
 		entrance_button.size = BAR_ENTRANCE.size * fit
+		garage_tricycle.position = (size - art_size * fit) * 0.5
+		garage_tricycle.size = art_size * fit
 	bar_characters.layout_in(size)

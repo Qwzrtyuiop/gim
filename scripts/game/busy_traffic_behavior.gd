@@ -27,7 +27,7 @@ static func spawn_side(rng: RandomNumberGenerator, player_speed: float, player_m
 	return RIGHT_SPAWN_SIDE
 
 
-static func spawn_x(viewport_size: Vector2, side: String, rng: RandomNumberGenerator, player_speed: float, player_max_speed: float) -> float:
+static func spawn_x(viewport_size: Vector2, side: String, rng: RandomNumberGenerator, _player_speed: float, _player_max_speed: float) -> float:
 	if side == LEFT_SPAWN_SIDE:
 		return -rng.randf_range(BACK_SPAWN_MIN_OFFSET, BACK_SPAWN_MAX_OFFSET)
 

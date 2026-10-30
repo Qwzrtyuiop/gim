@@ -286,8 +286,8 @@ func _can_present() -> bool:
 func _update_context() -> bool:
 	if bubble == null:
 		return false
-	var ready := _can_present()
-	if not ready:
+	var can_present := _can_present()
+	if not can_present:
 		bubble.hide()
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 		if playback != null:

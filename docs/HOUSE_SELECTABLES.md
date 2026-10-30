@@ -27,12 +27,14 @@ The supplied images remain unchanged.
 | `radio` | 79, 474, 138, 137 | News/weather radio |
 | `calendar` | 799, 392, 65, 114 | Calendar and debt |
 | `rest` | 1488, 228, 107, 545 | Rest/Sleep confirmation |
-| `ride` | Existing normalized floor polygon | Go outside: Ride or Shop |
+| `garage` | Existing normalized floor polygon | Open the garage |
 
-There is no exit sprite in the supplied sheet. The bottom-right floor exit keeps
-its existing polygon, with a subtle highlight when hovered/focused. All four
-actions retain their tutorial, modal and resource behavior. Local speech follows
-the current item bounds, including hover enlargement and letterboxing.
+There is no exit sprite in the supplied sheet. The bottom-right floor selector
+uses its original polygon, with a subtle highlight when hovered/focused, and
+opens the garage without advancing time or spending energy. The garage uses
+day/night artwork and the indoor rain mask; BACK returns to the room and MAP
+opens normal travel. Local speech follows the current item bounds, including
+hover enlargement and letterboxing.
 
 ## Updating the artwork
 

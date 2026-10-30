@@ -8,8 +8,8 @@ const GameTuning := preload("res://scripts/config/game_tuning.gd")
 # If a feature needs to survive scene changes or be saved, it usually belongs here.
 
 # Shared services
-const AchievementService := preload("res://scripts/achievement_service.gd")
-const PlayerStateSaveCodec := preload("res://scripts/save/player_state_save_codec.gd")
+const AchievementServiceData := preload("res://scripts/achievement_service.gd")
+const PlayerStateSaveCodecData := preload("res://scripts/save/player_state_save_codec.gd")
 const PlayerCharacterProgressState := preload("res://scripts/state/player_character_progress_state.gd")
 const PlayerCrashRepairState := preload("res://scripts/state/player_crash_repair_state.gd")
 const PlayerConstructionState := preload("res://scripts/state/player_construction_state.gd")
@@ -25,19 +25,25 @@ const PlayerStageState := preload("res://scripts/state/player_stage_state.gd")
 const PlayerStoryState := preload("res://scripts/state/player_story_state.gd")
 const PlayerUpgradeState := preload("res://scripts/state/player_upgrade_state.gd")
 const PlayerWeatherState := preload("res://scripts/state/player_weather_state.gd")
-const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
-const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
+const SeededRiderRuntimeData := preload("res://scripts/seeded_rider_runtime.gd")
+const StoryCatalogData := preload("res://scripts/story/story_catalog.gd")
 
 # Signals
 signal money_changed(amount: int)
 signal stress_changed(amount: int)
+# Emitted by PlayerStressShieldState through the shared state owner.
+@warning_ignore("unused_signal")
 signal stress_shield_changed(points: int)
 signal hull_changed(amount: int)
 # Compatibility notification for legacy consumers.
 signal energy_changed(amount: int)
 signal gas_changed(amount: float)
 signal karma_changed(amount: int)
+# Emitted by PlayerUpgradeState through the shared state owner.
+@warning_ignore("unused_signal")
 signal upgrade_changed(upgrade_id: String, level: int)
+# Emitted by AchievementService through the shared state owner.
+@warning_ignore("unused_signal")
 signal achievement_unlocked(achievement_id: String)
 
 # Run configuration
@@ -153,13 +159,13 @@ const TRAFFIC_EARNINGS_MULTIPLIERS := {
 var last_stage_result: Dictionary = {}
 var max_stress := DEFAULT_MAX_STRESS:
 	set(_value):
-		max_stress = AchievementService.stress_capacity(achievements)
+		max_stress = AchievementServiceData.stress_capacity(achievements)
 var max_hull := DEFAULT_MAX_HULL:
 	set(_value):
 		max_hull = DEFAULT_MAX_HULL
 var max_energy := DEFAULT_MAX_ENERGY:
 	set(_value):
-		max_energy = AchievementService.energy_capacity(achievements)
+		max_energy = AchievementServiceData.energy_capacity(achievements)
 var max_gas := DEFAULT_MAX_GAS_PERCENT
 var current_stage_type := FIRST_STAGE_TYPE
 var current_stage_special_type := STAGE_SPECIAL_TYPE_NONE
@@ -294,7 +300,7 @@ func _ready() -> void:
 
 
 func _load_progress() -> void:
-	PlayerStateSaveCodec.load_from_path(self, SAVE_PATH)
+	PlayerStateSaveCodecData.load_from_path(self, SAVE_PATH)
 
 
 # Save flow
@@ -304,7 +310,7 @@ func save_progress() -> void:
 	if _suppress_auto_save:
 		_has_deferred_save = true
 		return
-	PlayerStateSaveCodec.save_to_path(self, SAVE_PATH, SAVE_VERSION)
+	PlayerStateSaveCodecData.save_to_path(self, SAVE_PATH, SAVE_VERSION)
 
 
 func flush_deferred_save() -> void:
@@ -783,7 +789,7 @@ func relieve_stress(amount: int) -> int:
 
 
 func get_church_stress_relief() -> int:
-	return AchievementService.get_church_stress_relief(self)
+	return AchievementServiceData.get_church_stress_relief(self)
 
 
 func has_visited_location_today(location_id: String) -> bool:
@@ -934,27 +940,27 @@ func clear_pending_trip_selection() -> void:
 
 # Seeded rider runtime
 func add_seeded_rider_rule(rule_data: Dictionary) -> void:
-	SeededRiderRuntime.add_rule(self, rule_data)
+	SeededRiderRuntimeData.add_rule(self, rule_data)
 
 
 func seed_rider_for_stage(character_id: String, day: int, time_of_day := "", distance := "", slot := -1, forced_traffic := "", repeatable := false) -> void:
-	SeededRiderRuntime.seed_rider_for_stage(self, character_id, day, time_of_day, distance, slot, forced_traffic, repeatable)
+	SeededRiderRuntimeData.seed_rider_for_stage(self, character_id, day, time_of_day, distance, slot, forced_traffic, repeatable)
 
 
 func clear_seeded_rider_rules() -> void:
-	SeededRiderRuntime.clear_rules(self)
+	SeededRiderRuntimeData.clear_rules(self)
 
 
 func get_seeded_rider_rules() -> Array:
-	return SeededRiderRuntime.get_rules(self)
+	return SeededRiderRuntimeData.get_rules(self)
 
 
 func consume_seeded_rider_rules(rule_ids: Array) -> void:
-	SeededRiderRuntime.consume_player_rules(self, rule_ids)
+	SeededRiderRuntimeData.consume_player_rules(self, rule_ids)
 
 
 func get_seeded_rider_pool_setup(selection_context: Dictionary) -> Dictionary:
-	return SeededRiderRuntime.get_pool_setup(self, selection_context)
+	return SeededRiderRuntimeData.get_pool_setup(self, selection_context)
 
 
 # Pending story state
@@ -1093,31 +1099,31 @@ func consume_story_trigger(trigger_data: Dictionary) -> void:
 
 # Character catalog and stage previews
 func get_mock_characters() -> Array:
-	return StoryCatalog.get_mock_characters(self)
+	return StoryCatalogData.get_mock_characters(self)
 
 
 func get_character_by_id(character_id: String) -> Dictionary:
-	return StoryCatalog.get_character_by_id(self, character_id)
+	return StoryCatalogData.get_character_by_id(self, character_id)
 
 
 func get_character_display_name(character_id: String) -> String:
-	return StoryCatalog.get_character_display_name(self, character_id)
+	return StoryCatalogData.get_character_display_name(self, character_id)
 
 
 func get_speaker_display_name(speaker: String) -> String:
-	return StoryCatalog.get_speaker_display_name(self, speaker)
+	return StoryCatalogData.get_speaker_display_name(self, speaker)
 
 
 func get_generic_passengers() -> Array:
-	return StoryCatalog.get_generic_passengers()
+	return StoryCatalogData.get_generic_passengers()
 
 
 func get_unique_passengers() -> Array:
-	return StoryCatalog.get_unique_passengers(self)
+	return StoryCatalogData.get_unique_passengers(self)
 
 
 func get_unique_character_story_state(character_id: String, context: Dictionary = {}) -> Dictionary:
-	return StoryCatalog.get_unique_character_story_state(self, character_id, context)
+	return StoryCatalogData.get_unique_character_story_state(self, character_id, context)
 
 
 func get_current_mock_character_story_state(context: Dictionary = {}) -> Dictionary:
@@ -1125,7 +1131,7 @@ func get_current_mock_character_story_state(context: Dictionary = {}) -> Diction
 
 
 func get_character_stage_modifiers(character_id: String, context: Dictionary = {}) -> Dictionary:
-	return StoryCatalog.get_character_stage_modifiers(self, character_id, context)
+	return StoryCatalogData.get_character_stage_modifiers(self, character_id, context)
 
 
 func get_current_mock_character_stage_modifiers(context: Dictionary = {}) -> Dictionary:
@@ -1133,7 +1139,7 @@ func get_current_mock_character_stage_modifiers(context: Dictionary = {}) -> Dic
 
 
 func get_character_session_dialogue(character_id: String, context: Dictionary = {}) -> Dictionary:
-	return StoryCatalog.get_character_session_dialogue(self, character_id, context)
+	return StoryCatalogData.get_character_session_dialogue(self, character_id, context)
 
 
 func get_current_mock_character_session_dialogue(context: Dictionary = {}) -> Dictionary:
@@ -1226,7 +1232,7 @@ func get_upgrade_level(upgrade_id: String) -> int:
 
 
 func get_yosi_stress_relief() -> int:
-	return AchievementService.get_yosi_stress_relief(self)
+	return AchievementServiceData.get_yosi_stress_relief(self)
 
 
 func get_yosi_energy_restore() -> int:
@@ -1234,11 +1240,11 @@ func get_yosi_energy_restore() -> int:
 
 
 func record_yosi_purchase(amount := 1) -> int:
-	return AchievementService.record_yosi_purchase(self, amount)
+	return AchievementServiceData.record_yosi_purchase(self, amount)
 
 
 func record_rest(amount := 1, time_of_day := "") -> int:
-	return AchievementService.record_rest(self, amount, time_of_day)
+	return AchievementServiceData.record_rest(self, amount, time_of_day)
 
 
 func record_store_purchase(item_type: String) -> void:
@@ -1253,22 +1259,22 @@ func record_stage_completion() -> void:
 	if is_unique_character(current_mock_character_id):
 		character_completed_rides[current_mock_character_id] = maxi(0, int(character_completed_rides.get(current_mock_character_id, 0))) + 1
 		increment_unique_character_progress(current_mock_character_id)
-	AchievementService.record_stage_completion(self)
+	AchievementServiceData.record_stage_completion(self)
 
 
 func record_stage_crash() -> void:
-	AchievementService.record_stage_crash(self)
+	AchievementServiceData.record_stage_crash(self)
 
 
 func record_stage_failure() -> void:
 	_begin_state_batch()
 	finish_ride_stress_shield()
-	AchievementService.record_stage_failure(self)
+	AchievementServiceData.record_stage_failure(self)
 	_end_state_batch()
 
 
 func unlock_achievement(achievement_id: String) -> void:
-	AchievementService.unlock_achievement(self, achievement_id)
+	AchievementServiceData.unlock_achievement(self, achievement_id)
 
 
 func fail_run(reason: String) -> void:
@@ -1279,20 +1285,20 @@ func fail_run(reason: String) -> void:
 
 
 func has_achievement(achievement_id: String) -> bool:
-	return AchievementService.has_achievement(self, achievement_id)
+	return AchievementServiceData.has_achievement(self, achievement_id)
 
 
 func get_achievement_data(achievement_id: String) -> Dictionary:
-	return AchievementService.get_achievement_data(self, achievement_id)
+	return AchievementServiceData.get_achievement_data(self, achievement_id)
 
 
 func get_unlocked_achievement_ids() -> Array[String]:
-	return AchievementService.get_unlocked_achievement_ids(self)
+	return AchievementServiceData.get_unlocked_achievement_ids(self)
 
 
 # Weather and daily condition state
 func _reset_daily_consumable_counters(day_number: int) -> void:
-	AchievementService.reset_daily_consumable_counters(self, day_number)
+	AchievementServiceData.reset_daily_consumable_counters(self, day_number)
 
 
 func _roll_daily_conditions_for_day(day_number: int) -> void:
@@ -1347,7 +1353,7 @@ func reset() -> void:
 
 
 func _normalize_tamad_rest_time(time_of_day: String) -> String:
-	return AchievementService.normalize_tamad_rest_time(time_of_day)
+	return AchievementServiceData.normalize_tamad_rest_time(time_of_day)
 
 
 func _reset_story_triggers() -> void:

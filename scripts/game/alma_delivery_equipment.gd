@@ -23,7 +23,9 @@ var _cooldown_seconds := Tuning.ALMA_TRUCK_HORN_COOLDOWN
 
 
 static func for_owner(host):
-	var helper: Variant = host.get_meta(OWNER_META, null)
+	if not is_instance_valid(host) or not host.has_meta(OWNER_META):
+		return null
+	var helper: Variant = host.get_meta(OWNER_META)
 	return helper if is_instance_valid(helper) else null
 
 

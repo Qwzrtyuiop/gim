@@ -14,15 +14,19 @@ const TOOLTIPS := {
 	"radio": "Radio: news and weather forecast",
 	"calendar": "Calendar: weekly goal, debt and due date",
 	"rest": "Rest",
+	"garage": "Go to the garage",
 }
 
 class HotspotButton:
 	extends Button
 	var alpha_image: Image
+	var floor_exit := false
 
 	func _has_point(point: Vector2) -> bool:
 		if not Rect2(Vector2.ZERO, size).has_point(point):
 			return false
+		if floor_exit:
+			return Geometry2D.is_point_in_polygon(point, floor_polygon(size))
 		if alpha_image == null or size.x <= 0 or size.y <= 0:
 			return false
 		var pixel := Vector2i(point / size * Vector2(alpha_image.get_size()))
@@ -36,6 +40,14 @@ class HotspotButton:
 				if alpha_image.get_pixelv(sample).a >= 0.7:
 					return true
 		return false
+
+	static func floor_polygon(draw_size: Vector2) -> PackedVector2Array:
+		return PackedVector2Array([
+			Vector2(0, draw_size.y),
+			Vector2(draw_size.x * 0.42, draw_size.y * 0.10),
+			Vector2(draw_size.x, draw_size.y * 0.27),
+			draw_size,
+		])
 
 var buttons: Dictionary = {}
 var is_night := false
@@ -55,6 +67,7 @@ func _ready() -> void:
 		var button := HotspotButton.new()
 		button.name = action.capitalize() + "Hotspot"
 		button.alpha_image = Selectables.alpha_image(action)
+		button.floor_exit = action == "garage"
 		button.disabled = not enabled
 		button.tooltip_text = TOOLTIPS[action]
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -148,6 +161,15 @@ func _draw() -> void:
 	draw_texture_rect(NIGHT if is_night else DAY, image_rect, false, weather_effects.background_tint())
 	var action := active_action()
 	if not REGIONS.has(action):
+		return
+	if action == "garage":
+		var rect := sprite_rect_for(action)
+		var polygon := HotspotButton.floor_polygon(rect.size)
+		for index in range(polygon.size()):
+			polygon[index] += rect.position
+		draw_colored_polygon(polygon, Color(0.9, 0.75, 0.4, 0.08))
+		polygon.append(polygon[0])
+		draw_polyline(polygon, Color(0.9, 0.75, 0.4, 0.7), 1.5, true)
 		return
 	# Draw the selected object last, once, above the room artwork. Hit testing
 	# keeps its resting mask so enlarged edges cannot toggle hover repeatedly.

@@ -108,7 +108,7 @@ static func item_text(owner, item: Dictionary) -> String:
 	return text
 
 
-static func buy_item(owner, item: Dictionary, label: RichTextLabel, tier_container: HBoxContainer, button: Button) -> void:
+static func buy_item(owner, item: Dictionary, _label: RichTextLabel, tier_container: HBoxContainer, _button: Button) -> void:
 	if not shop_is_open(owner) or owner.tutorial_active or not owner.shop_overlay.visible or owner.is_transitioning:
 		return
 	var type := str(item.get("type", ""))
@@ -132,9 +132,9 @@ static func buy_item(owner, item: Dictionary, label: RichTextLabel, tier_contain
 		owner.status_label.text = "Beta blockers are already active for your next ride."
 		return
 
-	var item_cost = item_cost(owner, item)
+	var purchase_cost := item_cost(owner, item)
 	PlayerState._begin_state_batch()
-	if not PlayerState.spend_money(item_cost):
+	if not PlayerState.spend_money(purchase_cost):
 		PlayerState._end_state_batch()
 		owner.status_label.text = "Not enough money."
 		return
@@ -162,10 +162,10 @@ static func buy_item(owner, item: Dictionary, label: RichTextLabel, tier_contain
 			effects.append("reduced stress by %d" % relieved)
 		owner.status_label.text = "Bought %s." % item["name"] if effects.is_empty() else "%s %s." % [item["name"], " and ".join(effects)]
 		if type == "liquor":
-			owner.status_label.text += " Paid PhP %d." % item_cost
+			owner.status_label.text += " Paid PhP %d." % purchase_cost
 	elif type == "stress_shield":
 		if not PlayerState.grant_next_ride_stress_shield(int(item.get("stress_shield", GameTuning.BETA_BLOCKER_STRESS_SHIELD_POINTS))):
-			PlayerState.add_money(item_cost)
+			PlayerState.add_money(purchase_cost)
 			PlayerState._end_state_batch()
 			owner.status_label.text = "Beta blockers are already active for your next ride."
 			refresh_items(owner)
@@ -176,7 +176,7 @@ static func buy_item(owner, item: Dictionary, label: RichTextLabel, tier_contain
 	elif type == "repair":
 		var repaired: int = PlayerState.repair_hull(repair_amount(item))
 		PlayerState.record_store_purchase(type)
-		owner.status_label.text = "Repaired %d hull for PhP %d." % [repaired, item_cost]
+		owner.status_label.text = "Repaired %d hull for PhP %d." % [repaired, purchase_cost]
 	elif item["type"] == "gas":
 		var gas_before = PlayerState.gas
 		PlayerState.add_gas(float(item.get("gas", PlayerState.GAS_CAN_PERCENT)))
@@ -271,7 +271,7 @@ static func item_cost(owner, item: Dictionary) -> int:
 	return int(item["cost"]) + current_level * cost_step
 
 
-static func refresh_buy_button(owner, item: Dictionary, button: Button) -> void:
+static func refresh_buy_button(_owner, item: Dictionary, button: Button) -> void:
 	if item["type"] == "upgrade":
 		var current_level = PlayerState.get_upgrade_level(item["id"])
 		var max_level = int(item["max_level"])
@@ -320,7 +320,7 @@ static func make_tier_bars(owner, item: Dictionary) -> HBoxContainer:
 	return container
 
 
-static func refresh_tier_bars(owner, container: HBoxContainer, level: int, max_level: int) -> void:
+static func refresh_tier_bars(_owner, container: HBoxContainer, level: int, max_level: int) -> void:
 	for child in container.get_children():
 		if not child is Panel:
 			continue
@@ -345,7 +345,7 @@ static func refresh_tier_bars(owner, container: HBoxContainer, level: int, max_l
 		container.modulate = Color.WHITE
 
 
-static func make_store_row_style(owner) -> StyleBoxFlat:
+static func make_store_row_style(_owner) -> StyleBoxFlat:
 	var style = StyleBoxFlat.new()
 	style.bg_color = ROW_BG_COLOR
 	style.border_width_left = 2
@@ -371,7 +371,7 @@ static func apply_store_buy_button_style(owner, button: Button) -> void:
 	button.add_theme_stylebox_override("disabled", make_buy_button_style(owner, BUY_BUTTON_DISABLED_BG))
 
 
-static func make_buy_button_style(owner, color: Color) -> StyleBoxFlat:
+static func make_buy_button_style(_owner, color: Color) -> StyleBoxFlat:
 	var style = StyleBoxFlat.new()
 	style.bg_color = color
 	style.border_width_left = 2

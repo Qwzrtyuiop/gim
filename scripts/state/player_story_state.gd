@@ -1,8 +1,8 @@
 extends RefCounted
 
-const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
-const StoryTriggerRuntime := preload("res://scripts/story/story_trigger_runtime.gd")
-const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
+const StoryEventHandlerData := preload("res://scripts/story/story_event_handler.gd")
+const StoryTriggerRuntimeData := preload("res://scripts/story/story_trigger_runtime.gd")
+const StoryTriggerServiceData := preload("res://scripts/story/story_trigger_service.gd")
 const StoryGalleryUnlocker := preload("res://scripts/story/story_gallery_unlocker.gd")
 
 
@@ -81,37 +81,37 @@ static func get_unlocked_gallery_image_paths(player_state) -> Array[String]:
 
 
 static func set_event_value(player_state, event_id: String, value) -> void:
-	if not StoryEventHandler.set_event_value(player_state.event_values, event_id, value):
+	if not StoryEventHandlerData.set_event_value(player_state.event_values, event_id, value):
 		return
 	player_state.save_progress()
 
 
 static func set_event_values(player_state, values: Dictionary) -> void:
-	if not StoryEventHandler.set_event_values(player_state.event_values, values):
+	if not StoryEventHandlerData.set_event_values(player_state.event_values, values):
 		return
 	player_state.save_progress()
 
 
 static func get_event_value(player_state, event_id: String, default_value = null):
-	return StoryEventHandler.get_event_value(player_state.event_values, event_id, default_value)
+	return StoryEventHandlerData.get_event_value(player_state.event_values, event_id, default_value)
 
 
 static func has_event_value(player_state, event_id: String) -> bool:
-	return StoryEventHandler.has_event_value(player_state.event_values, event_id)
+	return StoryEventHandlerData.has_event_value(player_state.event_values, event_id)
 
 
 static func clear_event_value(player_state, event_id: String) -> void:
-	if not StoryEventHandler.clear_event_value(player_state.event_values, event_id):
+	if not StoryEventHandlerData.clear_event_value(player_state.event_values, event_id):
 		return
 	player_state.save_progress()
 
 
 static func get_event_values(player_state) -> Dictionary:
-	return StoryEventHandler.get_event_values(player_state.event_values)
+	return StoryEventHandlerData.get_event_values(player_state.event_values)
 
 
 static func clear_event_values(player_state) -> void:
-	if not StoryEventHandler.clear_event_values(player_state.event_values):
+	if not StoryEventHandlerData.clear_event_values(player_state.event_values):
 		return
 	player_state.save_progress()
 
@@ -165,7 +165,7 @@ static func add_story_trigger(player_state, trigger_data: Dictionary) -> void:
 	if trigger_data.is_empty():
 		return
 
-	var normalized_trigger: Dictionary = StoryTriggerService.normalize_trigger(player_state, trigger_data)
+	var normalized_trigger: Dictionary = StoryTriggerServiceData.normalize_trigger(player_state, trigger_data)
 	if normalized_trigger.is_empty():
 		return
 
@@ -184,11 +184,11 @@ static func get_story_triggers(player_state) -> Array:
 
 
 static func normalize_story_trigger_phase(phase: String) -> String:
-	return StoryTriggerService.normalize_story_trigger_phase(phase)
+	return StoryTriggerServiceData.normalize_story_trigger_phase(phase)
 
 
 static func find_story_trigger_for_phase(player_state, phase: String, day_number: int = -1, context: Dictionary = {}) -> Dictionary:
-	return StoryTriggerRuntime.find_story_trigger_for_phase(player_state, phase, day_number, context)
+	return StoryTriggerRuntimeData.find_story_trigger_for_phase(player_state, phase, day_number, context)
 
 
 static func has_story_trigger_for_phase(player_state, phase: String, day_number: int = -1, context: Dictionary = {}) -> bool:
@@ -196,17 +196,17 @@ static func has_story_trigger_for_phase(player_state, phase: String, day_number:
 
 
 static func get_story_payload_for_trigger(trigger_data: Dictionary) -> Dictionary:
-	return StoryTriggerService.get_story_payload_for_trigger(trigger_data)
+	return StoryTriggerServiceData.get_story_payload_for_trigger(trigger_data)
 
 
 static func consume_story_trigger(player_state, trigger_data: Dictionary) -> void:
-	if not StoryTriggerService.consume_story_trigger(player_state.consumed_story_triggers, trigger_data):
+	if not StoryTriggerServiceData.consume_story_trigger(player_state.consumed_story_triggers, trigger_data):
 		return
 	player_state.save_progress()
 
 
 static func reset_story_triggers(player_state) -> void:
-	player_state.story_triggers = StoryTriggerService.build_default_story_triggers()
+	player_state.story_triggers = StoryTriggerServiceData.build_default_story_triggers()
 	player_state.consumed_story_triggers.clear()
 
 

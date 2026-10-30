@@ -1,12 +1,12 @@
 extends RefCounted
 class_name PlayerStateSaveCodec
 
-const GameSaveResource := preload("res://scripts/save/game_save_resource.gd")
+const GameSaveResourceData := preload("res://scripts/save/game_save_resource.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
-const AchievementService := preload("res://scripts/achievement_service.gd")
+const AchievementServiceData := preload("res://scripts/achievement_service.gd")
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
-const SeededRiderRuntime := preload("res://scripts/seeded_rider_runtime.gd")
-const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
+const SeededRiderRuntimeData := preload("res://scripts/seeded_rider_runtime.gd")
+const StoryTriggerServiceData := preload("res://scripts/story/story_trigger_service.gd")
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
 const AssetPathMigration := preload("res://scripts/save/asset_path_migration.gd")
 
@@ -17,14 +17,14 @@ static func load_from_path(player_state, save_path: String) -> bool:
 
 	# Saves are mutable files; a held Resource must not turn a reload into an old snapshot.
 	var loaded_resource := ResourceLoader.load(save_path, "", ResourceLoader.CACHE_MODE_IGNORE)
-	if not loaded_resource is GameSaveResource:
+	if not loaded_resource is GameSaveResourceData:
 		return false
 
-	var save_resource := loaded_resource as GameSaveResource
+	var save_resource := loaded_resource as GameSaveResourceData
 	return load_snapshot(player_state, save_resource)
 
 
-static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool:
+static func load_snapshot(player_state, save_resource: GameSaveResourceData) -> bool:
 	if player_state._is_loading_save:
 		return false
 	if not snapshot_error(save_resource, player_state.SAVE_VERSION).is_empty():
@@ -45,9 +45,9 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	# Load earned capacity before restoring values above the base caps.
 	player_state.achievements = Dictionary(save_data.get("achievements", {})).duplicate(true)
 	player_state.money = int(save_data.get("money", player_state.money))
-	player_state.max_energy = AchievementService.energy_capacity(player_state.achievements)
+	player_state.max_energy = AchievementServiceData.energy_capacity(player_state.achievements)
 	player_state.energy = int(save_data.get("energy", player_state.DEFAULT_STARTING_ENERGY))
-	player_state.max_stress = AchievementService.stress_capacity(player_state.achievements)
+	player_state.max_stress = AchievementServiceData.stress_capacity(player_state.achievements)
 	player_state.stress = int(save_data.get("stress", player_state.DEFAULT_STARTING_STRESS))
 	player_state.max_hull = player_state.DEFAULT_MAX_HULL
 	player_state.hull = int(save_data.get("hull", player_state.DEFAULT_STARTING_HULL))
@@ -102,7 +102,7 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	var saved_seeded_rider_rules: Array = save_data.get("seeded_rider_rules", [])
 	for rule_data in saved_seeded_rider_rules:
 		if rule_data is Dictionary:
-			var normalized_rule := SeededRiderRuntime.normalize_rule(player_state, (rule_data as Dictionary).duplicate(true))
+			var normalized_rule := SeededRiderRuntimeData.normalize_rule(player_state, (rule_data as Dictionary).duplicate(true))
 			if normalized_rule.is_empty():
 				continue
 			player_state.seeded_rider_rules.append(normalized_rule)
@@ -142,11 +142,11 @@ static func load_snapshot(player_state, save_resource: GameSaveResource) -> bool
 	var saved_story_triggers: Array = save_data.get("story_triggers", [])
 	for trigger_data in saved_story_triggers:
 		if trigger_data is Dictionary:
-			var normalized_trigger := StoryTriggerService.normalize_trigger(player_state, (trigger_data as Dictionary).duplicate(true))
+			var normalized_trigger := StoryTriggerServiceData.normalize_trigger(player_state, (trigger_data as Dictionary).duplicate(true))
 			if normalized_trigger.is_empty():
 				continue
 			player_state.story_triggers.append(normalized_trigger)
-	var needs_story_trigger_save := StoryTriggerService.ensure_required_story_triggers(player_state.story_triggers)
+	var needs_story_trigger_save := StoryTriggerServiceData.ensure_required_story_triggers(player_state.story_triggers)
 	player_state.consumed_story_triggers = Dictionary(save_data.get("consumed_story_triggers", {})).duplicate(true)
 	player_state.upgrades = Dictionary(save_data.get("upgrades", {})).duplicate(true)
 	player_state.last_seen_story_sections = Dictionary(save_data.get("last_seen_story_sections", {})).duplicate(true)
@@ -187,8 +187,8 @@ static func save_to_path(player_state, save_path: String, save_version: int) -> 
 		push_error("Could not save progress to %s: %s" % [save_path, error_string(error)])
 
 
-static func build_snapshot(player_state, save_version: int) -> GameSaveResource:
-	var save_resource := GameSaveResource.new()
+static func build_snapshot(player_state, save_version: int) -> GameSaveResourceData:
+	var save_resource := GameSaveResourceData.new()
 	save_resource.version = save_version
 	save_resource.data = {
 		"money": player_state.money,
@@ -273,9 +273,9 @@ static func build_snapshot(player_state, save_version: int) -> GameSaveResource:
 
 
 static func snapshot_error(snapshot: Resource, maximum_version: int, require_slot_fields := false) -> String:
-	if not snapshot is GameSaveResource:
+	if not snapshot is GameSaveResourceData:
 		return "This is not a Gulong save."
-	var save_resource := snapshot as GameSaveResource
+	var save_resource := snapshot as GameSaveResourceData
 	if save_resource.version < 1 or save_resource.version > maximum_version:
 		return "This save uses an unsupported version."
 	var data: Dictionary = save_resource.data
@@ -329,10 +329,10 @@ static func _migrate_resource_data(source: Dictionary, version: int) -> Dictiona
 	var old_max := maxi(1, int(data.get("max_energy", 10)))
 	var old_energy := clampi(int(data.get("energy", old_max)), 0, old_max)
 	var earned := Dictionary(data.get("achievements", {}))
-	var energy_cap := AchievementService.energy_capacity(earned)
+	var energy_cap := AchievementServiceData.energy_capacity(earned)
 	data["max_energy"] = energy_cap
 	data["energy"] = clampi(old_energy, 0, energy_cap)
-	data["max_stress"] = AchievementService.stress_capacity(earned)
+	data["max_stress"] = AchievementServiceData.stress_capacity(earned)
 	data["stress"] = clampi(roundi((1.0 - float(old_energy) / float(old_max)) * 10.0), 0, 10)
 	data["max_hull"] = 10
 	data["hull"] = 0 if not Dictionary(data.get("pending_crash_repair", {})).is_empty() else 10

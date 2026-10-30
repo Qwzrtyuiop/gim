@@ -6,6 +6,7 @@ extends RefCounted
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const CharacterAvailability := preload("res://scripts/story/character_availability.gd")
 const PickupAssignment := preload("res://scripts/ride_selection/passenger_pickup_assignment.gd")
+const GenericAppearance := preload("res://scripts/ride_selection/generic_passenger_appearance.gd")
 const CARDS_PER_DISTANCE := 3
 
 var screen
@@ -105,12 +106,15 @@ func _lock_pools(candidates: Dictionary) -> Dictionary:
 
 
 func assign_pickup_locations(pools: Dictionary) -> bool:
-	return PickupAssignment.assign(
+	var phase: String = PlayerState.get_next_stage_time(screen._transition_mode())
+	var changed := PickupAssignment.assign(
 		pools,
-		PlayerState.get_next_stage_time(screen._transition_mode()),
+		phase,
 		PlayerState.get_transition_display_day(screen._transition_mode()),
 		screen._is_forced_first_day_ride(),
 	)
+	var appearance_changed := GenericAppearance.assign(pools, phase)
+	return changed or appearance_changed
 
 
 func _pick_character_for_distance(distance: String, used_ids: Dictionary, first_appearance_rolls: Dictionary, force_first_appearance_unlocks: bool) -> Dictionary:
@@ -249,10 +253,10 @@ func _roll_stage_special_type(active_distance: String, selected_traffic: String)
 			urgent_weight += 0.05
 			careful_weight += 0.04
 
-	var roll := rng.randf()
-	if roll < urgent_weight:
+	var trait_roll := rng.randf()
+	if trait_roll < urgent_weight:
 		return PlayerState.STAGE_SPECIAL_TYPE_URGENT
-	if roll < urgent_weight + careful_weight:
+	if trait_roll < urgent_weight + careful_weight:
 		return PlayerState.STAGE_SPECIAL_TYPE_CAREFUL
 	return PlayerState.STAGE_SPECIAL_TYPE_NONE
 

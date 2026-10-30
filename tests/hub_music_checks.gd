@@ -143,6 +143,8 @@ static func _test_weather_priority(host: Node) -> void:
 	_assert_uninterrupted(player, source, playback)
 	assert(is_equal_approx(AudioSettingsManager.get_player_base_db(player), RainProfile.music_duck_db("rain")), "Day rain ducks the current background without selecting the night theme")
 	PlayerState.set_current_stage_time("night")
+	# Story weather is phase-specific; explicitly seed the rainy-night fixture.
+	assert(WeatherState.set_story_weather(PlayerState, "rain"))
 	store._refresh_header()
 	_assert_track(HubMusicManager.RAINY_NIGHT_PATH)
 	source = player.stream

@@ -83,12 +83,12 @@ static func apply_motion(
 	player_wiggle_x_pixels: float,
 	player_wiggle_rotation_frequency: float,
 	player_wiggle_rotation_radians: float,
-	wiggle_amount: float
+	wiggle_strength: float
 ) -> void:
 	if move_forward:
 		player.position.x += stage_clear_player_exit_speed * delta
 	else:
-		player.position.x = player_x + sin(Time.get_ticks_msec() * player_wiggle_x_frequency) * player_wiggle_x_pixels * wiggle_amount
+		player.position.x = player_x + sin(Time.get_ticks_msec() * player_wiggle_x_frequency) * player_wiggle_x_pixels * wiggle_strength
 
 	player.position.y = lerpf(player.position.y, target_y, minf(1.0, delta * player_lane_lerp_speed * player_lane_lerp_x))
-	player.rotation = sin(Time.get_ticks_msec() * player_wiggle_rotation_frequency) * player_wiggle_rotation_radians * wiggle_amount
+	player.rotation = sin(Time.get_ticks_msec() * player_wiggle_rotation_frequency) * player_wiggle_rotation_radians * wiggle_strength

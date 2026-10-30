@@ -1,6 +1,6 @@
 extends RefCounted
 
-const StoryCatalog := preload("res://scripts/story/story_catalog.gd")
+const StoryCatalogData := preload("res://scripts/story/story_catalog.gd")
 
 
 static func set_current_mock_character(player_state, character_id: String) -> void:
@@ -86,7 +86,7 @@ static func consume_unique_session_dialogue(player_state, entry_id: String) -> v
 
 
 static func is_unique_character(character_id: String) -> bool:
-	return StoryCatalog.is_unique_character(character_id)
+	return StoryCatalogData.is_unique_character(character_id)
 
 
 static func reset_character_progress_state(player_state) -> void:

@@ -173,7 +173,7 @@ static func set_mouse_filter(is_active: bool, controls: Array, filter_state: Dic
 		var control := control_variant as Control
 		if control == null:
 			continue
-		control.mouse_filter = int(filter_state.get(control, control.mouse_filter))
+		control.mouse_filter = int(filter_state.get(control, control.mouse_filter)) as Control.MouseFilter
 	filter_state.clear()
 
 

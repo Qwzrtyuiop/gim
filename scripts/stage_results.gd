@@ -70,7 +70,7 @@ func _render_results(result: Dictionary) -> void:
 	rest_button.grab_focus()
 	var rest_note := "Rest: go home. Choose Rest or Sleep there to recover and advance time."
 	if has_pending_night_skip:
-		rest_note = "Head home. Tonight's plans with Benny will continue when you choose to sleep."
+		rest_note = "Head home to meet Benny tonight."
 	_refresh_status(rest_note)
 
 

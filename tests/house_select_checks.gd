@@ -20,7 +20,7 @@ static func _test_shared_geometry(host: Node) -> void:
 	var catalog = load(CATALOG_PATH)
 	assert(catalog.ART_SIZE == Vector2(1698, 926))
 	assert(HouseView.DAY.get_size() == catalog.ART_SIZE and HouseView.NIGHT.get_size() == catalog.ART_SIZE)
-	assert(HouseView.REGIONS.size() == ACTIONS.size())
+	assert(HouseView.REGIONS.size() == ACTIONS.size() + 1 and HouseView.REGIONS.has("garage"))
 	assert(not HouseView.REGIONS.has("ride"), "The old home exit must not remain clickable or keyboard-selectable")
 	var house := HouseView.new()
 	host.get_tree().root.add_child(house)

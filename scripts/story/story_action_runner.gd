@@ -2,7 +2,7 @@ extends RefCounted
 class_name StoryActionRunner
 
 const RandomRideEventService := preload("res://scripts/story/random_ride_event_service.gd")
-const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryEventHandlerData := preload("res://scripts/story/story_event_handler.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const StoryAudioRuntime := preload("res://scripts/story/story_audio_runtime.gd")
 const StoryPresentation := preload("res://scripts/story/story_presentation.gd")
@@ -216,7 +216,7 @@ static func apply_choice_event_values(choice_data: Dictionary) -> void:
 		PlayerState.set_event_values(choice_data.get("event_values", {}))
 	elif choice_data.has("event_id") or choice_data.has("event_value") or choice_data.has("key"):
 		PlayerState.set_event_values(
-			StoryEventHandler.build_single_event_values(
+			StoryEventHandlerData.build_single_event_values(
 				str(choice_data.get("event_id", choice_data.get("key", ""))),
 				choice_data.get("event_value", choice_data.get("value", 1))
 			)
@@ -228,7 +228,7 @@ static func apply_set_event_value_action(action_data: Dictionary) -> void:
 	if event_id.is_empty():
 		return
 	PlayerState.set_event_values(
-		StoryEventHandler.build_single_event_values(
+		StoryEventHandlerData.build_single_event_values(
 			event_id,
 			action_data.get("value", action_data.get("amount", 1))
 		)

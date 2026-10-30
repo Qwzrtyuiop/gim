@@ -105,7 +105,7 @@ static func update_random_lane_changes(owner, delta: float) -> void:
 		entity["lane_change_cooldown"] = owner.rng.randf_range(1.2, 3.5)
 
 
-static func random_lane_change_target(entity: Dictionary, lane_index: int) -> int:
+static func random_lane_change_target(_entity: Dictionary, lane_index: int) -> int:
 	match lane_index:
 		0:
 			return -1

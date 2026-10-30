@@ -51,7 +51,10 @@ func setup_dialogue(dialogue: HubDialogue) -> void:
 
 func set_active(value: bool, daytime := true) -> void:
 	celina_spawn.set_active(value)
-	crowd.texture = CROWD if daytime else _night_crowd
+	if daytime:
+		crowd.texture = CROWD
+	else:
+		crowd.texture = _night_crowd
 	crowd.visible = value
 	crowd.self_modulate = _background.self_modulate
 	set_process(crowd.visible)

@@ -29,7 +29,7 @@ func _ready() -> void:
 	get_tree().scene_changed.connect(_on_scene_changed)
 
 
-static func background_path(home_interior := false) -> String:
+func background_path(home_interior := false) -> String:
 	if PlayerState.get_current_time_of_day() == "night":
 		# Night is ambience-only unless an authored weather/location cue applies.
 		if not RainAudioProfile.path_for(PlayerState.current_weather).is_empty():

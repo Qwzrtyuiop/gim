@@ -6,6 +6,7 @@ const HomeInterface := preload("res://scripts/home/home_interface.gd")
 const HomeTutorial := preload("res://scripts/home/home_tutorial.gd")
 const HomeMap := preload("res://scripts/home/home_map.gd")
 const HospitalEncounter := preload("res://scripts/home/hospital_encounter.gd")
+const BennyEvening := preload("res://scripts/home/benny_evening_encounter.gd")
 const HubDialogue := preload("res://scripts/ui/hub_dialogue.gd")
 const HubNightAmbience := preload("res://scripts/ui/hub_night_ambience.gd")
 const RainAudioProfile := preload("res://scripts/audio/rain_audio_profile.gd")
@@ -14,6 +15,7 @@ const DialogueAnchors := preload("res://scripts/ui/hub_dialogue_anchors.gd")
 const DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
+const STORY_SCENE := "res://scenes/story_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -54,6 +56,8 @@ func _ready() -> void:
 	PlayerState.set_resume_scene(DAY_START_SCENE)
 	if PlayerState.is_run_failed():
 		get_tree().change_scene_to_file(GAME_OVER_SCENE)
+		return
+	if not returning_to_hospital and not returning_to_hub_story and _try_start_benny_evening():
 		return
 	if not returning_to_hospital and not returning_to_hub_story and PlayerState.get_current_day() <= 1 and PlayerState.get_pending_trip_selection().is_empty():
 		PlayerState.set_pending_trip_selection(DAY_START_SCENE, PlayerState.TRANSITION_CURRENT_STAGE)
@@ -105,6 +109,8 @@ func _on_house_action(action: String) -> void:
 			_show_info(action)
 		"rest":
 			_show_info("rest")
+		"garage":
+			_open_map("garage")
 
 
 func _create_hud() -> void:
@@ -120,18 +126,20 @@ func _create_map() -> void:
 	home_map.bar_music_changed.connect(_refresh_home_bgm)
 
 
-func _open_map() -> void:
+func _open_map(initial_location: String = "") -> void:
 	if is_transitioning or tutorial_active or info_overlay.visible or home_map.visible or _speech_is_blocking():
 		return
 	hub_dialogue.clear()
 	house.set_enabled(false)
 	map_button.hide()
 	status_header.hide()
-	home_map.open()
+	home_map.open("home", initial_location)
 	_refresh_home_bgm()
 
 
 func _close_map() -> void:
+	if _try_start_benny_evening():
+		return
 	house.set_enabled(not is_transitioning and not tutorial_active)
 	map_button.show()
 	status_header.show()
@@ -207,10 +215,20 @@ func _transition_home_rest(next_time: String) -> void:
 	PlayerState.relieve_stress(GameTuning.REST_STRESS_RELIEF)
 	PlayerState.set_current_stage_time(next_time)
 	PlayerState.clear_pending_trip_selection()
+	if _try_start_benny_evening():
+		return
 	_render_day_start()
 	await _fade_overlay_to(0.0, HOME_REST_FADE_SECONDS)
 	house.set_enabled(true)
 	is_transitioning = false
+
+
+func _try_start_benny_evening() -> bool:
+	if not BennyEvening.queue(PlayerState):
+		return false
+	is_transitioning = true
+	get_tree().change_scene_to_file(STORY_SCENE)
+	return true
 
 
 func _fade_overlay_to(alpha_value: float, duration: float) -> void:

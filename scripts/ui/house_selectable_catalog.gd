@@ -28,6 +28,7 @@ const REGIONS := {
 	"radio": Rect2(Vector2(79, 474) / ART_SIZE, Vector2(138, 137) / ART_SIZE),
 	"calendar": Rect2(Vector2(799, 392) / ART_SIZE, Vector2(65, 114) / ART_SIZE),
 	"rest": Rect2(Vector2(1488, 228) / ART_SIZE, Vector2(107, 545) / ART_SIZE),
+	"garage": Rect2(0.778, 0.865, 0.222, 0.135),
 }
 
 static var _alpha_images: Dictionary = {}

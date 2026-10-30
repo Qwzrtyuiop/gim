@@ -2,7 +2,7 @@ extends RefCounted
 
 # Conditional line routing and story eligibility predicates.
 
-const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryEventHandlerData := preload("res://scripts/story/story_event_handler.gd")
 const PlayerUpgradeState := preload("res://scripts/state/player_upgrade_state.gd")
 const MAX_CONDITION_DEPTH := 16
 const NUMERIC_CONDITION_FIELDS := ["stress", "hull", "energy", "gas", "karma", "day", "week", "remaining_debt", "character_progress"]
@@ -67,13 +67,13 @@ static func _matches_condition_source(condition_source: Dictionary, allow_plain_
 		return false
 	if not matches_forbidden_achievements(condition_source):
 		return false
-	if not StoryEventHandler.matches_required_events(event_values, condition_array(condition_source, "required_events", "required_event")):
+	if not StoryEventHandlerData.matches_required_events(event_values, condition_array(condition_source, "required_events", "required_event")):
 		return false
-	if not StoryEventHandler.matches_forbidden_events(event_values, condition_array(condition_source, "forbidden_events", "forbidden_event")):
+	if not StoryEventHandlerData.matches_forbidden_events(event_values, condition_array(condition_source, "forbidden_events", "forbidden_event")):
 		return false
-	if not StoryEventHandler.matches_event_values(event_values, condition_dictionary(condition_source, "required_event_values", "required_event_value"), true):
+	if not StoryEventHandlerData.matches_event_values(event_values, condition_dictionary(condition_source, "required_event_values", "required_event_value"), true):
 		return false
-	if not StoryEventHandler.matches_event_values(event_values, condition_dictionary(condition_source, "forbidden_event_values", "forbidden_event_value"), false):
+	if not StoryEventHandlerData.matches_event_values(event_values, condition_dictionary(condition_source, "forbidden_event_values", "forbidden_event_value"), false):
 		return false
 	if not matches_money_conditions(condition_source):
 		return false

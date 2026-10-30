@@ -82,13 +82,13 @@ func layout_near(target_rect: Rect2, safe_rect: Rect2, preferred_side := "auto")
 	var fit := minf(1, minf(safe_rect.size.x / maxf(1, actual_size.x), safe_rect.size.y / maxf(1, actual_size.y)))
 	panel.scale = Vector2.ONE * fit
 	var balloon_size := actual_size * fit
-	var position := safe_rect.position + Vector2((safe_rect.size.x - balloon_size.x) * 0.5, safe_rect.size.y - balloon_size.y)
+	var balloon_position := safe_rect.position + Vector2((safe_rect.size.x - balloon_size.x) * 0.5, safe_rect.size.y - balloon_size.y)
 	var has_target := target_rect.size.x > 0 and target_rect.size.y > 0
 	if has_target:
-		position = _position_for(target_rect, balloon_size, safe_rect, preferred_side)
-	position.x = clampf(position.x, safe_rect.position.x, safe_rect.end.x - balloon_size.x)
-	position.y = clampf(position.y, safe_rect.position.y, safe_rect.end.y - balloon_size.y)
-	panel.position = position.round()
+		balloon_position = _position_for(target_rect, balloon_size, safe_rect, preferred_side)
+	balloon_position.x = clampf(balloon_position.x, safe_rect.position.x, safe_rect.end.x - balloon_size.x)
+	balloon_position.y = clampf(balloon_position.y, safe_rect.position.y, safe_rect.end.y - balloon_size.y)
+	panel.position = balloon_position.round()
 	_build_tail(target_rect, Rect2(panel.position, balloon_size), safe_rect, has_target)
 	queue_redraw()
 

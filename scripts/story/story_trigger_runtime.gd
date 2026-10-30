@@ -1,17 +1,17 @@
 extends RefCounted
 class_name StoryTriggerRuntime
 
-const StoryTriggerService := preload("res://scripts/story/story_trigger_service.gd")
+const StoryTriggerServiceData := preload("res://scripts/story/story_trigger_service.gd")
 
 
 static func find_story_trigger_for_phase(player_state, phase: String, day_number := -1, context: Dictionary = {}) -> Dictionary:
-	var safe_phase: String = StoryTriggerService.normalize_story_trigger_phase(str(phase))
+	var safe_phase: String = StoryTriggerServiceData.normalize_story_trigger_phase(str(phase))
 	if safe_phase.is_empty():
 		return {}
 
 	var effective_day: int = resolve_day_number(player_state, day_number)
 	var trigger_context: Dictionary = build_context(player_state, effective_day, context)
-	return StoryTriggerService.find_story_trigger_for_phase(
+	return StoryTriggerServiceData.find_story_trigger_for_phase(
 		player_state.story_triggers,
 		player_state.consumed_story_triggers,
 		player_state.event_values,

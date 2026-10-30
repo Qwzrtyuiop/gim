@@ -17,8 +17,8 @@ static func prepare(state) -> Dictionary:
 	if result.is_empty() or not bool(result.get("completed", false)) or bool(result.get("paid_out", false)):
 		return {}
 	if bool(result.get("random_event_checked", false)):
-		var selected_id := str(result.get("random_story_id", result.get("random_ride_event", "")))
-		if not selected_id.is_empty() and state.pending_story.get("story_id", "") == selected_id:
+		var pending_event_id := str(result.get("random_story_id", result.get("random_ride_event", "")))
+		if not pending_event_id.is_empty() and state.pending_story.get("story_id", "") == pending_event_id:
 			return state.pending_story.duplicate(true)
 		return {}
 	state._begin_state_batch()

@@ -33,9 +33,9 @@ static func run(owner, action: Dictionary) -> void:
 				var reason := StoryTime.validation_error(options)
 				push_warning("Story time advance rejected: %s" % (reason if not reason.is_empty() else "resolve any failed run, active repair/special trip, or pending fare choice first"))
 		"return_to":
-			var destination := str(action.get("destination", ""))
-			if Catalog.DESTINATIONS.has(destination):
-				owner.story_payload["_story_destination"] = destination
+			var chosen_destination := str(action.get("destination", ""))
+			if Catalog.DESTINATIONS.has(chosen_destination):
+				owner.story_payload["_story_destination"] = chosen_destination
 				PlayerState.set_pending_story(owner.story_payload)
 		"queue_story":
 			var id := str(action.get("id", "")).strip_edges().to_lower()

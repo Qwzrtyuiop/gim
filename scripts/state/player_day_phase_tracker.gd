@@ -139,14 +139,14 @@ static func advance_after_stage_result(player_state, completed_phase: String) ->
 	if get_current_phase(player_state) != safe_completed_phase:
 		return false
 
-	var next_phase: String = ""
+	var following_phase: String = ""
 	match safe_completed_phase:
 		"morning":
-			next_phase = "noon"
+			following_phase = "noon"
 		"noon":
-			next_phase = "night"
+			following_phase = "night"
 		_:
 			return false
 
-	set_phase(player_state, next_phase)
+	set_phase(player_state, following_phase)
 	return true

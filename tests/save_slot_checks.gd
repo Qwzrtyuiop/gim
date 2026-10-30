@@ -64,6 +64,9 @@ static func run(host: Node) -> void:
 	PlayerState.reset()
 	assert(SaveSlotManager.has_slots(), "New-run reset must preserve manual slots")
 	AmbientAudioManager.stop_all()
+	HubMusicManager.stop_all()
+	# These fixtures replace current_scene manually, bypassing scene_changed.
+	await host.get_tree().create_timer(0.1).timeout
 	print("PASS: ten slots, daily autosave/revisited days, independent snapshots, invalid-file isolation, calendar confirmation/scroll, driving restoration and story load batching")
 
 
@@ -130,7 +133,13 @@ static func _story_handoff(host: Node) -> void:
 	}
 	var reader = load("res://scenes/story_scene.tscn").instantiate()
 	host.get_tree().root.add_child(reader)
-	await host.get_tree().process_frame
+	# Finish the asynchronous intro before freeing this reader during handoff.
+	# A node-bound fade killed mid-await leaves its static coroutine suspended.
+	for _frame in range(120):
+		if reader.body_label.text == "Checkpoint.":
+			break
+		await host.get_tree().process_frame
+	assert(reader.body_label.text == "Checkpoint.", "Story fixture must finish opening before checkpoint handoff")
 	assert(reader.checkpoint_batch_depth == 0)
 	assert(SaveSlotManager.save_slot(5, Context.capture(reader)) == OK)
 	reader._begin_checkpoint_batch()

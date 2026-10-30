@@ -6,7 +6,7 @@ class_name StoryTriggerService
 
 const StoryTriggerRules := preload("res://scripts/story/story_trigger_rules.gd")
 const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
-const StoryEventHandler := preload("res://scripts/story/story_event_handler.gd")
+const StoryEventHandlerData := preload("res://scripts/story/story_event_handler.gd")
 const NUMERIC_TRIGGER_FIELDS := [
 	"stress",
 	"hull",
@@ -189,13 +189,13 @@ static func _story_trigger_matches(trigger_data: Dictionary, phase: String, day_
 			continue
 		if not _trigger_matches_numeric_condition(trigger_data, numeric_field, context.get(numeric_field, null)):
 			return false
-	if not StoryEventHandler.matches_required_events(event_values, trigger_data.get("required_events", [])):
+	if not StoryEventHandlerData.matches_required_events(event_values, trigger_data.get("required_events", [])):
 		return false
-	if not StoryEventHandler.matches_forbidden_events(event_values, trigger_data.get("forbidden_events", [])):
+	if not StoryEventHandlerData.matches_forbidden_events(event_values, trigger_data.get("forbidden_events", [])):
 		return false
-	if not StoryEventHandler.matches_event_values(event_values, trigger_data.get("required_event_values", {}), true):
+	if not StoryEventHandlerData.matches_event_values(event_values, trigger_data.get("required_event_values", {}), true):
 		return false
-	if not StoryEventHandler.matches_event_values(event_values, trigger_data.get("forbidden_event_values", {}), false):
+	if not StoryEventHandlerData.matches_event_values(event_values, trigger_data.get("forbidden_event_values", {}), false):
 		return false
 
 	return true
@@ -232,13 +232,13 @@ static func _is_character_story_trigger(trigger_data: Dictionary) -> bool:
 
 
 static func random_events_unlocked(event_values: Dictionary, day_number: int) -> bool:
-	return day_number > 2 and StoryEventHandler.has_event_value(event_values, "day_2_station_bill")
+	return day_number > 2 and StoryEventHandlerData.has_event_value(event_values, "day_2_station_bill")
 
 
 static func _character_story_gate_satisfied(trigger_data: Dictionary, event_values: Dictionary) -> bool:
 	if bool(trigger_data.get("bypass_character_story_gate", false)):
 		return true
-	return StoryEventHandler.has_event_value(event_values, "day_2_station_bill")
+	return StoryEventHandlerData.has_event_value(event_values, "day_2_station_bill")
 
 
 static func _character_story_trigger_order(trigger_data: Dictionary) -> float:

@@ -3,11 +3,10 @@ extends RefCounted
 # One entry path for card clicks and rides queued by a passenger story.
 const MAIN_SCENE := "res://scenes/main.tscn"
 const DAY_START_SCENE := "res://scenes/day_start_transition.tscn"
-const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 
 
-static func start(character: Dictionary, distance: String, transition_mode: String, return_scene := "") -> Dictionary:
+static func start(character: Dictionary, distance: String, transition_mode: String, _return_scene := "") -> Dictionary:
 	if PlayerState.is_run_failed():
 		return {"scene": GAME_OVER_SCENE, "error": ""}
 	if not PlayerState.are_passengers_available():
@@ -22,10 +21,11 @@ static func start(character: Dictionary, distance: String, transition_mode: Stri
 	PlayerState.set_current_mock_character(str(character.get("id", "")))
 	PlayerState.set_current_stage_special_type(str(character.get("stage_special_type", "")))
 	PlayerState.set_current_special_stage_id(str(character.get("special_stage_id", "")))
-	var show_day_start := PlayerState.will_advance_day(transition_mode) and PlayerState.get_transition_display_day(transition_mode) <= 1
+	# The first departure shows Day 1; later mornings use the sleep day card.
+	var show_day_start := PlayerState.get_current_day() == 1 and int(PlayerState.stage_round) == 0
 	PlayerState.advance_to_next_stage(transition_mode, distance, str(character.get("stage_traffic", "")))
 	PlayerState.clear_pending_trip_selection()
-	var target := DAY_START_SCENE if show_day_start and return_scene != HOME_SCENE else MAIN_SCENE
+	var target := DAY_START_SCENE if show_day_start else MAIN_SCENE
 	if PlayerState.is_run_failed():
 		target = GAME_OVER_SCENE
 	PlayerState.set_resume_scene(target)

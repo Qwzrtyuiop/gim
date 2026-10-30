@@ -109,9 +109,9 @@ func _draw_needle(center: Vector2, radius: float, start_angle: float, end_angle:
 	draw_line(tail, tip, Color(1.0, 0.92, 0.62, 0.5), 2.0)
 
 
-func _draw_text(text: String, position: Vector2, font_size: int, color: Color, width: float = -1.0, alignment: int = HORIZONTAL_ALIGNMENT_LEFT) -> void:
-	draw_string(UI_FONT, position + Vector2(1.0, 0.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
-	draw_string(UI_FONT, position + Vector2(-1.0, 0.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
-	draw_string(UI_FONT, position + Vector2(0.0, 1.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
-	draw_string(UI_FONT, position + Vector2(0.0, -1.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
-	draw_string(UI_FONT, position, text, alignment, width, font_size, color)
+func _draw_text(text: String, draw_position: Vector2, font_size: int, color: Color, width: float = -1.0, alignment: int = HORIZONTAL_ALIGNMENT_LEFT) -> void:
+	draw_string(UI_FONT, draw_position + Vector2(1.0, 0.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
+	draw_string(UI_FONT, draw_position + Vector2(-1.0, 0.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
+	draw_string(UI_FONT, draw_position + Vector2(0.0, 1.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
+	draw_string(UI_FONT, draw_position + Vector2(0.0, -1.0), text, alignment, width, font_size, Color(0.0, 0.0, 0.0, 0.95))
+	draw_string(UI_FONT, draw_position, text, alignment, width, font_size, color)

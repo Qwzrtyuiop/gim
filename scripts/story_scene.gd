@@ -9,7 +9,7 @@ const StoryPresentation := preload("res://scripts/story/story_presentation.gd")
 const StoryInterface := preload("res://scripts/story/story_interface.gd")
 
 const FALLBACK_SCENE := "res://scenes/main_menu.tscn"
-const StoryActionRunner := preload("res://scripts/story/story_action_runner.gd")
+const StoryActionRunnerData := preload("res://scripts/story/story_action_runner.gd")
 const StoryPayload := preload("res://scripts/story/story_payload.gd")
 const StoryCheckpoint := preload("res://scripts/story/story_checkpoint.gd")
 const StoryPortraitLayer := preload("res://scripts/story/story_portrait_layer.gd")
@@ -439,7 +439,7 @@ func _run_choice_actions(choice_data: Dictionary, start_action := 0) -> void:
 	# Choice metadata precedes its actions. A resumed cursor must not overwrite
 	# event values already changed by the completed actions.
 	if not _is_replay_mode() and start_action == 0:
-		StoryActionRunner.apply_choice_event_values(choice_data)
+		StoryActionRunnerData.apply_choice_event_values(choice_data)
 
 	var raw_actions: Array = choice_data.get("actions", choice_data.get("effects", []))
 	for action_index in range(start_action, raw_actions.size()):
@@ -455,9 +455,9 @@ func _run_choice_actions(choice_data: Dictionary, start_action := 0) -> void:
 
 
 func _run_story_action(action_data: Dictionary) -> void:
-	if _is_replay_mode() and StoryActionRunner.is_persistent_story_action(action_data):
+	if _is_replay_mode() and StoryActionRunnerData.is_persistent_story_action(action_data):
 		return
-	await StoryActionRunner.run(self, action_data)
+	await StoryActionRunnerData.run(self, action_data)
 
 
 func _is_replay_mode() -> bool:

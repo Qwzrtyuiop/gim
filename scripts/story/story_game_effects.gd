@@ -163,4 +163,6 @@ static func _sum(left, right):
 			return null
 		return left + right
 	var result := float(left) + float(right)
-	return result if is_finite(result) else null
+	if not is_finite(result):
+		return null
+	return result

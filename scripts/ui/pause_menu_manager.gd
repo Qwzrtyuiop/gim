@@ -361,7 +361,7 @@ func _load_requested(slot: int) -> void:
 
 func _finish_slot_load(destination: String) -> void:
 	var old_scene := get_tree().current_scene
-	var previous_mode: int = old_scene.process_mode if old_scene != null else Node.PROCESS_MODE_INHERIT
+	var previous_mode: Node.ProcessMode = old_scene.process_mode if old_scene != null else Node.PROCESS_MODE_INHERIT
 	if old_scene != null:
 		old_scene.process_mode = Node.PROCESS_MODE_DISABLED
 	var error := get_tree().change_scene_to_file(destination)

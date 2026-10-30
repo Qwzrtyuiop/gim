@@ -4,7 +4,7 @@ const SpecialStages := preload("res://scripts/config/special_stages.gd")
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
-const AchievementService := preload("res://scripts/achievement_service.gd")
+const AchievementServiceData := preload("res://scripts/achievement_service.gd")
 const StressShield := preload("res://scripts/state/player_stress_shield_state.gd")
 const CHARACTER_RELIEF_EVENT := "daily_character_stress_relief"
 const CHARACTER_RELIEF_LOCATIONS := ["hospital", "bar", "park"]
@@ -156,7 +156,7 @@ static func prepare_stage_start(player_state, stage_descriptor: String = "") -> 
 	StressShield.begin_ride(player_state)
 	add_stress(player_state, GameTuning.TRIP_STRESS_GAIN)
 	player_state.current_trip_had_crash = false
-	player_state.current_trip_high_stress = player_state.stress >= AchievementService.HIGH_STRESS_THRESHOLD
+	player_state.current_trip_high_stress = player_state.stress >= AchievementServiceData.HIGH_STRESS_THRESHOLD
 	player_state.current_trip_low_gas = is_low_gas(player_state)
 	player_state.pending_stage_stress_applied = true
 	player_state.save_progress()
@@ -278,9 +278,9 @@ static func add_energy(player_state, amount: int) -> void:
 	player_state.energy += bounded_amount
 
 
-static func add_max_energy(player_state, amount: int) -> void:
+static func add_max_energy(player_state, _amount: int) -> void:
 	# Capacity comes from earned achievements rather than repeatable story rewards.
-	player_state.max_energy = AchievementService.energy_capacity(player_state.achievements)
+	player_state.max_energy = AchievementServiceData.energy_capacity(player_state.achievements)
 	player_state.energy = mini(player_state.energy, player_state.max_energy)
 
 

@@ -151,7 +151,7 @@ func set_offers(offers: Array, night: bool) -> void:
 	var prepared: Array[Dictionary] = []
 	var seen_ids: Dictionary = {}
 	var occupied_slots: Dictionary = {}
-	var generic_ids: Array[String] = []
+	var generic_characters: Dictionary = {}
 	var placeholder_count := 0
 	for offer_variant in offers:
 		if not offer_variant is Dictionary:
@@ -175,13 +175,13 @@ func set_offers(offers: Array, night: bool) -> void:
 		record["character_id"] = character_id
 		record["presentation"] = presentation
 		prepared.append(record)
-		if pickup_location == "station" and SpawnCatalog.GENERIC_IDS.has(character_id):
-			generic_ids.append(character_id)
+		if pickup_location == "station" and (bool(character.get("is_generic", false)) or character_id.begins_with("generic_")):
+			generic_characters[character_id] = character
 		elif pickup_location == "station" and not presentation.is_empty():
 			var slot := int(SpawnCatalog.GENERIC_SLOT_BY_CHARACTER.get(character_id, -1))
 			if slot >= 0:
 				occupied_slots[slot] = true
-	var generic_presentations := _generic_presentations(generic_ids, occupied_slots)
+	var generic_presentations := _generic_presentations(generic_characters, occupied_slots)
 	for record in prepared:
 		if generic_presentations.has(record.character_id):
 			record.presentation = generic_presentations[record.character_id]
@@ -222,36 +222,52 @@ func set_offers(offers: Array, night: bool) -> void:
 	_refresh_info()
 
 
-func _generic_presentations(generic_ids: Array[String], occupied_slots: Dictionary) -> Dictionary:
+func _generic_presentations(characters: Dictionary, occupied_slots: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	var used_slots := occupied_slots.duplicate()
+	var ordered_ids: Array = SpawnCatalog.GENERIC_IDS.duplicate()
+	for id: String in characters:
+		if not ordered_ids.has(id):
+			ordered_ids.append(id)
+	# Saved offer appearances take priority over any legacy presentation fallback.
+	for id: String in ordered_ids:
+		if not characters.has(id):
+			continue
+		var character: Dictionary = characters[id]
+		var slot: Variant = character.get("generic_spawn_slot")
+		if slot is int and (slot >= 0 and slot < SpawnCatalog.GENERIC_ENTRIES.size() or slot <= -2 and slot >= -SpawnCatalog.GENERIC_IDS.size() - 1) and not used_slots.has(slot):
+			used_slots[slot] = true
+			result[id] = _generic_slot_presentation(slot, bool(character.get("generic_spawn_alternate", false)))
 	var free_slots: Array[int] = []
 	for slot in range(SpawnCatalog.GENERIC_ENTRIES.size()):
-		if not occupied_slots.has(slot):
+		if not used_slots.has(slot):
 			free_slots.append(slot)
-	var result: Dictionary = {}
-	var overflow_count := 0
-	# Canonical order keeps each rider's pose stable when offer order changes.
-	for character_id: String in SpawnCatalog.GENERIC_IDS:
-		if not generic_ids.has(character_id):
+	var overflow_slot := -2
+	# Older/direct-render offers have no saved appearance; keep a stable fallback.
+	for character_id: String in ordered_ids:
+		if not characters.has(character_id) or result.has(character_id):
 			continue
 		if not free_slots.is_empty():
 			var slot: int = free_slots.pop_front()
-			# Choose once per day/phase without consuming gameplay randomness.
-			# Each alternate keeps its own authored size and canvas position.
 			var appearance_key := "%d:%s:%s" % [PlayerState.current_day, PlayerState.current_phase, character_id]
-			var presentation := SpawnCatalog.generic_entry(slot, appearance_key.hash() % 2 == 0)
-			presentation["slot"] = slot
-			result[character_id] = presentation
+			result[character_id] = _generic_slot_presentation(slot, appearance_key.hash() % 2 == 0)
 		else:
-			# Nine offers can outnumber the eight shared standing/seated spots.
-			# This narrow pose fits left of Dante and every authored main slot.
-			var presentation := SpawnCatalog.generic_entry(0)
-			var region: Rect2 = presentation.region
-			region.position = Vector2(28 + overflow_count * 80, 360)
-			presentation["region"] = region
-			presentation["slot"] = -2 - overflow_count
-			result[character_id] = presentation
-			overflow_count += 1
+			while used_slots.has(overflow_slot):
+				overflow_slot -= 1
+			result[character_id] = _generic_slot_presentation(overflow_slot, false)
+			used_slots[overflow_slot] = true
 	return result
+
+
+func _generic_slot_presentation(slot: int, alternate: bool) -> Dictionary:
+	var presentation := SpawnCatalog.generic_entry(slot if slot >= 0 else 0, alternate if slot >= 0 else false)
+	if slot < 0:
+		# The narrow overflow pose fits left of Dante and all authored main slots.
+		var region: Rect2 = presentation.region
+		region.position = Vector2(28 + (-slot - 2) * 80, 360)
+		presentation["region"] = region
+	presentation["slot"] = slot
+	return presentation
 
 
 func set_enabled(value: bool) -> void:

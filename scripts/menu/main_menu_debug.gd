@@ -51,7 +51,7 @@ static func apply_debug_button_theme(owner, button: BaseButton) -> void:
 	button.add_theme_stylebox_override("disabled", disabled_style)
 
 
-static func apply_debug_panel_theme(owner, panel: Panel) -> void:
+static func apply_debug_panel_theme(_owner, panel: Panel) -> void:
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(0.10, 0.09, 0.08, 0.97)
 	style.border_color = Color(0.71, 0.56, 0.31, 1.0)

@@ -107,6 +107,8 @@ func _visit_stress_relief(location_id: String) -> int:
 	if location_id == "park":
 		return GameTuning.PARK_STRESS_RELIEF
 	if location_id == "church":
+		if PlayerState.get_current_time_of_day() == "night":
+			return 0
 		return PlayerState.get_church_stress_relief()
 	return 0
 

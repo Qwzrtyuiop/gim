@@ -12,10 +12,14 @@ const DEFAULT_ICON_SIZE := Vector2(22.0, 22.0)
 
 static func create(config: Dictionary = {}) -> Dictionary:
 	var two_rows := bool(config.get("two_rows", false))
-	var row: BoxContainer = VBoxContainer.new() if two_rows else HBoxContainer.new()
+	var row: BoxContainer
+	if two_rows:
+		row = VBoxContainer.new()
+	else:
+		row = HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	row.alignment = int(config.get("alignment", BoxContainer.ALIGNMENT_CENTER))
+	row.alignment = int(config.get("alignment", BoxContainer.ALIGNMENT_CENTER)) as BoxContainer.AlignmentMode
 	row.add_theme_constant_override("separation", int(config.get("separation", 12)))
 
 	var label_config := {

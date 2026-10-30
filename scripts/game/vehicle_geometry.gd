@@ -33,7 +33,7 @@ static func collision_rect(sprite: Sprite2D, inset: Vector4, owner) -> Rect2:
 	return rect
 
 
-static func collision_rect_for_transform(sprite: Sprite2D, global_position: Vector2, scale: Vector2, local_rect: Rect2) -> Rect2:
+static func collision_rect_for_transform(_sprite: Sprite2D, global_position: Vector2, scale: Vector2, local_rect: Rect2) -> Rect2:
 	var scaled_position := Vector2(
 		local_rect.position.x * scale.x,
 		local_rect.position.y * scale.y
@@ -112,12 +112,12 @@ static func reference_scale_for_vehicle(owner, vehicle_key: String, fallback: Ve
 	if path.is_empty():
 		return fallback
 
-	var reference: Node2D = owner.get_node_or_null(path) as Node2D
-	if reference == null:
+	var scale_reference: Node2D = owner.get_node_or_null(path) as Node2D
+	if scale_reference == null:
 		return fallback
 
 	var viewport_height_ratio: float = owner.get_viewport_rect().size.y / 720.0
-	return reference.scale * viewport_height_ratio
+	return scale_reference.scale * viewport_height_ratio
 
 
 static func scale_for_vehicle_in_lane(owner, vehicle_key: String, fallback: Vector2, lane_index: int) -> Vector2:
