@@ -248,11 +248,11 @@ func _refresh_home_bgm() -> void:
 	if not is_instance_valid(bgm_player):
 		return
 	var indoors := home_map == null or not home_map.visible
-	var bar_active: bool = home_map != null and home_map.bar_audio != null and home_map.bar_audio.active
+	var local_music_active: bool = home_map != null and home_map.has_local_music()
 	bgm_player = HubMusicManager.request_track(
 		HubMusicManager.background_path(indoors),
 		RainAudioProfile.music_duck_db(PlayerState.get_current_weather()),
-		PlayerState.is_midnight() or bar_active,
+		PlayerState.is_midnight() or local_music_active,
 	)
 
 

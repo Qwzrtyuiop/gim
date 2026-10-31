@@ -35,6 +35,7 @@ const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.
 const ChurchPrayerEncounter := preload("res://scripts/home/church_prayer_encounter.gd")
 const ParkVisitEncounter := preload("res://scripts/home/park_visit_encounter.gd")
 const ChurchAudio := preload("res://scripts/home/church_audio.gd")
+const PierAudio := preload("res://scripts/home/pier_audio.gd")
 const AlmaDelivery := preload("res://scripts/home/alma_delivery_encounter.gd")
 const ConstructionWorkOverlay := preload("res://scripts/home/construction_work_overlay.gd")
 const GarageTricycleHotspot := preload("res://scripts/home/garage_tricycle_hotspot.gd")
@@ -79,6 +80,7 @@ var hospital_audio: HospitalAudio
 var construction_spawn: ConstructionBennySpawn
 var construction_audio: ConstructionAudio
 var church_audio: ChurchAudio
+var pier_audio: PierAudio
 var hub_story_overlay: HubStoryOverlay
 var work_overlay: ConstructionWorkOverlay
 var garage_tricycle: GarageTricycleHotspot
@@ -148,6 +150,8 @@ func _ready() -> void:
 	add_child(construction_audio)
 	church_audio = ChurchAudio.new()
 	add_child(church_audio)
+	pier_audio = PierAudio.new()
+	add_child(pier_audio)
 	hub_story_overlay = HubStoryOverlay.new()
 	add_child(hub_story_overlay)
 	hub_story_overlay.setup(self)
@@ -164,6 +168,7 @@ func _ready() -> void:
 	add_child(fishing_overlay)
 	fishing_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	fishing_overlay.finished.connect(_finish_fishing)
+	fishing_overlay.music_changed.connect(bar_music_changed.emit)
 	fishing_confirmation = _build_pier_dialog("FishingConfirmation")
 	fishing_confirmation.confirmed.connect(_confirm_fishing)
 	fishing_confirmation.cancelled.connect(_cancel_fishing)
@@ -212,6 +217,7 @@ func _show_map() -> void:
 	if _has_activity_overlay():
 		return
 	church_audio.set_active(false)
+	pier_audio.set_active(false)
 	_close_bar_shop()
 	_close_hospital_shop()
 	_dismiss_travel_confirmation()
@@ -426,6 +432,7 @@ func _visit(location_id: String) -> void:
 	location_view.show()
 	_set_hospital_active(location_id == "hospital")
 	_set_construction_active(location_id == "construction_site")
+	pier_audio.set_active(location_id == "pier")
 	# The VN reader owns its own loop during prayer and slot/memory playback.
 	church_audio.set_active(location_id == "church" and location_visit_story_id.is_empty())
 	map_button.grab_focus()
@@ -456,6 +463,7 @@ func _depart(scene_path: String) -> void:
 	if _has_activity_overlay():
 		return
 	church_audio.set_active(false)
+	pier_audio.set_active(false)
 	_close_bar_shop()
 	_close_hospital_shop()
 	_dismiss_travel_confirmation()
@@ -473,6 +481,7 @@ func _close() -> void:
 	if _has_activity_overlay():
 		return
 	church_audio.set_active(false)
+	pier_audio.set_active(false)
 	_close_bar_shop()
 	_close_hospital_shop()
 	_dismiss_travel_confirmation()
@@ -862,6 +871,7 @@ func _play_hub_story(story_id: String) -> void:
 	construction_spawn.set_interaction_enabled(false)
 	construction_audio.set_active(false)
 	church_audio.set_active(false)
+	pier_audio.set_active(false)
 	if inside_bar:
 		bar_characters.set_interaction_enabled(false)
 		bar_audio.set_active(false)
@@ -895,6 +905,7 @@ func _restore_activity_controls() -> void:
 	construction_spawn.set_interaction_enabled(true)
 	construction_audio.set_active(current_location == "construction_site" and location_view.visible and is_visible_in_tree())
 	church_audio.set_active(current_location == "church" and location_view.visible and is_visible_in_tree())
+	pier_audio.set_active(current_location == "pier" and location_view.visible and is_visible_in_tree())
 	bar_characters.set_interaction_enabled(true)
 	if inside_bar and current_location == "bar":
 		bar_characters.set_alma_pose_locked(AlmaDelivery.is_available())
@@ -969,6 +980,13 @@ func _relieve_character_stress(location_id: String, character_id: String) -> int
 	if bar_shop.visible or hospital_shop.visible or hub_dialogue.blocks_input() or (location_id == "bar" and not inside_bar):
 		return 0
 	return PlayerState.relieve_character_interaction(location_id, character_id)
+
+
+func has_local_music() -> bool:
+	return (
+		(bar_audio != null and bar_audio.active)
+		or (fishing_overlay != null and fishing_overlay.audio != null and fishing_overlay.audio.active)
+	)
 
 
 func _set_bar_active(value: bool) -> void:

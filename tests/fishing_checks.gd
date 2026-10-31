@@ -469,7 +469,7 @@ static func _test_pier_and_input(host: Node) -> void:
 	overlay._process(GameTuning.FISHING_OCEAN_FRAME_SECONDS)
 	assert(overlay.ocean_frame_index == 2)
 	overlay._process(GameTuning.FISHING_OCEAN_FRAME_SECONDS)
-	assert(overlay.ocean_frame_index == 0, "The three authored ocean frames wrap in a loop")
+	assert(overlay.ocean_frame_index == 0, "The water animation follows 1-2-3, advancing once per second")
 	overlay.set_process(true)
 	await _button(host, _reel_point(overlay, 0.0), true)
 	assert(overlay.dragging and overlay.cursor_locked)

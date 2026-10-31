@@ -1,5 +1,6 @@
 extends Control
 
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const RIDE_SELECTION_SCENE := "res://scenes/ride_selection.tscn"
 const HOUSE_DAY_START_SCENE := "res://scenes/day_start_scene.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
@@ -139,7 +140,7 @@ func _show_day_card(target_day: int) -> void:
 	collector_label.show()
 	day_change_player.play()
 	await _fade_label(day_label, 1.0, LABEL_FADE_SECONDS)
-	await get_tree().create_timer(DEBT_LINE_DELAY_SECONDS).timeout
+	await get_tree().create_timer(GameTuning.DAY_CARD_DETAILS_DELAY_SECONDS).timeout
 	debt_reveal_player.play()
 	await _fade_label(debt_label, 1.0, DEBT_LINE_FADE_SECONDS)
 	await get_tree().create_timer(DEBT_LINE_DELAY_SECONDS).timeout

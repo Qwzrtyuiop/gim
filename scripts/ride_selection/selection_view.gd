@@ -120,6 +120,6 @@ func refresh_bgm() -> void:
 	if bgm_player == null or not is_instance_valid(bgm_player):
 		return
 	var weather := PlayerState.get_current_weather()
-	var bar_active: bool = screen.travel_map != null and screen.travel_map.bar_audio != null and screen.travel_map.bar_audio.active
-	var blocked: bool = PlayerState.is_midnight() or bar_active or (screen.idle_music != null and screen.idle_music.active)
+	var local_music_active: bool = screen.travel_map != null and screen.travel_map.has_local_music()
+	var blocked: bool = PlayerState.is_midnight() or local_music_active or (screen.idle_music != null and screen.idle_music.active)
 	bgm_player = HubMusicManager.request_track(HubMusicManager.background_path(), RainAudioProfile.music_duck_db(weather), blocked)

@@ -119,9 +119,12 @@ const CRASH_REPAIR_ENERGY_RECOVERY_RATIO := 1.0 # 1.0 restores full energy.
 # then fade to black before opening the repair screen.
 const CRASH_REPAIR_HOLD_SECONDS := 0.35
 const CRASH_REPAIR_FADE_SECONDS := 1.2
+const DAY_CARD_DETAILS_DELAY_SECONDS := 2.0
 
 # Pier fishing prototype. Depth/current values are fractions of the water area.
-const FISHING_OCEAN_FRAME_SECONDS := 0.16
+const FISHING_OCEAN_FRAME_SECONDS := 1.0
+const FISHING_REEL_SFX_FADE_SECONDS := 0.2
+const FISHING_NIGHT_MUSIC_CHANCE := 0.1
 const FISHING_FISH_COUNT := 5
 const FISHING_SMALL_FISH_COUNT := 2
 const FISHING_SMALL_FISH_MAX_CM := 35.0

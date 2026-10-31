@@ -2,10 +2,12 @@ extends Control
 
 # Scene-local fishing prototype. The session owns hook/fish movement and catches.
 signal finished
+signal music_changed
 
 const FishingSession := preload("res://scripts/home/fishing_session.gd")
 const FishCatalog := preload("res://scripts/home/fishing_fish_catalog.gd")
 const FishingCatchResults := preload("res://scripts/home/fishing_catch_results.gd")
+const FishingAudio := preload("res://scripts/home/fishing_audio.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
@@ -14,6 +16,7 @@ const OCEAN_FRAMES := [
 	preload("res://assets/ui/fishingminigame/fishingframeloop2.png"),
 	preload("res://assets/ui/fishingminigame/fishingframeloop3.png"),
 ]
+const OCEAN_FRAME_ORDER := [0, 1, 2]
 const REEL := preload("res://assets/ui/fishingminigame/reel.png")
 const HOOK := preload("res://assets/ui/fishingminigame/hook.png")
 const ART_SIZE := Vector2(1774, 887)
@@ -27,6 +30,7 @@ const REEL_GRIP := Vector2(295, 842)
 const REEL_DRAG_RADIUS := 180.0
 const REEL_DEADZONE := 18.0
 const REEL_FIGHT_SHAKE_PIXELS := 5.0
+const REEL_SOUND_RELEASE_SECONDS := 0.1
 const HOOK_SOURCE := Rect2(974, 507, 19, 34)
 const HOOK_ATTACHMENT := Vector2(12.5, 0)
 const HOOK_TIP_OFFSET := Vector2(-10, 24.5)
@@ -43,6 +47,7 @@ class FishingCanvas:
 
 var active := false
 var session: FishingSession = FishingSession.new()
+var audio: FishingAudio
 var reel_angle := 0.0
 var dragging := false
 var cursor_locked := false
@@ -60,6 +65,8 @@ var _fish_elapsed := 0.0
 var _feedback_elapsed := 0.0
 var _reel_shake_elapsed := 0.0
 var _reel_shake_offset := Vector2.ZERO
+var _manual_reel_seconds := 0.0
+var _manual_reel_direction := 0.0
 var _hook_feedback: Label
 var _hook_feedback_tween: Tween
 var _last_hook_cue := ""
@@ -77,6 +84,9 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_appearance_rng.randomize()
 	_build_ui()
+	audio = FishingAudio.new()
+	add_child(audio)
+	audio.active_changed.connect(music_changed.emit)
 	session.fish_hooked.connect(_on_fish_hooked)
 	session.fish_caught.connect(_on_fish_caught)
 	resized.connect(_layout)
@@ -109,6 +119,7 @@ func present(seed_value: int = 0) -> void:
 	show()
 	_layout()
 	set_process(true)
+	audio.begin(PlayerState.get_current_time_of_day() == "night", PlayerState.current_weather)
 
 
 func close() -> void:
@@ -116,6 +127,7 @@ func close() -> void:
 		return
 	_clear_hook_feedback()
 	_release_drag()
+	audio.stop_reel()
 	set_process(false)
 	close_button.release_focus()
 	get_viewport().set_input_as_handled()
@@ -130,6 +142,7 @@ func _finish_session() -> void:
 	if not active:
 		return
 	active = false
+	audio.stop()
 	_clear_hook_feedback()
 	_release_drag()
 	set_process(false)
@@ -161,14 +174,21 @@ func _process(delta: float) -> void:
 	if dragging and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_release_drag()
 	_hook_cue_cooldown = maxf(0.0, _hook_cue_cooldown - delta)
+	_manual_reel_seconds = maxf(0.0, _manual_reel_seconds - delta)
 	var automatic_before: float = session.automatic_reel_angle
 	session.update(delta)
-	reel_angle = wrapf(reel_angle + session.automatic_reel_angle - automatic_before, -PI, PI)
+	var automatic_turn: float = session.automatic_reel_angle - automatic_before
+	reel_angle = wrapf(reel_angle + automatic_turn, -PI, PI)
+	# Clockwise payout uses idle SFX; only actual counterclockwise turns use pull.
+	var reel_direction := _manual_reel_direction if _manual_reel_seconds > 0.0 else signf(automatic_turn)
+	audio.set_reel_motion(reel_direction)
+	audio.set_weather(PlayerState.current_weather)
 	_update_reel_shake(delta)
 	_configure_fish()
 	var frame_seconds := GameTuning.FISHING_OCEAN_FRAME_SECONDS
-	_ocean_elapsed = fmod(_ocean_elapsed + maxf(0.0, delta), frame_seconds * OCEAN_FRAMES.size())
-	ocean_frame_index = mini(OCEAN_FRAMES.size() - 1, int(_ocean_elapsed / frame_seconds))
+	_ocean_elapsed = fmod(_ocean_elapsed + maxf(0.0, delta), frame_seconds * OCEAN_FRAME_ORDER.size())
+	var ocean_step := mini(OCEAN_FRAME_ORDER.size() - 1, int(_ocean_elapsed / frame_seconds))
+	ocean_frame_index = OCEAN_FRAME_ORDER[ocean_step]
 	_fish_elapsed = fmod(_fish_elapsed + maxf(0.0, delta), 0.54)
 	_feedback_elapsed = maxf(0.0, _feedback_elapsed - delta)
 	_refresh_status()
@@ -222,6 +242,14 @@ func _drag_relative(event: InputEventMouseMotion) -> void:
 	var change := clampf(motion.dot(tangent) / grip_offset.length(), -PI * 0.65, PI * 0.65)
 	var accepted: float = session.reel(change)
 	reel_angle = wrapf(reel_angle + accepted, -PI, PI)
+	if not is_zero_approx(accepted):
+		_manual_reel_seconds = REEL_SOUND_RELEASE_SECONDS
+		_manual_reel_direction = signf(accepted)
+		audio.set_reel_motion(_manual_reel_direction)
+	else:
+		_manual_reel_seconds = 0.0
+		_manual_reel_direction = 0.0
+		audio.set_reel_motion(0.0)
 	_canvas.queue_redraw()
 	_water_canvas.queue_redraw()
 
@@ -252,6 +280,10 @@ func _lock_cursor() -> void:
 
 func _release_drag() -> void:
 	dragging = false
+	_manual_reel_seconds = 0.0
+	_manual_reel_direction = 0.0
+	if is_instance_valid(audio):
+		audio.set_reel_motion(0.0)
 	_reel_shake_elapsed = 0.0
 	_reel_shake_offset = Vector2.ZERO
 	session.set_reel_held(false)
@@ -276,6 +308,8 @@ func _exit_tree() -> void:
 func _on_visibility_changed() -> void:
 	if not is_visible_in_tree():
 		_release_drag()
+		if is_instance_valid(audio):
+			audio.stop()
 
 
 func source_to_global(point: Vector2) -> Vector2:
@@ -467,7 +501,10 @@ func _layout() -> void:
 	var available := (size - margin * 2.0).max(Vector2.ONE)
 	var fit := minf(available.x / LAYOUT_SIZE.x, available.y / LAYOUT_SIZE.y)
 	_canvas.scale = Vector2.ONE * fit
-	_canvas.position = (size - LAYOUT_SIZE * fit) * 0.5
+	# Center beneath the top status bar while keeping room for the crank's swing.
+	var header_space := minf(44.0, size.y * 0.12)
+	var content_area := Rect2(Vector2(0, header_space), size - Vector2(0, header_space))
+	_canvas.position = content_area.position + (content_area.size - LAYOUT_SIZE * fit) * 0.5
 	_canvas.queue_redraw()
 	_water_canvas.queue_redraw()
 	queue_redraw()

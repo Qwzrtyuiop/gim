@@ -289,11 +289,11 @@ func _refresh_store_bgm() -> void:
 	var path: String = HubMusicManager.background_path()
 	if path != HubMusicManager.RAINY_NIGHT_PATH and shop_overlay.visible and active_category == "tricycle":
 		path = STORE_BGM_PATH
-	var bar_active: bool = travel_map != null and travel_map.bar_audio != null and travel_map.bar_audio.active
+	var local_music_active: bool = travel_map != null and travel_map.has_local_music()
 	bgm_player = HubMusicManager.request_track(
 		path,
 		RainAudioProfile.music_duck_db(PlayerState.get_current_weather()),
-		PlayerState.is_midnight() or bar_active,
+		PlayerState.is_midnight() or local_music_active,
 	)
 
 
