@@ -69,12 +69,24 @@ static func steer(entry: Dictionary, hook_tip: Vector2, delta: float, rng: Rando
 
 static func _cruise(entry: Dictionary, hook_tip: Vector2, delta: float, rng: RandomNumberGenerator, hook_available: bool) -> void:
 	var velocity: Vector2 = entry.velocity
-	entry.turn_timer = float(entry.get("turn_timer", 1.0)) - delta
-	if float(entry.turn_timer) <= 0.0:
-		entry.turn_timer = rng.randf_range(1.0, 3.5)
-		if rng.randf() < 0.4:
-			velocity.x *= -1.0
-	velocity.y = 0.0
+	var position: Vector2 = entry.position
+	var school_target: Variant = entry.get("school_target")
+	if school_target is Vector2:
+		var school_velocity: Vector2 = entry.get("school_velocity", Vector2.ZERO)
+		var following: Vector2 = school_velocity + (school_target - position) * GameTuning.FISHING_SCHOOL_FOLLOW_RATE
+		velocity = Vector2(
+			clampf(following.x, -GameTuning.FISHING_SCHOOL_MAX_SPEED_X, GameTuning.FISHING_SCHOOL_MAX_SPEED_X),
+			clampf(following.y, -GameTuning.FISHING_SCHOOL_MAX_SPEED_Y, GameTuning.FISHING_SCHOOL_MAX_SPEED_Y),
+		)
+	else:
+		entry.turn_timer = float(entry.get("turn_timer", 1.0)) - delta
+		if float(entry.turn_timer) <= 0.0:
+			entry.turn_timer = rng.randf_range(1.0, 3.5)
+			if rng.randf() < 0.4:
+				velocity.x *= -1.0
+		# Resume the fish's preferred depth after it investigates a shallower hook.
+		var preferred_depth := float(entry.get("preferred_depth", position.y))
+		velocity.y = clampf(preferred_depth - position.y, -GameTuning.FISHING_FISH_DEPTH_RETURN_SPEED, GameTuning.FISHING_FISH_DEPTH_RETURN_SPEED)
 	entry.velocity = velocity
 	if not is_zero_approx(velocity.x):
 		entry.facing = 1 if velocity.x > 0.0 else -1
@@ -82,12 +94,13 @@ static func _cruise(entry: Dictionary, hook_tip: Vector2, delta: float, rng: Ran
 	if float(entry.interest_timer) > 0.0:
 		return
 	entry.interest_timer = rng.randf_range(1.2, 2.5)
-	var position: Vector2 = entry.position
 	if not hook_available or position.x < 0.0 or position.x > 1.0:
 		return
 	if _water_distance(_mouth(entry), hook_tip) > GameTuning.FISHING_HOOK_INTEREST_RADIUS:
 		return
-	if rng.randf() >= GameTuning.FISHING_HOOK_CHECK_CHANCE:
+	var depth_fraction := clampf(inverse_lerp(GameTuning.FISHING_FISH_MIN_DEPTH, GameTuning.FISHING_FISH_MAX_DEPTH, hook_tip.y), 0.0, 1.0)
+	var check_chance := lerpf(GameTuning.FISHING_HOOK_CHECK_CHANCE, GameTuning.FISHING_HOOK_DEEP_CHECK_CHANCE, depth_fraction)
+	if rng.randf() >= check_chance:
 		return
 	entry.behavior = "approaching"
 	entry.approach_timer = APPROACH_SECONDS

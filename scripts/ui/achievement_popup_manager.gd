@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/frames/ui_frame.png")
 const POPUP_HOLD_SECONDS := 2.2
 const POPUP_FADE_SECONDS := 0.28
@@ -79,15 +79,15 @@ func _build_detail_ui() -> void:
 	style.set_border_width_all(4)
 	style.set_corner_radius_all(12)
 	panel.add_theme_stylebox_override("panel", style)
-	var heading := _make_detail_label(panel, "ACHIEVEMENT UNLOCKED", 11, Vector2(28, 26), Vector2(724, 22))
+	var heading := _make_detail_label(panel, "ACHIEVEMENT UNLOCKED", 18, Vector2(28, 26), Vector2(724, 24))
 	heading.modulate = Color(1, 0.8, 0.5)
-	detail_title = _make_detail_label(panel, "", 22, Vector2(28, 65), Vector2(724, 30))
-	detail_subtitle = _make_detail_label(panel, "", 12, Vector2(28, 110), Vector2(724, 22))
-	detail_body = _make_detail_label(panel, "", 12, Vector2(36, 158), Vector2(708, 220))
+	detail_title = _make_detail_label(panel, "", 34, Vector2(28, 58), Vector2(724, 42))
+	detail_subtitle = _make_detail_label(panel, "", 20, Vector2(28, 110), Vector2(724, 28))
+	detail_body = _make_detail_label(panel, "", 20, Vector2(36, 158), Vector2(708, 220))
 	detail_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	detail_body.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	detail_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail_hint = _make_detail_label(panel, "CLICK / ENTER TO CONTINUE", 11, Vector2(28, 396), Vector2(724, 24))
+	detail_hint = _make_detail_label(panel, "CLICK / ENTER TO CONTINUE", 18, Vector2(28, 396), Vector2(724, 24))
 	tutorial_highlight = Panel.new()
 	tutorial_highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tutorial_highlight.position = Vector2(18, 54)
@@ -107,8 +107,8 @@ func _build_detail_ui() -> void:
 	tutorial_style.bg_color = Color(0.22, 0.17, 0.09, 1)
 	tutorial_panel.add_theme_stylebox_override("panel", tutorial_style)
 	panel.add_child(tutorial_panel)
-	_make_detail_label(tutorial_panel, "ACHIEVEMENTS", 10, Vector2(16, 10), Vector2(692, 18))
-	tutorial_message = _make_detail_label(tutorial_panel, "", 12, Vector2(16, 32), Vector2(692, 54))
+	_make_detail_label(tutorial_panel, "ACHIEVEMENTS", 16, Vector2(16, 8), Vector2(692, 20))
+	tutorial_message = _make_detail_label(tutorial_panel, "", 20, Vector2(16, 32), Vector2(692, 54))
 	tutorial_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_set_tutorial_step(-1)
 
@@ -187,24 +187,24 @@ func _build_ui() -> void:
 	popup_frame.offset_left = -360.0
 	popup_frame.offset_top = 24.0
 	popup_frame.offset_right = -24.0
-	popup_frame.offset_bottom = 144.0
+	popup_frame.offset_bottom = 172.0
 	popup_frame.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	add_child(popup_frame)
 
-	heading_label = _make_label(10, Color(0.43, 0.24, 0.10, 1.0), 1)
+	heading_label = _make_label(18, Color(0.43, 0.24, 0.10, 1.0), 1)
 	heading_label.text = "ACHIEVEMENT UNLOCKED"
 	heading_label.position = Vector2(44.0, 22.0)
-	heading_label.size = Vector2(240.0, 18.0)
+	heading_label.size = Vector2(270.0, 22.0)
 	popup_frame.add_child(heading_label)
 
-	title_label = _make_label(18, Color(0.24, 0.13, 0.07, 1.0), 1)
-	title_label.position = Vector2(42.0, 44.0)
-	title_label.size = Vector2(270.0, 26.0)
+	title_label = _make_label(28, Color(0.24, 0.13, 0.07, 1.0), 1)
+	title_label.position = Vector2(42.0, 47.0)
+	title_label.size = Vector2(270.0, 34.0)
 	popup_frame.add_child(title_label)
 
-	subtitle_label = _make_label(11, Color(0.38, 0.23, 0.11, 1.0), 1)
-	subtitle_label.position = Vector2(44.0, 78.0)
-	subtitle_label.size = Vector2(250.0, 24.0)
+	subtitle_label = _make_label(18, Color(0.38, 0.23, 0.11, 1.0), 1)
+	subtitle_label.position = Vector2(44.0, 88.0)
+	subtitle_label.size = Vector2(250.0, 44.0)
 	subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	popup_frame.add_child(subtitle_label)
 

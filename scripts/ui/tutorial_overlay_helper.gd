@@ -55,7 +55,7 @@ static func create(owner: Control, font: Font, overlay_z_index := 0) -> Dictiona
 	}
 
 
-static func make_label(font: Font, font_size := 12) -> Label:
+static func make_label(font: Font, font_size := 20) -> Label:
 	var label := Label.new()
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -64,7 +64,7 @@ static func make_label(font: Font, font_size := 12) -> Label:
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88, 1.0))
 	label.add_theme_color_override("font_outline_color", Color(0.12, 0.08, 0.04, 0.95))
-	label.add_theme_constant_override("outline_size", 2)
+	label.add_theme_constant_override("outline_size", 1)
 	return label
 
 
@@ -73,11 +73,12 @@ static func layout_for_targets(owner: Control, highlight: Panel, text_panel: Pan
 	var bounds := owner.get_global_transform() * Rect2(Vector2.ZERO, owner.size)
 	var label_size := Vector2(minf(480.0, maxf(1.0, bounds.size.x - 32.0)), 88.0)
 	if text_label != null:
-		var text_len := text_label.text.length()
-		if text_len > 180:
-			label_size.y = 150.0
-		elif text_len > 120:
-			label_size.y = 120.0
+		var font := text_label.get_theme_font("font")
+		var font_size := text_label.get_theme_font_size("font_size")
+		var measured := font.get_multiline_string_size(text_label.text, HORIZONTAL_ALIGNMENT_CENTER, maxf(1.0, label_size.x - 24.0), font_size)
+		var line_count := maxi(1, ceili(measured.y / font.get_height(font_size)))
+		var text_height := measured.y + maxf(0, line_count - 1) * text_label.get_theme_constant("line_spacing")
+		label_size.y = maxf(label_size.y, text_height + 20.0)
 	label_size.y = minf(label_size.y, maxf(1.0, bounds.size.y - 24.0))
 
 	if rect.size == Vector2.ZERO:

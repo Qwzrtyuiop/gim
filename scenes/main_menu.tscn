@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://cstjurkv3hhyn" path="res://scripts/main_menu.gd" id="1_ax3lt"]
 [ext_resource type="Texture2D" uid="uid://p53fpb8grxe8" path="res://assets/story/backgrounds/roads/bg1_loop.png" id="2_mfjxx"]
 [ext_resource type="Texture2D" uid="uid://dnjhxq5xjsg6" path="res://assets/ui/branding/logo.png" id="4_14rdd"]
-[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="5_y265i"]
+[ext_resource type="FontVariation" uid="uid://bfontjersey10" path="res://assets/fonts/game_font.tres" id="5_y265i"]
 [ext_resource type="Texture2D" uid="uid://d1efue5uhvbjs" path="res://assets/ui/buttons/main_menu/start_inactive.png" id="6_d72k0"]
 [ext_resource type="Texture2D" uid="uid://duotevl0m03dt" path="res://assets/ui/buttons/main_menu/quit_inactive.png" id="8_xc3vo"]
 [ext_resource type="Texture2D" uid="uid://buwkwy70ahfgb" path="res://assets/ui/buttons/button_generic.png" id="9_achbtn"]
@@ -11,15 +11,16 @@
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("5_y265i")
+font_size = 24
 font_color = Color(0.98, 0.95, 0.78, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_hint"]
 font = ExtResource("5_y265i")
-font_size = 13
+font_size = 20
 font_color = Color(0.92, 0.95, 0.88, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [node name="MainMenu" type="Control" unique_id=889567701]
@@ -95,12 +96,28 @@ anchor_right = 0.5
 offset_left = -380.0
 offset_top = 212.0
 offset_right = 380.0
-offset_bottom = 278.0
+offset_bottom = 244.0
 grow_horizontal = 2
-text = "a Role-Playing Game Exploring Filipino Traits
-Through the Journey of a Tricycle Driver"
+text = "a Role-Playing Game Exploring Filipino Traits"
 label_settings = SubResource("LabelSettings_subtitle")
 horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SubtitleContinuation" type="Label" parent="."]
+z_index = 10
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -380.0
+offset_top = 244.0
+offset_right = 380.0
+offset_bottom = 276.0
+grow_horizontal = 2
+text = "Through the Journey of a Tricycle Driver"
+label_settings = SubResource("LabelSettings_subtitle")
+horizontal_alignment = 1
+vertical_alignment = 1
 
 [node name="Menu" type="VBoxContainer" parent="." unique_id=799899787]
 z_index = 10
@@ -163,6 +180,30 @@ texture_hover = ExtResource("8_xc3vo")
 texture_focused = ExtResource("8_xc3vo")
 ignore_texture_size = true
 stretch_mode = 0
+
+[node name="ArcadeModeCheckBox" type="CheckBox" parent="."]
+z_index = 10
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 22.0
+offset_right = -26.0
+offset_bottom = 70.0
+grow_horizontal = 0
+tooltip_text = "Enable driving power-ups for a new game"
+mouse_default_cursor_shape = 2
+focus_neighbor_left = NodePath("../Menu/StartButton")
+theme_override_colors/font_color = Color(0.98, 0.94, 0.74, 1)
+theme_override_colors/font_hover_color = Color(1, 0.98, 0.86, 1)
+theme_override_colors/font_pressed_color = Color(1, 0.98, 0.86, 1)
+theme_override_colors/font_focus_color = Color(1, 0.98, 0.86, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 1
+theme_override_fonts/font = ExtResource("5_y265i")
+theme_override_font_sizes/font_size = 22
+text = "Arcade mode"
 
 [node name="DebugUnlockAllButton" type="TextureButton" parent="." unique_id=1070409326]
 visible = false

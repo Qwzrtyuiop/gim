@@ -1,6 +1,6 @@
 extends Control
 
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const SPEED_COLOR := Color(0.98, 0.86, 0.32, 1.0)
 const LABEL_COLOR := Color(0.95, 0.96, 0.88, 1.0)
 const DIAL_BG_COLOR := Color(0.03, 0.04, 0.05, 0.72)
@@ -57,9 +57,9 @@ func _draw() -> void:
 	draw_circle(center, 6.0, Color(0.70, 0.64, 0.48, 1.0))
 	draw_circle(center, 3.0, Color(0.04, 0.05, 0.06, 1.0))
 
-	_draw_text("SPEED", Vector2(dial_rect.position.x, dial_rect.position.y + 4.0), 10, LABEL_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_draw_text("%03d" % speed_kmh, Vector2(dial_rect.position.x, center.y - 36.0), 21, SPEED_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_draw_text("KM/H", Vector2(dial_rect.position.x, center.y - 12.0), 9, LABEL_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_draw_text("SPEED", Vector2(dial_rect.position.x, dial_rect.position.y + 16.0), 14, LABEL_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_draw_text("%03d" % speed_kmh, Vector2(dial_rect.position.x, center.y - 28.0), 48, SPEED_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_draw_text("KM/H", Vector2(dial_rect.position.x, center.y - 6.0), 14, LABEL_COLOR, dial_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _draw_half_circle_panel(center: Vector2, radius: float, start_angle: float, end_angle: float, color: Color) -> void:

@@ -1,6 +1,7 @@
 extends RefCounted
 
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const UI_FRAME_TEXTURE := preload("res://assets/ui/frames/ui_frame.png")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const STRESS_ICON := preload("res://assets/ui/icons/stress_brain.png")
@@ -25,7 +26,7 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 	ui.add_child(speedometer)
 	refs["speedometer"] = speedometer
 
-	var time_label := _make_label(16, Color(0.78, 0.92, 0.94, 1.0), 4)
+	var time_label := _make_label(24, Color(0.78, 0.92, 0.94, 1.0), 1)
 	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(time_label)
@@ -37,7 +38,7 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 	ui.add_child(bottom_bar)
 	refs["bottom_bar"] = bottom_bar
 
-	var help_label := _make_label(10, Color(0.95, 0.96, 0.88, 1.0), 4)
+	var help_label := _make_label(14, Color(0.95, 0.96, 0.88, 1.0), 1)
 	ui.add_child(help_label)
 	refs["help_label"] = help_label
 
@@ -53,7 +54,7 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 	ui.add_child(distance_progress_fill)
 	refs["distance_progress_fill"] = distance_progress_fill
 
-	var distance_label := _make_label(14, Color(0.60, 0.95, 0.80, 1.0), 4)
+	var distance_label := _make_label(20, Color(0.60, 0.95, 0.80, 1.0), 1)
 	distance_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	distance_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(distance_label)
@@ -65,7 +66,7 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 	footer_stats_row.add_theme_constant_override("separation", 12)
 	ui.add_child(footer_stats_row)
 	refs["footer_stats_row"] = footer_stats_row
-	var footer_money_label := _make_label(12, Color(1.0, 0.97, 0.82), 2)
+	var footer_money_label := _make_label(20, Color(1.0, 0.97, 0.82), 1)
 	footer_money_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	footer_money_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer_stats_row.add_child(footer_money_label)
@@ -77,13 +78,13 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 		footer_stats_row.add_child(icon)
 		if resources[index] == "stress":
 			icon.add_child(StressShieldIndicator.new())
-		var resource_label := _make_label(12, Color(1.0, 0.97, 0.82), 2)
+		var resource_label := _make_label(20, Color(1.0, 0.97, 0.82), 1)
 		resource_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		footer_stats_row.add_child(resource_label)
 		refs["footer_%s_label" % resources[index]] = resource_label
 	_refresh_footer_stats()
 
-	var status_label := _make_label(22, Color(1.0, 0.97, 0.82, 1.0), 6)
+	var status_label := _make_label(34, Color(1.0, 0.97, 0.82, 1.0), 2)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(status_label)
@@ -97,14 +98,14 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 	ui.add_child(top_right_info_panel)
 	refs["top_right_info_panel"] = top_right_info_panel
 
-	var stage_label := _make_label(11, Color(0.92, 0.95, 0.88, 1.0), 4)
+	var stage_label := _make_label(18, Color(0.92, 0.95, 0.88, 1.0), 1)
 	stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stage_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	stage_label.text = "DAY %d\n%s" % [PlayerState.get_current_day(), stage_type.to_upper()]
 	ui.add_child(stage_label)
 	refs["stage_label"] = stage_label
 
-	var weekly_goal_label := _make_label(12, Color(1.0, 0.95, 0.78, 1.0), 4)
+	var weekly_goal_label := _make_label(20, Color(1.0, 0.95, 0.78, 1.0), 1)
 	weekly_goal_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	weekly_goal_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	ui.add_child(weekly_goal_label)
@@ -117,6 +118,25 @@ func setup(parent: Node, gameplay_entry_fade_seconds: float, stage_type: String)
 	var speeder_lane_change_warning_label := _make_warning_label()
 	ui.add_child(speeder_lane_change_warning_label)
 	refs["speeder_lane_change_warning_label"] = speeder_lane_change_warning_label
+
+	var passing_bar := ProgressBar.new()
+	passing_bar.name = "PassingCooldownBar"
+	passing_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	passing_bar.show_percentage = false
+	passing_bar.min_value = 0.0
+	passing_bar.max_value = 1.0
+	passing_bar.step = 0.0
+	var passing_background := StyleBoxFlat.new()
+	passing_background.bg_color = Color(0.06, 0.08, 0.08, 0.88)
+	passing_background.border_color = Color("b9a784")
+	passing_background.set_border_width_all(1)
+	passing_bar.add_theme_stylebox_override("background", passing_background)
+	var passing_fill := StyleBoxFlat.new()
+	passing_fill.bg_color = Color("65d6ba")
+	passing_bar.add_theme_stylebox_override("fill", passing_fill)
+	ui.add_child(passing_bar)
+	passing_bar.hide()
+	refs["passing_bar"] = passing_bar
 
 	var fade_rect := ColorRect.new()
 	fade_rect.color = Color(0.0, 0.0, 0.0, 1.0 if gameplay_entry_fade_seconds > 0.0 else 0.0)
@@ -167,7 +187,7 @@ func layout(size: Vector2, player_x: float, player_lane: int, stage_type: String
 		footer_stats_row.add_theme_constant_override("separation", 8 if compact else 12)
 		for child: Control in footer_stats_row.get_children():
 			if child is Label:
-				child.add_theme_font_size_override("font_size", 9 if compact else 12)
+				child.add_theme_font_size_override("font_size", 16 if compact else 20)
 			elif child is TextureRect:
 				child.custom_minimum_size = Vector2.ONE * (18.0 if compact else 22.0)
 		footer_stats_row.position = Vector2(16.0, size.y - 52.0)
@@ -176,7 +196,7 @@ func layout(size: Vector2, player_x: float, player_lane: int, stage_type: String
 	var help_label := refs.get("help_label") as Label
 	if help_label:
 		help_label.text = "ARROWS/WASD drive   SHIFT boost   Q horn"
-		help_label.add_theme_font_size_override("font_size", 8 if compact else 9)
+		help_label.add_theme_font_size_override("font_size", 13 if compact else 14)
 		help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		help_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		help_label.position = Vector2(16.0, size.y - 24.0)
@@ -205,9 +225,9 @@ func layout(size: Vector2, player_x: float, player_lane: int, stage_type: String
 
 	var distance_label := refs.get("distance_label") as Label
 	if distance_label:
-		distance_label.add_theme_font_size_override("font_size", 10 if compact else 12)
+		distance_label.add_theme_font_size_override("font_size", 16 if compact else 20)
 		distance_label.position = Vector2(distance_center - distance_width * 0.5, size.y - 82.0)
-		distance_label.size = Vector2(distance_width, 22.0)
+		distance_label.size = Vector2(distance_width, 24.0)
 
 	var status_label := refs.get("status_label") as Label
 	if status_label:
@@ -276,6 +296,22 @@ func update(
 		weekly_goal_label.text = "WEEKLY GOAL: PhP %d" % PlayerState.get_current_weekly_goal()
 
 
+func update_passing_bar(anchor: Vector2, cooldown: float, game_state: String, viewport_size: Vector2) -> void:
+	var passing_bar := refs.get("passing_bar") as ProgressBar
+	if passing_bar == null:
+		return
+	passing_bar.visible = game_state == "playing" and cooldown > 0.0
+	if not passing_bar.visible:
+		return
+	var ui_scale := clampf(viewport_size.y / 720.0, 0.7, 1.3)
+	passing_bar.size = Vector2(64.0, 7.0) * ui_scale
+	passing_bar.position = Vector2(
+		clampf(anchor.x - passing_bar.size.x * 0.5, 4.0, maxf(4.0, viewport_size.x - passing_bar.size.x - 4.0)),
+		maxf(4.0, anchor.y - passing_bar.size.y - 12.0 * ui_scale)
+	)
+	passing_bar.value = clampf(1.0 - cooldown / GameTuning.PLAYER_PASSING_COOLDOWN_SECONDS, 0.0, 1.0)
+
+
 func _refresh_footer_stats() -> void:
 	refs.footer_money_label.text = "PhP %d" % PlayerState.money
 	refs.footer_energy_label.text = "%d/%d" % [PlayerState.energy, PlayerState.max_energy]
@@ -301,11 +337,11 @@ func _layout_stage_panel(stage_type: String) -> void:
 	var weekly_goal_label := refs.get("weekly_goal_label") as Label
 	if weekly_goal_label:
 		weekly_goal_label.position = Vector2(40.0, 70.0)
-		weekly_goal_label.size = Vector2(268.0, 22.0)
+		weekly_goal_label.size = Vector2(268.0, 24.0)
 
 
 func _make_warning_label() -> Label:
-	var label := _make_label(48, Color(1.0, 0.92, 0.2, 1.0), 7)
+	var label := _make_label(48, Color(1.0, 0.92, 0.2, 1.0), 2)
 	label.text = "!"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER

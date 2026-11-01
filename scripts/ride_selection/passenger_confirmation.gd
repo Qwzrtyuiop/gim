@@ -5,7 +5,7 @@ signal confirmed
 signal cancelled
 
 const PassengerTripCard := preload("res://scripts/ride_selection/passenger_trip_card.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const PANEL_WIDTH := 700.0
 const VIEWPORT_MARGIN := 24.0
 
@@ -90,13 +90,13 @@ func _build() -> void:
 	content.mouse_filter = Control.MOUSE_FILTER_STOP
 	content.add_theme_constant_override("separation", 20)
 	panel.add_child(content)
-	heading_label = _label(16, Color("faefd5"))
+	heading_label = _label(26, Color("faefd5"))
 	heading_label.text = "TAKE THIS PASSENGER?"
 	content.add_child(heading_label)
 	card = PassengerTripCard.new()
 	card.name = "ConfirmedTripSummary"
 	content.add_child(card)
-	note_label = _label(10, Color("b8ab92"))
+	note_label = _label(18, Color("b8ab92"))
 	note_label.text = "Confirm to continue with this passenger."
 	content.add_child(note_label)
 	var actions := HBoxContainer.new()
@@ -172,7 +172,7 @@ func _button(text: String, primary: bool) -> Button:
 	button.custom_minimum_size = Vector2(160, 46)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_override("font", FONT)
-	button.add_theme_font_size_override("font_size", 11)
+	button.add_theme_font_size_override("font_size", 20)
 	button.add_theme_color_override("font_color", Color("22180c") if primary else Color("eadfc7"))
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color("d7b477") if primary else Color("292016")

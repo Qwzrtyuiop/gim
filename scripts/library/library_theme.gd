@@ -2,7 +2,7 @@ extends RefCounted
 
 # Shared library styling, with each screen's existing colors and spacing.
 
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 
 
 static func apply_gallery_button(button: BaseButton) -> void:
@@ -19,7 +19,7 @@ static func apply_achievement_button(button: BaseButton) -> void:
 
 static func _apply_button(button: BaseButton, bg_color: Color, vertical_margin: float) -> void:
 	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_font_size_override("font_size", 20)
 	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.18, 0.10, 0.06, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.18, 0.10, 0.06, 1.0))
@@ -34,8 +34,8 @@ static func _apply_button(button: BaseButton, bg_color: Color, vertical_margin: 
 	normal_style.set_corner_radius_all(8)
 	normal_style.content_margin_left = 18.0
 	normal_style.content_margin_right = 18.0
-	normal_style.content_margin_top = vertical_margin
-	normal_style.content_margin_bottom = vertical_margin
+	normal_style.content_margin_top = minf(vertical_margin, 8.0)
+	normal_style.content_margin_bottom = minf(vertical_margin, 8.0)
 
 	var hover_style: StyleBoxFlat = normal_style.duplicate()
 	hover_style.bg_color = Color(0.83, 0.63, 0.33, 0.98)

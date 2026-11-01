@@ -3,7 +3,7 @@ extends RefCounted
 # Introduces one station control/resource at a time before opening passengers.
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 
 var screen
 var overlay: Control

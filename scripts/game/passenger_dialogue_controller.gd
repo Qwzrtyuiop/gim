@@ -4,7 +4,7 @@ class_name PassengerDialogueController
 const GameFlowController := preload("res://scripts/game/game_flow_controller.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const DeliveryChatter := preload("res://scripts/game/alma_delivery_chatter.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const CATEGORY_GO_FASTER := "go_faster"
 const CATEGORY_HURRY_UP := "hurry_up"
 const CATEGORY_CAREFUL := "careful"

@@ -14,6 +14,8 @@ const PASSENGER_MESSAGES_ENABLED := false
 
 # Isidro's first event qualifies above this speed, or after a vehicle collision.
 const ISIDRO_FIRST_EVENT_SPEED_KMH := 70.0
+const ISIDRO_MIDNIGHT_START_WEEK := 2
+const ISIDRO_MIDNIGHT_SPAWN_CHANCE := 0.35
 
 # Random ride stories: probability per eligible unnamed-passenger ride (0..1).
 const MALASAKIT_EVENT_CHANCE := 0.10
@@ -51,6 +53,10 @@ const PLAYER_COAST_DECELERATION := 85.0
 const PLAYER_COAST_X := 1.0
 const PLAYER_LANE_LERP_SPEED := 9.0
 const PLAYER_LANE_LERP_X := 1.0
+const PLAYER_PASSING_SECONDS := 1.5
+const PLAYER_PASSING_COOLDOWN_SECONDS := 5.0
+const PLAYER_PASSING_GAS_COST_PERCENT := 2.0
+const PLAYER_PASSING_TRANSITION_SECONDS := 0.18
 const PLAYER_DISTANCE_GAIN_X := 1.0
 const PLAYER_WIGGLE_STOP_SPEED := 45.0
 const PLAYER_WIGGLE_X_PIXELS := 2.0
@@ -121,19 +127,56 @@ const CRASH_REPAIR_HOLD_SECONDS := 0.35
 const CRASH_REPAIR_FADE_SECONDS := 1.2
 const DAY_CARD_DETAILS_DELAY_SECONDS := 2.0
 
+# Optional Arcade-mode driving pickups. Each window may produce one pickup.
+const ARCADE_POWERUP_SPAWN_MIN_SECONDS := 8.0
+const ARCADE_POWERUP_SPAWN_MAX_SECONDS := 14.0
+const ARCADE_POWERUP_SPAWN_CHANCE := 0.75
+const ARCADE_POWERUP_MAX_ACTIVE := 2
+const ARCADE_POWERUP_DURATION_SECONDS := 10.0
+const ARCADE_POWERUP_TIME_BONUS_SECONDS := 10.0
+const ARCADE_POWERUP_RADIUS := 26.0
+const ARCADE_POWERUP_LANE_HEIGHT := 40.0
+
+# Basketball court arrivals and pickup games.
+const BASKETBALL_EMPTY_CHANCE := 0.30
+const BASKETBALL_PICKUP_CHANCE := 0.50
+const BASKETBALL_WIN_CHANCE := 0.50
+const BASKETBALL_EMPTY_STRESS_RELIEF := 2
+const BASKETBALL_WIN_STRESS_RELIEF := 5
+const BASKETBALL_LOSS_STRESS_RELIEF := 2
+const BASKETBALL_WAGER_WIN_REWARD := 40
+const BASKETBALL_WAGER_LOSS_STRESS := 3
+
 # Pier fishing prototype. Depth/current values are fractions of the water area.
 const FISHING_OCEAN_FRAME_SECONDS := 1.0
 const FISHING_REEL_SFX_FADE_SECONDS := 0.2
 const FISHING_NIGHT_MUSIC_CHANCE := 0.1
-const FISHING_FISH_COUNT := 5
-const FISHING_SMALL_FISH_COUNT := 2
+const FISHING_FISH_COUNT := 30
+const FISHING_SMALL_FISH_COUNT := 12
 const FISHING_SMALL_FISH_MAX_CM := 35.0
+const FISHING_FISH_MIN_DEPTH := 0.23
+const FISHING_FISH_MAX_DEPTH := 0.88
+const FISHING_FISH_DEPTH_BIAS := 0.4
+const FISHING_FISH_DEPTH_RETURN_SPEED := 0.04
+const FISHING_SCHOOL_MAX_MEMBERS := 3
+const FISHING_SCHOOL_RADIUS := Vector2(0.065, 0.035)
+const FISHING_SCHOOL_SPEED_MIN := 0.035
+const FISHING_SCHOOL_SPEED_MAX := 0.055
+const FISHING_SCHOOL_FOLLOW_RATE := 1.5
+const FISHING_SCHOOL_MAX_SPEED_X := 0.12
+const FISHING_SCHOOL_MAX_SPEED_Y := 0.08
 const FISHING_SPECIES_WEIGHT_CM := 50.0
 const FISHING_SIZE_ROLL_POWER := 3.0
 const FISHING_FISH_RESPAWN_MIN_SECONDS := 1.0
 const FISHING_FISH_RESPAWN_MAX_SECONDS := 3.5
 const FISHING_REEL_LINE_PER_RADIAN := 0.003
 const FISHING_IDLE_PAYOUT_SPEED := 0.004
+const FISHING_REEL_FLICK_MIN_SPEED := 2.0
+const FISHING_REEL_FLICK_MAX_SPEED := 100.0
+const FISHING_REEL_FLICK_DRAG := 2.0
+const FISHING_REEL_FLICK_GAIN := 1.0
+const FISHING_REEL_FLICK_STOP_SPEED := 0.1
+const FISHING_REEL_FLICK_INPUT_WINDOW_SECONDS := 0.12
 const FISHING_CURRENT_SPEED := 0.055
 const FISHING_HOOKED_ANCHOR_FOLLOW_RATE := 5.0
 const FISHING_FISH_PULL_MIN := 0.22
@@ -141,6 +184,7 @@ const FISHING_FISH_PULL_MAX := 0.34
 const FISHING_FISH_POWER_MIN := 0.2
 const FISHING_FISH_POWER_MAX := 2.0
 const FISHING_HOOK_CHECK_CHANCE := 0.3
+const FISHING_HOOK_DEEP_CHECK_CHANCE := 0.8
 const FISHING_HOOK_BITE_CHANCE := 0.35
 const FISHING_HOOK_INTEREST_RADIUS := 0.28
 const FISHING_HOOK_INSPECT_SPEED := 0.2
@@ -149,6 +193,25 @@ const FISHING_PULL_BURST_MAX_SECONDS := 4.5
 const FISHING_REST_MIN_SECONDS := 2.4
 const FISHING_REST_MAX_SECONDS := 3.8
 const FISHING_FISH_STRETCH_SPEED := 0.8
+const FISHING_FISH_LATERAL_SPEED := 0.10
+const FISHING_FISH_LATERAL_FORCE := 1.5
+const FISHING_TAUT_SWING_GAIN := 1.6
+const FISHING_TAUT_SWING_MAX_SPEED := 0.7
+const FISHING_TAUT_SWING_MAX_ANGLE := 0.55
+const FISHING_FIGHT_PACE_MIN := 0.65
+const FISHING_FIGHT_PACE_MAX := 1.6
+const FISHING_SIDEWAYS_INTERVAL_MIN_SECONDS := 0.45
+const FISHING_SIDEWAYS_INTERVAL_MAX_SECONDS := 1.1
+const FISHING_SIDEWAYS_PACE_MIN := 0.7
+const FISHING_SIDEWAYS_PACE_MAX := 1.4
+const FISHING_SIDEWAYS_SMOOTH_RATE := 1.5
+const FISHING_LINE_PRESSURE_MIN_RATE := 0.10
+const FISHING_LINE_PRESSURE_MAX_RATE := 0.40
+const FISHING_LINE_PRESSURE_WEIGHT_REFERENCE_CM := 60.0
+const FISHING_LINE_PRESSURE_RELIEF_PER_LINE_UNIT := 30.0
+const FISHING_LINE_PRESSURE_WARNING := 0.65
+const FISHING_SNAPPED_FISH_ESCAPE_SPEED := 0.24
+const FISHING_SNAPPED_FISH_RETRY_SECONDS := 8.0
 
 # Perspective, headlights and stage-exit animation.
 const INCOMING_LANE_SCALE := 0.78
@@ -430,15 +493,14 @@ const STORE_ITEMS := [
 	},
 ]
 
-# Nighttime bar drinks cost more than food, with better value for larger relief.
-# They are consumed immediately and restore stress only, never action energy.
+# Bar food and drinks are consumed immediately and relieve stress only.
 const BAR_DISCOUNT := 0.10
 const BAR_ITEMS := [
 	{
 		"id": "bar_beer",
 		"name": "San Mig Right",
 		"description": "A legally distinct brand. Reduce up to {stress_relief} stress",
-		"cost": 120,
+		"cost": 70,
 		"type": "liquor",
 		"stress_relief": 3,
 	},
@@ -446,7 +508,7 @@ const BAR_ITEMS := [
 		"id": "bar_rum",
 		"name": "Lead Horse",
 		"description": "Stronger than your average beer. Reduce up to {stress_relief} stress",
-		"cost": 220,
+		"cost": 130,
 		"type": "liquor",
 		"stress_relief": 6,
 	},
@@ -454,9 +516,25 @@ const BAR_ITEMS := [
 		"id": "bar_whiskey",
 		"name": "Antonov Vodka",
 		"description": "Forget all your problems. Reduce up to {stress_relief} stress",
-		"cost": 350,
+		"cost": 200,
 		"type": "liquor",
 		"stress_relief": 10,
+	},
+	{
+		"id": "bar_fries",
+		"name": "Fries",
+		"description": "Crispy fries. Reduce up to {stress_relief} stress",
+		"cost": 75,
+		"type": "stress_relief",
+		"stress_relief": 2,
+	},
+	{
+		"id": "bar_rice_meal",
+		"name": "Rice Meal",
+		"description": "A warm rice meal. Reduce up to {stress_relief} stress",
+		"cost": 140,
+		"type": "stress_relief",
+		"stress_relief": 4,
 	},
 ]
 

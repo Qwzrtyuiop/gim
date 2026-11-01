@@ -7,10 +7,11 @@ signal music_changed
 const FishingSession := preload("res://scripts/home/fishing_session.gd")
 const FishCatalog := preload("res://scripts/home/fishing_fish_catalog.gd")
 const FishingCatchResults := preload("res://scripts/home/fishing_catch_results.gd")
+const FishingStatusPanel := preload("res://scripts/home/fishing_status_panel.gd")
 const FishingAudio := preload("res://scripts/home/fishing_audio.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const OCEAN_FRAMES := [
 	preload("res://assets/ui/fishingminigame/fishingframeloop1.png"),
 	preload("res://assets/ui/fishingminigame/fishingframeloop2.png"),
@@ -55,11 +56,9 @@ var ocean_frame_index := 0
 var close_button: Button
 var _canvas: FishingCanvas
 var _water_canvas: FishingCanvas
-var _status: Label
-var _catch_label: Label
+var _status_panel: FishingStatusPanel
 var _catch_results: FishingCatchResults
 var _session_catches: Array[Dictionary] = []
-var _info_panel: StyleBoxFlat
 var _ocean_elapsed := 0.0
 var _fish_elapsed := 0.0
 var _feedback_elapsed := 0.0
@@ -67,6 +66,8 @@ var _reel_shake_elapsed := 0.0
 var _reel_shake_offset := Vector2.ZERO
 var _manual_reel_seconds := 0.0
 var _manual_reel_direction := 0.0
+var _flick_sample_speed := 0.0
+var _last_reel_motion_usec := 0
 var _hook_feedback: Label
 var _hook_feedback_tween: Tween
 var _last_hook_cue := ""
@@ -89,6 +90,7 @@ func _ready() -> void:
 	audio.active_changed.connect(music_changed.emit)
 	session.fish_hooked.connect(_on_fish_hooked)
 	session.fish_caught.connect(_on_fish_caught)
+	session.line_snapped.connect(_on_line_snapped)
 	resized.connect(_layout)
 	visibility_changed.connect(_on_visibility_changed)
 	_layout()
@@ -113,8 +115,8 @@ func present(seed_value: int = 0) -> void:
 	_canvas.show()
 	_clear_hook_feedback()
 	_release_drag()
-	_status.text = "Lower the hook\ntoward a fish."
-	_status.add_theme_color_override("font_color", Color("f6e2b6"))
+	_status_panel.set_status("Cast your line.", "Flick right to lower.\nGrab reel to stop.")
+	_status_panel.set_line_pressure(0.0, false)
 	_refresh_catches()
 	show()
 	_layout()
@@ -172,7 +174,7 @@ func _process(delta: float) -> void:
 	if not active or not is_visible_in_tree() or get_tree().paused:
 		return
 	if dragging and not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		_release_drag()
+		_release_drag(true)
 	_hook_cue_cooldown = maxf(0.0, _hook_cue_cooldown - delta)
 	_manual_reel_seconds = maxf(0.0, _manual_reel_seconds - delta)
 	var automatic_before: float = session.automatic_reel_angle
@@ -206,7 +208,7 @@ func _input(event: InputEvent) -> void:
 		_drag_relative(event)
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
-		_release_drag()
+		_release_drag(true)
 		get_viewport().set_input_as_handled()
 
 
@@ -219,12 +221,14 @@ func _gui_input(event: InputEvent) -> void:
 			var offset := source - REEL_PIVOT
 			if offset.length() <= REEL_DRAG_RADIUS and offset.length() >= REEL_DEADZONE:
 				dragging = true
+				_flick_sample_speed = 0.0
+				_last_reel_motion_usec = Time.get_ticks_usec()
 				session.set_reel_held(true)
 				_lock_cursor()
 				mouse_default_cursor_shape = Control.CURSOR_DRAG
 				_canvas.queue_redraw()
 		else:
-			_release_drag()
+			_release_drag(true)
 		accept_event()
 	elif event is InputEventMouseMotion and not dragging:
 		var source := global_to_source(get_global_transform_with_canvas() * event.position)
@@ -241,6 +245,7 @@ func _drag_relative(event: InputEventMouseMotion) -> void:
 	var tangent := Vector2(-grip_offset.y, grip_offset.x).normalized()
 	var change := clampf(motion.dot(tangent) / grip_offset.length(), -PI * 0.65, PI * 0.65)
 	var accepted: float = session.reel(change)
+	_record_reel_flick(accepted)
 	reel_angle = wrapf(reel_angle + accepted, -PI, PI)
 	if not is_zero_approx(accepted):
 		_manual_reel_seconds = REEL_SOUND_RELEASE_SECONDS
@@ -252,6 +257,20 @@ func _drag_relative(event: InputEventMouseMotion) -> void:
 		audio.set_reel_motion(0.0)
 	_canvas.queue_redraw()
 	_water_canvas.queue_redraw()
+
+
+func _record_reel_flick(accepted_angle: float) -> void:
+	var now := Time.get_ticks_usec()
+	var elapsed := float(now - _last_reel_motion_usec) / 1000000.0
+	_last_reel_motion_usec = now
+	if accepted_angle <= 0.0 or session.hooked_fish_id >= 0:
+		_flick_sample_speed = 0.0
+		return
+	if elapsed > GameTuning.FISHING_REEL_FLICK_INPUT_WINDOW_SECONDS:
+		_flick_sample_speed = 0.0
+	# Use accepted angular movement, so resolution and zoom do not alter a flick.
+	var angular_speed := minf(accepted_angle / maxf(elapsed, 1.0 / 240.0), GameTuning.FISHING_REEL_FLICK_MAX_SPEED)
+	_flick_sample_speed = angular_speed if is_zero_approx(_flick_sample_speed) else lerpf(_flick_sample_speed, angular_speed, 0.6)
 
 
 func grip_source_position() -> Vector2:
@@ -278,7 +297,16 @@ func _lock_cursor() -> void:
 		_native_cursor_captured = true
 
 
-func _release_drag() -> void:
+func _release_drag(allow_flick := false) -> void:
+	var was_dragging := dragging
+	var flick_speed := 0.0
+	var last_motion_age := float(Time.get_ticks_usec() - _last_reel_motion_usec) / 1000000.0
+	if allow_flick and was_dragging and last_motion_age <= GameTuning.FISHING_REEL_FLICK_INPUT_WINDOW_SECONDS:
+		flick_speed = _flick_sample_speed
+	_flick_sample_speed = 0.0
+	_last_reel_motion_usec = 0
+	if not allow_flick:
+		session.stop_reel_flick()
 	dragging = false
 	_manual_reel_seconds = 0.0
 	_manual_reel_direction = 0.0
@@ -287,6 +315,8 @@ func _release_drag() -> void:
 	_reel_shake_elapsed = 0.0
 	_reel_shake_offset = Vector2.ZERO
 	session.set_reel_held(false)
+	if flick_speed > 0.0:
+		session.start_reel_flick(flick_speed)
 	if _native_cursor_captured:
 		Input.mouse_mode = _mouse_mode_before_capture
 	_native_cursor_captured = false
@@ -321,6 +351,7 @@ func global_to_source(point: Vector2) -> Vector2:
 
 
 func _on_fish_hooked(_id: int) -> void:
+	_flick_sample_speed = 0.0
 	_refresh_status()
 	_feedback_elapsed = 2.5
 
@@ -332,34 +363,53 @@ func _on_fish_caught(_total: int) -> void:
 			_session_catches.append(record)
 	_configure_fish()
 	_clear_hook_feedback()
-	_status.text = "Got one!\nTry for another."
-	_status.add_theme_color_override("font_color", Color("c4e39a"))
+	_status_panel.set_status("Nice catch!", "Try for another.", FishingStatusPanel.SUCCESS_COLOR)
 	_feedback_elapsed = 2.5
 	_refresh_catches()
 
 
+func _on_line_snapped(tip_position: Vector2) -> void:
+	_release_drag()
+	_status_panel.set_status("Line snapped!", "The fish got away.\nTry another cast.", FishingStatusPanel.DANGER_COLOR)
+	_status_panel.set_line_pressure(0.0, false)
+	_feedback_elapsed = 2.5
+	_show_hook_feedback("Snap!", tip_position)
+
+
 func _refresh_catches() -> void:
-	_catch_label.text = "Fish caught: %d" % session.caught_count
+	_status_panel.set_caught(session.caught_count)
 
 
 func _refresh_status() -> void:
+	_status_panel.set_line_pressure(session.line_pressure, session.hooked_fish_id >= 0)
 	if session.fight_phase == "pulling" or session.fight_phase == "resting":
-		_status.text = ""
+		var warning := session.fight_phase == "pulling" and session.line_pressure >= GameTuning.FISHING_LINE_PRESSURE_WARNING
+		if warning:
+			_status_panel.set_status("Easy on the line!", "Lower the hook to\nease the tension.", FishingStatusPanel.WARNING_COLOR)
+		else:
+			_status_panel.set_status("Fish on!", "Watch the cues\nby the hook.")
 		var cue := "Hold!" if session.is_reel_in_blocked() else "Reel!"
+		if warning and session.fight_phase == "pulling":
+			cue = "Lower!"
 		if cue != _last_hook_cue and _hook_cue_cooldown <= 0.0:
 			_show_hook_feedback(cue)
 	elif _feedback_elapsed <= 0.0:
-		_status.text = "Lower the hook\ntoward a fish."
-		_status.add_theme_color_override("font_color", Color("f6e2b6"))
+		_status_panel.set_status("Cast your line.", "Flick right to lower.\nGrab reel to stop.")
 
 
-func _show_hook_feedback(cue: String) -> void:
+func _show_hook_feedback(cue: String, tip_position := Vector2.INF) -> void:
 	_clear_hook_feedback()
 	_last_hook_cue = cue
 	_hook_cue_cooldown = HOOK_FEEDBACK_SECONDS
-	_hook_feedback = _label(cue, 28, Rect2(0, 0, 180, 40))
-	_hook_feedback.add_theme_color_override("font_color", Color("ffa68f") if cue == "Hold!" else Color("c4ef8a"))
-	var tip := WATER_RECT.position + session.hook_tip_position() * WATER_RECT.size
+	_hook_feedback = _label(cue, 38, Rect2(0, 0, 180, 52))
+	var color := Color("c4ef8a")
+	if cue in ["Hold!", "Lower!"]:
+		color = FishingStatusPanel.WARNING_COLOR
+	elif cue == "Snap!":
+		color = FishingStatusPanel.DANGER_COLOR
+	_hook_feedback.add_theme_color_override("font_color", color)
+	var source_tip: Vector2 = session.hook_tip_position() if tip_position == Vector2.INF else tip_position
+	var tip := WATER_RECT.position + source_tip * WATER_RECT.size
 	_hook_feedback.position = Vector2(clampf(tip.x - 90.0, 4.0, ART_SIZE.x - 184.0), maxf(50.0, tip.y - 40.0))
 	_hook_feedback_tween = create_tween().set_parallel(true)
 	_hook_feedback_tween.tween_property(_hook_feedback, "position:y", _hook_feedback.position.y - 42.0, HOOK_FEEDBACK_SECONDS)
@@ -393,13 +443,6 @@ func _configure_fish() -> void:
 
 
 func _build_ui() -> void:
-	_info_panel = StyleBoxFlat.new()
-	_info_panel.bg_color = Color(0.025, 0.085, 0.11, 0.9)
-	_info_panel.border_color = Color(0.72, 0.82, 0.77, 0.35)
-	_info_panel.set_border_width_all(2)
-	_info_panel.set_corner_radius_all(10)
-	_info_panel.shadow_color = Color(0, 0, 0, 0.25)
-	_info_panel.shadow_size = 6
 	_canvas = FishingCanvas.new()
 	_canvas.name = "FishingCanvas"
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -414,11 +457,10 @@ func _build_ui() -> void:
 	_water_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_water_canvas.paint = _paint_water
 	_canvas.add_child(_water_canvas)
-	_catch_label = _label("", 26, Rect2(696, 734, 470, 40))
-	_catch_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_status = _label("", 24, Rect2(696, 792, 470, 90))
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_label("Turn right: lower\nTurn left: reel in", 24, Rect2(1200, 748, 490, 124))
+	_status_panel = FishingStatusPanel.new()
+	_status_panel.position = INFO_RECT.position
+	_status_panel.size = INFO_RECT.size
+	_canvas.add_child(_status_panel)
 	close_button = Button.new()
 	close_button.name = "CloseFishing"
 	close_button.text = "FINISH"
@@ -446,15 +488,13 @@ func _label(text: String, font_size: int, rect: Rect2) -> Label:
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", Color("f6e2b6"))
 	label.add_theme_color_override("font_outline_color", Color("10231e"))
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", 2)
 	_canvas.add_child(label)
 	return label
 
 
 func _paint_canvas(canvas: Control) -> void:
 	canvas.draw_texture_rect(OCEAN_FRAMES[ocean_frame_index], Rect2(Vector2.ZERO, ART_SIZE), false)
-	canvas.draw_style_box(_info_panel, INFO_RECT)
-	canvas.draw_line(Vector2(1180, 734), Vector2(1180, 892), Color(0.72, 0.82, 0.77, 0.2), 2)
 	canvas.draw_set_transform(REEL_PIVOT + _reel_shake_offset, reel_angle, Vector2.ONE)
 	canvas.draw_texture_rect_region(REEL, Rect2(REEL_SOURCE.position - REEL_PIVOT, REEL_SOURCE.size), REEL_SOURCE)
 	canvas.draw_set_transform(Vector2.ZERO)
@@ -490,7 +530,8 @@ func _paint_water(canvas: Control) -> void:
 	for point: Vector2 in session.line_points:
 		rope_points.append(point * WATER_RECT.size)
 	if rope_points.size() >= 2:
-		canvas.draw_polyline(rope_points, Color("a7e8eb"), 2, false)
+		var rope_color := Color("a7e8eb").lerp(FishingStatusPanel.DANGER_COLOR, session.line_pressure)
+		canvas.draw_polyline(rope_points, rope_color, 2, false)
 	canvas.draw_texture_rect_region(HOOK, Rect2(attachment - HOOK_ATTACHMENT, HOOK_SOURCE.size), HOOK_SOURCE)
 
 

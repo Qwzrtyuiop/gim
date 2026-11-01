@@ -3,7 +3,7 @@ extends RefCounted
 # The first completed morning ride introduces exploration without travelling.
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const COMPLETION_EVENT := "tutorial_first_ride_map_complete"
 
 var screen

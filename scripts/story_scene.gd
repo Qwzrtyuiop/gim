@@ -18,6 +18,7 @@ const PassengerStory := preload("res://scripts/ride_selection/passenger_story.gd
 const StoryDialoguePlayback := preload("res://scripts/story/story_dialogue_playback.gd")
 const CharacterSpriteRuntime := preload("res://scripts/story/story_character_sprite_runtime.gd")
 const RideStoryInterruption := preload("res://scripts/game/ride_story_interruption.gd")
+const StoryPlaybackControls := preload("res://scripts/story/story_playback_controls.gd")
 
 @onready var background: TextureRect = $Background
 @onready var background_fade_overlay: ColorRect = $BackgroundFadeOverlay
@@ -66,6 +67,8 @@ var checkpoint_continuation: Dictionary = {}
 var dialogue_playback: Node
 var character_sprites: Dictionary = {}
 var inline_complete_callback := Callable()
+var playback_controls: StoryPlaybackControls
+var skip_button: Button
 
 
 # Scene lifecycle.
@@ -78,6 +81,10 @@ func _ready() -> void:
 	dialogue_playback.name = "DialoguePlayback"
 	add_child(dialogue_playback)
 	dialogue_playback.setup(body_label)
+	playback_controls = StoryPlaybackControls.new()
+	playback_controls.setup(self)
+	add_child(playback_controls)
+	skip_button = StoryInterface.build_playback_controls(self)
 	portrait_layer = StoryPortraitLayer.new()
 	add_child(portrait_layer)
 	move_child(portrait_layer, chapter_label.get_index())
@@ -111,6 +118,12 @@ func _input(event: InputEvent) -> void:
 			# Stop the global pause handler from toggling the same press again.
 			get_viewport().set_input_as_handled()
 		return
+	if is_instance_valid(playback_controls) and playback_controls.handle_input(event):
+		get_viewport().set_input_as_handled()
+		return
+	# Let the Skip button receive its click without also advancing the current line.
+	if event is InputEventMouseButton and skip_button != null and skip_button.is_visible_in_tree() and skip_button.get_global_rect().has_point(event.position):
+		return
 	var continue_pressed := event.is_action_pressed("ui_accept") and not event.is_echo()
 	continue_pressed = continue_pressed or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
 	if continue_pressed and is_instance_valid(dialogue_playback) and dialogue_playback.active:
@@ -125,6 +138,15 @@ func _input(event: InputEvent) -> void:
 		_advance_story()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_advance_story()
+
+
+func _request_story_skip() -> void:
+	if is_instance_valid(playback_controls):
+		playback_controls.request_skip()
+
+
+func is_story_fast_forwarding() -> bool:
+	return is_instance_valid(playback_controls) and playback_controls.is_accelerating()
 
 
 func _notification(what: int) -> void:

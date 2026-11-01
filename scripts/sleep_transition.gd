@@ -129,7 +129,7 @@ func _show_sleep_message() -> void:
 
 func _show_day_card(target_day: int) -> void:
 	day_label.text = "DAY %d" % target_day
-	debt_label.text = "PhP %d remaining debt" % PlayerState.get_total_debt_goal()
+	debt_label.text = "Next payment: PhP %d" % PlayerState.get_current_weekly_goal()
 	var days_left := PlayerState.get_days_until_debt_collection(target_day)
 	collector_label.text = "Collection in %d %s" % [days_left, "Day" if days_left == 1 else "Days"]
 	day_label.visible = true

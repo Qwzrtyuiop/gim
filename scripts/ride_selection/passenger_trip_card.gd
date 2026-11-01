@@ -1,7 +1,7 @@
 extends PanelContainer
 
 # Shared presentation for a passenger's hover preview and confirmation summary.
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const STRESS_ICON := preload("res://assets/ui/icons/stress_brain.png")
@@ -90,7 +90,7 @@ func _build() -> void:
 	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	heading.add_theme_constant_override("separation", 20)
 	content.add_child(heading)
-	name_label = _label(16, CREAM)
+	name_label = _label(26, CREAM)
 	name_label.name = "PassengerName"
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -109,7 +109,7 @@ func _build() -> void:
 	badge_style.content_margin_bottom = 5
 	_badge_panel.add_theme_stylebox_override("panel", badge_style)
 	heading.add_child(_badge_panel)
-	badge_label = _label(9, GOLD)
+	badge_label = _label(16, GOLD)
 	badge_label.name = "TripSpecial"
 	_badge_panel.add_child(badge_label)
 	_badge_panel.hide()
@@ -117,11 +117,11 @@ func _build() -> void:
 	route.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	route.add_theme_constant_override("separation", 20)
 	content.add_child(route)
-	route_label = _label(10, MUTED)
+	route_label = _label(18, MUTED)
 	route_label.name = "TripRoute"
 	route_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	route.add_child(route_label)
-	traffic_label = _label(10, MUTED)
+	traffic_label = _label(18, MUTED)
 	traffic_label.name = "TripTraffic"
 	traffic_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	route.add_child(traffic_label)
@@ -154,11 +154,11 @@ static func create_resource_cost_row(with_caption := false) -> Dictionary:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 20)
 	if with_caption:
-		var caption := _label(9, MUTED)
+		var caption := _label(16, MUTED)
 		caption.text = "Per ride:"
 		caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		caption.add_theme_color_override("font_outline_color", Color("181008"))
-		caption.add_theme_constant_override("outline_size", 2)
+		caption.add_theme_constant_override("outline_size", 1)
 		row.add_child(caption)
 	var refs := {"row": row}
 	for entry in [
@@ -177,11 +177,11 @@ static func create_resource_cost_row(with_caption := false) -> Dictionary:
 		icon.custom_minimum_size = Vector2(18, 18)
 		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		pair.add_child(icon)
-		var value := _label(10, entry.color)
+		var value := _label(18, entry.color)
 		value.text = entry.text
 		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		value.add_theme_color_override("font_outline_color", Color("181008"))
-		value.add_theme_constant_override("outline_size", 2)
+		value.add_theme_constant_override("outline_size", 1)
 		pair.add_child(value)
 		refs[entry.id + "_label"] = value
 	return refs
@@ -194,10 +194,10 @@ func _metric(parent: HBoxContainer, caption: String, value_name: String) -> Labe
 	column.size_flags_stretch_ratio = 1.0
 	column.add_theme_constant_override("separation", 8)
 	parent.add_child(column)
-	var label := _label(9, MUTED)
+	var label := _label(16, MUTED)
 	label.text = caption
 	column.add_child(label)
-	var value := _label(14, CREAM)
+	var value := _label(22, CREAM)
 	value.name = value_name
 	column.add_child(value)
 	return value

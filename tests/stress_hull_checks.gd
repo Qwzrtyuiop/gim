@@ -191,6 +191,7 @@ static func _test_store(host: Node) -> void:
 	await _buy(store, repair)
 	assert(PlayerState.money == 970 and PlayerState.hull == 7, "The food counter cannot sell mechanic repairs")
 	PlayerState.stress = 0
+	PlayerState.current_phase = "noon"
 	await _buy(store, food)
 	assert(PlayerState.money == 940 and PlayerState.stress == 0 and PlayerState.energy == 5, "Calm players can still buy food without exceeding resource caps")
 	assert(store.status_label.text == "Bought Turon.")
@@ -257,6 +258,8 @@ static func _test_food_recovery(host: Node) -> void:
 	assert(int(Tuning.STORE_ITEMS[_item_index("full_meal")].energy_restore) == 2, "Synthetic cap coverage must leave the real catalog unchanged")
 	await _assert_food_purchase(store, pancit, 4, 5, 4, 5, false, false)
 	assert(store.status_label.text == "Not enough money.")
+	assert(not PlayerState.has_eaten_this_phase(), "An unaffordable meal cannot consume the phase allowance")
+	await _test_food_phase_limit(store)
 	store.hub_dialogue.clear()
 	store.bgm_player.stop()
 	store.free()
@@ -266,6 +269,8 @@ static func _test_food_recovery(host: Node) -> void:
 
 
 static func _assert_food_purchase(store, item: Dictionary, energy: int, stress: int, expected_energy: int, expected_stress: int, succeeds: bool, affordable := true) -> void:
+	# Each recovery case starts with a fresh meal allowance.
+	PlayerState.clear_event_value("food_purchase_phase")
 	PlayerState.energy = energy
 	PlayerState.stress = stress
 	PlayerState.money = 10000 if affordable else 0
@@ -289,6 +294,44 @@ static func _assert_food_purchase(store, item: Dictionary, energy: int, stress: 
 		assert(store.status_label.text == "Bought %s." % str(item.name), "A purchase with no recovery still reports the bought item")
 	assert(PlayerState._state_batch_depth == 0 and not PlayerState._suppress_auto_save, "Food purchase must close its state batch")
 	assert([PlayerState.get_current_day(), PlayerState.get_current_time_of_day(), PlayerState.stage_round, PlayerState.hull, PlayerState.gas] == unchanged, "Food purchases must not change time, hull or fuel")
+
+
+static func _test_food_phase_limit(store) -> void:
+	PlayerState.money = 10000
+	PlayerState.energy = 2
+	PlayerState.stress = 5
+	await _buy(store, _item_index("pancit"))
+	assert(PlayerState.has_eaten_this_phase())
+	var after_meal := [PlayerState.money, PlayerState.energy, PlayerState.stress, PlayerState.non_gas_store_purchases_this_week]
+	await _buy(store, _item_index("turon"))
+	assert(store.status_label.text == StoreItems.FOOD_FULL_MESSAGE)
+	assert([PlayerState.money, PlayerState.energy, PlayerState.stress, PlayerState.non_gas_store_purchases_this_week] == after_meal, "A second meal cannot charge money or grant recovery")
+	store._close_shop()
+	store._open_shop("food")
+	store.hub_dialogue.clear()
+	assert(PlayerState.has_eaten_this_phase(), "Reopening the counter does not reset the meal allowance")
+	var snapshot := Codec.build_snapshot(PlayerState, PlayerState.SAVE_VERSION)
+	PlayerState.current_phase = "night"
+	assert(not PlayerState.has_eaten_this_phase(), "A new phase opens another meal allowance")
+	assert(Codec.load_snapshot(PlayerState, snapshot) and PlayerState.has_eaten_this_phase(), "Loading restores the saved phase's meal claim")
+	PlayerState.current_phase = "night"
+	await _buy(store, _item_index("yosi"))
+	assert(not PlayerState.has_eaten_this_phase(), "Cigarettes do not count as food")
+	store.active_category = "bar"
+	var liquor: Dictionary = Tuning.BAR_ITEMS[0]
+	var tier := HBoxContainer.new()
+	await StoreItems.buy_item(store, liquor, store.store_item_labels[0], tier, store.store_buy_buttons[0])
+	assert(not PlayerState.has_eaten_this_phase(), "Alcohol does not consume the food allowance")
+	store.active_category = "food"
+	await _buy(store, _item_index("turon"))
+	assert(PlayerState.has_eaten_this_phase(), "Food remains available after buying alcohol")
+	store.active_category = "bar"
+	var money_before: int = PlayerState.money
+	var liquor_cost := StoreItems.item_cost(store, liquor)
+	await StoreItems.buy_item(store, liquor, store.store_item_labels[0], tier, store.store_buy_buttons[0])
+	assert(PlayerState.money == money_before - liquor_cost, "Being full cannot block alcohol")
+	tier.free()
+	store.active_category = "food"
 
 
 static func _buy(store, index: int) -> void:

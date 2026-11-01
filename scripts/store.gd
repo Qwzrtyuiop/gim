@@ -18,7 +18,7 @@ const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const STORE_BGM_PATH := "res://assets/audio/music/menus/store.mp3"
 const FAIL_FADE_SECONDS := 0.35
 const StoreItemCatalog := preload("res://scripts/store/store_item_catalog.gd")
@@ -155,10 +155,11 @@ func _layout_store() -> void:
 	owner_portrait.size = owner_panel.size - Vector2(24, 24)
 	var panel_rect := Rect2(margin + owner_width + gap, HubStatusHeader.CONTENT_TOP, available_width - owner_width, size.y - HubStatusHeader.CONTENT_TOP - 32)
 	var title := shop_overlay.get_node("Title") as Label
-	title.label_settings.font_size = 16 if size.x >= 1100 else 12
+	title.label_settings.font_size = 28 if size.x >= 1100 else 22
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.label_settings.font_size = 11
-	money_label.label_settings.font_size = 11
+	status_label.label_settings.font_size = 18
+	money_label.label_settings.font_size = 18
+	back_label.label_settings.font_size = 22
 	var placements := {
 		"Panel": panel_rect,
 		"Title": Rect2(panel_rect.position + Vector2(132, 14), Vector2(panel_rect.size.x - 264, 42)),
@@ -473,6 +474,14 @@ func _show_shop_greeting() -> void:
 
 
 func _show_shop_feedback(text: String) -> void:
+	if text in [StoreItems.FOOD_FULL_MESSAGE, StoreItems.YOSI_COUGH_MESSAGE]:
+		show_message(text, {
+			"target": "shopkeeper",
+			"speaker": "John Toda",
+			"show_tail": false,
+			"duration": 3.0,
+		})
+		return
 	show_message(text, {
 		"target": "shopkeeper",
 		"speaker": "Lito" if active_category == "tricycle" else "Shopkeeper",

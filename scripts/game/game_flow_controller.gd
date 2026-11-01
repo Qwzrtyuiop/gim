@@ -3,12 +3,14 @@ extends RefCounted
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
 
+const ArcadePowerups := preload("res://scripts/game/arcade_powerups.gd")
 const GameEconomyManager := preload("res://scripts/game/game_economy_manager.gd")
 const GameEnvironmentController := preload("res://scripts/game/game_environment_controller.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
 const VehicleCollisionController := preload("res://scripts/game/vehicle_collision_controller.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
 const PlayerHorn := preload("res://scripts/game/player_horn_controller.gd")
+const PlayerPassing := preload("res://scripts/game/player_passing_controller.gd")
 
 const STAGE_RESULTS_SCENE := "res://scenes/stage_results.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
@@ -72,6 +74,10 @@ static func current_speed_kmh_exact(owner) -> float:
 static func end_game(owner, title: String, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
+	var powerups: Variant = ArcadePowerups.for_owner(owner)
+	if powerups != null:
+		powerups.clear()
+	PlayerPassing.cancel(owner)
 	PlayerHorn.stop(owner)
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	PlayerState.flush_deferred_save()
@@ -96,6 +102,9 @@ static func end_game(owner, title: String, detail: String) -> void:
 
 static func handle_player_hit(owner, detail: String, damage: int, stress_gain := -1) -> void:
 	if owner.game_state != "playing" or owner.player_hit_invincible_timer > 0.0:
+		return
+	var powerups: Variant = ArcadePowerups.for_owner(owner)
+	if powerups != null and powerups.shield_seconds > 0.0:
 		return
 
 	owner.trip_vehicle_collision_count += 1
@@ -125,6 +134,10 @@ static func handle_player_hit(owner, detail: String, damage: int, stress_gain :=
 static func send_to_crash_repair(owner, detail: String) -> void:
 	if owner.game_state != "playing":
 		return
+	var powerups: Variant = ArcadePowerups.for_owner(owner)
+	if powerups != null:
+		powerups.clear()
+	PlayerPassing.cancel(owner)
 	PlayerHorn.stop(owner)
 	owner.game_state = "CRASH"
 	VehicleTrafficController.clear_oncoming_warning(owner)
@@ -200,6 +213,9 @@ static func try_retry_stage(owner) -> void:
 
 
 static func reset_game(owner) -> void:
+	var powerups: Variant = ArcadePowerups.for_owner(owner)
+	if powerups != null:
+		powerups.clear()
 	GameStageSetup.apply_stage_profile(owner)
 	GameStageSetup.apply_weather_modifiers(owner)
 	GameStageSetup.apply_player_upgrades(owner)
@@ -220,6 +236,7 @@ static func reset_game(owner) -> void:
 	owner.traffic_jam_gaps.reset()
 	VehicleTrafficController.clear_oncoming_warning(owner)
 	owner.player_lane = GameTuning.PLAYER_START_LANE
+	PlayerPassing.reset(owner)
 	owner.player_speed = owner.player_start_speed
 	owner.distance = 0.0
 	owner.time_left = owner.time_limit

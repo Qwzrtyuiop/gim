@@ -304,6 +304,17 @@ static func update_ui(owner, speed_kmh: int, speedometer_max_kmh: int) -> void:
 		owner.time_left,
 		owner.stage_type
 	)
+	var passing_anchor := Vector2.ZERO
+	if is_instance_valid(owner.player) and owner.player_passing_cooldown > 0.0:
+		var visible: Rect2 = VehicleGeometry.visible_texture_rect(owner.player.texture, owner)
+		var roof: Vector2 = Vector2(visible.get_center().x, visible.position.y) - owner.player.texture.get_size() * 0.5
+		passing_anchor = owner.player.get_global_transform_with_canvas() * roof
+	owner.game_hud.update_passing_bar(
+		passing_anchor,
+		owner.player_passing_cooldown,
+		owner.game_state,
+		owner.get_viewport_rect().size
+	)
 
 
 static func current_time_filter_color(owner) -> Color:

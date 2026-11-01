@@ -140,8 +140,8 @@ func _build() -> void:
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	paper.size = DESIGN_SIZE
 	notebook.add_child(paper)
-	title_label = _label(notebook, "SAVE GAME", Rect2(76, 68, 456, 58), 42, RED_INK)
-	_label(notebook, "YOUR JOURNEY / 10 SAVE SLOTS", Rect2(76, 127, 456, 30), 19, MUTED)
+	title_label = _label(notebook, "SAVE GAME", Rect2(76, 68, 456, 58), 48, RED_INK)
+	_label(notebook, "YOUR JOURNEY / 10 SAVE SLOTS", Rect2(76, 127, 456, 30), 24, MUTED)
 	scroll = ScrollContainer.new()
 	scroll.name = "SlotScroll"
 	scroll.position = Vector2(76, 178)
@@ -155,8 +155,8 @@ func _build() -> void:
 	slot_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slot_list.add_theme_constant_override("separation", 12)
 	scroll.add_child(slot_list)
-	_label(notebook, "SCROLL TO VIEW ALL SLOTS", Rect2(76, 788, 456, 27), 18, MUTED)
-	_label(notebook, "01 AUTOSAVE / 02-10 MANUAL", Rect2(76, 833, 456, 28), 19, MUTED)
+	_label(notebook, "SCROLL TO VIEW ALL SLOTS", Rect2(76, 788, 456, 27), 22, MUTED)
+	_label(notebook, "01 AUTOSAVE / 02-10 MANUAL", Rect2(76, 833, 456, 28), 24, MUTED)
 	_build_preview()
 	status_label = _label(notebook, "", Rect2(694, 696, 438, 52), 22, MUTED)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -183,7 +183,7 @@ func _build() -> void:
 	panel_style.set_border_width_all(2)
 	panel.add_theme_stylebox_override("panel", panel_style)
 	confirmation.add_child(panel)
-	confirmation_text = _label(panel, "", Rect2(24, 26, 396, 162), 28)
+	confirmation_text = _label(panel, "", Rect2(24, 26, 396, 162), 36)
 	confirmation_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	cancel_button = _button(panel, "CANCEL", Rect2(24, 222, 182, 52))
 	cancel_button.pressed.connect(_hide_confirmation)
@@ -201,8 +201,8 @@ func _layout() -> void:
 
 
 func _build_preview() -> void:
-	preview_title = _label(notebook, "SLOT 02", Rect2(694, 68, 438, 58), 42, RED_INK)
-	preview_kind = _label(notebook, "MANUAL SAVE", Rect2(694, 127, 438, 30), 19, MUTED)
+	preview_title = _label(notebook, "SLOT 02", Rect2(694, 68, 438, 58), 48, RED_INK)
+	preview_kind = _label(notebook, "MANUAL SAVE", Rect2(694, 127, 438, 30), 24, MUTED)
 	var frame := Panel.new()
 	frame.position = Vector2(694, 178)
 	frame.size = Vector2(438, 246)
@@ -222,12 +222,12 @@ func _build_preview() -> void:
 	frame.add_child(preview_image)
 	_fill(preview_image, 5)
 	preview_placeholder = _label(frame, "+", Rect2(0, 0, 438, 246), 72, MUTED)
-	preview_day = _label(notebook, "", Rect2(694, 454, 438, 48), 34, INK)
-	preview_location = _label(notebook, "", Rect2(694, 514, 438, 74), 28, INK)
+	preview_day = _label(notebook, "", Rect2(694, 454, 438, 48), 40, INK)
+	preview_location = _label(notebook, "", Rect2(694, 514, 438, 74), 32, INK)
 	preview_location.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview_location.clip_text = true
-	preview_time = _label(notebook, "", Rect2(694, 600, 438, 36), 23, MUTED)
-	preview_hint = _label(notebook, "", Rect2(694, 654, 438, 30), 19, RED_INK)
+	preview_time = _label(notebook, "", Rect2(694, 600, 438, 36), 28, MUTED)
+	preview_hint = _label(notebook, "", Rect2(694, 654, 438, 30), 24, RED_INK)
 
 
 func _show_slot_details(slot: int) -> void:
@@ -248,7 +248,7 @@ func _show_slot_details(slot: int) -> void:
 	preview_image.visible = preview_image.texture != null
 	preview_placeholder.visible = not preview_image.visible
 	preview_placeholder.text = "NO PREVIEW" if exists else ("AUTO" if slot == 1 else "+")
-	preview_placeholder.add_theme_font_size_override("font_size", 32 if exists or slot == 1 else 72)
+	preview_placeholder.add_theme_font_size_override("font_size", 40 if exists or slot == 1 else 90)
 	preview_day.text = "Day %d / %s" % [int(entry.get("day", 1)), str(entry.get("phase", "")).capitalize()] if valid else ("Save unavailable" if exists else "An unwritten page")
 	preview_location.text = str(entry.get("location", "Saved game")) if valid else ("This file cannot be loaded." if exists else "Your next memory starts here.")
 	preview_location.tooltip_text = preview_location.text

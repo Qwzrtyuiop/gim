@@ -1,7 +1,7 @@
 extends PanelContainer
 
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const CONTENT_TOP := 64.0
 const BAR_HEIGHT := 44.0
 
@@ -33,14 +33,14 @@ func _ready() -> void:
 	day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	day_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	day_label.add_theme_font_override("font", FONT)
-	day_label.add_theme_font_size_override("font_size", 12)
+	day_label.add_theme_font_size_override("font_size", 20)
 	day_label.add_theme_color_override("font_color", Color("#fff6e1"))
 	day_label.add_theme_color_override("font_outline_color", Color("#392719"))
-	day_label.add_theme_constant_override("outline_size", 3)
+	day_label.add_theme_constant_override("outline_size", 1)
 	_content.add_child(day_label)
 	stats_refs = PlayerStatsRow.create({
 		"font": FONT,
-		"font_size": 12,
+		"font_size": 20,
 		"font_color": Color("#fff6e1"),
 		"outline_color": Color(0.0, 0.0, 0.0, 0.8),
 		"separation": 10,

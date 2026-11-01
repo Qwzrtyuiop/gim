@@ -3,6 +3,7 @@ extends RefCounted
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
 const FIRST_STAGE_TYPE := "short-morning-chill"
+const NIGHT_PARKED_CHANCE_BONUS := 0.25
 
 # Main-lane convoys leave pockets wide enough to merge back after overtaking.
 const TRAFFIC_JAM_SAFE_GAPS := {

@@ -1,7 +1,7 @@
 extends RefCounted
 
 # The station teaches resources. The first drive only rehearses its controls.
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
 const PHASES := ["up", "down", "accelerate", "brake", "boost", "horn"]
 const CONTROL_KEYS := [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_W, KEY_S, KEY_A, KEY_D, KEY_SHIFT, KEY_Q]
@@ -145,6 +145,7 @@ func _build_overlay(parent: Node) -> void:
 	highlight = refs.highlight
 	text_panel = refs.text_panel
 	hint_label = refs.text_label
+	hint_label.add_theme_constant_override("outline_size", 1)
 	highlight.hide()
 
 
@@ -154,7 +155,7 @@ func _layout(viewport_size: Vector2) -> void:
 	_layout_size = viewport_size
 	text_panel.size = Vector2(minf(600.0, maxf(1.0, viewport_size.x - 40.0)), 172.0)
 	text_panel.position = Vector2((viewport_size.x - text_panel.size.x) * 0.5, maxf(16.0, viewport_size.y * 0.16))
-	hint_label.add_theme_font_size_override("font_size", 11 if viewport_size.x < 800.0 else 12)
+	hint_label.add_theme_font_size_override("font_size", 18 if viewport_size.x < 800.0 else 20)
 
 
 static func _is_key(event: InputEvent, keycodes: Array) -> bool:

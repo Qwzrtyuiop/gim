@@ -1,5 +1,7 @@
 extends RefCounted
 
+const PlaybackControls := preload("res://scripts/story/story_playback_controls.gd")
+
 # VN pan/zoom commands and fitted background geometry. Runtime state remains
 # on the story reader so checkpoints and tween ownership keep their contracts.
 const DEFAULT_BG_CAMERA_DURATION := 0.0
@@ -88,6 +90,8 @@ static func parse_background_pan(owner, pan_data) -> Vector2:
 static func refresh_background_transform(owner, duration := 0.0) -> void:
 	if owner.background == null or not is_instance_valid(owner.background):
 		return
+	if PlaybackControls.accelerating(owner):
+		duration = 0.0
 
 	if owner.background_motion_tween != null:
 		owner.background_motion_tween.kill()

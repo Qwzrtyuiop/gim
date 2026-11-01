@@ -6,7 +6,7 @@ signal confirmed
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const DESIGN_SIZE := Vector2(768, 512)
 const TEXTURE := preload("res://assets/ui/frames/pillow.png")
-const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const INK := Color("392719")
 
@@ -31,9 +31,9 @@ func _ready() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 	# The pillow's flat center is the writing area; leave its folded edges clear.
-	title_label = _label(Rect2(154, 145, 460, 44), 36, INK)
-	recovery_label = _label(Rect2(154, 205, 460, 40), 24, Color("7a512b"))
-	time_label = _label(Rect2(154, 258, 460, 32), 24, Color("625648"))
+	title_label = _label(Rect2(154, 145, 460, 44), 38, INK)
+	recovery_label = _label(Rect2(154, 205, 460, 40), 30, Color("7a512b"))
+	time_label = _label(Rect2(154, 258, 460, 32), 28, Color("625648"))
 	cancel_button = _button("Not Yet", Vector2(204, 318))
 	cancel_button.name = "CancelRest"
 	cancel_button.pressed.connect(func() -> void: closed.emit())
@@ -85,7 +85,7 @@ func _button(text: String, at: Vector2) -> Button:
 	button.size = Vector2(168, 44)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_override("font", FONT)
-	button.add_theme_font_size_override("font_size", 26)
+	button.add_theme_font_size_override("font_size", 32)
 	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
 		button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	button.add_theme_color_override("font_color", INK)

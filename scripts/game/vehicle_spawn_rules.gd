@@ -35,6 +35,13 @@ static func shoulder_speed_range(owner) -> Vector2:
 	return Vector2(owner.shoulder_vehicle_min_speed, maxf(owner.main_vehicle_min_speed, owner.main_vehicle_max_speed))
 
 
+static func shoulder_parked_chance(owner) -> float:
+	var chance: float = owner.shoulder_parked_chance
+	if owner.stage_time_of_day == "night":
+		chance += StageProfiles.NIGHT_PARKED_CHANCE_BONUS
+	return clampf(chance, 0.0, 1.0)
+
+
 static func is_post_day_seven_traffic_ramp(owner) -> bool:
 	return owner.use_player_state_stage_sequence and PlayerState.get_current_day() > 7
 

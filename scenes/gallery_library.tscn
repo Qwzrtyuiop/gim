@@ -2,25 +2,25 @@
 
 [ext_resource type="Script" path="res://scripts/gallery_library.gd" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/story/backgrounds/roads/bg1_loop.png" id="2_bg"]
-[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="3_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/game_font.tres" id="3_font"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_title"]
 font = ExtResource("3_font")
-font_size = 22
+font_size = 28
 font_color = Color(0.98, 0.95, 0.82, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_subtitle"]
 font = ExtResource("3_font")
-font_size = 11
+font_size = 18
 font_color = Color(0.95, 0.91, 0.78, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_body"]
 font = ExtResource("3_font")
-font_size = 12
+font_size = 20
 font_color = Color(0.98, 0.95, 0.88, 1)
 outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)

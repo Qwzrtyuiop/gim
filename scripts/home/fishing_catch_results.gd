@@ -5,7 +5,7 @@ signal finished
 
 const FishSpecies := preload("res://scripts/home/fishing_species_catalog.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const PAPER := Color("f6e2b6")
 const RECORD_COLOR := Color("f3c978")
 const PANEL_LIMIT := Vector2(960, 640)
@@ -60,19 +60,19 @@ func _finish() -> void:
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
-	_panel.add_theme_stylebox_override("panel", _panel_style(Color("142b31"), Color("7b887c"), 2))
+	_panel.add_theme_stylebox_override("panel", _panel_style(Color("252d26"), Color("a59062"), 2))
 	add_child(_panel)
 	_margin = MarginContainer.new()
 	_panel.add_child(_margin)
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 12)
 	_margin.add_child(content)
-	_title = _label("YOUR CATCH", 22)
+	_title = _label("YOUR CATCH", 32)
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_title)
-	_subtitle = _label("", 12)
+	_subtitle = _label("", 20)
 	_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_subtitle.add_theme_color_override("font_color", Color("b7ccc7"))
+	_subtitle.add_theme_color_override("font_color", Color("b9baa1"))
 	content.add_child(_subtitle)
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -99,7 +99,7 @@ func _rebuild_cards() -> void:
 		_list.remove_child(child)
 		child.queue_free()
 	if _catches.is_empty():
-		var empty := _label("No fish this time.\nThere's always another cast.", 12)
+		var empty := _label("No fish this time.\nThere's always another cast.", 20)
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty.custom_minimum_size.y = 100
 		_list.add_child(empty)
@@ -112,9 +112,9 @@ func _catch_card(catch_data: Dictionary) -> PanelContainer:
 	var fish_id := str(catch_data.get("fish_id", ""))
 	var species: Dictionary = FishSpecies.find(fish_id)
 	var card := PanelContainer.new()
-	card.custom_minimum_size.y = 112 if _compact else 132
+	card.custom_minimum_size.y = 128 if _compact else 144
 	card.mouse_filter = Control.MOUSE_FILTER_PASS
-	var style := _panel_style(Color("203b41"), Color("50645f"), 1)
+	var style := _panel_style(Color("1c241e"), Color("4e5a4a"), 1)
 	style.content_margin_left = 16
 	style.content_margin_right = 16
 	style.content_margin_top = 12
@@ -135,11 +135,11 @@ func _catch_card(catch_data: Dictionary) -> PanelContainer:
 	details.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	details.add_theme_constant_override("separation", 8)
 	row.add_child(details)
-	var fish_name := _label(str(species.get("name", "Fish")), 14)
+	var fish_name := _label(str(species.get("name", "Fish")), 20)
 	fish_name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	details.add_child(fish_name)
-	var length_label := _label("%.1f cm" % float(catch_data.get("length_cm", 0.0)), 14)
-	length_label.add_theme_color_override("font_color", Color("c7e3da"))
+	var length_label := _label("%.1f cm" % float(catch_data.get("length_cm", 0.0)), 20)
+	length_label.add_theme_color_override("font_color", Color("c4e39a"))
 	details.add_child(length_label)
 	var badges := PackedStringArray()
 	if bool(catch_data.get("first_catch", false)):
@@ -150,7 +150,7 @@ func _catch_card(catch_data: Dictionary) -> PanelContainer:
 		if bool(catch_data.get("is_smallest", false)):
 			badges.append("Smallest caught")
 	if not badges.is_empty():
-		var record := _label("\n".join(badges), 10)
+		var record := _label("\n".join(badges), 16)
 		record.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		record.add_theme_color_override("font_color", RECORD_COLOR)
 		details.add_child(record)
@@ -172,7 +172,7 @@ func _panel_style(background: Color, border: Color, border_width: int) -> StyleB
 	style.bg_color = background
 	style.border_color = border
 	style.set_border_width_all(border_width)
-	style.set_corner_radius_all(8)
+	style.set_corner_radius_all(2)
 	return style
 
 
@@ -185,7 +185,7 @@ func _layout_panel() -> void:
 	var inset := 16 if _compact else 24
 	for edge in ["left", "right", "top", "bottom"]:
 		_margin.add_theme_constant_override("margin_" + edge, inset)
-	_title.add_theme_font_size_override("font_size", 18 if _compact else 22)
+	_title.add_theme_font_size_override("font_size", 26 if _compact else 32)
 	_panel.size = (size - Vector2(48, 48)).max(Vector2.ONE).min(PANEL_LIMIT)
 	_panel.position = (size - _panel.size) * 0.5
 	if rebuild:

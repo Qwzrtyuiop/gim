@@ -1,27 +1,27 @@
 [gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/sleep_transition.gd" id="1_sleep"]
-[ext_resource type="FontFile" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/game_font.tres" id="2_font"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_sleep"]
 font = ExtResource("2_font")
-font_size = 22
+font_size = 32
 font_color = Color(0.96, 0.96, 0.92, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_day"]
 font = ExtResource("2_font")
-font_size = 30
+font_size = 44
 font_color = Color(0.98, 0.97, 0.9, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [sub_resource type="LabelSettings" id="LabelSettings_debt"]
 font = ExtResource("2_font")
-font_size = 16
+font_size = 26
 font_color = Color(0.96, 0.94, 0.82, 1)
-outline_size = 2
+outline_size = 1
 outline_color = Color(0, 0, 0, 0.95)
 
 [node name="SleepTransition" type="Control"]

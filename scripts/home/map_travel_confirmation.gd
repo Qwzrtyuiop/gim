@@ -4,7 +4,7 @@ signal confirmed
 signal cancelled
 
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const PANEL_WIDTH := 580.0
 
 var panel: PanelContainer
@@ -45,8 +45,8 @@ func _ready() -> void:
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 24)
 	panel.add_child(content)
-	heading_label = _label(16, Color("faefd5"))
-	cost_label = _label(12, Color("d7bc8c"))
+	heading_label = _label(26, Color("faefd5"))
+	cost_label = _label(20, Color("d7bc8c"))
 	content.add_child(heading_label)
 	content.add_child(cost_label)
 	var actions := HBoxContainer.new()

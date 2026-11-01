@@ -7,6 +7,10 @@ const UNMASKED_INDOOR_BACKGROUNDS := ["res://assets/story/backgrounds/churchday.
 const MARKERS := {
 	"bar.png": "barrain_indoor.png",
 	"barnight.png": "barnightrain.png",
+	"basketball.png": "basketballrain.png",
+	"basketballnight.png": "basketballrain.png",
+	"bigstationday.png": "bigstationrain.png",
+	"bigstationnight.png": "bigstationrain.png",
 	"garagenormal.png": "garagerain_indoor.png",
 	"garagenight.png": "garagerain_indoor.png",
 	"hospitalday.png": "hospitalrain_indoor.png",
@@ -17,6 +21,7 @@ const MARKERS := {
 	"parknight.png": "parkrain.png",
 	"pier.png": "pierrain.png",
 	"piernight.png": "pierrain.png",
+	"school.png": "schoolrain.png",
 	"market.png": "marketrain.png",
 	"marketnight.png": "marketrain.png",
 	"constructionday.png": "constructionrain.png",

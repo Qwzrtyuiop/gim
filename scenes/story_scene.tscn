@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://c3p6tn8qyj6i8"]
 
 [ext_resource type="Script" uid="uid://dl8js33lfk7dj" path="res://scripts/story_scene.gd" id="1_story"]
-[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="2_font"]
+[ext_resource type="FontVariation" path="res://assets/fonts/game_font.tres" id="2_font"]
 
 [node name="StoryScene" type="Control" unique_id=925313710]
 layout_mode = 3

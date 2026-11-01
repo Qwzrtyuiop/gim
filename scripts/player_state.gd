@@ -16,6 +16,7 @@ const PlayerConstructionState := preload("res://scripts/state/player_constructio
 const PlayerDayPhaseTracker := preload("res://scripts/state/player_day_phase_tracker.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
 const PlayerFishingState := preload("res://scripts/state/player_fishing_state.gd")
+const PlayerFoodState := preload("res://scripts/state/player_food_state.gd")
 const PlayerLocationVisitState := preload("res://scripts/state/player_location_visit_state.gd")
 const PlayerPendingState := preload("res://scripts/state/player_pending_state.gd")
 const PlayerResourceState := preload("res://scripts/state/player_resource_state.gd")
@@ -48,6 +49,7 @@ signal upgrade_changed(upgrade_id: String, level: int)
 signal achievement_unlocked(achievement_id: String)
 
 # Run configuration
+const ARCADE_MODE_EVENT_ID := "arcade_mode"
 const FIRST_STAGE_TYPE := "short-morning-chill"
 const STAGE_DIFFICULTIES := ["short", "medium", "long"]
 const STAGE_TIMES := ["morning", "noon", "night"]
@@ -341,6 +343,15 @@ func _end_state_batch(save_after := true, discard_deferred := false) -> void:
 		return
 	if save_after and _has_deferred_save:
 		flush_deferred_save()
+
+
+# Run options
+func is_arcade_mode_enabled() -> bool:
+	return bool(get_event_value(ARCADE_MODE_EVENT_ID, false))
+
+
+func set_arcade_mode_enabled(value: bool) -> void:
+	set_event_value(ARCADE_MODE_EVENT_ID, value)
 
 
 # Story event and resume state
@@ -800,6 +811,14 @@ func has_visited_location_today(location_id: String) -> bool:
 
 func record_location_visit(location_id: String) -> int:
 	return PlayerLocationVisitState.record_visit(self, location_id)
+
+
+func has_eaten_this_phase() -> bool:
+	return PlayerFoodState.has_eaten_this_phase(self)
+
+
+func record_food_purchase() -> bool:
+	return PlayerFoodState.record_purchase(self)
 
 
 func record_fish_catch(catch_data: Dictionary) -> Dictionary:

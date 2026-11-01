@@ -6,7 +6,7 @@ const OWNER_META := &"alma_delivery_equipment"
 const Tuning := preload("res://scripts/config/game_tuning.gd")
 const HornTraffic := preload("res://scripts/game/vehicle_horn_response.gd")
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 # Trimmed PCM starts at the horn's onset, without the source MP3's silent lead-in.
 const HORN_SOUND := preload("res://assets/audio/sfx/driving/truck_horn.wav")
 
@@ -121,13 +121,15 @@ func _build_ui() -> void:
 	_surface.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(_surface)
 	_surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_status = TutorialOverlayHelper.make_label(FONT, 10)
+	_status = TutorialOverlayHelper.make_label(FONT, 16)
+	_status.add_theme_constant_override("outline_size", 1)
 	_status.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_surface.add_child(_status)
 	var refs := TutorialOverlayHelper.create(_surface, FONT)
 	_overlay = refs.overlay
 	_panel = refs.text_panel
 	_text = refs.text_label
+	_text.add_theme_constant_override("outline_size", 1)
 	refs.highlight.hide()
 	_text.text = "TRUCK HORN\n\nPress Q to send out a horn wave.\nCars pull aside when it reaches them.\nIt recharges in 5 seconds.\n\nPress Enter or click to begin."
 
@@ -138,7 +140,7 @@ func _layout() -> void:
 	_status.size = Vector2(minf(360.0, dimensions.x - 24.0), 32.0)
 	_panel.size = Vector2(minf(640.0, maxf(1.0, dimensions.x - 40.0)), minf(210.0, dimensions.y - 32.0))
 	_panel.position = (dimensions - _panel.size) * 0.5
-	_text.add_theme_font_size_override("font_size", 10 if dimensions.x < 800.0 else 12)
+	_text.add_theme_font_size_override("font_size", 18 if dimensions.x < 800.0 else 20)
 
 
 func _refresh_status() -> void:

@@ -23,7 +23,7 @@ func _init(selection_screen) -> void:
 func offers(location_id := "") -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	if not PlayerState.are_passengers_available():
-		return MidnightEncounters.offers(PlayerState) if location_id in ["", "station"] else result
+		return MidnightEncounters.offers(PlayerState, location_id)
 	var seen: Dictionary = {}
 	var phase: String = PlayerState.get_next_stage_time(screen._transition_mode())
 	if phase == "night" and location_id in ["market", "street"]:

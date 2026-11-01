@@ -23,15 +23,15 @@ static func create(host: Node, parent: Control, font: Font, position_value: Vect
 
 	var title := Label.new()
 	title.text = title_text
-	title.position = Vector2(0.0, 14.0)
-	title.size = Vector2(size_value.x, 22.0)
-	_apply_label_theme(title, font, 13, Color(0.97, 0.93, 0.80, 1.0), 2)
+	title.position = Vector2(0.0, 10.0)
+	title.size = Vector2(size_value.x, 32.0)
+	_apply_label_theme(title, font, 26, Color(0.97, 0.93, 0.80, 1.0), 1)
 	panel.add_child(title)
 
 	var rows := VBoxContainer.new()
-	rows.position = Vector2(18.0, 46.0)
-	rows.size = Vector2(size_value.x - 36.0, size_value.y - 60.0)
-	rows.add_theme_constant_override("separation", 8)
+	rows.position = Vector2(18.0, 52.0)
+	rows.size = Vector2(size_value.x - 36.0, size_value.y - 66.0)
+	rows.add_theme_constant_override("separation", 6)
 	panel.add_child(rows)
 
 	for row_data in CATEGORY_ROWS:
@@ -41,9 +41,9 @@ static func create(host: Node, parent: Control, font: Font, position_value: Vect
 		rows.add_child(row)
 
 		var label := Label.new()
-		label.custom_minimum_size = Vector2(70.0, 24.0)
+		label.custom_minimum_size = Vector2(70.0, 28.0)
 		label.text = str(row_data["label"])
-		_apply_label_theme(label, font, 11, Color(0.96, 0.93, 0.84, 1.0), 1, HORIZONTAL_ALIGNMENT_LEFT)
+		_apply_label_theme(label, font, 20, Color(0.96, 0.93, 0.84, 1.0), 1, HORIZONTAL_ALIGNMENT_LEFT)
 		row.add_child(label)
 
 		var slider := HSlider.new()
@@ -55,9 +55,9 @@ static func create(host: Node, parent: Control, font: Font, position_value: Vect
 		row.add_child(slider)
 
 		var value_label := Label.new()
-		value_label.custom_minimum_size = Vector2(52.0, 24.0)
+		value_label.custom_minimum_size = Vector2(52.0, 28.0)
 		value_label.text = "%d%%" % roundi(slider.value)
-		_apply_label_theme(value_label, font, 10, Color(0.92, 0.88, 0.76, 1.0), 1)
+		_apply_label_theme(value_label, font, 20, Color(0.92, 0.88, 0.76, 1.0), 1)
 		row.add_child(value_label)
 
 		slider.value_changed.connect(func(value: float) -> void:

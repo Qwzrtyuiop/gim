@@ -14,6 +14,7 @@ const HOME := "res://scenes/day_start_scene.tscn"
 static func run(host: Node) -> void:
 	assert(ProjectSettings.get_setting("testing/isolated", false))
 	_test_session()
+	_test_line_pressure()
 	_test_fish_passages()
 	_test_fish_art()
 	_test_species_and_inventory()
@@ -130,6 +131,24 @@ static func _test_session() -> void:
 	assert(model.fight_phase == "free")
 	_test_reel_brake()
 	_test_tension_slack()
+	_test_hook_preserves_slack()
+
+
+static func _test_hook_preserves_slack() -> void:
+	var model := Session.new()
+	model.reset(714)
+	model.line_anchor_x = 0.5
+	model.teleport_hook(Vector2(0.5, 0.45))
+	model._line.set_length(0.9, model._line_anchor(), true)
+	model._refresh_line()
+	model.set_reel_held(true)
+	model.fish.assign([_fish(71, model.hook_tip_position())])
+	var paid_out: float = model.line_length
+	model.update(0.001)
+	assert(model.hooked_fish_id == 71)
+	assert(is_equal_approx(model.line_length, paid_out) and not model.is_line_taut(), "A bite preserves the line already paid out, including slack")
+	var before_reeling: float = model.line_length
+	assert(model.reel(-0.5) < 0.0 and model.line_length < before_reeling, "A freshly hooked fish cannot lock retrieval before taking up the existing slack")
 
 
 static func _wait_for_rest(model) -> void:
@@ -176,6 +195,8 @@ static func _test_reel_brake() -> void:
 
 static func _test_tension_slack() -> void:
 	var model = _latched_fixture(712)
+	# This fixture isolates slack and fight phases; snapping is covered separately.
+	model._line_pressure_rate = 0.0
 	model.set_reel_held(true)
 	assert(model.is_reel_in_blocked())
 	var endpoint: Vector2 = model.hook_position
@@ -203,11 +224,43 @@ static func _test_tension_slack() -> void:
 	assert(not model.is_reel_in_blocked() and model.reel(-0.5) < 0.0, "A resting fish permits retrieval regardless of tension")
 
 
+static func _test_line_pressure() -> void:
+	var model = _latched_fixture(713)
+	model.set_reel_held(true)
+	model.fight_seconds_left = 10.0
+	model._line_pressure_rate = GameTuning.FISHING_LINE_PRESSURE_MAX_RATE
+	model.update(0.25)
+	assert(model.line_pressure > 0.0, "Holding a taut line against a pulling fish builds pressure")
+	var pressure: float = model.line_pressure
+	model.reel(0.02 / GameTuning.FISHING_REEL_LINE_PER_RADIAN)
+	assert(model.line_pressure < pressure, "Manually lowering the hook releases line pressure")
+	model.fight_phase = "resting"
+	model.fight_seconds_left = 10.0
+	pressure = model.line_pressure
+	model.update(0.25)
+	assert(is_equal_approx(model.line_pressure, pressure), "A resting fish cannot build snapping pressure")
+	model.teleport_hook(Vector2(0.5, 0.45))
+	model.fight_phase = "pulling"
+	model.fight_seconds_left = 10.0
+	model.line_pressure = 0.99999
+	var snaps: Array[Vector2] = []
+	model.line_snapped.connect(func(tip: Vector2) -> void: snaps.append(tip))
+	model.update(0.05)
+	assert(snaps.size() == 1 and model.last_event == "snapped" and model.hooked_fish_id == -1)
+	assert(model.caught_count == 0 and model.catches.is_empty(), "A snapped line never awards the escaped fish")
+	assert(model.line_pressure == 0.0 and model.hook_position.y < 0.1, "Snapping restrings the hook for another cast")
+	assert(float(model.fish[0].interest_timer) > 0.0, "The escaped fish cannot immediately bite again")
+	model.update(0.1)
+	assert(snaps.size() == 1, "A single broken line emits only one snap")
+
+
 static func _test_fish_passages() -> void:
 	var model := Session.new()
 	model.reset(441)
-	assert(model.fish.size() == 3, "Only a small pool swims through the fishing view")
+	assert(model.fish.size() == GameTuning.FISHING_FISH_COUNT and model.fish.size() <= 30, "The swimming pool respects the configured 30-fish limit")
 	var passage := _fish(4, Vector2(0.99, 0.75))
+	passage.behavior = "cruising"
+	passage.interest_timer = 1000.0
 	passage.velocity = Vector2(0.12, 0)
 	model.fish.assign([passage])
 	model.update(0.3)
@@ -487,6 +540,25 @@ static func _test_pier_and_input(host: Node) -> void:
 	assert(overlay.session.line_points == paused_rope)
 	await _key(host, KEY_ESCAPE)
 	assert(not tree.paused and not PauseMenuManager.visible and overlay.active and not overlay.dragging)
+
+	overlay.set_process(false)
+	overlay.session.teleport_hook(Vector2(0.5, 0.45))
+	overlay.session.fish.assign([_fish(81, overlay.session.hook_tip_position())])
+	overlay.session.set_reel_held(true)
+	overlay.session.update(0.001)
+	assert(overlay.session.hooked_fish_id == 81)
+	overlay.audio.set_reel_motion(1.0)
+	await tree.create_timer(GameTuning.FISHING_REEL_SFX_FADE_SECONDS + 0.05).timeout
+	assert(overlay.audio.idle_player.playing)
+	assert(not overlay.audio.pull_player.playing)
+	overlay.session.line_pressure = 0.99999
+	overlay.session.update(0.05)
+	assert(overlay.session.last_event == "snapped" and not overlay.dragging)
+	overlay.audio.set_reel_motion(-1.0)
+	assert(overlay.audio.pull_player.playing, "Reel sounds resume after a line snap within the same fishing session")
+	overlay.audio.set_reel_motion(1.0)
+	assert(overlay.audio.idle_player.playing, "Lowering sounds remain available after restringing too")
+	overlay.set_process(true)
 
 	await _click(host, overlay.close_button.get_global_rect().get_center())
 	assert(not overlay.active and not overlay.visible and world.location_view.visible)

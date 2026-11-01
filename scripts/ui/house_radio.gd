@@ -4,7 +4,7 @@ signal closed
 
 const DESIGN_SIZE := Vector2(960, 540)
 const TEXTURE := preload("res://assets/ui/frames/Radio.png")
-const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const ImageOutline := preload("res://scripts/story/story_portrait_outline.gd")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const CREAM := Color("f5dfac")
@@ -30,27 +30,27 @@ func _ready() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 	ImageOutline.apply_to(background)
-	_label("TODAY'S NEWS", Rect2(82, 218, 400, 34), 30, AMBER)
-	day_label = _label("", Rect2(540, 223, 338, 26), 20, MUTED)
+	_label("TODAY'S NEWS", Rect2(82, 211, 400, 44), 38, AMBER)
+	day_label = _label("", Rect2(540, 223, 338, 26), 22, MUTED)
 	day_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_rule(Rect2(82, 261, 796, 1))
 	_rule(Rect2(478, 285, 1, 130))
-	_label("GAS PRICE", Rect2(94, 284, 360, 26), 21, MUTED)
-	price_label = _label("", Rect2(94, 313, 360, 50), 42, CREAM)
-	_label("CHANGE SINCE YESTERDAY", Rect2(94, 373, 360, 22), 17, MUTED)
-	change_label = _label("", Rect2(94, 397, 360, 30), 23, AMBER)
-	_label("WEATHER FORECAST", Rect2(512, 284, 350, 26), 21, AMBER)
-	_label("TODAY", Rect2(512, 329, 140, 26), 18, MUTED)
-	today_label = _label("", Rect2(656, 325, 206, 34), 29, CREAM)
-	_label("TOMORROW", Rect2(512, 382, 140, 26), 18, MUTED)
-	tomorrow_label = _label("", Rect2(656, 378, 206, 34), 29, CREAM)
+	_label("GAS PRICE", Rect2(94, 284, 360, 28), 24, MUTED)
+	price_label = _label("", Rect2(94, 313, 360, 50), 44, CREAM)
+	_label("CHANGE SINCE YESTERDAY", Rect2(94, 373, 360, 24), 20, MUTED)
+	change_label = _label("", Rect2(94, 397, 360, 30), 26, AMBER)
+	_label("WEATHER FORECAST", Rect2(512, 284, 350, 28), 24, AMBER)
+	_label("TODAY", Rect2(512, 329, 140, 26), 22, MUTED)
+	today_label = _label("", Rect2(656, 325, 206, 34), 30, CREAM)
+	_label("TOMORROW", Rect2(512, 382, 140, 26), 22, MUTED)
+	tomorrow_label = _label("", Rect2(656, 378, 206, 34), 30, CREAM)
 	close_button = Button.new()
 	close_button.text = "TURN OFF"
 	close_button.position = Vector2(385, 444)
 	close_button.size = Vector2(190, 34)
 	close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	close_button.add_theme_font_override("font", FONT)
-	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.add_theme_font_size_override("font_size", 26)
 	for state in ["normal", "hover", "pressed", "focus"]:
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color("302419") if state == "normal" else Color("594128")
@@ -77,7 +77,7 @@ func _label(text: String, rect: Rect2, font_size: int, color: Color) -> Label:
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color("281c10"))
-	label.add_theme_constant_override("outline_size", 2)
+	label.add_theme_constant_override("outline_size", 1)
 	add_child(label)
 	return label
 

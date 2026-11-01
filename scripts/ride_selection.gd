@@ -99,7 +99,6 @@ func _ready() -> void:
 	idle_music.active_changed.connect(_on_idle_music_changed)
 	add_child(idle_music)
 	passenger_overlay.visibility_changed.connect(idle_music.refresh_availability)
-	MidnightEncounters.prepare(PlayerState)
 	_refresh_terminal()
 	var story_error := PlayerState.take_pending_trip_selection_error()
 	if not story_error.is_empty():
@@ -147,6 +146,7 @@ func _set_distance(difficulty: String) -> void:
 
 
 func _refresh_terminal() -> void:
+	MidnightEncounters.prepare(PlayerState)
 	terminal_offers = view.offers(pickup_location)
 	view.refresh_terminal()
 	var weather := PlayerState.get_current_weather()
@@ -196,7 +196,7 @@ func _choose_offer(distance: String, slot: int) -> void:
 
 
 func _interact_midnight_encounter(offer: Dictionary) -> void:
-	if not MidnightEncounters.is_available(PlayerState, offer):
+	if str(offer.get("pickup_location", "station")) != pickup_location or not MidnightEncounters.is_available(PlayerState, offer):
 		_refresh_terminal()
 		return
 	var interaction := MidnightEncounters.interact(PlayerState, offer)
@@ -208,8 +208,8 @@ func _interact_midnight_encounter(offer: Dictionary) -> void:
 		midnight_encounter_selected.emit(str(offer.encounter_id), str(offer.character.id))
 		return
 	show_message(str(interaction.text), {
-		"target": "gardo",
-		"character_id": "gardo",
+		"target": str(offer.character.id),
+		"character_id": str(offer.character.id),
 	})
 
 

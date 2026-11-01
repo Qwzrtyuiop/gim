@@ -1,7 +1,7 @@
 extends RefCounted
 
 # Notebook widgets share immutable styles; hovering never allocates new styles.
-const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const INK := Color("4b2d19")
 const RED_INK := Color("873d2c")
 const MUTED := Color("86603b")
@@ -27,7 +27,11 @@ static func label(parent: Control, text: String, rect: Rect2, font_size: int, co
 
 
 static func row_label(parent: Control, text: String, top: float, height: float, font_size: int, color: Color) -> Label:
-	var widget := label(parent, text, Rect2(164, top, 0, height), font_size, color)
+	var readable_size := roundi(font_size * 1.3)
+	# Slot rows have fixed writing lines; keep the larger face inside each one.
+	while readable_size > font_size and FONT.get_height(readable_size) > height:
+		readable_size -= 1
+	var widget := label(parent, text, Rect2(164, top, 0, height), readable_size, color)
 	widget.anchor_right = 1.0
 	widget.offset_right = -14
 	widget.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -42,7 +46,7 @@ static func button(parent: Control, text: String, rect: Rect2) -> Button:
 	widget.size = rect.size
 	widget.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	widget.add_theme_font_override("font", FONT)
-	widget.add_theme_font_size_override("font_size", 25)
+	widget.add_theme_font_size_override("font_size", 32)
 	for state in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		widget.add_theme_color_override(state, INK)
 	style_button(widget)

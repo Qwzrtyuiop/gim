@@ -12,7 +12,7 @@ const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const HubStatusHeader := preload("res://scripts/ui/hub_status_header.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 const PassengerTripCard := preload("res://scripts/ride_selection/passenger_trip_card.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
 const RAIN_MARKER := preload("res://assets/story/backgrounds/locations/terminalrain.png")
 const MARKET_RAIN_MARKER := preload("res://assets/story/backgrounds/locations/marketrain.png")
@@ -165,7 +165,9 @@ func set_offers(offers: Array, night: bool) -> void:
 		var presentation: Dictionary = SpawnCatalog.midnight_entry(character_id) if str(offer.get("presentation", "")) == "midnight" else SpawnCatalog.entry(character_id, night)
 		if pickup_location != "station":
 			var variant := str(character.get("pickup_variant", ""))
-			if bool(character.get("is_generic", false)) or character_id.begins_with("generic_"):
+			if str(offer.get("presentation", "")) == "midnight":
+				presentation = AreaSpawnCatalog.midnight_entry(pickup_location, character_id)
+			elif bool(character.get("is_generic", false)) or character_id.begins_with("generic_"):
 				presentation = AreaSpawnCatalog.generic_entry(pickup_location, variant.trim_prefix("slot_").to_int(), night)
 			else:
 				presentation = AreaSpawnCatalog.entry(pickup_location, character_id, night, variant)

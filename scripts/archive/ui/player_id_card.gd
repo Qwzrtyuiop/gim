@@ -2,7 +2,7 @@ extends Control
 
 # Source-pixel regions follow the supplied full card, including John's photo.
 const FRAME := preload("res://assets/archive/ui/id_card/IDfull.png")
-const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const STRESS_ICON := preload("res://assets/ui/icons/stress_brain.png")
 const HULL_ICON := preload("res://assets/ui/icons/hull_shield.svg")

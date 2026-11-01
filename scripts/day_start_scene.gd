@@ -18,7 +18,7 @@ const SLEEP_TRANSITION_SCENE := "res://scenes/sleep_transition.tscn"
 const STORY_SCENE := "res://scenes/story_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const HOME_BGM_PATH := "res://assets/audio/music/story/peace.mp3"
 const HOME_REST_FADE_SECONDS := 0.28
 

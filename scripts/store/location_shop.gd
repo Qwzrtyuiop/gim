@@ -5,7 +5,7 @@ extends Control
 signal closed
 
 const StoreItems := preload("res://scripts/store/store_items.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const CONTENT_SIZE := Vector2(1180, 600)
 
@@ -148,11 +148,11 @@ func _build_interface() -> void:
 	owner_portrait.position = Vector2(12, 12)
 	owner_portrait.size = Vector2(276, 576)
 	panel = _panel("Panel", Rect2(328, 0, 852, 600))
-	title_label = _label("Title", _shop_title(), 20)
+	title_label = _label("Title", _shop_title(), 32)
 	title_label.position = Vector2(352, 16)
 	title_label.size = Vector2(620, 44)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	money_label = _label("MoneyLabel", "", 12)
+	money_label = _label("MoneyLabel", "", 20)
 	money_label.position = Vector2(352, 76)
 	money_label.size = Vector2(804, 32)
 	money_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -168,7 +168,7 @@ func _build_interface() -> void:
 	item_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	item_list.add_theme_constant_override("separation", 12)
 	item_scroll.add_child(item_list)
-	status_label = _label("StatusLabel", _shop_prompt(), 12)
+	status_label = _label("StatusLabel", _shop_prompt(), 20)
 	status_label.position = Vector2(352, 524)
 	status_label.size = Vector2(804, 52)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

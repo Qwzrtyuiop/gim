@@ -102,6 +102,42 @@ const STORIES := {
 		"title": "Prayer",
 		"subtitle": "John takes a moment to pray.",
 	},
+	"basketball_empty": {
+		"english": preload("res://scripts/story/payloads/events/basketball/basketball_empty.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/basketball/basketball_empty_tagalog.gd"),
+		"title": "Empty Court",
+		"subtitle": "John rests at an empty basketball court.",
+	},
+	"basketball_empty_short": {
+		"english": preload("res://scripts/story/payloads/events/basketball/basketball_empty_short.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/basketball/basketball_empty_short_tagalog.gd"),
+		"title": "Empty Court",
+		"subtitle": "A short break by the court.",
+	},
+	"basketball_pickup": {
+		"english": preload("res://scripts/story/payloads/events/basketball/basketball_pickup.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/basketball/basketball_pickup_tagalog.gd"),
+		"title": "Pickup Game",
+		"subtitle": "The players invite John to join their game.",
+	},
+	"basketball_pickup_short": {
+		"english": preload("res://scripts/story/payloads/events/basketball/basketball_pickup_short.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/basketball/basketball_pickup_short_tagalog.gd"),
+		"title": "Pickup Game",
+		"subtitle": "Another chance to play basketball.",
+	},
+	"basketball_wager": {
+		"english": preload("res://scripts/story/payloads/events/basketball/basketball_wager.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/basketball/basketball_wager_tagalog.gd"),
+		"title": "A Friendly Wager",
+		"subtitle": "A pickup game has a small wager riding on it.",
+	},
+	"basketball_wager_short": {
+		"english": preload("res://scripts/story/payloads/events/basketball/basketball_wager_short.gd"),
+		"tagalog": preload("res://scripts/story/payloads/events/basketball/basketball_wager_short_tagalog.gd"),
+		"title": "A Friendly Wager",
+		"subtitle": "John can join another game with a wager.",
+	},
 	"park_visit_1": {
 		"english": preload("res://scripts/story/payloads/events/park/park_visit_1.gd"),
 		"tagalog": preload("res://scripts/story/payloads/events/park/park_visit_1_tagalog.gd"),

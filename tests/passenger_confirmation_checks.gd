@@ -106,8 +106,13 @@ static func _test_cancel_and_layout(host: Node) -> void:
 		_assert_card_layout(card)
 	selection.size = Vector2(1280, 720)
 	await host.get_tree().process_frame
+	var previous_scene := host.get_tree().current_scene
+	host.get_tree().current_scene = selection
 	await _key(host, KEY_ESCAPE)
-	assert(not dialog.visible and selection.passenger_overlay.visible, "Escape closes confirmation before closing the passenger screen")
+	assert(dialog.visible and selection.passenger_overlay.visible and PauseMenuManager.is_menu_open(), "Escape opens the pause menu without dismissing passenger confirmation")
+	PauseMenuManager.hide_pause_menu()
+	host.get_tree().current_scene = previous_scene
+	selection._cancel_passenger()
 	assert(selection.terminal_view.enabled and _snapshot(selection) == original)
 	selection._choose_offer("long", 0)
 	await host.get_tree().process_frame

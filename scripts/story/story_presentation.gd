@@ -9,6 +9,12 @@ const CharacterSpriteRuntime := preload("res://scripts/story/story_character_spr
 const StoryInterface := preload("res://scripts/story/story_interface.gd")
 const StoryBackgroundWeather := preload("res://scripts/story/story_background_weather.gd")
 const BackgroundCamera := preload("res://scripts/story/story_background_camera.gd")
+const PlaybackControls := preload("res://scripts/story/story_playback_controls.gd")
+const BasketballPlayers := preload("res://scripts/home/basketball_players.gd")
+const BASKETBALL_BACKGROUNDS := [
+	"res://assets/story/backgrounds/locations/basketball.png",
+	"res://assets/story/backgrounds/locations/basketballnight.png",
+]
 const INTRO_FADE_SECONDS := 0.35
 const OUTRO_FADE_SECONDS := 0.35
 const DEFAULT_SCREEN_FADE_SECONDS := 0.24
@@ -95,6 +101,7 @@ static func set_background_texture(owner, texture_ref, reset_camera := false) ->
 	owner.background.texture = resolved_texture
 	owner.background.visible = resolved_texture != null
 	StoryBackgroundWeather.apply(owner.background)
+	_refresh_basketball_players(owner)
 	AmbientAudioManager.set_rain_indoors(StoryBackgroundWeather.is_indoor_background(resolved_texture))
 	if resolved_texture != null:
 		remember_gallery_image(owner, texture_ref)
@@ -107,6 +114,20 @@ static func set_background_texture(owner, texture_ref, reset_camera := false) ->
 		owner.portrait_layer.layout_portraits()
 	refresh_portrait_visibility(owner)
 	save_portrait_state(owner)
+
+
+static func _refresh_basketball_players(owner) -> void:
+	var players := owner.background.get_node_or_null("BasketballPlayers") as BasketballPlayers
+	var background_path := ""
+	if owner.background.texture != null:
+		background_path = owner.background.texture.resource_path
+	var active := bool(owner.story_payload.get("basketball_players", false)) and background_path in BASKETBALL_BACKGROUNDS
+	if players == null:
+		if not active:
+			return
+		players = BasketballPlayers.new()
+		players.setup(owner.background)
+	players.set_active(active)
 
 
 static func refresh_portrait_visibility(owner) -> void:
@@ -278,24 +299,24 @@ static func refresh_background_transform(owner, duration := 0.0) -> void:
 static func pause_for_seconds(owner, duration: float) -> void:
 	if duration <= 0.0:
 		return
-	await owner.get_tree().create_timer(duration, false).timeout
+	await PlaybackControls.wait_seconds(owner, duration)
 
 
 static func fade_background_overlay(owner, target_alpha: float, duration: float) -> void:
-	if duration <= 0.0:
+	if duration <= 0.0 or PlaybackControls.accelerating(owner):
 		owner.background_fade_overlay.color.a = target_alpha
 		return
 
 	var tween: Tween = owner.create_tween()
 	tween.tween_property(owner.background_fade_overlay, "color:a", target_alpha, duration)
-	await tween.finished
+	await PlaybackControls.wait_tween(owner, tween)
 
 
 static func fade_screen_overlay(owner, target_alpha: float, duration: float) -> void:
-	if duration <= 0.0:
+	if duration <= 0.0 or PlaybackControls.accelerating(owner):
 		owner.fade_overlay.color.a = target_alpha
 		return
 
 	var tween: Tween = owner.create_tween()
 	tween.tween_property(owner.fade_overlay, "color:a", target_alpha, duration)
-	await tween.finished
+	await PlaybackControls.wait_tween(owner, tween)

@@ -1,6 +1,7 @@
 extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
+const PlayerPassing := preload("res://scripts/game/player_passing_controller.gd")
 const TrafficIndex := preload("res://scripts/game/vehicle_traffic_index.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleTrafficController := preload("res://scripts/game/vehicle_traffic_controller.gd")
@@ -9,6 +10,9 @@ const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animati
 
 static func collision_data(owner) -> Dictionary:
 	if owner.player_hit_invincible_timer > 0.0:
+		return {}
+	# Match traffic's between-lane evasive maneuver while the player passes.
+	if PlayerPassing.is_active(owner):
 		return {}
 
 	var player_rect: Rect2 = VehicleGeometry.collision_rect(owner.player, owner.PLAYER_HITBOX_INSET, owner)

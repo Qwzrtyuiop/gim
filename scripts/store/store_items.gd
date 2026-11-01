@@ -4,6 +4,8 @@ extends RefCounted
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const BarItemCatalog := preload("res://scripts/store/bar_item_catalog.gd")
 const FIRST_AID_DAY_EVENT := "hospital_first_aid_day"
+const FOOD_FULL_MESSAGE := "I'm full."
+const YOSI_COUGH_MESSAGE := "*cough cough*"
 const TIER_FILLED_COLOR := Color(0.86, 0.56, 0.18, 1.0)
 const TIER_EMPTY_COLOR := Color(0.43, 0.34, 0.26, 0.84)
 const TIER_BORDER_COLOR := Color(0.23, 0.16, 0.10, 0.92)
@@ -46,7 +48,7 @@ static func build_items(owner) -> void:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size = Vector2(0.0, 48.0)
 		label.add_theme_font_override("normal_font", owner.UI_FONT)
-		label.add_theme_font_size_override("normal_font_size", 12)
+		label.add_theme_font_size_override("normal_font_size", 20)
 		label.add_theme_color_override("default_color", Color(0.24, 0.16, 0.10, 1.0))
 		label.add_theme_color_override("font_outline_color", Color(0.95, 0.92, 0.84, 0.92))
 		label.add_theme_constant_override("outline_size", 1)
@@ -92,7 +94,7 @@ static func item_text(owner, item: Dictionary) -> String:
 		else:
 			description = "Reduce stress by %d. May cause negative effects." % food_stress_relief(item)
 	var cost_text: String = "PhP %d" % item_cost(owner, item)
-	if owner.active_category == "bar" and item["type"] == "liquor" and BarItemCatalog.discount_active():
+	if owner.active_category == "bar" and BarItemCatalog.discount_active():
 		cost_text += " (%d%% OFF)" % roundi(GameTuning.BAR_DISCOUNT * 100.0)
 	if item["type"] == "gas":
 		cost_text = PlayerState.get_gas_price_text()
@@ -113,6 +115,9 @@ static func buy_item(owner, item: Dictionary, _label: RichTextLabel, tier_contai
 		return
 	var type := str(item.get("type", ""))
 	if not available_in_shop(owner, type):
+		return
+	if is_food(item) and PlayerState.has_eaten_this_phase():
+		owner.status_label.text = FOOD_FULL_MESSAGE
 		return
 	if item["type"] == "upgrade":
 		var current_level = PlayerState.get_upgrade_level(item["id"])
@@ -146,6 +151,8 @@ static func buy_item(owner, item: Dictionary, _label: RichTextLabel, tier_contai
 		owner.status_label.text = "%s upgraded to Lv %d." % [item["name"], next_level]
 		refresh_tier_bars(owner, tier_container, next_level, int(item["max_level"]))
 	elif type in ["stress_relief", "liquor", "first_aid"]:
+		if is_food(item):
+			PlayerState.record_food_purchase()
 		var energy_before: int = PlayerState.energy
 		PlayerState.add_energy(food_energy_restore(item))
 		var restored: int = PlayerState.energy - energy_before
@@ -163,6 +170,8 @@ static func buy_item(owner, item: Dictionary, _label: RichTextLabel, tier_contai
 		owner.status_label.text = "Bought %s." % item["name"] if effects.is_empty() else "%s %s." % [item["name"], " and ".join(effects)]
 		if type == "liquor":
 			owner.status_label.text += " Paid PhP %d." % purchase_cost
+		elif str(item.get("id", "")) == "yosi" and not PlayerState.has_achievement("maninigarilyo"):
+			owner.status_label.text = YOSI_COUGH_MESSAGE
 	elif type == "stress_shield":
 		if not PlayerState.grant_next_ride_stress_shield(int(item.get("stress_shield", GameTuning.BETA_BLOCKER_STRESS_SHIELD_POINTS))):
 			PlayerState.add_money(purchase_cost)
@@ -194,7 +203,7 @@ static func available_in_shop(owner, item_type: String) -> bool:
 	if owner.active_category == "tricycle":
 		return item_type in ["upgrade", "gas", "repair"]
 	if owner.active_category == "bar":
-		return item_type == "liquor"
+		return item_type in ["liquor", "stress_relief"]
 	if owner.active_category == "hospital":
 		return item_type in ["first_aid", "stress_shield"]
 	return owner.active_category == "food" and item_type == "stress_relief"
@@ -212,6 +221,11 @@ static func food_energy_restore(item: Dictionary) -> int:
 	if str(item.get("type", "")) == "liquor":
 		return 0
 	return clampi(int(item.get("energy_restore", 0)), 0, GameTuning.FOOD_MAX_ENERGY_RESTORE)
+
+
+static func is_food(item: Dictionary) -> bool:
+	# Cigarettes share the food counter's catalog, but are not a meal.
+	return str(item.get("type", "")) == "stress_relief" and str(item.get("id", "")) != "yosi"
 
 
 static func food_stress_relief(item: Dictionary) -> int:
@@ -244,7 +258,7 @@ static func refresh_items(owner) -> void:
 
 static func apply_button_font(owner, button: Button) -> void:
 	button.add_theme_font_override("font", owner.UI_FONT)
-	button.add_theme_font_size_override("font_size", 16)
+	button.add_theme_font_size_override("font_size", 24)
 	button.add_theme_color_override("font_color", Color(0.97, 0.92, 0.80, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.20, 0.11, 0.06, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.12, 0.08, 0.05, 1.0))
@@ -255,7 +269,7 @@ static func apply_button_font(owner, button: Button) -> void:
 
 
 static func item_cost(owner, item: Dictionary) -> int:
-	if owner.active_category == "bar" and item["type"] == "liquor":
+	if owner.active_category == "bar":
 		return BarItemCatalog.item_cost(item)
 	if item["type"] == "gas":
 		return PlayerState.get_gas_price()

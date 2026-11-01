@@ -10,7 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://c7iev2sfp8t65" path="res://assets/vehicles/motorcycle.png" id="8_kw13x"]
 [ext_resource type="Texture2D" uid="uid://vaarmdqhgc1" path="res://assets/vehicles/sedan.png" id="9_c7lel"]
 [ext_resource type="Texture2D" uid="uid://b5kbx25r7i86a" path="res://assets/vehicles/truck.png" id="10_1s5vf"]
-[ext_resource type="FontFile" uid="uid://b8bl3grm5xqe7" path="res://assets/fonts/PressStart2P-Regular.ttf" id="11_rqqbv"]
+[ext_resource type="FontVariation" path="res://assets/fonts/game_font.tres" id="11_rqqbv"]
 [ext_resource type="Texture2D" uid="uid://b4tkbv1uy06ru" path="res://assets/vehicles/beetle.png" id="12_beetle"]
 [ext_resource type="Texture2D" uid="uid://coul5dwqhk551" path="res://assets/vehicles/bus.png" id="13_bus"]
 [ext_resource type="Texture2D" uid="uid://hl0mttutp5wa" path="res://assets/vehicles/cargotruck.png" id="14_cargotruck"]

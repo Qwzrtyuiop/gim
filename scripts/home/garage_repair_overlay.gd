@@ -7,7 +7,8 @@ signal attempt_resolved(success: bool)
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 const RepairFrame := preload("res://scripts/home/garage_repair_frame.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const RepairAudio := preload("res://scripts/home/garage_repair_audio.gd")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const WRENCH := preload("res://assets/ui/wrenchrepair/wrenchmain.png")
 const SLIDER := preload("res://assets/ui/wrenchrepair/wrenchslider.png")
 const TARGET := preload("res://assets/ui/wrenchrepair/wrenchtarget.png")
@@ -24,6 +25,7 @@ const TARGET_FRACTION := 187.0 / 1619.0
 const BACKDROP_OPACITY := 0.85
 
 var active := false
+var audio: RepairAudio
 var _complete := false
 var _clicks := 0
 var _repaired := 0
@@ -47,7 +49,10 @@ func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_rng.randomize()
 	_build_ui()
+	audio = RepairAudio.new()
+	add_child(audio)
 	resized.connect(_layout)
+	visibility_changed.connect(_on_visibility_changed)
 	_layout()
 	hide()
 	set_process(false)
@@ -73,6 +78,7 @@ func present() -> void:
 	show()
 	_layout()
 	set_process(true)
+	audio.begin()
 
 
 func _process(delta: float) -> void:
@@ -105,6 +111,7 @@ func _submit() -> void:
 	var success := slider_center >= _target_left and slider_center <= _target_left + TARGET_FRACTION
 	if success:
 		_repaired += PlayerState.repair_hull(GameTuning.GARAGE_REPAIR_HULL_PER_SUCCESS)
+	audio.play_result(success)
 	_show_feedback(success)
 	_update_status()
 	if _clicks >= GameTuning.GARAGE_REPAIR_MAX_ATTEMPTS or PlayerState.hull >= PlayerState.max_hull:
@@ -165,10 +172,16 @@ func _finish() -> void:
 	if not active or not _complete:
 		return
 	active = false
+	audio.stop()
 	_done.release_focus()
 	hide()
 	get_viewport().set_input_as_handled()
 	finished.emit()
+
+
+func _on_visibility_changed() -> void:
+	if not is_visible_in_tree() and is_instance_valid(audio):
+		audio.stop()
 
 
 func _build_ui() -> void:
@@ -176,15 +189,15 @@ func _build_ui() -> void:
 	_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_content.size = DESIGN_SIZE
 	add_child(_content)
-	var title := _label("GARAGE REPAIRS", 23, Rect2(32, 28, 916, 42))
+	var title := _label("GARAGE REPAIRS", 28, Rect2(32, 28, 916, 42))
 	title.add_theme_color_override("font_color", Color("e5c68a"))
-	_instruction = _label("", 14, Rect2(32, 78, 916, 50))
+	_instruction = _label("", 20, Rect2(32, 78, 916, 60))
 	_instruction.add_theme_constant_override("line_spacing", 8)
 	var wrench := _art(WRENCH, MAIN_SOURCE)
 	wrench.position = ART_ORIGIN
 	_target = _art(TARGET, TARGET_SOURCE)
 	_slider = _art(SLIDER, SLIDER_SOURCE)
-	_status = _label("", 14, Rect2(32, 300, 916, 32))
+	_status = _label("", 20, Rect2(32, 300, 916, 32))
 	_status.add_theme_color_override("font_color", RepairFrame.SECONDARY_TEXT)
 	_done = Button.new()
 	_done.text = "DONE"
@@ -208,7 +221,7 @@ func _label(text: String, font_size: int, rect: Rect2) -> Label:
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", RepairFrame.TEXT)
 	label.add_theme_color_override("font_outline_color", RepairFrame.INK)
-	label.add_theme_constant_override("outline_size", 3)
+	label.add_theme_constant_override("outline_size", 1)
 	_content.add_child(label)
 	return label
 

@@ -50,6 +50,9 @@ static func _setup(phase := "morning", day := 3) -> void:
 	rider["stage_special_type"] = ""
 	rider["pickup_location"] = "station"
 	rider["pickup_variant"] = ""
+	# Seed a complete current offer so navigation does not perform legacy appearance migration.
+	rider["generic_spawn_slot"] = 0
+	rider["generic_spawn_alternate"] = false
 	PlayerState.lock_pending_trip_selection({"short": [rider], "medium": [], "long": []}, "short")
 	if phase == "midnight":
 		PlayerState.last_stage_result = {"day": day, "time_of_day": "night"}
@@ -170,6 +173,11 @@ static func _test_north_road(host: Node) -> void:
 						assert(world.map_view.visible and not world.location_view.visible and PlayerState.energy == energy_before)
 						assert(world.hub_dialogue.active_line.get("text") == world.ABANDONED_BUILDING_MESSAGE and world.hub_dialogue.bubble.tail_points.is_empty())
 						continue
+					if location_id in ["church", "school"] and phase == "night":
+						assert(cost == 0 and PlayerState.energy == energy_before)
+						assert(world.map_view.visible and not world.location_view.visible)
+						assert(world.hub_dialogue.active_line.get("text") == "It's closed." and world.hub_dialogue.bubble.tail_points.is_empty())
+						continue
 					assert(cost == (0 if location_id in ["pier", "school", "big_station"] else 1))
 					assert(PlayerState.energy == energy_before - cost, "North arrivals use the current free/paid destination rules")
 					assert(world.location_view.visible and not world.map_view.visible and world.current_location == location_id)
@@ -177,6 +185,14 @@ static func _test_north_road(host: Node) -> void:
 						assert(world.background.texture.resource_path.ends_with("constructionnight.png" if phase == "night" else "constructionday.png"))
 					elif location_id == "church":
 						assert(world.background.texture.resource_path.ends_with("churchday.png"))
+					elif location_id == "pier":
+						assert(world.background.texture.resource_path.ends_with("piernight.png" if phase == "night" else "pier.png"))
+					elif location_id == "big_station":
+						assert(world.background.texture.resource_path.ends_with("bigstationnight.png" if phase == "night" else "bigstationday.png"))
+					elif location_id == "school":
+						assert(world.background.texture.resource_path.ends_with("school.png"))
+					elif location_id == "basketball_court":
+						assert(world.background.texture.resource_path.ends_with("basketballnight.png" if phase == "night" else "basketball.png"))
 					else:
 						assert(world.background.texture is AtlasTexture)
 						assert(world.background.texture.atlas == world.map_view.get_background_texture())
@@ -186,19 +202,23 @@ static func _test_north_road(host: Node) -> void:
 					else:
 						assert(not rain.visible, "An indoor church without an authored rain mask cannot show falling rain across the pews")
 					assert(not world.entrance_button.visible and not world.store_button.visible)
-					await _key(host, KEY_ESCAPE)
+					await _pause_and_resume(host)
+					assert(world.location_view.visible and not world.map_view.visible and world.current_location == location_id, "Escape pauses without leaving the destination")
+					await _click(host, world.map_button.get_global_rect().get_center())
 					assert(world.map_view.map_region == "north" and world.map_view.visible)
 				await _travel(host, world, "town")
 				assert(world.map_view.map_region == "town" and world.visible)
 				await _travel(host, world, "north")
-				await _key(host, KEY_ESCAPE)
+				await _pause_and_resume(host)
+				assert(world.map_view.map_region == "north" and world.map_view.visible, "Escape pauses without changing map region")
+				await _click(host, world.map_view.back_button.get_global_rect().get_center())
 				assert(world.map_view.map_region == "town" and world.visible and not PauseMenuManager.visible)
 			if day >= 8:
-				original.energy -= 3
+				original.energy -= 2 if phase == "night" else 3
 			var actual := _snapshot()
 			actual.erase("saves")
 			original.erase("saves")
-			assert(actual == original, "Only the basketball court, first construction visit and church spend energy; region navigation and closed-building speech preserve other state")
+			assert(actual == original, "Only the basketball court, first construction visit and daytime church spend energy; region navigation and closed-building speech preserve other state")
 			host.get_tree().current_scene = null
 			home.free()
 			await _settle(host)
@@ -242,11 +262,15 @@ static func _test_location_phases(host: Node) -> void:
 		assert(world.background.texture.resource_path.ends_with("hospitalnight.png" if phase in ["night", "midnight"] else "hospitalday.png"))
 		var hospital_rain = world.background.get_node("StoryBackgroundWeather")
 		assert(hospital_rain._effects.indoor and hospital_rain._effects.is_raining())
-		await _key(host, KEY_ESCAPE)
-		assert(world.map_view.visible and not PauseMenuManager.visible, "Escape from a location belongs to the map before pause")
+		await _pause_and_resume(host)
+		assert(world.location_view.visible and world.current_location == "hospital", "Escape pauses without leaving Hospital")
+		await _click(host, world.map_button.get_global_rect().get_center())
+		assert(world.map_view.visible and not PauseMenuManager.visible)
 		await _travel(host, world, "park")
 		assert(world.background.texture.resource_path.ends_with("parknight.png" if phase in ["night", "midnight"] else "park.png"))
-		await _key(host, KEY_ESCAPE)
+		await _pause_and_resume(host)
+		assert(world.location_view.visible and world.current_location == "park", "Escape pauses without leaving Park")
+		await _click(host, world.map_button.get_global_rect().get_center())
 		var location_before_bar: String = world.current_location
 		var before_bar := _snapshot()
 		await _travel(host, world, "bar")
@@ -275,18 +299,24 @@ static func _test_location_phases(host: Node) -> void:
 			assert(not world.entrance_button.visible and world.exit_button.visible)
 			var indoor_rain = world.background.get_node("StoryBackgroundWeather")
 			assert(indoor_rain._effects.indoor and indoor_rain._effects.marker_texture.resource_path.ends_with("barrain_indoor.png"))
-			await _key(host, KEY_ESCAPE)
+			await _pause_and_resume(host)
+			assert(world.inside_bar and world.background.texture.resource_path.ends_with("/bar.png"), "Escape pauses without exiting the bar interior")
+			await _click(host, world.exit_button.get_global_rect().get_center())
 			assert(not world.inside_bar and world.background.texture.resource_path.ends_with("barnight.png"))
-			assert(not PauseMenuManager.visible, "The first indoor Escape exits the building without also opening pause")
-			await _key(host, KEY_ESCAPE)
+			assert(not PauseMenuManager.visible, "The Outside button exits the building")
+			await _click(host, world.map_button.get_global_rect().get_center())
 		assert(world.map_view.visible and not PauseMenuManager.visible)
-		await _key(host, KEY_ESCAPE)
+		await _pause_and_resume(host)
+		assert(world.visible and world.map_view.visible and not home.house.enabled, "Escape pauses without closing the map")
+		await _click(host, world.map_view.back_button.get_global_rect().get_center())
 		assert(not world.visible and home.house.enabled and home.map_button.visible and home.status_header.visible)
-		assert(not PauseMenuManager.visible, "Closing the map must consume the Escape that closed it")
+		assert(not PauseMenuManager.visible, "The Back button closes the map without opening pause")
 		assert(AmbientAudioManager.rain_player.get_stream_playback() == rain_playback, "Map and preview travel cannot restart the shared rain loop")
 		var paid_arrivals := 3 if phase in ["night", "midnight"] else 2
 		original.energy -= paid_arrivals
 		original.stress -= 2
+		if phase in ["night", "midnight"]:
+			original.events["bar_visited"] = true
 		var actual := _snapshot()
 		actual.erase("saves")
 		original.erase("saves")
@@ -337,8 +367,10 @@ static func _test_hub_departures(host: Node) -> void:
 			screen._close_passengers()
 			await _settle(host)
 			assert(screen.travel_map.visible and screen.travel_map.map_view.visible and screen.travel_map.current_location == pickup)
-			await _key(host, KEY_ESCAPE)
-			assert(not screen.travel_map.visible and screen.passenger_overlay.visible and not PauseMenuManager.visible, "Map Escape returns to the current pickup screen and consumes its input")
+			await _pause_and_resume(host)
+			assert(screen.travel_map.visible and screen.travel_map.map_view.visible and not screen.passenger_overlay.visible, "Escape pauses without leaving a pickup map")
+			await _click(host, screen.travel_map.map_view.back_button.get_global_rect().get_center())
+			assert(not screen.travel_map.visible and screen.passenger_overlay.visible and not PauseMenuManager.visible, "Map Back returns to the current pickup screen")
 			assert(_snapshot(false) == original)
 			screen._close_passengers()
 			await _settle(host)
@@ -401,8 +433,10 @@ static func _test_travel_confirmation(host: Node) -> void:
 	assert(not dialog.visible and world.map_view.visible and world.map_view.enabled and _snapshot() == original)
 	await _click(host, world.map_view.region_for("hospital").get_center())
 	await _key(host, KEY_ESCAPE)
-	assert(not dialog.visible and world.visible and world.map_view.visible and not PauseMenuManager.visible)
-	assert(_snapshot() == original, "Escape must cancel travel without closing the map or spending energy")
+	assert(dialog.visible and world.visible and world.map_view.visible and PauseMenuManager.is_menu_open())
+	assert(_snapshot() == original, "Escape must pause travel without spending energy or dismissing confirmation")
+	PauseMenuManager.hide_pause_menu()
+	dialog._cancel()
 	await _click(host, world.map_view.region_for("hospital").get_center())
 	for dimensions in [Vector2(1280, 720), Vector2(640, 360), Vector2(900, 900)]:
 		home.size = dimensions
@@ -461,6 +495,14 @@ static func _move(host: Node, point: Vector2) -> void:
 	event.global_position = point
 	host.get_viewport().push_input(event, true)
 	await _settle(host)
+
+
+static func _pause_and_resume(host: Node) -> void:
+	await _key(host, KEY_ESCAPE)
+	assert(PauseMenuManager.is_menu_open() and host.get_tree().paused, "Escape belongs only to the pause menu")
+	PauseMenuManager.hide_pause_menu()
+	await _settle(host)
+	assert(not PauseMenuManager.is_menu_open() and not host.get_tree().paused)
 
 
 static func _key(host: Node, key: int) -> void:

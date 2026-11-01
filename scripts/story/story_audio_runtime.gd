@@ -1,5 +1,7 @@
 extends RefCounted
 
+const PlaybackControls := preload("res://scripts/story/story_playback_controls.gd")
+
 # Story music, SFX, restoration, and volume transitions.
 
 const StoryConditions := preload("res://scripts/story/story_conditions.gd")
@@ -209,8 +211,12 @@ static func fade_audio_player_volume(owner, player: AudioStreamPlayer, duration:
 		return
 	if owner.bgm_fade_tween:
 		owner.bgm_fade_tween.kill()
+		owner.bgm_fade_tween = null
+	if duration <= 0.0 or PlaybackControls.accelerating(owner):
+		player.volume_db = to_db
+		return
 	player.volume_db = from_db
 	owner.bgm_fade_tween = owner.create_tween()
 	owner.bgm_fade_tween.tween_property(player, "volume_db", to_db, duration)
-	await owner.bgm_fade_tween.finished
+	await PlaybackControls.wait_tween(owner, owner.bgm_fade_tween)
 	owner.bgm_fade_tween = null

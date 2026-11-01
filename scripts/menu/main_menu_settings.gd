@@ -41,7 +41,7 @@ static func build_audio_panel(owner) -> void:
 	owner.audio_toggle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	owner.audio_toggle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	owner.audio_toggle_label.add_theme_font_override("font", owner.UI_FONT)
-	owner.audio_toggle_label.add_theme_font_size_override("font_size", 14)
+	owner.audio_toggle_label.add_theme_font_size_override("font_size", 22)
 	owner.audio_toggle_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
 	owner.audio_toggle_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	owner.audio_toggle_label.add_theme_constant_override("outline_size", 1)
@@ -71,7 +71,7 @@ static func build_language_button(owner) -> void:
 	owner.language_toggle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	owner.language_toggle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	owner.language_toggle_label.add_theme_font_override("font", owner.UI_FONT)
-	owner.language_toggle_label.add_theme_font_size_override("font_size", 14)
+	owner.language_toggle_label.add_theme_font_size_override("font_size", 22)
 	owner.language_toggle_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
 	owner.language_toggle_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	owner.language_toggle_label.add_theme_constant_override("outline_size", 1)

@@ -123,6 +123,13 @@ static func entry(area_id: String, character_id: String, night: bool, variant :=
 	return presentation
 
 
+static func midnight_entry(area_id: String, character_id: String) -> Dictionary:
+	# Isidro's midnight encounter reuses his authored Street placement only.
+	if area_id != "street" or character_id != "ito":
+		return {}
+	return entry(area_id, character_id, false)
+
+
 static func generic_count(area_id: String, night := false) -> int:
 	return 3 if area_id == "market" and not night else 0
 

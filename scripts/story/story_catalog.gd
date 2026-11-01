@@ -167,6 +167,9 @@ static func _character_with_progress(player_state, character_data: Dictionary) -
 			absence.get("day", 0) == player_state.get_current_day()
 			and str(absence.get("phase", "")) == player_state.get_current_time_of_day()
 		)
+	if character_id == "jessa" and str(player_state.event_values.get("jessa_second_encounter_choice", "")) == "police":
+		# Reporting her removes future offers, including saved/seeded lineups.
+		character_copy["unavailable_now"] = true
 	var intro_completion_event: String = str(character_copy.get("intro_completion_event", ""))
 	var intro_times: Variant = character_copy.get("intro_eligible_times", [])
 	var intro_completed := not intro_completion_event.is_empty() and bool(player_state.event_values.get(intro_completion_event, false))

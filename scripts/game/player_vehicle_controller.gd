@@ -2,9 +2,11 @@ extends RefCounted
 
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
 
+const ArcadePowerups := preload("res://scripts/game/arcade_powerups.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const PlayerVehicleBehavior := preload("res://scripts/game/player_vehicle_behavior.gd")
+const PlayerPassing := preload("res://scripts/game/player_passing_controller.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
 const VehicleWheelAnimation := preload("res://scripts/game/vehicle_wheel_animation.gd")
@@ -52,19 +54,15 @@ static func layout_player(owner, size: Vector2) -> void:
 	if owner.stage_traffic == "busy":
 		owner.player_x = BusyTrafficBehavior.player_x(size)
 
-	owner.player.scale = VehicleGeometry.scale_for_vehicle_in_lane(
-		owner,
-		"player_tricycle",
-		VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(GameTuning.PLAYER_FALLBACK_HEIGHT, size.y * GameTuning.PLAYER_FALLBACK_HEIGHT_RATIO)),
-		owner.player_lane
-	)
+	owner.player.scale = _target_scale(owner, size)
+	_update_draw_order(owner)
 	VehicleVisuals.apply_shadow(owner, owner.player, owner.PLAYER_HITBOX_INSET)
 	VehicleVisuals.apply_headlight(owner, owner.player, owner.PLAYER_HITBOX_INSET)
 	owner.player.position = Vector2(
 		owner.player_x,
 		VehicleGeometry.sprite_y_for_hitbox_bottom(
 			owner.player,
-			VehicleGeometry.lane_y(owner, owner.player_lane, size),
+			_target_guide_y(owner, size),
 			owner.PLAYER_HITBOX_INSET,
 			owner
 		)
@@ -72,10 +70,13 @@ static func layout_player(owner, size: Vector2) -> void:
 
 
 static func handle_speed(owner, delta: float) -> void:
-	owner.boost_active = GameInput.is_boosting() and PlayerState.boost_gas_is_available()
+	var powerups: Variant = ArcadePowerups.for_owner(owner)
+	var free_boost: bool = powerups != null and powerups.free_boost_seconds > 0.0
+	owner.boost_active = free_boost or (GameInput.is_boosting() and PlayerState.boost_gas_is_available())
 	if owner.boost_active:
 		owner.boost_speed_x = owner.player_boost_max_speed_x
-		consume_boost_gas(owner, delta)
+		if not free_boost:
+			consume_boost_gas(owner, delta)
 	else:
 		owner.boost_speed_x = move_toward(
 			owner.boost_speed_x,
@@ -126,19 +127,15 @@ static func update_player(owner, delta: float, move_forward := false) -> void:
 	elif owner.player_is_stage_clear_exiting:
 		wheel_speed = owner.stage_clear_player_exit_speed
 	VehicleWheelAnimation.update(owner.player, wheel_speed, delta)
-	var target_scale: Vector2 = VehicleGeometry.scale_for_vehicle_in_lane(
-		owner,
-		"player_tricycle",
-		VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(GameTuning.PLAYER_FALLBACK_HEIGHT, owner.get_viewport_rect().size.y * GameTuning.PLAYER_FALLBACK_HEIGHT_RATIO)),
-		owner.player_lane
-	)
+	var target_scale := _target_scale(owner, owner.get_viewport_rect().size)
 	owner.player.scale = owner.player.scale.lerp(target_scale, minf(1.0, delta * owner.player_perspective_lerp_speed))
+	_update_draw_order(owner)
 	VehicleVisuals.apply_shadow(owner, owner.player, owner.PLAYER_HITBOX_INSET)
 	VehicleVisuals.apply_headlight(owner, owner.player, owner.PLAYER_HITBOX_INSET)
 
 	var target_y: float = VehicleGeometry.sprite_y_for_hitbox_bottom(
 		owner.player,
-		VehicleGeometry.lane_y(owner, owner.player_lane, owner.get_viewport_rect().size),
+		_target_guide_y(owner, owner.get_viewport_rect().size),
 		owner.PLAYER_HITBOX_INSET,
 		owner
 	)
@@ -172,5 +169,32 @@ static func change_lane(owner, direction: int) -> void:
 		return
 	if owner.player_hit_recovery_timer > 0.0:
 		return
+	if PlayerPassing.is_active(owner):
+		return
 	owner.player_lane = PlayerVehicleBehavior.changed_lane(owner.player_lane, direction)
 	owner.player.z_index = VehicleGeometry.z_for_lane(owner, owner.player_lane, 1)
+
+
+static func _target_guide_y(owner, size: Vector2) -> float:
+	var guide: float = VehicleGeometry.lane_y(owner, owner.player_lane, size)
+	if PlayerPassing.is_active(owner):
+		var adjacent: float = VehicleGeometry.lane_y(owner, PlayerPassing.adjacent_lane(owner), size)
+		guide = lerpf(guide, adjacent, 0.5 * PlayerPassing.blend(owner))
+	return guide
+
+
+static func _target_scale(owner, size: Vector2) -> Vector2:
+	var fallback := VehicleGeometry.scale_for_height(owner.PLAYER_TEXTURE, min(GameTuning.PLAYER_FALLBACK_HEIGHT, size.y * GameTuning.PLAYER_FALLBACK_HEIGHT_RATIO))
+	var scale: Vector2 = VehicleGeometry.scale_for_vehicle_in_lane(owner, "player_tricycle", fallback, owner.player_lane)
+	if PlayerPassing.is_active(owner):
+		var adjacent: Vector2 = VehicleGeometry.scale_for_vehicle_in_lane(owner, "player_tricycle", fallback, PlayerPassing.adjacent_lane(owner))
+		scale = scale.lerp(adjacent, 0.5 * PlayerPassing.blend(owner))
+	return scale
+
+
+static func _update_draw_order(owner) -> void:
+	var depth := VehicleGeometry.z_for_lane(owner, owner.player_lane, 1)
+	if PlayerPassing.is_active(owner):
+		var adjacent := VehicleGeometry.z_for_lane(owner, PlayerPassing.adjacent_lane(owner), 1)
+		depth = roundi(lerpf(float(depth), float(adjacent), 0.5 * PlayerPassing.blend(owner)))
+	owner.player.z_index = depth

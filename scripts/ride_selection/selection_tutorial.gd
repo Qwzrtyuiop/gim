@@ -2,7 +2,7 @@ extends RefCounted
 
 # Explains a real locked offer without selecting or charging it until the end.
 const TutorialOverlayHelper := preload("res://scripts/ui/tutorial_overlay_helper.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 
 var screen
 var overlay: Control

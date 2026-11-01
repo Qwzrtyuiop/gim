@@ -61,7 +61,7 @@ static func spawn_traffic(owner, lane_index: int, spawn_side := BusyTrafficBehav
 			fallback_height = 96.0
 		2:
 			var can_spawn_parked: bool = owner.stage_traffic != "busy" or spawn_side != BusyTrafficBehavior.LEFT_SPAWN_SIDE
-			if can_spawn_parked and owner.rng.randf() < owner.shoulder_parked_chance:
+			if can_spawn_parked and owner.rng.randf() < VehicleSpawnRules.shoulder_parked_chance(owner):
 				is_parked = true
 				vehicle_key = GameRandom.choose(owner.rng, owner.PARKED_VEHICLE_KEYS)
 				world_speed = 0.0

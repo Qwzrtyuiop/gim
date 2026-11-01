@@ -2,7 +2,7 @@ extends CanvasLayer
 
 const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const ACHIEVEMENTS_LIBRARY_SCENE := "res://scenes/achievements_library.tscn"
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const NOTEBOOK_TEXTURE := preload("res://assets/ui/frames/notebookclosed.png")
 const NOTEBOOK_REGION := Rect2(224, 108, 860, 1068)
 const BUTTON_TEXTURE := preload("res://assets/ui/buttons/button_generic.png")
@@ -182,7 +182,7 @@ func _build_ui() -> void:
 		menu_panel,
 		UI_FONT,
 		Vector2(125.0, 396.0),
-		Vector2(320.0, 170.0),
+		Vector2(320.0, 204.0),
 		"AUDIO"
 	)
 
@@ -406,7 +406,7 @@ func _make_label(font_size: int, font_color: Color, outline_size: int) -> Label:
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_override("font", UI_FONT)
-	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_font_size_override("font_size", roundi(font_size * 1.4))
 	label.add_theme_color_override("font_color", font_color)
 	label.add_theme_color_override("font_outline_color", Color(0.04, 0.02, 0.01, 1.0))
 	label.add_theme_constant_override("outline_size", outline_size)
@@ -424,7 +424,7 @@ func _apply_panel_theme(panel: Panel, bg_color: Color) -> void:
 
 func _apply_flat_button_theme(button: Button) -> void:
 	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_font_size_override("font_size", 20)
 	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.17, 0.10, 0.06, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.17, 0.10, 0.06, 1.0))

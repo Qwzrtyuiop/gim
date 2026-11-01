@@ -1,7 +1,7 @@
 extends Control
 
 # Results presentation owns no rewards, calendar changes or scene transitions.
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const PlayerStatsRow := preload("res://scripts/ui/player_stats_row.gd")
 const StageState := preload("res://scripts/state/player_stage_state.gd")
 const CREAM := Color("faefd5")
@@ -43,12 +43,12 @@ func build(buttons: HBoxContainer) -> void:
 	canvas.name = "ResultsLayout"
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(canvas)
-	var caption := _label(9, GOLD, "TRIP SUMMARY")
+	var caption := _label(16, GOLD, "TRIP SUMMARY")
 	canvas.add_child(caption)
-	_place(caption, Rect2(0, 0, 460, 16))
-	heading_label = _label(24, CREAM)
+	_place(caption, Rect2(0, 0, 460, 22))
+	heading_label = _label(38, CREAM)
 	canvas.add_child(heading_label)
-	date_label = _label(11, MUTED)
+	date_label = _label(18, MUTED)
 	date_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	canvas.add_child(date_label)
 	_build_stats()
@@ -64,7 +64,7 @@ func build(buttons: HBoxContainer) -> void:
 		button.custom_minimum_size = Vector2(216, 78)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	footer_note = _label(9, MUTED)
+	footer_note = _label(16, MUTED)
 	footer_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	footer_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	canvas.add_child(footer_note)
@@ -123,7 +123,7 @@ func update_goal(total: int, completed: bool) -> void:
 		earnings_summary_label.text = "This ride earned %.1f%% of your weekly goal." % (float(total) / float(goal) * 100.0)
 	else:
 		earnings_summary_label.text = "You earned PHP %d.\nThe debt is paid off." % total
-	debt_label.text = "DEBT REMAINING\n\nPHP %d" % PlayerState.get_total_debt_goal()
+	debt_label.text = "DEBT REMAINING\nPHP %d" % PlayerState.get_total_debt_goal()
 	due_label.text = PlayerState.get_debt_due_text() if goal > 0 else "All paid."
 
 
@@ -139,7 +139,7 @@ func _build_stats() -> void:
 	stats_refs = PlayerStatsRow.create({
 		"spread": true,
 		"font": FONT,
-		"font_size": 11,
+		"font_size": 18,
 		"font_color": CREAM,
 		"outline_color": Color("181008"),
 	})
@@ -149,7 +149,7 @@ func _build_stats() -> void:
 func _build_passenger() -> void:
 	passenger_panel = _panel(Color(0.12, 0.10, 0.07, 0.97), 18)
 	var content := _stack(passenger_panel, 12)
-	content.add_child(_label(9, GOLD, "PASSENGER"))
+	content.add_child(_label(16, GOLD, "PASSENGER"))
 	portrait = TextureRect.new()
 	portrait.name = "PassengerPortrait"
 	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -158,11 +158,11 @@ func _build_passenger() -> void:
 	portrait.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	portrait.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	content.add_child(portrait)
-	passenger_name = _label(16, CREAM)
+	passenger_name = _label(26, CREAM)
 	passenger_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	passenger_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	content.add_child(passenger_name)
-	_passenger_status = _label(9, MUTED)
+	_passenger_status = _label(16, MUTED)
 	_passenger_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_passenger_status)
 
@@ -170,11 +170,11 @@ func _build_passenger() -> void:
 func _build_receipt() -> void:
 	receipt_panel = _panel(Color(0.055, 0.043, 0.03, 0.98), 24)
 	var content := _stack(receipt_panel, 14)
-	content.add_child(_label(10, GOLD, "FARE BREAKDOWN"))
-	route_label = _label(11, CREAM)
+	content.add_child(_label(18, GOLD, "FARE BREAKDOWN"))
+	route_label = _label(18, CREAM)
 	route_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	content.add_child(route_label)
-	special_label = _label(9, GOLD)
+	special_label = _label(16, GOLD)
 	content.add_child(special_label)
 	content.add_child(_divider())
 	var scroll := ScrollContainer.new()
@@ -186,9 +186,9 @@ func _build_receipt() -> void:
 	receipt_rows.add_theme_constant_override("separation", 14)
 	scroll.add_child(receipt_rows)
 	content.add_child(_divider())
-	_total_caption = _label(9, MUTED)
+	_total_caption = _label(16, MUTED)
 	content.add_child(_total_caption)
-	total_label = _label(28, GOLD)
+	total_label = _label(42, GOLD)
 	content.add_child(total_label)
 
 
@@ -197,9 +197,9 @@ func _build_goal() -> void:
 	goal_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	goal_panel.add_theme_stylebox_override("panel", _style(Color(0.075, 0.065, 0.045, 0.97), 0, 0))
 	canvas.add_child(goal_panel)
-	_goal_caption = _label(10, GOLD, "WEEKLY GOAL")
+	_goal_caption = _label(18, GOLD, "WEEKLY GOAL")
 	goal_panel.add_child(_goal_caption)
-	goal_label = _label(20, CREAM)
+	goal_label = _label(32, CREAM)
 	goal_panel.add_child(goal_label)
 	goal_progress = ProgressBar.new()
 	goal_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -210,19 +210,19 @@ func _build_goal() -> void:
 	fill.set_corner_radius_all(3)
 	goal_progress.add_theme_stylebox_override("fill", fill)
 	goal_panel.add_child(goal_progress)
-	goal_progress_label = _label(10, MUTED)
+	goal_progress_label = _label(18, MUTED)
 	goal_progress_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	goal_panel.add_child(goal_progress_label)
-	earnings_summary_label = _label(11, CREAM)
+	earnings_summary_label = _label(18, CREAM)
 	earnings_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	goal_panel.add_child(earnings_summary_label)
 	_goal_divider = ColorRect.new()
 	_goal_divider.color = Color(0.65, 0.54, 0.37, 0.4)
 	_goal_divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	goal_panel.add_child(_goal_divider)
-	debt_label = _label(11, MUTED)
+	debt_label = _label(18, MUTED)
 	goal_panel.add_child(debt_label)
-	due_label = _label(10, GOLD)
+	due_label = _label(18, GOLD)
 	due_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	goal_panel.add_child(due_label)
 
@@ -234,18 +234,18 @@ func _add_receipt_line(text: String) -> void:
 	if colon > 0 and text.left(colon).strip_edges().to_lower() == "total":
 		return
 	if colon < 0:
-		var note := _label(10, MUTED, text)
+		var note := _label(18, MUTED, text)
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		receipt_rows.add_child(note)
 		return
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 20)
 	receipt_rows.add_child(row)
-	var caption := _label(11, MUTED, text.left(colon))
+	var caption := _label(18, MUTED, text.left(colon))
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(caption)
-	var value := _label(11, CREAM, text.substr(colon + 1).strip_edges())
+	var value := _label(18, CREAM, text.substr(colon + 1).strip_edges())
 	value.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -256,43 +256,43 @@ func _layout() -> void:
 	if canvas == null:
 		return
 	var compact := size.x / maxf(size.y, 1.0) < 1.4
-	canvas.size = Vector2(840, 800) if compact else Vector2(1160, 660)
+	canvas.size = Vector2(840, 824) if compact else Vector2(1160, 684)
 	var fit := minf((size.x - 48) / canvas.size.x, (size.y - 40) / canvas.size.y)
 	fit = clampf(fit, 0.1, 1.5)
 	canvas.scale = Vector2.ONE * fit
 	canvas.position = ((size - canvas.size * fit) * 0.5).round()
 	var width := canvas.size.x
-	_place(heading_label, Rect2(0, 24, width, 36))
-	_place(date_label, Rect2(width - 250, 0, 250, 16))
+	_place(heading_label, Rect2(0, 24, width, 44))
+	_place(date_label, Rect2(width - 250, 0, 250, 22))
 	_place(_stats_panel, Rect2(0, 76, width, 48))
 	if compact:
 		_place(passenger_panel, Rect2(0, 140, 240, 360))
 		_place(receipt_panel, Rect2(256, 140, 584, 360))
 		_place(goal_panel, Rect2(0, 516, 840, 156))
 		_place(_buttons, Rect2(0, 688, width, 78))
-		_place(footer_note, Rect2(0, 776, width, 24))
-		_place(_goal_caption, Rect2(20, 18, 260, 16))
-		_place(goal_label, Rect2(20, 44, 270, 26))
-		_place(goal_progress, Rect2(20, 84, 264, 10))
-		_place(goal_progress_label, Rect2(20, 108, 270, 32))
+		_place(footer_note, Rect2(0, 776, width, 48))
+		_place(_goal_caption, Rect2(20, 14, 260, 24))
+		_place(goal_label, Rect2(20, 40, 270, 38))
+		_place(goal_progress, Rect2(20, 88, 264, 10))
+		_place(goal_progress_label, Rect2(20, 104, 270, 44))
 		_place(earnings_summary_label, Rect2(316, 24, 228, 112))
 		_place(_goal_divider, Rect2(570, 20, 1, 116))
 		_place(debt_label, Rect2(594, 24, 226, 60))
-		_place(due_label, Rect2(594, 108, 226, 32))
+		_place(due_label, Rect2(594, 104, 226, 44))
 	else:
 		_place(passenger_panel, Rect2(0, 140, 280, 380))
 		_place(receipt_panel, Rect2(296, 140, 520, 380))
 		_place(goal_panel, Rect2(832, 140, 328, 380))
 		_place(_buttons, Rect2(0, 540, width, 78))
-		_place(footer_note, Rect2(0, 632, width, 28))
-		_place(_goal_caption, Rect2(24, 24, 280, 16))
-		_place(goal_label, Rect2(24, 56, 280, 26))
+		_place(footer_note, Rect2(0, 632, width, 48))
+		_place(_goal_caption, Rect2(24, 24, 280, 24))
+		_place(goal_label, Rect2(24, 56, 280, 38))
 		_place(goal_progress, Rect2(24, 106, 280, 10))
-		_place(goal_progress_label, Rect2(24, 132, 280, 38))
+		_place(goal_progress_label, Rect2(24, 128, 280, 48))
 		_place(earnings_summary_label, Rect2(24, 190, 280, 66))
 		_place(_goal_divider, Rect2(24, 268, 280, 1))
-		_place(debt_label, Rect2(24, 292, 280, 48))
-		_place(due_label, Rect2(24, 348, 280, 20))
+		_place(debt_label, Rect2(24, 280, 280, 56))
+		_place(due_label, Rect2(24, 348, 280, 24))
 
 
 func _panel(color: Color, padding: int) -> PanelContainer:

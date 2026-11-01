@@ -3,7 +3,7 @@ extends RefCounted
 # Shared artwork for the hub status display and its navigation controls.
 const BIG_MENU := preload("res://assets/ui/buttons/dashboard/BigMenu.png")
 const SMALL_BUTTON := preload("res://assets/ui/buttons/dashboard/smallButton.png")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const INK := Color("392719")
 const BUTTON_SIZE := Vector2(168, 44)
 
@@ -22,13 +22,13 @@ static func apply_button(button: Button) -> void:
 	button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	button.add_theme_font_override("font", FONT)
-	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_font_size_override("font_size", 20)
 	for state in ["normal", "hover", "pressed", "disabled"]:
 		var style := _texture_style(SMALL_BUTTON)
 		style.content_margin_left = 30
 		style.content_margin_right = 30
-		style.content_margin_top = 13
-		style.content_margin_bottom = 11
+		style.content_margin_top = 10
+		style.content_margin_bottom = 10
 		match state:
 			"hover":
 				style.modulate_color = Color(1.13, 1.09, 0.98)

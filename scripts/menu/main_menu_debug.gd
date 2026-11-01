@@ -15,7 +15,7 @@ static func debug_unlock_all(owner) -> void:
 
 static func apply_debug_button_theme(owner, button: BaseButton) -> void:
 	button.add_theme_font_override("font", owner.UI_FONT)
-	button.add_theme_font_size_override("font_size", 10)
+	button.add_theme_font_size_override("font_size", 16)
 	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.18, 0.10, 0.06, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.18, 0.10, 0.06, 1.0))
@@ -84,7 +84,7 @@ static func build_debug_unlock_panel(owner) -> void:
 	title_label.position = Vector2(28.0, 20.0)
 	title_label.size = Vector2(460.0, 36.0)
 	title_label.add_theme_font_override("font", owner.UI_FONT)
-	title_label.add_theme_font_size_override("font_size", 18)
+	title_label.add_theme_font_size_override("font_size", 28)
 	title_label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
 	title_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	title_label.add_theme_constant_override("outline_size", 1)
@@ -141,7 +141,7 @@ static func build_debug_unlock_panel(owner) -> void:
 	all_label.text = "Unlock gallery memories only, or unlock every debug reward at once."
 	all_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	all_label.add_theme_font_override("font", owner.UI_FONT)
-	all_label.add_theme_font_size_override("font_size", 10)
+	all_label.add_theme_font_size_override("font_size", 16)
 	all_label.add_theme_color_override("font_color", Color(0.98, 0.95, 0.86, 1.0))
 	all_box.add_child(all_label)
 

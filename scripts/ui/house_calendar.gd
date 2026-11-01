@@ -6,7 +6,7 @@ const DESIGN_SIZE := Vector2(376, 668)
 const INK := Color("4b2d19")
 const RED_INK := Color("873d2c")
 const FADED_INK := Color("86603b")
-const FONT := preload("res://assets/fonts/PixelifySans-wght.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 
 var day_label: Label
@@ -24,27 +24,27 @@ var current_slot := 0
 func _ready() -> void:
 	size = DESIGN_SIZE
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_label("CALENDAR", Rect2(32, 102, 312, 22), 18, FADED_INK)
+	_label("CALENDAR", Rect2(32, 100, 312, 25), 22, FADED_INK)
 	day_label = _label("", Rect2(32, 125, 312, 68), 56, RED_INK)
-	phase_label = _label("", Rect2(32, 193, 312, 27), 23)
-	week_label = _label("", Rect2(32, 233, 312, 22), 18, FADED_INK)
+	phase_label = _label("", Rect2(32, 193, 312, 30), 26)
+	week_label = _label("", Rect2(32, 233, 312, 24), 20, FADED_INK)
 	var interval: int = maxi(1, PlayerState.DEBT_COLLECTION_INTERVAL_DAYS)
 	var cell_width := 304.0 / interval
 	for index in range(interval):
-		day_numbers.append(_label("", Rect2(36 + index * cell_width, 263, cell_width, 34), 22))
-	_label("WEEKLY GOAL", Rect2(36, 325, 304, 22), 18, FADED_INK)
-	goal_label = _label("", Rect2(36, 349, 304, 42), 34)
-	_label("DEBT REMAINING", Rect2(36, 411, 304, 22), 18, FADED_INK)
-	debt_label = _label("", Rect2(36, 435, 304, 36), 28)
+		day_numbers.append(_label("", Rect2(36 + index * cell_width, 263, cell_width, 34), 28))
+	_label("WEEKLY GOAL", Rect2(36, 325, 304, 24), 20, FADED_INK)
+	goal_label = _label("", Rect2(36, 349, 304, 42), 36)
+	_label("DEBT REMAINING", Rect2(36, 411, 304, 24), 20, FADED_INK)
+	debt_label = _label("", Rect2(36, 435, 304, 36), 30)
 	due_label = _label("", Rect2(38, 500, 300, 26), 23, RED_INK)
-	countdown_label = _label("", Rect2(38, 528, 300, 22), 18, RED_INK)
+	countdown_label = _label("", Rect2(38, 528, 300, 22), 19, RED_INK)
 	close_button = Button.new()
 	close_button.text = "PUT AWAY"
 	close_button.position = Vector2(93, 580)
 	close_button.size = Vector2(190, 38)
 	close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	close_button.add_theme_font_override("font", FONT)
-	close_button.add_theme_font_size_override("font_size", 22)
+	close_button.add_theme_font_size_override("font_size", 28)
 	for state in ["normal", "hover", "pressed", "focus"]:
 		var style := StyleBoxFlat.new()
 		style.bg_color = Color(0.30, 0.17, 0.08, 0.13 if state != "normal" else 0.0)

@@ -24,6 +24,7 @@ const BarAudio := preload("res://scripts/home/bar_audio.gd")
 const BarShop := preload("res://scripts/store/bar_shop.gd")
 const HospitalCelinaSpawn := preload("res://scripts/home/hospital_celina_spawn.gd")
 const HospitalCharacters := preload("res://scripts/home/hospital_characters.gd")
+const BasketballPlayers := preload("res://scripts/home/basketball_players.gd")
 const HospitalAudio := preload("res://scripts/home/hospital_audio.gd")
 const HospitalEncounter := preload("res://scripts/home/hospital_encounter.gd")
 const HospitalShop := preload("res://scripts/store/hospital_shop.gd")
@@ -34,6 +35,7 @@ const HubStoryOverlay := preload("res://scripts/home/hub_story_overlay.gd")
 const StoryPayloadCatalog := preload("res://scripts/story/story_payload_catalog.gd")
 const ChurchPrayerEncounter := preload("res://scripts/home/church_prayer_encounter.gd")
 const ParkVisitEncounter := preload("res://scripts/home/park_visit_encounter.gd")
+const BasketballVisitEncounter := preload("res://scripts/home/basketball_visit_encounter.gd")
 const ChurchAudio := preload("res://scripts/home/church_audio.gd")
 const PierAudio := preload("res://scripts/home/pier_audio.gd")
 const AlmaDelivery := preload("res://scripts/home/alma_delivery_encounter.gd")
@@ -61,6 +63,9 @@ const NORTH_ROAD_CLOSED_MESSAGE := "There's road construction ahead. I can't get
 const BACKGROUNDS := {
 	"garage": ["garagenormal.png", "garagenight.png"],
 	"pier": ["pier.png", "piernight.png"],
+	"big_station": ["bigstationday.png", "bigstationnight.png"],
+	"school": ["school.png", "school.png"],
+	"basketball_court": ["basketball.png", "basketballnight.png"],
 	"market": ["market.png", "marketnight.png"],
 	"street": ["passengerstreetday.png", "passengerstreetnight.png", "passengerstreetmidnight.png"],
 	"park": ["park.png", "parknight.png"],
@@ -76,6 +81,7 @@ var background: TextureRect
 var bar_characters: BarCharacters
 var celina_spawn: HospitalCelinaSpawn
 var hospital_characters: HospitalCharacters
+var basketball_players: BasketballPlayers
 var hospital_audio: HospitalAudio
 var construction_spawn: ConstructionBennySpawn
 var construction_audio: ConstructionAudio
@@ -216,6 +222,7 @@ func open(origin: String = "home", initial_location: String = "") -> void:
 func _show_map() -> void:
 	if _has_activity_overlay():
 		return
+	basketball_players.set_active(false)
 	church_audio.set_active(false)
 	pier_audio.set_active(false)
 	_close_bar_shop()
@@ -305,8 +312,8 @@ func _dismiss_travel_confirmation() -> void:
 func _visit(location_id: String) -> void:
 	if _has_activity_overlay():
 		return
-	if location_id == "church" and PlayerState.get_current_time_of_day() == "night":
-		_show_location_message("It's closed.", "map_church")
+	if location_id in ["church", "school"] and PlayerState.get_current_time_of_day() == "night":
+		_show_location_message("It's closed.", "map_" + location_id)
 		return
 	if _daily_visit_blocked(location_id):
 		if map_view.buttons.has(location_id):
@@ -390,6 +397,8 @@ func _visit(location_id: String) -> void:
 			location_visit_story_id = ChurchPrayerEncounter.record_visit()
 			if not location_visit_story_id.is_empty():
 				PlayerState.relieve_stress(PlayerState.get_church_stress_relief())
+		elif location_id == "basketball_court":
+			location_visit_story_id = BasketballVisitEncounter.record_visit()
 	_mark_location_passenger_absence(location_id)
 	PlayerState._end_state_batch()
 	current_location = location_id
@@ -420,6 +429,7 @@ func _visit(location_id: String) -> void:
 		background.texture = load(art_path if art_path.begins_with("res://") else LOCATIONS + art_path) as Texture2D
 	BackgroundWeather.apply(background, map_crop)
 	_refresh_rain_environment()
+	basketball_players.set_active(location_id == "basketball_court" and BasketballVisitEncounter.players_visible())
 	garage_tricycle.visible = location_id == "garage"
 	pier_dock.visible = location_id == "pier"
 	pier_shop.visible = location_id == "pier"
@@ -848,6 +858,7 @@ func _play_hub_story(story_id: String) -> void:
 	var payload := StoryPayloadCatalog.build(story_id)
 	if payload.is_empty():
 		return
+	BasketballVisitEncounter.configure_payload(payload)
 	# Standalone slot resumes return here through Home, which restores the
 	# recorded map/site without charging travel for a second time.
 	payload["return_scene"] = HOME_SCENE
@@ -1032,6 +1043,8 @@ func _build_location_view() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	location_view.add_child(background)
 	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	basketball_players = BasketballPlayers.new()
+	basketball_players.setup(background)
 	garage_tricycle = GarageTricycleHotspot.new()
 	garage_tricycle.tooltip_text = "Attempt repairs: -%d energy, up to +%d condition" % [GameTuning.GARAGE_REPAIR_ENERGY_COST, GameTuning.GARAGE_REPAIR_MAX_ATTEMPTS * GameTuning.GARAGE_REPAIR_HULL_PER_SUCCESS]
 	background.add_child(garage_tricycle)
@@ -1099,6 +1112,7 @@ func _build_location_view() -> void:
 	hub_dialogue.register_control("map_bar", map_view.buttons.bar)
 	hub_dialogue.register_control("map_hospital", map_view.buttons.hospital)
 	hub_dialogue.register_control("map_church", map_view.buttons.church)
+	hub_dialogue.register_control("map_school", map_view.buttons.school)
 	hub_dialogue.register_control("map_north", map_view.buttons.north)
 	bar_characters.setup_dialogue(hub_dialogue)
 	hospital_characters.setup_dialogue(hub_dialogue)

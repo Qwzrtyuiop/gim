@@ -1,6 +1,8 @@
 extends RefCounted
 
 # Slot-only live driving state. Normal cross-scene checkpoints retain their own flow.
+const ArcadePowerups := preload("res://scripts/game/arcade_powerups.gd")
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const StageSetup := preload("res://scripts/game/game_stage_setup.gd")
 const StageProfiles := preload("res://scripts/game/stage_profiles.gd")
 const Visuals := preload("res://scripts/game/vehicle_visuals.gd")
@@ -13,6 +15,7 @@ const OWNER_FIELDS := [
 	"distance", "target_distance", "rolled_target_distance", "rolled_target_stage_type",
 	"time_left", "time_limit", "overtime_seconds", "overtime_fare_penalty_php_per_second",
 	"player_lane", "player_speed", "player_x", "boost_active", "boost_speed_x", "boost_gas_save_timer",
+	"player_passing_time_left", "player_passing_cooldown", "player_passing_blend", "player_passing_origin_lane",
 	"player_hit_recovery_timer", "player_hit_invincible_timer", "player_hit_flicker_timer", "player_hit_flicker_visible",
 	"passenger_rule_violation_count", "trip_peak_speed_kmh", "trip_vehicle_collision_count",
 	"spawn_timers", "top_lane_pressure", "speeder_spawn_timer", "speeder_warning_active", "speeder_warning_timer",
@@ -59,7 +62,7 @@ static func capture(game) -> Dictionary:
 		var texture: Texture2D = game.background_scroller.tiles[0].get("texture")
 		if texture != null:
 			background_path = texture.resource_path
-	return {
+	var snapshot: Dictionary = {
 		"version": 1,
 		"stress_modifiers": PlayerState.get_stress_vehicle_modifiers(),
 		"values": values,
@@ -73,6 +76,10 @@ static func capture(game) -> Dictionary:
 		"jam_count": int(game.traffic_jam_gaps.get("_convoy_count")),
 		"jam_limit": int(game.traffic_jam_gaps.get("_convoy_limit")),
 	}
+	var powerups: Variant = ArcadePowerups.for_owner(game)
+	if powerups != null:
+		snapshot["arcade_powerups"] = powerups.snapshot()
+	return snapshot
 
 
 static func restore(game, data: Dictionary) -> bool:
@@ -86,6 +93,9 @@ static func restore(game, data: Dictionary) -> bool:
 		if not entry is Dictionary or not game.VEHICLE_TEXTURES.has(str(entry.get("vehicle_key", ""))) or not entry.get("_sprite") is Dictionary:
 			return false
 	var values: Dictionary = data.values
+	var passing := _passing_state(values)
+	if passing.is_empty():
+		return false
 	var pressure: Variant = values.get("top_lane_pressure", 0.0)
 	if not (pressure is int or pressure is float) or not is_finite(float(pressure)):
 		return false
@@ -116,6 +126,9 @@ static func restore(game, data: Dictionary) -> bool:
 	game.truck_horn_cooldown = maxf(0.0, float(truck_cooldown))
 	game.truck_horn_wave = _copy_value(wave)
 	game.delivery_tutorial_seen = bool(values.get("delivery_tutorial_seen", false))
+	# Optional live fields default independently of the previously loaded ride.
+	for field: String in passing:
+		game.set(field, passing[field])
 	StageSetup.restore_stress_modifier_base(game, saved_modifiers)
 	var viewport: Vector2 = game.get_viewport_rect().size
 	var saved_viewport: Vector2 = data.get("viewport", viewport)
@@ -159,10 +172,38 @@ static func restore(game, data: Dictionary) -> bool:
 	game.stage_tutorial.timer_started = true
 	game.passenger_dialogue_controller.clear()
 	TrafficIndex.invalidate(game)
+	var powerups: Variant = ArcadePowerups.for_owner(game)
+	if powerups != null:
+		var saved_powerups: Variant = data.get("arcade_powerups", {})
+		powerups.restore(saved_powerups if saved_powerups is Dictionary else {}, ratio)
 	# Reconstruction may allocate visual resources, but must not advance driving RNG.
 	game.rng.seed = int(data.get("rng_seed", str(game.rng.seed)))
 	game.rng.state = int(data.get("rng_state", str(game.rng.state)))
 	return true
+
+
+static func _passing_state(values: Dictionary) -> Dictionary:
+	var passing: Dictionary = {}
+	var limits := {
+		"player_passing_time_left": GameTuning.PLAYER_PASSING_SECONDS,
+		"player_passing_cooldown": GameTuning.PLAYER_PASSING_COOLDOWN_SECONDS,
+		"player_passing_blend": 1.0,
+	}
+	for field: String in limits:
+		var value: Variant = values.get(field, 0.0)
+		if not (value is int or value is float) or not is_finite(float(value)):
+			return {}
+		passing[field] = clampf(float(value), 0.0, float(limits[field]))
+	var origin: Variant = values.get("player_passing_origin_lane", -1)
+	if not origin is int or int(origin) < -1 or int(origin) > 2:
+		return {}
+	var active := float(passing.player_passing_time_left) > 0.0 or float(passing.player_passing_blend) > 0.0
+	if active:
+		var lane: Variant = values.get("player_lane")
+		if not lane is int or int(origin) < 0 or int(origin) != int(lane):
+			return {}
+	passing["player_passing_origin_lane"] = int(origin) if active else -1
+	return passing
 
 
 static func _restart_warnings(game, warning_index: int) -> void:

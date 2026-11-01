@@ -2,11 +2,12 @@ extends RefCounted
 
 # Dialogue, choice controls, visual theme, and debt overlays.
 
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
 const StoryConditions := preload("res://scripts/story/story_conditions.gd")
 const StoryDebtTransition := preload("res://scripts/story/story_debt_transition.gd")
 const PlayerDebtState := preload("res://scripts/state/player_debt_state.gd")
+const StoryPlaybackControls := preload("res://scripts/story/story_playback_controls.gd")
 const DEFAULT_CONTINUE_HINT := "ENTER / CLICK"
 const DIALOGUE_PANEL_COLOR := Color(0.09, 0.08, 0.07, 0.92)
 const DIALOGUE_PANEL_BORDER := Color(0.71, 0.58, 0.39, 0.95)
@@ -18,13 +19,63 @@ const CHOICE_BUTTON_PRESSED_BG := Color(0.28, 0.45, 0.28, 0.98)
 const CHOICE_BUTTON_BORDER := Color(0.13, 0.09, 0.06, 0.98)
 
 
+static func build_playback_controls(owner) -> Button:
+	var skip := Button.new()
+	skip.name = "SkipStory"
+	skip.text = "SKIP"
+	skip.tooltip_text = "Skip to the next choice or the end of this scene"
+	skip.focus_mode = Control.FOCUS_NONE
+	skip.mouse_filter = Control.MOUSE_FILTER_STOP
+	skip.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	skip.z_index = 101
+	skip.add_theme_font_override("font", UI_FONT)
+	skip.add_theme_font_size_override("font_size", 18)
+	skip.add_theme_color_override("font_color", Color("faefd5"))
+	skip.add_theme_color_override("font_hover_color", Color("f2cd82"))
+	skip.add_theme_color_override("font_pressed_color", Color("d6b876"))
+	skip.add_theme_color_override("font_disabled_color", Color("837b69"))
+	skip.add_theme_color_override("font_outline_color", Color.BLACK)
+	skip.add_theme_constant_override("outline_size", 1)
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.04, 0.035, 0.025, 0.4 if state == "hover" else 0.24)
+		style.set_corner_radius_all(4)
+		skip.add_theme_stylebox_override(state, style)
+	skip.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
+	owner.add_child(skip)
+	skip.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	skip.offset_left = -142
+	skip.offset_top = 22
+	skip.offset_right = -22
+	skip.offset_bottom = 60
+	skip.pressed.connect(owner._request_story_skip)
+	UIAudioManager.attach_button(skip)
+	var hint := Label.new()
+	hint.name = "FastForwardHint"
+	hint.text = "Ctrl: fast forward"
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hint.position = Vector2(-140, 42)
+	hint.size = Vector2(260, 20)
+	apply_label_theme(hint, 13, Color("d5cbb7"), Color.BLACK, 1)
+	skip.add_child(hint)
+	# Leave the top-right controls clear when the story shows its debt reminder.
+	owner.debt_overlay.position.y = maxf(96.0, owner.debt_overlay.position.y)
+	return skip
+
+
 static func apply_line_text(owner, line: Dictionary) -> void:
 	var speaker := str(line.get("speaker", ""))
 	var body_text := str(line.get("text", ""))
 	var continue_text := str(line.get("continue_hint", DEFAULT_CONTINUE_HINT))
 	set_dialogue_content(owner, speaker, body_text, continue_text, true)
 	if is_instance_valid(owner.get("dialogue_playback")):
-		owner.dialogue_playback.start(owner.story_payload, line, speaker)
+		var playback_line := line
+		if StoryPlaybackControls.accelerating(owner):
+			playback_line = line.duplicate(true)
+			playback_line["typewriter"] = false
+		owner.dialogue_playback.start(owner.story_payload, playback_line, speaker)
 	# Authored introductions can control the label without changing the speaker
 	# identity used for portraits or saved passenger progress.
 	if line.has("speaker_display_name"):
@@ -57,7 +108,7 @@ static func render_choices(owner, line: Dictionary) -> void:
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		apply_label_theme(label, 12, Color(0.95, 0.84, 0.62), Color.BLACK, 1)
+		apply_label_theme(label, 20, Color(0.95, 0.84, 0.62), Color.BLACK, 1)
 		label.add_theme_constant_override("line_spacing", 8)
 		details_panel.add_child(label)
 		owner.choice_container.add_child(details_panel)
@@ -136,6 +187,7 @@ static func apply_theme(owner) -> void:
 	owner.background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	owner.background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	owner.background_fade_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owner.fade_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	owner.chapter_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	owner.debt_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	owner.left_portrait_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -144,12 +196,12 @@ static func apply_theme(owner) -> void:
 	owner.speaker_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	owner.body_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	owner.continue_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	apply_label_theme(owner.chapter_label, 12, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 2)
-	apply_label_theme(owner.debt_remaining_label, 11, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 2)
-	apply_label_theme(owner.debt_due_label, 10, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
-	apply_label_theme(owner.speaker_label, 16, Color(0.96, 0.84, 0.56, 1.0), Color.BLACK, 2)
-	apply_label_theme(owner.body_label, 13, Color(0.98, 0.96, 0.90, 1.0), Color.BLACK, 2)
-	apply_label_theme(owner.continue_label, 10, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
+	apply_label_theme(owner.chapter_label, 20, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 1)
+	apply_label_theme(owner.debt_remaining_label, 18, Color(0.96, 0.92, 0.78, 1.0), Color.BLACK, 1)
+	apply_label_theme(owner.debt_due_label, 16, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
+	apply_label_theme(owner.speaker_label, 26, Color(0.96, 0.84, 0.56, 1.0), Color.BLACK, 1)
+	apply_label_theme(owner.body_label, 22, Color(0.98, 0.96, 0.90, 1.0), Color.BLACK, 1)
+	apply_label_theme(owner.continue_label, 16, Color(0.88, 0.84, 0.74, 1.0), Color.BLACK, 1)
 	owner.left_portrait_frame.visible = false
 	owner.right_portrait_frame.visible = false
 	owner.dialogue_panel.visible = false
@@ -178,7 +230,7 @@ static func apply_label_theme(label: Label, font_size: int, font_color: Color, o
 
 static func apply_choice_button_theme(button: Button) -> void:
 	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 12)
+	button.add_theme_font_size_override("font_size", 20)
 	button.add_theme_color_override("font_color", Color(0.98, 0.95, 0.88, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.16, 0.10, 0.06, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.10, 0.08, 0.05, 1.0))
@@ -217,7 +269,7 @@ static func show_weekly_debt_transition(owner) -> void:
 	owner.add_child(owner.weekly_debt_transition)
 	owner.weekly_debt_transition.setup(PlayerDebtState.first_week_transition_report(PlayerState))
 	owner.dialogue_panel.visible = false
-	await owner.weekly_debt_transition.play()
+	await owner.weekly_debt_transition.play(owner)
 
 
 static func hide_weekly_debt_transition(owner) -> void:
@@ -241,6 +293,8 @@ static func show_debt_overlay(owner, overlay_data) -> void:
 		PlayerState.get_debt_due_text(display_day)
 	))
 	var fade_duration := float(config.get("fade_in", config.get("duration", 0.24)))
+	if StoryPlaybackControls.accelerating(owner):
+		fade_duration = 0.0
 	if owner.debt_overlay_tween:
 		owner.debt_overlay_tween.kill()
 	owner.debt_overlay.visible = true
@@ -250,7 +304,7 @@ static func show_debt_overlay(owner, overlay_data) -> void:
 		return
 	owner.debt_overlay_tween = owner.create_tween()
 	owner.debt_overlay_tween.tween_property(owner.debt_overlay, "modulate:a", 1.0, fade_duration)
-	await owner.debt_overlay_tween.finished
+	await StoryPlaybackControls.wait_tween(owner, owner.debt_overlay_tween)
 	owner.debt_overlay_tween = null
 
 
@@ -260,6 +314,8 @@ static func hide_debt_overlay(owner, overlay_data) -> void:
 		fade_duration = float((overlay_data as Dictionary).get("fade_out", (overlay_data as Dictionary).get("duration", fade_duration)))
 	elif overlay_data != null:
 		fade_duration = float(overlay_data)
+	if StoryPlaybackControls.accelerating(owner):
+		fade_duration = 0.0
 	if not owner.debt_overlay.visible:
 		return
 	if owner.debt_overlay_tween:
@@ -270,7 +326,7 @@ static func hide_debt_overlay(owner, overlay_data) -> void:
 		return
 	owner.debt_overlay_tween = owner.create_tween()
 	owner.debt_overlay_tween.tween_property(owner.debt_overlay, "modulate:a", 0.0, fade_duration)
-	await owner.debt_overlay_tween.finished
+	await StoryPlaybackControls.wait_tween(owner, owner.debt_overlay_tween)
 	owner.debt_overlay.visible = false
 	owner.debt_overlay.modulate = Color(1.0, 1.0, 1.0, 0.0)
 	owner.debt_overlay_tween = null

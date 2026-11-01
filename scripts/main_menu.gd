@@ -16,7 +16,7 @@ const SaveGameContext := preload("res://scripts/save/save_game_context.gd")
 const LOAD_BUTTON_TEXTURE := preload("res://assets/ui/buttons/button_generic.png")
 const Scene01IntroPayloadEnglish := preload("res://scripts/story/payloads/intro/scene_01_intro.gd")
 const Scene01IntroPayloadTagalog := preload("res://scripts/story/payloads/intro/scene_01_intro_tagalog.gd")
-const UI_FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const UI_FONT := preload("res://assets/fonts/game_font.tres")
 const VEHICLE_TEXTURES := {
 	"blue_truck": preload("res://assets/vehicles/blue_truck.png"),
 	"gray_sedan": preload("res://assets/vehicles/gray_sedan.png"),
@@ -31,6 +31,7 @@ const HIGH_STRESS_WARNING := "Start the day with high stress?\nYour vehicle will
 const START_FADE_SECONDS := 0.35
 
 @onready var start_button: BaseButton = $Menu/StartButton
+@onready var arcade_mode_checkbox: CheckBox = $ArcadeModeCheckBox
 @onready var quit_button: BaseButton = $Menu/QuitButton
 @onready var gallery_button: BaseButton = $Menu/GalleryButton
 @onready var gallery_label: Label = $Menu/GalleryButton/GalleryLabel
@@ -123,7 +124,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event.is_action_pressed("ui_accept"):
-		if gallery_button.has_focus():
+		if arcade_mode_checkbox.has_focus():
+			return
+		elif gallery_button.has_focus():
 			_open_gallery_library()
 		elif achievements_button.has_focus():
 			_open_achievements_library()
@@ -141,7 +144,9 @@ func _start_game() -> void:
 	if is_start_transitioning:
 		return
 
+	var arcade_mode_enabled := arcade_mode_checkbox.button_pressed
 	PlayerState.reset()
+	PlayerState.set_arcade_mode_enabled(arcade_mode_enabled)
 	PlayerState.begin_stage_sequence()
 	if PlayerState.stress >= GameTuning.STRESS_WARNING_THRESHOLD:
 		start_confirm_dialog.popup_centered()
@@ -158,6 +163,7 @@ func _confirm_start_game() -> void:
 
 	is_start_transitioning = true
 	start_button.disabled = true
+	arcade_mode_checkbox.disabled = true
 	load_button.disabled = true
 	quit_button.disabled = true
 	gallery_button.disabled = true
@@ -197,7 +203,7 @@ func _build_save_slot_screen() -> void:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_override("font", UI_FONT)
-	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_font_size_override("font_size", 22)
 	label.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
 	label.add_theme_color_override("font_outline_color", Color.BLACK)
 	label.add_theme_constant_override("outline_size", 1)
@@ -273,7 +279,7 @@ func _refresh_load_availability() -> void:
 
 
 func _menu_controls() -> Array[BaseButton]:
-	return [start_button, quit_button, gallery_button, achievements_button, debug_unlock_all_button, audio_toggle_button, language_toggle_button, load_button]
+	return [start_button, arcade_mode_checkbox, quit_button, gallery_button, achievements_button, debug_unlock_all_button, audio_toggle_button, language_toggle_button, load_button]
 
 
 func _quit_game() -> void:
@@ -310,7 +316,7 @@ func _create_dialogs() -> void:
 
 func _apply_button_font(button: BaseButton) -> void:
 	button.add_theme_font_override("font", UI_FONT)
-	button.add_theme_font_size_override("font_size", 18)
+	button.add_theme_font_size_override("font_size", 28)
 	button.add_theme_color_override("font_color", Color(0.98, 0.94, 0.74, 1.0))
 	button.add_theme_color_override("font_hover_color", Color(0.18, 0.08, 0.05, 1.0))
 	button.add_theme_color_override("font_pressed_color", Color(0.18, 0.08, 0.05, 1.0))

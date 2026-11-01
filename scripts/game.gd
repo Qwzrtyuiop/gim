@@ -25,6 +25,8 @@ const GameFlowController := preload("res://scripts/game/game_flow_controller.gd"
 const RideStoryInterruption := preload("res://scripts/game/ride_story_interruption.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const PlayerHorn := preload("res://scripts/game/player_horn_controller.gd")
+const PlayerPassing := preload("res://scripts/game/player_passing_controller.gd")
+const ArcadePowerups := preload("res://scripts/game/arcade_powerups.gd")
 const AlmaDeliveryEquipment := preload("res://scripts/game/alma_delivery_equipment.gd")
 const GameRenderer := preload("res://scripts/game/game_renderer.gd")
 const GameStageSetup := preload("res://scripts/game/game_stage_setup.gd")
@@ -328,6 +330,10 @@ var night_visibility_material: ShaderMaterial
 var headlight_cone_texture: Texture2D
 var player: Sprite2D
 var player_lane := GameTuning.PLAYER_START_LANE
+var player_passing_time_left := 0.0
+var player_passing_cooldown := 0.0
+var player_passing_blend := 0.0
+var player_passing_origin_lane := -1
 var player_speed := 0.0
 var distance := 0.0
 var time_left := 0.0
@@ -369,6 +375,7 @@ var truck_horn_cooldown := 0.0
 var truck_horn_wave: Dictionary = {}
 var delivery_tutorial_seen := false
 var alma_delivery_equipment: AlmaDeliveryEquipment
+var arcade_powerups: ArcadePowerups
 var fade_rect: ColorRect
 var stage_tutorial
 var passenger_dialogue_controller
@@ -451,6 +458,9 @@ func _ready() -> void:
 	GameEnvironmentController.create_noon_glow(self, NOON_GLOW_SHADER_CODE)
 	GameEnvironmentController.create_night_visibility_mask(self, NIGHT_VISIBILITY_SHADER_CODE)
 	GameEnvironmentController.create_ui(self, gameplay_entry_fade_seconds)
+	arcade_powerups = ArcadePowerups.new()
+	add_child(arcade_powerups)
+	arcade_powerups.setup(self)
 	passenger_rule_violation_count = 0
 	passenger_dialogue_controller = PassengerDialogueControllerData.new()
 	passenger_dialogue_controller.setup(self, game_hud.get_ui_root())
@@ -482,6 +492,8 @@ func _notification(what: int) -> void:
 		PlayerHorn.stop(self)
 	if what == NOTIFICATION_WM_SIZE_CHANGED:
 		GameEnvironmentController.layout_scene(self)
+		if arcade_powerups != null:
+			arcade_powerups.refresh_layout()
 		queue_redraw()
 
 
@@ -530,7 +542,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.is_action_pressed("ui_down") or event.keycode == KEY_S:
 			PlayerVehicleController.change_lane(self, 1)
 		elif event.keycode == KEY_SPACE or event.keycode == KEY_R:
-			if game_state == "YOU MADE IT":
+			if event.keycode == KEY_SPACE and game_state == "playing":
+				PlayerPassing.try_start(self)
+				get_viewport().set_input_as_handled()
+			elif game_state == "YOU MADE IT":
 				GameFlowController.go_to_profit_screen(self)
 			elif game_state != "playing":
 				GameFlowController.try_retry_stage(self)
@@ -570,6 +585,8 @@ func _process(delta: float) -> void:
 		return
 
 	if game_state == "playing":
+		arcade_powerups.tick_effects(delta)
+		PlayerPassing.update(self, delta)
 		_update_player_hit_state(delta)
 		if player_hit_recovery_timer > 0.0:
 			player_speed = 0.0
@@ -595,6 +612,7 @@ func _process(delta: float) -> void:
 		VehicleTrafficController.update_overtake_speed_boosts(self, delta)
 		VehicleTrafficController.update_entities(self, delta)
 		PlayerVehicleController.update_player(self, delta)
+		arcade_powerups.update_pickups(delta)
 		if passenger_dialogue_controller != null:
 			passenger_dialogue_controller.update(self, delta)
 		var collision: Dictionary = VehicleCollisionController.collision_data(self)

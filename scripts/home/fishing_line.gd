@@ -1,6 +1,7 @@
 extends RefCounted
 
 # Verlet positions use water-height units so horizontal and vertical lengths agree.
+const GameTuning := preload("res://scripts/config/game_tuning.gd")
 const WATER_ASPECT := 1665.0 / 585.0
 const SEGMENTS := 20
 const MIN_LENGTH := 0.04
@@ -70,27 +71,71 @@ func pull_available(distance: float, anchor: Vector2, sideways: float) -> void:
 	if _points.is_empty() or distance <= 0.0:
 		return
 	var start := _to_space(anchor)
-	var span: Vector2 = _points.back() - start
-	var direction: Vector2 = span.normalized() if span.length() > 0.0001 else Vector2.DOWN
-	# A fish pulls the endpoint outward, taking up slack before drawing new line.
-	direction = direction.lerp(Vector2(sideways * WATER_ASPECT, 1.0).normalized(), 0.04).normalized()
-	var reach := minf(length, span.length() + distance)
-	var maximum_y := MAX_HOOK_DEPTH - start.y
-	var next_span: Vector2 = direction * reach
-	if next_span.y > maximum_y:
-		# At the bottom, fight sideways so the remaining line can still become taut.
-		next_span.y = maximum_y
-		var horizontal := sqrt(maxf(0.0, reach * reach - maximum_y * maximum_y))
-		var side := signf(span.x) if absf(span.x) > 0.01 else (-1.0 if sideways < 0.0 else 1.0)
-		if start.x + horizontal * side > MAX_X * WATER_ASPECT or start.x + horizontal * side < MIN_X * WATER_ASPECT:
-			side *= -1.0
-		next_span.x = horizontal * side
-	_shape_between(start, start + next_span)
+	var endpoint: Vector2 = _points.back()
+	if is_taut(anchor) and not is_zero_approx(sideways):
+		_swing_taut_endpoint(start, endpoint, distance, sideways)
+		return
+	# Spend available slack on depth first, then allow a small lateral struggle.
+	# Never reconstruct or flip the entire span when a fish reaches the bottom.
+	var horizontal := endpoint.x - start.x
+	var reachable_depth := start.y + sqrt(maxf(0.0, length * length - horizontal * horizontal))
+	var next_depth := minf(endpoint.y + distance, minf(MAX_HOOK_DEPTH, reachable_depth))
+	next_depth = maxf(endpoint.y, next_depth)
+	var vertical := next_depth - start.y
+	var horizontal_room := sqrt(maxf(0.0, length * length - vertical * vertical))
+	var left := maxf(MIN_X * WATER_ASPECT, start.x - horizontal_room)
+	var right := minf(MAX_X * WATER_ASPECT, start.x + horizontal_room)
+	var lateral := sideways * WATER_ASPECT
+	var edge_margin := 0.06 * WATER_ASPECT
+	if endpoint.x < MIN_X * WATER_ASPECT + edge_margin:
+		lateral = absf(lateral)
+	elif endpoint.x > MAX_X * WATER_ASPECT - edge_margin:
+		lateral = -absf(lateral)
+	var lateral_scale := 0.25 if endpoint.y < MAX_HOOK_DEPTH - 0.02 else 1.0
+	var next_x := clampf(endpoint.x + lateral * distance * lateral_scale, left, right)
+	_shape_between(start, Vector2(next_x, next_depth))
+
+
+func _swing_taut_endpoint(anchor: Vector2, endpoint: Vector2, distance: float, sideways: float) -> void:
+	var span := endpoint - anchor
+	var radius := minf(length, span.length())
+	if radius <= 0.00001:
+		return
+	# Rotate along the paid-out radius instead of locking X at the deepest point.
+	# The angular step is small and time-limited, so a struggle cannot jump upward.
+	var angle := atan2(span.x, span.y)
+	var angular_limit := maxf(GameTuning.FISHING_TAUT_SWING_MAX_ANGLE, absf(angle))
+	var bottom_angle := acos(clampf((MAX_HOOK_DEPTH - anchor.y) / radius, 0.0, 1.0))
+	if bottom_angle > 0.0:
+		angular_limit = maxf(angular_limit, bottom_angle + 0.2)
+	var depth_limit := acos(clampf((MIN_HOOK_DEPTH - anchor.y) / radius, 0.0, 1.0))
+	var left := maxf(-minf(angular_limit, depth_limit), asin(clampf((MIN_X * WATER_ASPECT - anchor.x) / radius, -1.0, 1.0)))
+	var right := minf(minf(angular_limit, depth_limit), asin(clampf((MAX_X * WATER_ASPECT - anchor.x) / radius, -1.0, 1.0)))
+	# A long line at the seabed has two valid arcs. Stay on the current side.
+	if bottom_angle > 0.0:
+		if angle < 0.0:
+			right = minf(right, -bottom_angle)
+		else:
+			left = maxf(left, bottom_angle)
+	if left > right:
+		return
+	var direction := signf(sideways)
+	if angle <= left + 0.001:
+		direction = 1.0
+	elif angle >= right - 0.001:
+		direction = -1.0
+	var intensity := clampf(absf(sideways) * WATER_ASPECT, 0.35, 1.0)
+	var angular_step := minf(distance * intensity * GameTuning.FISHING_TAUT_SWING_GAIN / maxf(radius, 0.08), GameTuning.FISHING_TAUT_SWING_MAX_SPEED * _last_delta)
+	var next_angle := clampf(angle + direction * angular_step, left, right)
+	_shape_between(anchor, anchor + Vector2(sin(next_angle), cos(next_angle)) * radius)
 
 
 func _shape_between(anchor: Vector2, endpoint: Vector2) -> void:
 	var span := endpoint - anchor
 	var perpendicular := Vector2(-span.y, span.x).normalized()
+	var water_center := Vector2((MIN_X + MAX_X) * WATER_ASPECT * 0.5, (ANCHOR_DEPTH + MAX_HOOK_DEPTH) * 0.5)
+	if perpendicular.dot(water_center - anchor.lerp(endpoint, 0.5)) < 0.0:
+		perpendicular = -perpendicular
 	var low := 0.0
 	var high := length * 0.5
 	# Preserve the paid-out length as a slack curve without teleporting the fish.
@@ -100,7 +145,7 @@ func _shape_between(anchor: Vector2, endpoint: Vector2) -> void:
 		var previous := anchor
 		for index in range(1, SEGMENTS + 1):
 			var amount := float(index) / SEGMENTS
-			var point := anchor.lerp(endpoint, amount) + perpendicular * sin(amount * PI) * amplitude
+			var point := _bounded_position(anchor.lerp(endpoint, amount) + perpendicular * sin(amount * PI) * amplitude, index == SEGMENTS)
 			arc += previous.distance_to(point)
 			previous = point
 		if arc <= length:
@@ -118,6 +163,7 @@ func _shape_between(anchor: Vector2, endpoint: Vector2) -> void:
 func step(delta: float, anchor: Vector2, current: float, fight: float = 0.0, hooked: bool = false, fight_strength: float = 1.0) -> void:
 	if _points.is_empty() or delta <= 0.0:
 		return
+	var previous_depth: float = _points.back().y
 	_elapsed += delta
 	var retention := exp(-4.0 * delta)
 	var time_ratio := delta / maxf(_last_delta, 0.00001)
@@ -130,10 +176,19 @@ func step(delta: float, anchor: Vector2, current: float, fight: float = 0.0, hoo
 		if index == SEGMENTS:
 			acceleration.y += 0.45
 			if hooked:
-				acceleration += Vector2(fight * WATER_ASPECT * 7.0, 0.8 * fight_strength)
+				acceleration += Vector2(fight * WATER_ASPECT * GameTuning.FISHING_FISH_LATERAL_FORCE, 0.8 * fight_strength)
 		_points[index] = point + velocity + acceleration * delta * delta
 	_last_delta = delta
-	_constrain(_to_space(anchor))
+	var start := _to_space(anchor)
+	_constrain(start)
+	if hooked and _points.back().y < previous_depth:
+		# A taut rope can block a downward pull; it must not lift the fish instead.
+		var endpoint: Vector2 = _points.back()
+		endpoint.y = minf(previous_depth, minf(MAX_HOOK_DEPTH, start.y + length))
+		var vertical := endpoint.y - start.y
+		var horizontal_room := sqrt(maxf(0.0, length * length - vertical * vertical))
+		endpoint.x = clampf(endpoint.x, maxf(MIN_X * WATER_ASPECT, start.x - horizontal_room), minf(MAX_X * WATER_ASPECT, start.x + horizontal_room))
+		_shape_between(start, endpoint)
 
 
 func normalized_points() -> Array[Vector2]:
@@ -153,7 +208,7 @@ func _constrain(anchor: Vector2) -> void:
 		for index in range(1, _points.size()):
 			var span := _points[index] - _points[index - 1]
 			var distance := span.length()
-			if distance > 0.000001:
+			if distance > rest:
 				var correction := span * (distance - rest) / distance
 				if index == 1:
 					_points[index] -= correction
@@ -173,9 +228,23 @@ func _constrain(anchor: Vector2) -> void:
 
 func _bound_point(index: int) -> void:
 	var point := _points[index]
-	point.x = clampf(point.x, MIN_X * WATER_ASPECT, MAX_X * WATER_ASPECT)
-	point.y = clampf(point.y, MIN_HOOK_DEPTH if index == SEGMENTS else ANCHOR_DEPTH, MAX_HOOK_DEPTH)
-	_points[index] = point
+	var bounded := _bounded_position(point, index == SEGMENTS)
+	var previous := _previous[index]
+	# Remove outward momentum only; tangential motion can slide off a corner.
+	if bounded.x != point.x or (bounded.x <= MIN_X * WATER_ASPECT and previous.x > bounded.x) or (bounded.x >= MAX_X * WATER_ASPECT and previous.x < bounded.x):
+		previous.x = bounded.x
+	var minimum_y := MIN_HOOK_DEPTH if index == SEGMENTS else ANCHOR_DEPTH
+	if bounded.y != point.y or (bounded.y <= minimum_y and previous.y > bounded.y) or (bounded.y >= MAX_HOOK_DEPTH and previous.y < bounded.y):
+		previous.y = bounded.y
+	_points[index] = bounded
+	_previous[index] = previous
+
+
+func _bounded_position(point: Vector2, endpoint: bool) -> Vector2:
+	return Vector2(
+		clampf(point.x, MIN_X * WATER_ASPECT, MAX_X * WATER_ASPECT),
+		clampf(point.y, MIN_HOOK_DEPTH if endpoint else ANCHOR_DEPTH, MAX_HOOK_DEPTH),
+	)
 
 
 func _to_space(point: Vector2) -> Vector2:

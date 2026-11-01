@@ -4,7 +4,7 @@ extends Control
 signal advanced
 signal dismissed
 
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const BACKGROUND := Color(0.055, 0.043, 0.030, 0.98)
 const CREAM := Color("faefd5")
 const MUTED := Color("b8ab92")
@@ -37,7 +37,7 @@ func set_line(speaker: String, text: String, options: Dictionary = {}) -> void:
 	speaker_label.visible = not speaker.is_empty()
 	body_label.text = text
 	body_label.visible_characters = -1
-	body_label.add_theme_font_size_override("font_size", int(_number(options.get("font_size", 12), 12, 10, 18)))
+	body_label.add_theme_font_size_override("font_size", int(_number(options.get("font_size", 20), 20, 16, 24)))
 	hint_label.text = str(options.get("hint", "Click to continue"))
 	hint_label.visible = not hint_label.text.is_empty()
 	close_button.visible = bool(options.get("closable", true))
@@ -61,8 +61,8 @@ func layout_near(target_rect: Rect2, safe_rect: Rect2, preferred_side := "auto")
 	var measured := FONT.get_multiline_string_size(body_label.text, HORIZONTAL_ALIGNMENT_LEFT, text_width, font_size)
 	var line_count := maxi(1, ceili(measured.y / FONT.get_height(font_size)))
 	var body_height := measured.y + maxf(0, line_count - 1) * body_label.get_theme_constant("line_spacing")
-	var header_height := 28.0 if _header.visible else 0.0
-	var hint_height := 10.0 if hint_label.visible else 0.0
+	var header_height := _header.get_combined_minimum_size().y if _header.visible else 0.0
+	var hint_height := hint_label.get_combined_minimum_size().y if hint_label.visible else 0.0
 	var fixed_height := PADDING * 2 + header_height + hint_height
 	if _header.visible:
 		fixed_height += 8
@@ -122,7 +122,7 @@ func _build() -> void:
 	_header.alignment = BoxContainer.ALIGNMENT_END
 	_header.add_theme_constant_override("separation", 12)
 	_content.add_child(_header)
-	speaker_label = _label(11, GOLD)
+	speaker_label = _label(18, GOLD)
 	speaker_label.name = "SpeechSpeaker"
 	speaker_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	speaker_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -136,7 +136,7 @@ func _build() -> void:
 	close_button.focus_mode = Control.FOCUS_NONE
 	close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	close_button.add_theme_font_override("font", FONT)
-	close_button.add_theme_font_size_override("font_size", 10)
+	close_button.add_theme_font_size_override("font_size", 18)
 	close_button.add_theme_color_override("font_color", MUTED)
 	close_button.add_theme_color_override("font_hover_color", CREAM)
 	close_button.add_theme_color_override("font_pressed_color", GOLD)
@@ -152,14 +152,14 @@ func _build() -> void:
 	_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 	_scroll.gui_input.connect(_on_panel_input)
 	_content.add_child(_scroll)
-	body_label = _label(12, CREAM)
+	body_label = _label(20, CREAM)
 	body_label.name = "SpeechText"
 	body_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body_label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
 	body_label.add_theme_constant_override("line_spacing", 6)
 	_scroll.add_child(body_label)
-	hint_label = _label(9, MUTED)
+	hint_label = _label(16, MUTED)
 	hint_label.name = "SpeechHint"
 	hint_label.text = "Click to continue"
 	_content.add_child(hint_label)

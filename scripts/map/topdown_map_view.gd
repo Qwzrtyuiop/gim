@@ -8,7 +8,7 @@ const InputHighlightMode := preload("res://scripts/ui/input_highlight_mode.gd")
 const DashboardTheme := preload("res://scripts/ui/dashboard_theme.gd")
 const HubWeatherEffects := preload("res://scripts/ui/hub_weather_effects.gd")
 const GameTuning := preload("res://scripts/config/game_tuning.gd")
-const FONT := preload("res://assets/fonts/PressStart2P-Regular.ttf")
+const FONT := preload("res://assets/fonts/game_font.tres")
 const ENERGY_ICON := preload("res://assets/ui/icons/energy_lightning.svg")
 const STRESS_ICON := preload("res://assets/ui/icons/stress_brain.png")
 
@@ -36,6 +36,10 @@ var stress_cursor_label: Label
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var map_theme := Theme.new()
+	map_theme.set_font("font", "TooltipLabel", FONT)
+	map_theme.set_font_size("font_size", "TooltipLabel", 22)
+	theme = map_theme
 	weather_effects = HubWeatherEffects.new()
 	weather_effects.configure(null)
 	add_child(weather_effects)
@@ -58,7 +62,7 @@ func _ready() -> void:
 		add_child(button)
 		UIAudioManager.attach_button(button)
 		buttons[location_id] = button
-	info_panel = _text_panel("", 11)
+	info_panel = _text_panel("", 22)
 	info_label = info_panel.get_child(0) as Label
 	add_child(info_panel)
 	back_button = Button.new()
@@ -122,10 +126,10 @@ func _build_energy_cursor() -> void:
 	energy_cursor_label = Label.new()
 	energy_cursor_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	energy_cursor_label.add_theme_font_override("font", FONT)
-	energy_cursor_label.add_theme_font_size_override("font_size", 14)
+	energy_cursor_label.add_theme_font_size_override("font_size", 18)
 	energy_cursor_label.add_theme_color_override("font_color", Color("ffe28a"))
 	energy_cursor_label.add_theme_color_override("font_outline_color", Color("201409"))
-	energy_cursor_label.add_theme_constant_override("outline_size", 3)
+	energy_cursor_label.add_theme_constant_override("outline_size", 1)
 	energy_cursor.add_child(energy_cursor_label)
 	energy_cursor_icon = TextureRect.new()
 	energy_cursor_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -244,7 +248,8 @@ func _layout() -> void:
 		buttons[location_id].position = region.position
 		buttons[location_id].size = region.size
 	if info_panel != null:
-		var panel_height := 76.0 if _visit_stress_relief(active_location()) > 0 else 54.0
+		var line_height := info_label.get_theme_font("font").get_height(info_label.get_theme_font_size("font_size"))
+		var panel_height := maxf(54.0, ceilf(line_height) * (info_label.text.count("\n") + 1) + 20.0)
 		info_panel.size = Vector2(minf(600, maxf(180, size.x - 40)), panel_height)
 		info_panel.position = Vector2((size.x - info_panel.size.x) * 0.5, size.y - panel_height - 22)
 		if size.x < 1000:

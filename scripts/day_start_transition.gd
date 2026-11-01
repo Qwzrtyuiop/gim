@@ -22,7 +22,7 @@ var debt_reveal_player: AudioStreamPlayer
 func _ready() -> void:
 	PlayerState.set_resume_scene("res://scenes/day_start_transition.tscn")
 	day_label.text = "DAY %d" % PlayerState.get_current_day()
-	debt_label.text = "PhP %d remaining debt" % PlayerState.get_total_debt_goal()
+	debt_label.text = "Next payment: PhP %d" % PlayerState.get_current_weekly_goal()
 	var days_left := PlayerState.get_days_until_debt_collection()
 	collector_label.text = "Collection in %d %s" % [days_left, "Day" if days_left == 1 else "Days"]
 	debt_reveal_player = AudioStreamPlayer.new()
