@@ -5,6 +5,7 @@ const SLEEP_SCENE := "res://scenes/sleep_transition.tscn"
 const HOME_SCENE := "res://scenes/day_start_scene.tscn"
 const GAME_OVER_SCENE := "res://scenes/game_over.tscn"
 const ButtonGlow := preload("res://scripts/ui/button_glow.gd")
+const PlayerVehiclePaint := preload("res://scripts/game/player_vehicle_paint.gd")
 const REPAIR_AUDIO_PATH := "res://assets/audio/ambience/repair.mp3"
 const DOT_INTERVAL_SECONDS := 0.5
 
@@ -29,6 +30,7 @@ func _ready() -> void:
 		get_tree().change_scene_to_file(SLEEP_SCENE)
 		return
 	PlayerState.set_resume_scene(REPAIR_SCENE)
+	PlayerVehiclePaint.apply($Center/Panel/Content/Tricycle)
 	var days := int(repair["days"])
 	var restored_hull := clampi(int(repair.get("hull_restore", PlayerState.max_hull)), 1, PlayerState.max_hull)
 	var free_patch := bool(repair.get("free_repair", false))

@@ -6,6 +6,7 @@ const ArcadePowerups := preload("res://scripts/game/arcade_powerups.gd")
 const BusyTrafficBehavior := preload("res://scripts/game/busy_traffic_behavior.gd")
 const GameInput := preload("res://scripts/game/game_input.gd")
 const PlayerVehicleBehavior := preload("res://scripts/game/player_vehicle_behavior.gd")
+const PlayerVehiclePaint := preload("res://scripts/game/player_vehicle_paint.gd")
 const PlayerPassing := preload("res://scripts/game/player_passing_controller.gd")
 const VehicleGeometry := preload("res://scripts/game/vehicle_geometry.gd")
 const VehicleVisuals := preload("res://scripts/game/vehicle_visuals.gd")
@@ -45,6 +46,7 @@ static func create_player(owner) -> void:
 	owner.player.texture = owner.PLAYER_TEXTURE
 	owner.player.centered = true
 	VehicleWheelAnimation.attach(owner.player, "player_tricycle")
+	PlayerVehiclePaint.apply(owner.player)
 	owner.player.z_index = VehicleGeometry.z_for_lane(owner, owner.player_lane, 1)
 	owner.add_child(owner.player)
 	VehicleVisuals.apply_headlight(owner, owner.player, owner.PLAYER_HITBOX_INSET)

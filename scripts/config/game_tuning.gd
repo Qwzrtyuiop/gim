@@ -271,6 +271,46 @@ const WHEEL_ROTATION_SPEED_X := 1.0
 const WHEEL_MAX_REVOLUTIONS_PER_SECOND := 2.25
 const WHEEL_TIRE_HIGHLIGHT_STRENGTH := 0.16
 
+# Player paint: yellow mask = main body; red mask = highlight/trim.
+# Alpha controls repaint strength: 0 keeps the original art, 1 fully recolors.
+# For example, Color("3276b8") makes the main body blue.
+const PLAYER_MAIN_PAINT_COLOR := Color("f3b91a00")
+const PLAYER_HIGHLIGHT_PAINT_COLOR := Color("a2272a00")
+
+# Prepared paint pairs for previews and future customization; defaults stay above.
+const PLAYER_PAINT_PRESETS := {
+	"ocean_blue": {
+		"name": "Ocean Blue",
+		"main": Color("3e78a3"),
+		"highlight": Color("d3bd8a"),
+	},
+	"forest_green": {
+		"name": "Forest Green",
+		"main": Color("4b7754"),
+		"highlight": Color("b58b42"),
+	},
+	"burgundy": {
+		"name": "Burgundy",
+		"main": Color("87404b"),
+		"highlight": Color("d5c7a7"),
+	},
+	"coastal_teal": {
+		"name": "Coastal Teal",
+		"main": Color("367f7b"),
+		"highlight": Color("c17a65"),
+	},
+	"dusky_violet": {
+		"name": "Dusky Violet",
+		"main": Color("785c90"),
+		"highlight": Color("bba3c8"),
+	},
+	"charcoal_brass": {
+		"name": "Charcoal & Brass",
+		"main": Color("50575c"),
+		"highlight": Color("b58b42"),
+	},
+}
+
 # Main-menu traffic. Speeds are pixels/second; gaps and wrap offsets are pixels.
 # Lane 0 travels left, lane 1 travels right. x_ratio is the initial screen position.
 # Scale is multiplied by INCOMING_LANE_SCALE / MAIN_LANE_SCALE above.

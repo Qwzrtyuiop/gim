@@ -1,0 +1,38 @@
+[
+	{
+		"highlight": "d3bd8a",
+		"id": "ocean_blue",
+		"main": "3e78a3",
+		"name": "Ocean Blue"
+	},
+	{
+		"highlight": "b58b42",
+		"id": "forest_green",
+		"main": "4b7754",
+		"name": "Forest Green"
+	},
+	{
+		"highlight": "d5c7a7",
+		"id": "burgundy",
+		"main": "87404b",
+		"name": "Burgundy"
+	},
+	{
+		"highlight": "c17a65",
+		"id": "coastal_teal",
+		"main": "367f7b",
+		"name": "Coastal Teal"
+	},
+	{
+		"highlight": "bba3c8",
+		"id": "dusky_violet",
+		"main": "785c90",
+		"name": "Dusky Violet"
+	},
+	{
+		"highlight": "b58b42",
+		"id": "charcoal_brass",
+		"main": "50575c",
+		"name": "Charcoal & Brass"
+	}
+]
